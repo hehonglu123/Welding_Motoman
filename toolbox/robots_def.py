@@ -5,6 +5,7 @@ from general_robotics_toolbox import robotraconteur as rr_rox
 import numpy as np
 import yaml, copy, time
 import pickle
+from utils import *
 
 def Rx(theta):
 	return np.array([[1,0,0],[0,np.cos(theta),-np.sin(theta)],[0,np.sin(theta),np.cos(theta)]])
@@ -373,23 +374,21 @@ def jdot(q,qdot):
 
 def main():
 	###robot object class
-	robot=robot_obj('MA_1440_A0',def_path='../config/MA_1440_A0_robot_default_config.yml')#,tool_file_path='../config/weldgun.csv')
+	robot_name='MA_2010_A0'
+	robot=robot_obj(robot_name,def_path='../config/'+robot_name+'_robot_default_config.yml')#,tool_file_path='../config/weldgun.csv')
 	
-	pulse2deg=np.array([1341.4, 1341.4, 1341.4, 1000, 1000, 622])
-	q_pulse=np.array([-1,-879,-10902,-3,4554,150])
+	pulse2deg_1440=np.array([1.435355447016790322e+03,1.300329111270902331e+03,1.422225409601069941e+03,9.699560942607320158e+02,9.802408285708806943e+02,4.547552630640436178e+02])
+	pulse2deg_2010=np.array([1.341416193724337745e+03,1.907685083229250267e+03,1.592916090846681982e+03,1.022871664227330484e+03,9.802549195016306385e+02,4.547554799861444508e+02])
+	pulse2deg=pulse2deg_2010
+	q_pulse=np.array([1149,205,169,15106,-4663,-7755])
 	q=np.radians(q_pulse/pulse2deg)
-
+	print(q)
 	# q=np.radians([-70.11,41.39,44.30,27.01,28.79,0])
 	pose=robot.fwd(q)
 	print(pose)
-	print(robot.inv(pose.p,pose.R,q))
-	# last_joints=[-0.84190536,  0.61401203,  0.2305977,  -2.70622154, -0.74584949, -2.21577141]
-	# pose=robot.fwd(last_joints)
-	# print('correct: ',robot.inv(pose.p,pose.R,last_joints))
-	# theta_v=robot.inv(pose.p,pose.R)
-	# print('inv solutions: ',theta_v)
-	# print('equivalent_configurations: ',equivalent_configurations(robot.robot_def, theta_v, last_joints))
+	print(np.degrees(rotationMatrixToEulerAngles(pose.R)))
 
+	print(robot.inv(pose.p,pose.R,q))
 
 if __name__ == '__main__':
 	main()
