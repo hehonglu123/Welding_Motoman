@@ -375,8 +375,11 @@ def main():
 	###robot object class
 	robot=robot_obj('MA_1440_A0',def_path='../config/MA_1440_A0_robot_default_config.yml')#,tool_file_path='../config/weldgun.csv')
 	
-	# print(robot.fwd(np.zeros(6)))
-	q=np.radians([-70.11,41.39,44.30,27.01,28.79,0])
+	pulse2deg=np.array([1341.4, 1341.4, 1341.4, 1000, 1000, 622])
+	q_pulse=np.array([-1,-879,-10902,-3,4554,150])
+	q=np.radians(q_pulse/pulse2deg)
+
+	# q=np.radians([-70.11,41.39,44.30,27.01,28.79,0])
 	pose=robot.fwd(q)
 	print(pose)
 	print(robot.inv(pose.p,pose.R,q))
