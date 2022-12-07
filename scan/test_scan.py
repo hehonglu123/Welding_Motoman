@@ -11,7 +11,7 @@ cos60=.5
 robot=robot_obj('MA_1440_A0',def_path='../config/MA_1440_A0_robot_default_config.yml',tool_file_path='../config/scanner_tcp.csv',\
 	pulse2deg_file_path='../config/MA_1440_A0_pulse2deg.csv')
 
-center=np.array([1000,0,0])
+center=np.array([1000,0,-200])
 radius=300
 p1=np.array([center[0]-radius*cos60,center[1],center[2]+radius*sin60])
 p2=np.array([center[0],center[1],center[2]+radius])

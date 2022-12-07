@@ -1,0 +1,3 @@
+center height: 468.75 mm
+length: 500 mm
+tilt angle: 14.52053529218 deg
