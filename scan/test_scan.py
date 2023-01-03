@@ -36,17 +36,17 @@ client=MotionProgramExecClient(ROBOT_CHOICE='RB2',pulse2deg=robot.pulse2deg)
 ###TODO: fix tool definition
 # client.robodk_rob.DONT_USE_SETTOOL=False
 # client.robodk_rob.setTool(Pose([0,0,450,0,0,0]), None, 'welder')
-client.robodk_rob.ACTIVE_TOOL=1
+client.ACTIVE_TOOL=1
 
-client.robodk_rob.ProgStart(r"""AAA""")
-client.robodk_rob.setFrame(Pose([0,0,0,0,0,0]),-1,r"""Motoman MA1440 Base""")
-# client.robodk_rob.MoveJ(Pose([0,0,0,0,0,0]),np.degrees(q1),5,0)
-client.robodk_rob.MoveJ(Pose([0,0,0,0,0,0]),np.degrees(q2),5,0)
-client.robodk_rob.MoveJ(Pose([0,0,0,0,0,0]),np.degrees(q3),5,0)
-client.robodk_rob.MoveJ(Pose([0,0,0,0,0,0]),np.degrees(q2),5,0)
-client.robodk_rob.MoveJ(Pose([0,0,0,0,0,0]),np.degrees(q3),5,0)
-client.robodk_rob.ProgFinish(r"""AAA""")
-client.robodk_rob.ProgSave(".","AAA",False)
+client.ProgStart(r"""AAA""")
+client.setFrame(Pose([0,0,0,0,0,0]),-1,r"""Motoman MA1440 Base""")
+# client.MoveJ(Pose([0,0,0,0,0,0]),np.degrees(q1),5,0)
+client.MoveJ(Pose([0,0,0,0,0,0]),np.degrees(q2),5,0)
+client.MoveJ(Pose([0,0,0,0,0,0]),np.degrees(q3),5,0)
+client.MoveJ(Pose([0,0,0,0,0,0]),np.degrees(q2),5,0)
+client.MoveJ(Pose([0,0,0,0,0,0]),np.degrees(q3),5,0)
+client.ProgFinish(r"""AAA""")
+client.ProgSave(".","AAA",False)
 
-client.execute_motion_program("AAA.JBI")
-client.mh.disconnectMH()
+# client.execute_motion_program("AAA.JBI")
+# client.disconnectMH()
