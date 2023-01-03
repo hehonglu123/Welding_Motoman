@@ -14,8 +14,12 @@ ms=MotionSend()
 primitives_all=[]
 p_bp_all=[]
 q_bp_all=[]
-# for file in glob.glob(data_dir+solution_dir+'1L/*.csv'):
-# 	breakpoints,primitives, p_bp,q_bp=ms.extract_data_from_cmd(file)
+
+cmd_dir=data_dir+solution_dir+'1L/'
+
+# num_command=len(fnmatch.filter(cmd_dir, '*.csv'))
+# for i in range(num_command):
+# 	breakpoints,primitives, p_bp,q_bp=ms.extract_data_from_cmd(cmd_dir+'command'+str(i)+'.csv')
 # 	ms.exec_motions(robot,primitives,breakpoints,p_bp,q_bp,[1,20],0)
 
-ms.exec_motion_from_dir(robot,data_dir+solution_dir+'1L/')
+ms.exec_motion_from_dir(robot,cmd_dir)

@@ -1,6 +1,6 @@
 import numpy as np
 from general_robotics_toolbox import *
-import sys, glob
+import sys, glob, fnmatch
 from robot_def import *
 from pandas import read_csv
 from dx200_motion_program_exec_client import *
@@ -52,8 +52,9 @@ class MotionSend(object):
 		client.ProgStart(r"""AAA""")
 		client.setFrame(Pose([0,0,0,0,0,0]),-1,r"""Motoman MA2010 Base""")
 
-		for file in glob.glob(directory+'*.csv'):
-			breakpoints,primitives, p_bp,q_bp=self.extract_data_from_cmd(file)
+		num_command=len(fnmatch.filter(os.listdir(directory), '*.csv'))
+		for i in range(num_command):
+			breakpoints,primitives, p_bp,q_bp=self.extract_data_from_cmd(directory+'command'+str(i)+'.csv')
 			client=self.form_motion_cmd(client,primitives,q_bp,p_bp,[1,20],0)
 
 		client.ProgFinish(r"""AAA""")
