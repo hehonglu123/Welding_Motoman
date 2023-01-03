@@ -252,6 +252,7 @@ def main3():
 	pulse2deg_file_path='../config/MA_2010_A0_pulse2deg.csv')
 
 	pose=robot.fwd(np.radians([-35.4291,56.6333,40.5194,4.5177,-52.2505,-11.6546]))
+	print(pose)
 	pose=robot.fwd(np.radians([-36.8918,61.1844,48.1628,3.6876,-55.2334,-9.6293]))
 	print(pose)
 

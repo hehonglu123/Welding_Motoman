@@ -1,15 +1,19 @@
 import numpy as np
 from general_robotics_toolbox import *
-import sys
-from robots_def import *
-from error_check import *
-from toolbox_circular_fit import *
-from lambda_calc import *
+import sys, glob
+from robot_def import *
+from pandas import read_csv
+from dx200_motion_program_exec_client import *
+
+# from error_check import *
+# from toolbox_circular_fit import *
+# from lambda_calc import *
 
 class MotionSend(object):
-	def __init__(self,ip='192.168.55.1') -> None:
-		self.ip=ip
+	def __init__(self,IP='192.168.1.31') -> None:
+		self.IP=IP
 		self.ROBOT_CHOICE_MAP={'MA_2010_A0':'RB1','MA_1440_A0':'RB2','D500B':'S1'}
+
 
 	def extract_data_from_cmd(self,filename):
 		data = read_csv(filename)
@@ -42,33 +46,66 @@ class MotionSend(object):
 
 		return breakpoints,primitives, p_bp,q_bp
 
-	def exe_from_file(self,robot,filename,speed,zone):
-		breakpoints,primitives, p_bp,q_bp=self.extract_data_from_cmd(filename)
-		return self.exec_motions(robot,primitives,breakpoints,p_bp,q_bp,speed,zone)
+	def exec_motion_from_dir(self,robot,directory):
+		client = MotionProgramExecClient(IP=self.IP,ROBOT_CHOICE=self.ROBOT_CHOICE_MAP[robot.robot_name],pulse2deg=robot.pulse2deg)
+		client.ACTIVE_TOOL=1
+		client.ProgStart(r"""AAA""")
+		client.setFrame(Pose([0,0,0,0,0,0]),-1,r"""Motoman MA2010 Base""")
 
-	def exec_motions(self,robot,primitives,breakpoints,p_bp,q_bp,speed,zone):
-		self.client = MotionProgramExecClient(ip=self.ip,ROBOT_CHOICE=self.ROBOT_CHOICE_MAP[robot.robot_name],pulse2deg=robot.pulse2deg)
+		for file in glob.glob(directory+'*.csv'):
+			breakpoints,primitives, p_bp,q_bp=self.extract_data_from_cmd(file)
+			client=self.form_motion_cmd(client,primitives,q_bp,p_bp,[1,20],0)
 
-		self.client.robodk_rob.ACTIVE_TOOL=1
-	    self.client.robodk_rob.ProgStart(r"""AAA""")
-	    self.client.robodk_rob.setFrame(Pose([0,0,0,0,0,0]),-1,r"""Motoman MA2010 Base""")
+		client.ProgFinish(r"""AAA""")
+		client.ProgSave(".","AAA",False)
 
+		client.execute_motion_program("AAA.JBI")
+
+	def form_motion_cmd(self,client,primitives,q_bp,p_bp,speed,zone):
 		for i in range(len(primitives)):
 			if 'movel' in primitives[i]:
 				###TODO: fix pose
-				self.client.robodk_rob.MoveL(Pose(p_bp[i][0]+),q_bp[i][0],speed,zone)
-				
+				if type(speed) is list:
+					if type(zone) is list:
+						client.MoveL(None,np.degrees(q_bp[i][0]),speed[i],zone[i])
+					else:
+						client.MoveL(None,np.degrees(q_bp[i][0]),speed[i],zone)
+				else:
+					if type(zone) is list:
+						client.MoveL(None,np.degrees(q_bp[i][0]),speed,zone[i])
+					else:
+						client.MoveL(None,np.degrees(q_bp[i][0]),speed,zone)
 
-			elif 'movec' in primitives[i]:
-				self.client.robodk_rob.MoveC(Pose(p_bp[i][0]+),q_bp[i][0],speed,zone)
-				self.client.robodk_rob.MoveC(Pose(p_bp[i][1]+),q_bp[i][1],speed,zone)
+			elif 'movec' in primitives[i]:		###moveC needs testing
+				client.MoveC(None,np.degrees(q_bp[i][0]),speed,zone)
+				client.MoveC(None,np.degrees(q_bp[i][1]),speed,zone)
 
 			elif 'movej' in primitives[i]:
-				self.client.robodk_rob.MoveJ(Pose(p_bp[i][0]+),q_bp[i][0],speed,zone)
+				if type(speed) is list:
+					if type(zone) is list:
+						client.MoveJ(None,np.degrees(q_bp[i][0]),speed[i],zone[i])
+					else:
+						client.MoveJ(None,np.degrees(q_bp[i][0]),speed[i],zone)
+				else:
+					if type(zone) is list:
+						client.MoveJ(None,np.degrees(q_bp[i][0]),speed,zone[i])
+					else:
+						client.MoveJ(None,np.degrees(q_bp[i][0]),speed,zone)
 
-		self.client.robodk_rob.ProgFinish(r"""AAA""")
-	    self.client.robodk_rob.ProgSave(".","AAA",False)
+		return client
 
-	    self.client.execute_motion_program("AAA.JBI")
-	    
+	def exec_motions(self,robot,primitives,breakpoints,p_bp,q_bp,speed,zone):
+		client = MotionProgramExecClient(IP=self.IP,ROBOT_CHOICE=self.ROBOT_CHOICE_MAP[robot.robot_name],pulse2deg=robot.pulse2deg)
+		client.ACTIVE_TOOL=1
+		client.ProgStart(r"""AAA""")
+		client.setFrame(Pose([0,0,0,0,0,0]),-1,r"""Motoman MA2010 Base""")
+		client=self.form_motion_cmd(client,primitives,q_bp,p_bp,speed,zone)
+
+
+		client.ProgFinish(r"""AAA""")
+		client.ProgSave(".","AAA",False)
+
+		client.execute_motion_program("AAA.JBI")
+		
+
 		return
