@@ -3,11 +3,11 @@ import matplotlib.pyplot as plt
 from matplotlib import cm
 
 
-wall_width=10
+wall_width=100
 layer_height=1
 num_layers=50
 
-points_distance=0.1
+points_distance=0.5
 
 points_per_layer=int(wall_width/points_distance)
 curve_dense=np.zeros((num_layers*points_per_layer,6))

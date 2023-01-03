@@ -48,7 +48,7 @@ class robot_obj(object):
 			self.base_H=np.eye(4)
 
 		if len(pulse2deg_file_path)>0:
-			self.pulse2deg=np.loadtxt(pulse2deg_file_path,delimiter=',')
+			self.pulse2deg=np.abs(np.loadtxt(pulse2deg_file_path,delimiter=',')) #negate joint 2, 4, 6
 
 
 		###set attributes
@@ -246,5 +246,14 @@ def main2():
 	pose=robot.fwd(np.ones(6))
 	print(pose)
 	print(robot.inv(pose.p,pose.R))
+
+def main3():
+	robot=robot_obj('MA_2010_A0',def_path='../config/MA_2010_A0_robot_default_config.yml',tool_file_path='../config/weldgun.csv',\
+	pulse2deg_file_path='../config/MA_2010_A0_pulse2deg.csv')
+
+	pose=robot.fwd(np.radians([-35.4291,56.6333,40.5194,4.5177,-52.2505,-11.6546]))
+	pose=robot.fwd(np.radians([-36.8918,61.1844,48.1628,3.6876,-55.2334,-9.6293]))
+	print(pose)
+
 if __name__ == '__main__':
-	main1()
+	main3()
