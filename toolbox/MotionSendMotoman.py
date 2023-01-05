@@ -46,7 +46,7 @@ class MotionSend(object):
 
 		return breakpoints,primitives, p_bp,q_bp
 
-	def exec_motion_from_dir(self,robot,directory):
+	def exec_motion_from_dir(self,robot,directory,arc=False):
 		client = MotionProgramExecClient(IP=self.IP,ROBOT_CHOICE=self.ROBOT_CHOICE_MAP[robot.robot_name],pulse2deg=robot.pulse2deg)
 		client.ACTIVE_TOOL=1
 		client.ProgStart(r"""AAA""")
@@ -55,14 +55,14 @@ class MotionSend(object):
 		num_command=len(fnmatch.filter(os.listdir(directory), '*.csv'))
 		for i in range(num_command):
 			breakpoints,primitives, p_bp,q_bp=self.extract_data_from_cmd(directory+'command'+str(i)+'.csv')
-			client=self.form_motion_cmd(client,primitives,q_bp,p_bp,[1,20],0)
+			client=self.form_motion_cmd(client,primitives,q_bp,p_bp,[1,20],0,arc)
 
 		client.ProgFinish(r"""AAA""")
 		client.ProgSave(".","AAA",False)
 
 		client.execute_motion_program("AAA.JBI")
 
-	def form_motion_cmd(self,client,primitives,q_bp,p_bp,speed,zone):
+	def form_motion_cmd(self,client,primitives,q_bp,p_bp,speed,zone,arc=False):
 		for i in range(len(primitives)):
 			if 'movel' in primitives[i]:
 				###TODO: fix pose
@@ -92,6 +92,10 @@ class MotionSend(object):
 						client.MoveJ(None,np.degrees(q_bp[i][0]),speed,zone[i])
 					else:
 						client.MoveJ(None,np.degrees(q_bp[i][0]),speed,zone)
+				if arc==True and i==0:
+					client.SetArc(True)
+		if arc:
+			client.SetArc(False)
 
 		return client
 
