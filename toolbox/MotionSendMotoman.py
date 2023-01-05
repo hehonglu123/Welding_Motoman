@@ -52,7 +52,8 @@ class MotionSend(object):
 		client.ProgStart(r"""AAA""")
 		client.setFrame(Pose([0,0,0,0,0,0]),-1,r"""Motoman MA2010 Base""")
 
-		num_command=len(fnmatch.filter(os.listdir(directory), '*.csv'))
+		# num_command=len(fnmatch.filter(os.listdir(directory), '*.csv'))
+		num_command=10
 		for i in range(num_command):
 			breakpoints,primitives, p_bp,q_bp=self.extract_data_from_cmd(directory+'command'+str(i)+'.csv')
 			client=self.form_motion_cmd(client,primitives,q_bp,p_bp,[1,20],0,arc)

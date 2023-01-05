@@ -15,16 +15,14 @@ end_q=np.array([-36.8918,61.1844,48.1628,3.6876,-55.2334,-9.6293])
 
 client=MotionProgramExecClient(IP='192.168.1.31',ROBOT_CHOICE='RB1',pulse2deg=robot.pulse2deg)
 
-###TODO: fix tool definition
-# client.DONT_USE_SETTOOL=False
-# client.setTool(Pose([0,0,450,0,0,0]), None, 'welder')
+
 client.ACTIVE_TOOL=1
 
 client.ProgStart(r"""AAA""")
 client.setFrame(Pose([0,0,0,0,0,0]),-1,r"""Motoman MA2010 Base""")
 client.MoveJ(Pose([0,0,0,0,0,0]),start_q,1,0)
-client.SetArc(True)
-client.MoveL(Pose([0,0,0,0,0,0]),end_q,10,0)
+client.SetArc(True,AC=110,AVP=100,T=0.,V=250)
+client.MoveL(Pose([0,0,0,0,0,0]),end_q,20,0)
 client.SetArc(False)
 client.ProgFinish(r"""AAA""")
 client.ProgSave(".","AAA",False)
