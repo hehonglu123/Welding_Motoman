@@ -100,7 +100,7 @@ class MotionSend(object):
 
 		return client
 
-	def exec_motions(self,robot,primitives,breakpoints,p_bp,q_bp,speed,zone):
+	def exec_motions(self,robot,primitives,p_bp,q_bp,speed,zone):
 		client = MotionProgramExecClient(IP=self.IP,ROBOT_CHOICE=self.ROBOT_CHOICE_MAP[robot.robot_name],pulse2deg=robot.pulse2deg)
 		client.ACTIVE_TOOL=1
 		client.ProgStart(r"""AAA""")
