@@ -18,8 +18,9 @@ q_bp_all=[]
 cmd_dir=data_dir+solution_dir+'1L/'
 
 # num_command=len(fnmatch.filter(cmd_dir, '*.csv'))
+# num_command=10
 # for i in range(num_command):
 # 	breakpoints,primitives, p_bp,q_bp=ms.extract_data_from_cmd(cmd_dir+'command'+str(i)+'.csv')
 # 	ms.exec_motions(robot,primitives,breakpoints,p_bp,q_bp,[1,20],0)
 
-ms.exec_motion_from_dir(robot,cmd_dir,arc=False)
+ms.exec_motion_from_dir(robot,cmd_dir,arc=True)
