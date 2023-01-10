@@ -2,7 +2,7 @@ import sys, glob
 sys.path.append('../toolbox/')
 from robot_def import *
 
-data_dir='../data/wall/'
+data_dir='../data/cylinder/'
 solution_dir='baseline/'
 robot=robot_obj('MA_2010_A0',def_path='../config/MA_2010_A0_robot_default_config.yml',tool_file_path='../config/weldgun.csv',\
 	pulse2deg_file_path='../config/MA_2010_A0_pulse2deg.csv')

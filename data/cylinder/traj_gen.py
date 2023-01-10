@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 from matplotlib import cm
 
 
-wall_radius=5
+wall_radius=30
 layer_height=1
 num_layers=50
 

@@ -53,14 +53,17 @@ class MotionSend(object):
 		client.setFrame(Pose([0,0,0,0,0,0]),-1,r"""Motoman MA2010 Base""")
 
 		# num_command=len(fnmatch.filter(os.listdir(directory), '*.csv'))
-		num_command=20
+		num_command=50
 		for i in range(num_command):
 			breakpoints,primitives, p_bp,q_bp=self.extract_data_from_cmd(directory+'command'+str(i)+'.csv')
 			if i<3:
-				client=self.form_motion_cmd(client,primitives,q_bp,p_bp,[1,5*(i+1)],0,arc)
+				client=self.form_motion_cmd(client,primitives,q_bp,p_bp,[1,5],0,arc)
 			else:
-				client=self.form_motion_cmd(client,primitives,q_bp,p_bp,[1,70],0,arc)
+				client=self.form_motion_cmd(client,primitives,q_bp,p_bp,[1,50],0.1,arc)
 
+		# num_layers=20
+		# breakpoints,primitives, p_bp,q_bp=self.extract_data_from_cmd(directory+'command0.csv')
+		# client=self.form_motion_cmd(client,primitives[:num_layers],q_bp[:num_layers],p_bp[:num_layers],[1,5,10,15]+[50]*20,1,arc)
 
 		client.ProgFinish(r"""AAA""")
 		client.ProgSave(".","AAA",False)
@@ -83,8 +86,18 @@ class MotionSend(object):
 						client.MoveL(None,np.degrees(q_bp[i][0]),speed,zone)
 
 			elif 'movec' in primitives[i]:		###moveC needs testing
-				client.MoveC(None,np.degrees(q_bp[i][0]),speed,zone)
-				client.MoveC(None,np.degrees(q_bp[i][1]),speed,zone)
+				if type(speed) is list:
+					if type(zone) is list:
+						client.MoveC(np.degrees(q_bp[i-1][-1]),np.degrees(q_bp[i][0]),np.degrees(q_bp[i][1]),speed[i],zone[i])
+					else:
+						client.MoveC(np.degrees(q_bp[i-1][-1]),np.degrees(q_bp[i][0]),np.degrees(q_bp[i][1]),speed[i],zone)
+				else:
+					if type(zone) is list:
+						client.MoveC(np.degrees(q_bp[i-1][-1]),np.degrees(q_bp[i][0]),np.degrees(q_bp[i][1]),speed,zone[i])
+					else:
+						client.MoveC(np.degrees(q_bp[i-1][-1]),np.degrees(q_bp[i][0]),np.degrees(q_bp[i][1]),speed,zone)
+
+				
 
 			elif 'movej' in primitives[i]:
 				if type(speed) is list:

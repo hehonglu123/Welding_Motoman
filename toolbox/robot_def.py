@@ -251,10 +251,9 @@ def main3():
 	robot=robot_obj('MA_2010_A0',def_path='../config/MA_2010_A0_robot_default_config.yml',tool_file_path='../config/weldgun.csv',\
 	pulse2deg_file_path='../config/MA_2010_A0_pulse2deg.csv')
 
-	pose=robot.fwd(np.radians([-35.4291,56.6333,40.5194,4.5177,-52.2505,-11.6546]))
+	pose=robot.fwd(np.radians([-36.3864,55.4046,40.9005,3.4413,-51.2629,-8.9103]))
 	print(pose)
-	pose=robot.fwd(np.radians([-36.8918,61.1844,48.1628,3.6876,-55.2334,-9.6293]))
-	print(pose)
+
 
 if __name__ == '__main__':
 	main3()
