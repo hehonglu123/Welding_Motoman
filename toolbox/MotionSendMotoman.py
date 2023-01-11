@@ -102,14 +102,14 @@ class MotionSend(object):
 			elif 'movej' in primitives[i]:
 				if type(speed) is list:
 					if type(zone) is list:
-						client.MoveJ(None,np.degrees(q_bp[i][0]),speed[i],zone[i])
+						client.MoveJ(np.degrees(q_bp[i][0]),speed[i],zone[i])
 					else:
-						client.MoveJ(None,np.degrees(q_bp[i][0]),speed[i],zone)
+						client.MoveJ(np.degrees(q_bp[i][0]),speed[i],zone)
 				else:
 					if type(zone) is list:
-						client.MoveJ(None,np.degrees(q_bp[i][0]),speed,zone[i])
+						client.MoveJ(np.degrees(q_bp[i][0]),speed,zone[i])
 					else:
-						client.MoveJ(None,np.degrees(q_bp[i][0]),speed,zone)
+						client.MoveJ(np.degrees(q_bp[i][0]),speed,zone)
 				if arc==True and i==0:
 					client.SetArc(True)
 		if arc:
