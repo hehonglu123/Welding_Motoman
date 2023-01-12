@@ -53,17 +53,17 @@ class MotionSend(object):
 		client.setFrame(Pose([0,0,0,0,0,0]),-1,r"""Motoman MA2010 Base""")
 
 		# num_command=len(fnmatch.filter(os.listdir(directory), '*.csv'))
-		# num_command=50
-		# for i in range(num_command):
-		# 	breakpoints,primitives, p_bp,q_bp=self.extract_data_from_cmd(directory+'command'+str(i)+'.csv')
-		# 	if i<3:
-		# 		client=self.form_motion_cmd(client,primitives,q_bp,p_bp,[1,5],0,arc)
-		# 	else:
-		# 		client=self.form_motion_cmd(client,primitives,q_bp,p_bp,[1,50],0.1,arc)
+		num_command=50
+		for i in range(num_command):
+			breakpoints,primitives, p_bp,q_bp=self.extract_data_from_cmd(directory+'command'+str(i)+'.csv')
+			if i<3:
+				client=self.form_motion_cmd(client,primitives,q_bp,p_bp,[1,5],0.1,arc)
+			else:
+				client=self.form_motion_cmd(client,primitives,q_bp,p_bp,[1,50],0.5,arc)
 
-		num_layers=20
-		breakpoints,primitives, p_bp,q_bp=self.extract_data_from_cmd(directory+'command0.csv')
-		client=self.form_motion_cmd(client,primitives[:num_layers],q_bp[:num_layers],p_bp[:num_layers],[1,5,10,15]+[50]*20,1,arc)
+		# num_layers=20
+		# breakpoints,primitives, p_bp,q_bp=self.extract_data_from_cmd(directory+'command0.csv')
+		# client=self.form_motion_cmd(client,primitives[:num_layers],q_bp[:num_layers],p_bp[:num_layers],[1,5,10,15]+[50]*20,1,arc)
 
 		client.ProgFinish(r"""AAA""")
 		client.ProgSave(".","AAA",False)
