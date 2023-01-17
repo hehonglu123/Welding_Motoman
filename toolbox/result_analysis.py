@@ -1,7 +1,7 @@
 import numpy as np
 import copy
 from general_robotics_toolbox import *
-from utils import *
+from utils import moving_average
 ###calculate distance between point to line
 def get_distance(p1,p2,p3):
 	return np.linalg.norm(np.cross(p2-p1, p1-p3))/np.linalg.norm(p2-p1)
@@ -188,7 +188,7 @@ def logged_data_analysis(robot,timestamp,curve_exe_js):
 		except IndexError:
 			pass
 
-	act_speed=moving_average(act_speed,padding=True)
+	# act_speed=moving_average(act_speed,padding=True)
 
 	return lam, np.array(curve_exe), np.array(curve_exe_R), act_speed
 

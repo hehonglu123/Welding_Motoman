@@ -27,19 +27,14 @@ class Tess_Env(object):
 	def __init__(self,urdf_path):
 
 		#link and joint names in urdf
-		ABB_6640_180_255_joint_names=["ABB_6640_180_255_joint_1","ABB_6640_180_255_joint_2","ABB_6640_180_255_joint_3","ABB_6640_180_255_joint_4","ABB_6640_180_255_joint_5","ABB_6640_180_255_joint_6"]
-		ABB_6640_180_255_link_names=["ABB_6640_180_255_link_1","ABB_6640_180_255_link_2","ABB_6640_180_255_link_3","ABB_6640_180_255_link_4","ABB_6640_180_255_link_5","ABB_6640_180_255_link_6","ABB_6640_180_255_tool"]
-		ABB_1200_5_90_joint_names=['ABB_1200_5_90_joint_1','ABB_1200_5_90_joint_2','ABB_1200_5_90_joint_3','ABB_1200_5_90_joint_4','ABB_1200_5_90_joint_5','ABB_1200_5_90_joint_6']
-		ABB_1200_5_90_link_names=['ABB_1200_5_90_link_1','ABB_1200_5_90_link_2','ABB_1200_5_90_link_3','ABB_1200_5_90_link_4','ABB_1200_5_90_link_5','ABB_1200_5_90_link_6']
+		MA2010_link_names=["MA2010_base_link","MA2010_link_1_s","MA2010_link_2_l","MA2010_link_3_u","MA2010_link_4_r","MA2010_link_5_b","MA2010_link_6_t"]
+		MA2010_joint_names=["MA2010_joint_1_s","MA2010_joint_2_l","MA2010_joint_3_u","MA2010_joint_4_r","MA2010_joint_5_b","MA2010_joint_6_t"]
 
-		FANUC_m10ia_joint_names=['FANUC_m10ia_joint_1','FANUC_m10ia_joint_2','FANUC_m10ia_joint_3','FANUC_m10ia_joint_4','FANUC_m10ia_joint_5','FANUC_m10ia_joint_6']
-		FANUC_m10ia_link_names=['FANUC_m10ia_link_1','FANUC_m10ia_link_2','FANUC_m10ia_link_3','FANUC_m10ia_link_4','FANUC_m10ia_link_5','FANUC_m10ia_link_6']
-		FANUC_lrmate200id_joint_names=['FANUC_lrmate200id_joint_1','FANUC_lrmate200id_joint_2','FANUC_lrmate200id_joint_3','FANUC_lrmate200id_joint_4','FANUC_lrmate200id_joint_5','FANUC_lrmate200id_joint_6']
-		FANUC_lrmate200id_link_names=['FANUC_lrmate200id_link_1','FANUC_lrmate200id_link_2','FANUC_lrmate200id_link_3','FANUC_lrmate200id_link_4','FANUC_lrmate200id_link_5','FANUC_lrmate200id_link_6']
-
+		D500B_joint_names=["D500B_joint_1","D500B_joint_2"]
+		D500B_link_names=["D500B_base_link","D500B_link_1","D500B_link_2"]
 		#Robot dictionaries, all reference by name
-		self.robot_linkname={'ABB_6640_180_255':ABB_6640_180_255_link_names,'ABB_1200_5_90':ABB_1200_5_90_link_names,'FANUC_m10ia':FANUC_m10ia_link_names,'FANUC_lrmate200id':FANUC_lrmate200id_link_names}
-		self.robot_jointname={'ABB_6640_180_255':ABB_6640_180_255_joint_names,'ABB_1200_5_90':ABB_1200_5_90_joint_names,'FANUC_m10ia':FANUC_m10ia_joint_names,'FANUC_lrmate200id':FANUC_lrmate200id_joint_names}
+		self.robot_linkname={'MA2010':MA2010_link_names,'D500B':D500B_link_names}
+		self.robot_jointname={'MA2010':MA2010_joint_names,'D500B':D500B_joint_names}
 		
 
 		######tesseract environment setup:
@@ -121,14 +116,6 @@ def main():
 
 	t=Tess_Env('../config/urdf/')				#create obj
 	
-	###place part in place
-	curve_pose=np.loadtxt('data/wood/baseline/curve_pose.csv',delimiter=',')
-	curve_pose[:3,-1]=curve_pose[:3,-1]/1000.
-	# t.update_pose('curve_1',curve_pose)
-	
-	###visualize trajectory
-	curve_js=np.loadtxt('data/wood/baseline/Curve_js.csv',delimiter=',')
-	t.viewer_trajectory('ABB_6640_180_255',curve_js[::100])
 	input("Press enter to quit")
 	#stop background checker
 
@@ -147,7 +134,7 @@ def collision_test():
 	input("Press enter to quit")
 
 if __name__ == '__main__':
-	collision_test()
+	main()
 
 
 

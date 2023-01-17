@@ -2,6 +2,9 @@ import sys
 sys.path.append('../../toolbox/')
 from robot_def import *
 from dx200_motion_program_exec_client import *
+from result_analysis import *
+import matplotlib.pyplot as plt
+
 
 robot=robot_obj('MA_2010_A0',def_path='../../config/MA_2010_A0_robot_default_config.yml',tool_file_path='../../config/weldgun.csv',\
 	pulse2deg_file_path='../../config/MA_2010_A0_pulse2deg.csv')
@@ -39,16 +42,23 @@ client.ProgStart(r"""AAA""")
 client.setFrame(Pose([0,0,0,0,0,0]),-1,r"""Motoman MA2010 Base""")
 
 client.MoveJ(q1,1,0)
-client.MoveL(q2,10,10)
-client.SetArc(True)
-client.MoveL(q3,10,10)
-client.SetArc(False)
+client.MoveL(q2,10,0.5)
+# client.SetArc(True)
+client.MoveL(q3,10,0.5)
+# client.SetArc(False)
 client.MoveL(q4,10,0)
-	
 	
 
 
 client.ProgFinish(r"""AAA""")
 client.ProgSave(".","AAA",False)
 
-client.execute_motion_program("AAA.JBI")
+timestamp, curve_exe_js=client.execute_motion_program("AAA.JBI")
+
+lam, curve_exe, curve_exe_R, speed=logged_data_analysis(robot,timestamp,np.radians(curve_exe_js))
+
+start_idx=np.argmin(np.linalg.norm(curve_exe-p1,axis=1))
+
+plt.title('Speed')
+plt.plot(lam[start_idx+1:],speed[start_idx:])
+plt.show()
