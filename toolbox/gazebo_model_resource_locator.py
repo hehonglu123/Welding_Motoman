@@ -10,6 +10,8 @@ class GazeboModelResourceLocator(ResourceLocator):
         self.model_paths = model_env_path.split(os.pathsep)
         assert len(self.model_paths) != 0, "No GAZEBO_MODEL_PATH specified!"
         for p in self.model_paths:
+            if os.path.isdir(p):
+                break
             assert os.path.isdir(p), "GAZEBO_MODEL_PATH directory does not exist: %s" % p
 
     def locateResource(self,url):
