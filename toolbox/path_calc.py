@@ -4,12 +4,9 @@ from pandas import *
 import sys, traceback
 from general_robotics_toolbox import *
 import matplotlib.pyplot as plt
-from robots_def import *
-from error_check import *
 from utils import * 
 from scipy.optimize import fminbound
 from scipy.signal import find_peaks
-# from dual_arm import *
 
 def calc_curvature(curve):
 	lam=calc_lam_cs(curve)
@@ -600,119 +597,7 @@ def traj_speed_est_dual(robot1,robot2,curve_js1,curve_js2,lam,vd,qdot_init1=[],q
 
 
 def main():
-	###lamdot calculation
-	robot=abb6640(d=50)
-	curve_js = read_csv("../data/wood/Curve_js.csv",header=None).values
-
-	# train_data = read_csv("../constraint_solver/single_arm/trajectory/curve_pose_opt/arm1.csv", names=col_names)
-	# train_data = read_csv("qsol.csv", names=col_names)
-	# train_data = read_csv("../constraint_solver/single_arm/trajectory/all_theta_opt/all_theta_opt_js.csv", names=col_names)
-
-	lam=calc_lam_js(curve_js,robot)
-	
-	step=10
-	lam_dot=calc_lamdot(curve_js,lam,robot,step)
-	plt.plot(lam[::step],lam_dot)
-	plt.xlabel('path length (mm)')
-	plt.ylabel('max lambda_dot')
-	plt.ylim([0,4000])
-	plt.title('lambda_dot vs lambda')
-	plt.show()
-
-def main2():
-	###lamdot dual calculation
-	###read in points
-	curve_js1 = read_csv("../constraint_solver/dual_arm/trajectory/arm1.csv",header=None).values
-	curve_js2 = read_csv("../constraint_solver/dual_arm/trajectory/arm2.csv",header=None).values
-	###define robots
-	robot1=abb1200(d=50)
-	robot2=abb6640()
-
-	###read in robot2 pose
-	with open('../constraint_solver/dual_arm/trajectory/abb6640.yaml') as file:
-		H_6640 = np.array(yaml.safe_load(file)['H'],dtype=np.float64)
-
-	base2_R=H_6640[:-1,:-1]
-	base2_p=1000.*H_6640[:-1,-1]
-	
-	lam=calc_lam_js_2arm(curve_js1,curve_js2,robot1,robot2)
-	step=10
-	lam_dot=calc_lamdot_2arm(np.hstack((curve_js1,curve_js2)),lam,robot1,robot2,step)
-	plt.plot(lam[::step],lam_dot)
-	plt.xlabel('path length (mm)')
-	plt.ylabel('max lambda_dot')
-	plt.title('lambda_dot vs lambda')
-	plt.ylim([0,2000])
-	plt.show()
-
-def main3():
-	###speed estimation
-	from MotionSend import MotionSend
-	from blending import form_traj_from_bp,blend_js_from_primitive
-	dataset='wood/'
-	solution_dir='baseline/'
-	robot=abb6640(d=50, acc_dict_path='robot_info/6640acc_new.pickle')
-	curve = read_csv('../data/'+dataset+solution_dir+'/Curve_in_base_frame.csv',header=None).values
-
-	curve_js=read_csv('../data/'+dataset+solution_dir+'/Curve_js.csv',header=None).values
-	curve=curve[::1000]
-	curve_js=curve_js[::1000]
-	lam_original=calc_lam_cs(curve)
-
-	ms = MotionSend()
-	
-	breakpoints,primitives,p_bp,q_bp=ms.extract_data_from_cmd('../data/'+dataset+'baseline/100L/command.csv')
-	# breakpoints,primitives,p_bp,q_bp=ms.extract_data_from_cmd('../ILC/max_gradient/curve1_250_100L_multipeak/command.csv')
-	# breakpoints,primitives,p_bp,q_bp=ms.extract_data_from_cmd('../ILC/max_gradient/curve2_1100_100L_multipeak/command.csv')
-
-	curve_interp, curve_R_interp, curve_js_interp, breakpoints_blended=form_traj_from_bp(q_bp,primitives,robot)
-	curve_js_blended,curve_blended,curve_R_blended=blend_js_from_primitive(curve_interp, curve_js_interp, breakpoints_blended, primitives,robot,zone=10)
-	lam_blended=calc_lam_js(curve_js_blended,robot)
-
-	exe_dir='../simulation/robotstudio_sim/scripts/fitting_output/'+dataset+'/100L/'
-	v_cmds=[200,250,300,350,400,450,500]
-	# v_cmds=[1300]
-	# v_cmds=[800,900,1000,1100,1200,1300,1400]
-	for v_cmd in v_cmds:
-
-		###read actual exe file
-		df = read_csv(exe_dir+"curve_exe"+"_v"+str(v_cmd)+"_z10.csv")
-		lam_exe, curve_exe, curve_exe_R,curve_exe_js, act_speed, timestamp=ms.logged_data_analysis(robot,df,realrobot=True)
-		lam_exe, curve_exe, curve_exe_R,curve_exe_js, act_speed, timestamp=ms.chop_extension(curve_exe, curve_exe_R,curve_exe_js, act_speed, timestamp,curve[0,:3],curve[-1,:3])
-
-		###get joint acceleration at each pose
-		joint_acc_limit=robot.get_acc(curve_exe_js)
-
-		speed_est=traj_speed_est(robot,curve_exe_js,lam_exe,v_cmd)
-
-
-		qdot_all=np.gradient(curve_exe_js,axis=0)/np.tile([np.gradient(timestamp)],(6,1)).T
-		qddot_all=np.gradient(qdot_all,axis=0)/np.tile([np.gradient(timestamp)],(6,1)).T
-		qddot_violate_idx=np.array([])
-		for i in range(len(curve_exe_js[0])):
-			qddot_violate_idx=np.append(qddot_violate_idx,np.argwhere(np.abs(qddot_all[:,i])>joint_acc_limit[:,i]))
-		qddot_violate_idx=np.unique(qddot_violate_idx).astype(int)
-		# for idx in qddot_violate_idx:
-		# 	plt.axvline(x=lam_exe[idx],c='orange')
-		
-
-		plt.plot(lam_exe,speed_est,label='estimated')
-		plt.plot(lam_exe,act_speed,label='actual')
-
-		plt.legend()
-		plt.ylim([0,1.2*v_cmd])
-		plt.xlabel('lambda (mm)')
-		plt.ylabel('Speed (mm/s)')
-		plt.title('Speed Estimation for v'+str(v_cmd))
-		plt.show()
-
-		plt.figure()
-		ax = plt.axes(projection='3d')
-		ax.plot3D(curve[:,0], curve[:,1], curve[:,2], c='gray',label='original')
-		ax.plot3D(curve_exe[:,0], curve_exe[:,1], curve_exe[:,2], c='red',label='execution')
-		ax.scatter3D(curve_exe[qddot_violate_idx,0], curve_exe[qddot_violate_idx,1], curve_exe[qddot_violate_idx,2], c=curve_exe[qddot_violate_idx,2], cmap='Greens',label='commanded points')
-		plt.show()
-
+	return
 
 		
 

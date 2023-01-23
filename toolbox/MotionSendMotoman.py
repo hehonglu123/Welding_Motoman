@@ -48,10 +48,7 @@ class MotionSend(object):
 
 	def exec_motion_from_dir(self,robot,directory,arc=False):
 		client = MotionProgramExecClient(IP=self.IP,ROBOT_CHOICE=self.ROBOT_CHOICE_MAP[robot.robot_name],pulse2deg=robot.pulse2deg)
-		client.ACTIVE_TOOL=1
-		client.ProgStart(r"""AAA""")
-		client.setFrame(Pose([0,0,0,0,0,0]),-1,r"""Motoman MA2010 Base""")
-
+		
 		# num_command=len(fnmatch.filter(os.listdir(directory), '*.csv'))
 		num_command=50
 		for i in range(num_command):
@@ -65,9 +62,7 @@ class MotionSend(object):
 		# breakpoints,primitives, p_bp,q_bp=self.extract_data_from_cmd(directory+'command0.csv')
 		# client=self.form_motion_cmd(client,primitives[:num_layers],q_bp[:num_layers],p_bp[:num_layers],[1,5,10,15]+[50]*20,1,arc)
 
-		client.ProgFinish(r"""AAA""")
-		client.ProgSave(".","AAA",False)
-
+		client.ProgEnd()
 		client.execute_motion_program("AAA.JBI")
 
 	def form_motion_cmd(self,client,primitives,q_bp,p_bp,speed,zone,arc=False):
@@ -119,15 +114,11 @@ class MotionSend(object):
 
 	def exec_motions(self,robot,primitives,p_bp,q_bp,speed,zone):
 		client = MotionProgramExecClient(IP=self.IP,ROBOT_CHOICE=self.ROBOT_CHOICE_MAP[robot.robot_name],pulse2deg=robot.pulse2deg)
-		client.ACTIVE_TOOL=1
-		client.ProgStart(r"""AAA""")
-		client.setFrame(Pose([0,0,0,0,0,0]),-1,r"""Motoman MA2010 Base""")
+
 		client=self.form_motion_cmd(client,primitives,q_bp,p_bp,speed,zone)
 
 
-		client.ProgFinish(r"""AAA""")
-		client.ProgSave(".","AAA",False)
-
+		client.ProgEnd()
 		client.execute_motion_program("AAA.JBI")
 		
 

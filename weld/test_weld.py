@@ -15,15 +15,10 @@ end_q=np.array([-38.2509,67.1388,57.8163,2.93,-58.8529,-7.7910])
 client=MotionProgramExecClient(IP='192.168.1.31',ROBOT_CHOICE='RB1',pulse2deg=robot.pulse2deg)
 
 
-client.ACTIVE_TOOL=1
-
-client.ProgStart(r"""AAA""")
-client.setFrame(Pose([0,0,0,0,0,0]),-1,r"""Motoman MA2010 Base""")
 client.MoveJ(start_q,1,0)
 client.SetArc(True,cond_num=11)
 client.MoveL(end_q,10,0)
 client.SetArc(False)
-client.ProgFinish(r"""AAA""")
-client.ProgSave(".","AAA",False)
+client.ProgEnd()
 
 client.execute_motion_program("AAA.JBI")

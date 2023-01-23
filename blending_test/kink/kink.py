@@ -4,8 +4,6 @@ from robot_def import *
 from dx200_motion_program_exec_client import *
 from MotionSendMotoman import *
 
-from RobotRaconteur.Client import *
-import cv2
 import matplotlib.pyplot as plt
 import time
 
@@ -30,24 +28,22 @@ q_end=robot.inv(p_end, R, qseed)[0]
 def jog2start():
 	client=MotionProgramExecClient(IP='192.168.1.31',ROBOT_CHOICE='RB1',pulse2deg=robot.pulse2deg)
 	client.ProgStart(r"""AAA""")
-	client.MoveJ(q_start,1,0)
+	client.MoveJ(np.degrees(q_start),1,0)
 	client.ProgFinish(r"""AAA""")
 	client.ProgSave(".","AAA",False)
 	client.execute_motion_program("AAA.JBI")
 
 def blending_zone_test():
-	z_all=np.linspace(0,10,num=20)
-	for i in range(len(z_all)):
+	pl_all=np.arange(0,9)
+	for i in range(len(pl_all)):
 		jog2start()
 
 		client=MotionProgramExecClient(IP='192.168.1.31',ROBOT_CHOICE='RB1',pulse2deg=robot.pulse2deg)
-		client.ProgStart(r"""AAA""")
-		client.MoveL(q_mid,10,z_all[i])
-		client.MoveL(q_end,10,0)
-		client.ProgFinish(r"""AAA""")
-		client.ProgSave(".","AAA",False)
+		client.MoveL(np.degrees(q_mid),10,pl_all[i])
+		client.MoveL(np.degrees(q_end),10,0)
+		client.ProgEnd()
 		timestamp, curve_exe_js=client.execute_motion_program("AAA.JBI")
-		np.savetxt('blending_zone_test/z'+str(z_all[i])+'.csv',np.hstack((timestamp,curve_exe_js)),delimiter=',')
+		np.savetxt('blending_zone_test/pl'+str(pl_all[i])+'.csv',np.hstack((timestamp.reshape(-1, 1),curve_exe_js)),delimiter=',')
 
 
 
