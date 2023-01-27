@@ -16,9 +16,9 @@ client=MotionProgramExecClient(IP='192.168.1.31',ROBOT_CHOICE='RB1',pulse2deg=ro
 
 
 client.MoveJ(start_q,1,0)
-client.SetArc(True,cond_num=11)
+client.SetArc(True,cond_num=13)
 client.MoveL(end_q,10,0)
 client.SetArc(False)
 client.ProgEnd()
 
-client.execute_motion_program("AAA.JBI")
+client.execute_motion_program()
