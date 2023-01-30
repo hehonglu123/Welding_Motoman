@@ -354,3 +354,5 @@ motion_primitive.egg-info/
 generated_src/
 generated_src
 {"mode":"full","isActive":false}
+
+.vscode/
