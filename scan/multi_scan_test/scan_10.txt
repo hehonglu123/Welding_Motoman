@@ -1,0 +1,21 @@
+Points Num: 21820
+Frame Elapes: 0.8026095000095665
+Points Num: 21253
+Frame Elapes: 0.7780589000321925
+Points Num: 21473
+Frame Elapes: 0.782760500209406
+Points Num: 21401
+Frame Elapes: 0.7827572000678629
+Points Num: 22147
+Frame Elapes: 0.8044253999833018
+Points Num: 22215
+Frame Elapes: 0.8002932001836598
+Points Num: 21890
+Frame Elapes: 0.9007443999871612
+Points Num: 21789
+Frame Elapes: 0.7851863999385387
+Points Num: 21713
+Frame Elapes: 0.7769597000442445
+Points Num: 21436
+Frame Elapes: 0.7828607000410557
+FPS: 1.2486943183920274
