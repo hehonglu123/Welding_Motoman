@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 import time
 import numpy as np
 
-data_dir='test1/'
+data_dir='test2/'
 config_dir='../../config/'
 
 scan_resolution=5 #scan every 5 mm
@@ -22,6 +22,12 @@ robot=robot_obj('MA_1440_A0',def_path=config_dir+'MA_1440_A0_robot_default_confi
 
 cart_p=[]
 joints_p=np.loadtxt(data_dir+'scan_js.csv',delimiter=",", dtype=np.float64)
+for i in range(len(joints_p)):
+	joints_p[i][5] = -joints_p[i][5]
+	joints_p[i][3] = -joints_p[i][3]
+	joints_p[i][1] = 90 - joints_p[i][1]
+	joints_p[i][2] = joints_p[i][2] + joints_p[i][1]
+
 joints_p=np.radians(joints_p)
 for q in joints_p:
 	cart_p.append(robot.fwd(q))
@@ -62,17 +68,17 @@ curve_js=np.array(curve_js)
 print(curve)
 print(np.degrees(curve_js))
 print("Total step:",total_step)
-exit()
+
 
 ms=MotionSend()
 
-move_robot_only=True
+move_robot_only=False
 
 if not move_robot_only:
 	client=RRN.ConnectService('rr+tcp://192.168.55.27:64238?service=scanner')
 
 for i in range(len(curve)):
-	# ms.exec_motions(robot,['movej'],[curve[i]],[[curve_js[i]]],10,0)
+	# ms.exec_motions(robot,['movej'],[curve[i]],[[curve_js[i]]],5,0)
 	ms.exec_motions(robot,['movel'],[curve[i]],[[curve_js[i]]],5,0)
 	time.sleep(0.3) # stop 1 sec
 
@@ -80,5 +86,5 @@ for i in range(len(curve)):
 		for scan_i in range(scan_per_pose):
 			mesh=client.capture(True)
 			scan_points = RRN.NamedArrayToArray(mesh.vertices)
-			np.savetxt('points_'+str(i)+'_'+str(scan_i)+'.csv',scan_points,delimiter=',')
+			np.savetxt(data_dir + 'points_'+str(i)+'_'+str(scan_i)+'.csv',scan_points,delimiter=',')
 			print("Pose:",i,",Scan:",scan_i,",points:",len(scan_points))
