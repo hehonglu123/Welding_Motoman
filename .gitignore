@@ -356,3 +356,5 @@ generated_src
 {"mode":"full","isActive":false}
 
 .vscode/
+
+scan/scan_merge/**/points*
