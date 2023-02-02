@@ -28,7 +28,7 @@ def display_inlier_outlier(cloud, ind):
 
     print("Showing outliers (red) and inliers (gray): ")
     outlier_cloud.paint_uniform_color([1, 0, 0])
-    inlier_cloud.paint_uniform_color([0.8, 0.8, 0.8])
+    inlier_cloud.paint_uniform_color([0, 0.8, 0])
     o3d.visualization.draw([inlier_cloud, outlier_cloud])
 
 def visualize_pcd(show_pcd_list):
@@ -119,6 +119,8 @@ for i in range(len(curve)):
 		## to pcd
 		pcd = o3d.geometry.PointCloud()
 		pcd.points=o3d.utility.Vector3dVector(points)
+		# visualize_pcd([pcd])
+		# exit()
 		## voxel down sample
 		pcd = pcd.voxel_down_sample(voxel_size=voxel_size)
 		## add to combined pcd
@@ -128,18 +130,20 @@ for i in range(len(curve)):
 # visualize_pcd([pcd_combined])
 ## voxel down sample
 pcd_combined = pcd_combined.voxel_down_sample(voxel_size=voxel_size)
-# print(type(pcd_combined.points))
+# visualize_pcd([pcd_combined])
 # exit()
 ## crop point clouds
 min_bound = (-1,-1,-1)
 max_bound = (143.1+5,15.8+1,30.6+1)
 bbox = o3d.geometry.AxisAlignedBoundingBox(min_bound=min_bound,max_bound=max_bound)
 pcd_combined=pcd_combined.crop(bbox)
+# visualize_pcd([pcd_combined])
 ## outlier removal
 nb_neighbors=40
 std_ratio=0.5
 cl,ind=pcd_combined.remove_statistical_outlier(nb_neighbors=nb_neighbors,std_ratio=std_ratio)
 # display_inlier_outlier(pcd_combined,ind)
+# exit()
 pcd_combined=cl
 ## DBSCAN pcd clustering
 cluster_neighbor=0.75
@@ -152,6 +156,7 @@ print("Cluster count:",labels.max()+1)
 colors = plt.get_cmap("tab20")(labels / (max_label if max_label > 0 else 1))
 colors[labels < 0] = 0
 # pcd_combined.colors = o3d.utility.Vector3dVector(colors[:, :3])
+# visualize_pcd([pcd_combined])
 pcd_combined=pcd_combined.select_by_index(np.argwhere(labels>=0))
 ## plane reconstruction
 # pcd_combined.estimate_normals(
@@ -166,6 +171,7 @@ pcd_combined=pcd_combined.select_by_index(np.argwhere(labels>=0))
 ######## compare with scan mesh
 scan_mesh=o3d.io.read_triangle_mesh(data_dir+'../lego_brick/scan_mesh.stl')
 scan_mesh.compute_vertex_normals()
+# visualize_pcd([scan_mesh])
 scan_mesh_points = o3d.io.read_point_cloud(data_dir+'../lego_brick/scan_mesh_points.pcd')
 ## register points (dont need this after the motion trackers (?))
 min_bound = (-1,-1,19.3)
@@ -182,6 +188,7 @@ reg_p2p = o3d.pipelines.registration.registration_icp(
     o3d.pipelines.registration.TransformationEstimationPointToPoint())
 print(reg_p2p)
 print(reg_p2p.transformation)
+visualize_pcd([pcd_combined,scan_mesh])
 pcd_combined_reg.transform(reg_p2p.transformation)
 pcd_combined.transform(reg_p2p.transformation)
 pcd_combined_reg.paint_uniform_color([1, 0.706, 0])
@@ -198,7 +205,8 @@ scan_mesh_target.triangles = o3d.utility.Vector3iVector(
     np.asarray(scan_mesh.triangles)[normal_z_id, :])
 scan_mesh_target.triangle_normals = o3d.utility.Vector3dVector(
     np.asarray(scan_mesh.triangle_normals)[normal_z_id, :])
-# visualize_pcd([scan_mesh_target,pcd_combined])
+visualize_pcd([scan_mesh_target])
+visualize_pcd([scan_mesh_target,pcd_combined])
 ## calculate distance to mesh
 scan_mesh_target_t = o3d.t.geometry.TriangleMesh.from_legacy(scan_mesh_target)
 scene = o3d.t.geometry.RaycastingScene()
@@ -216,7 +224,7 @@ high_bound=max_dist+0.1
 color_dist = plt.get_cmap("rainbow")((unsigned_distance-low_bound)/(high_bound-low_bound))
 pcd_combined_dist_scan=deepcopy(pcd_combined)
 pcd_combined_dist_scan.colors = o3d.utility.Vector3dVector(color_dist[:, :3])
-# visualize_pcd([scan_mesh_target,pcd_combined_dist_scan])
+visualize_pcd([scan_mesh_target,pcd_combined_dist_scan])
 
 ######## compare with target mesh
 target_mesh=o3d.io.read_triangle_mesh(data_dir+'../lego_brick/target_mesh.stl')
@@ -228,7 +236,7 @@ min_bound=min_bound-margin
 max_bound=max_bound+margin
 bbox = o3d.geometry.AxisAlignedBoundingBox(min_bound=min_bound,max_bound=max_bound)
 target_mesh_target=target_mesh.crop(bbox)
-# visualize_pcd([target_mesh_target,pcd_combined])
+visualize_pcd([target_mesh_target,pcd_combined])
 
 ## calculate distance to mesh
 target_mesh_target_t = o3d.t.geometry.TriangleMesh.from_legacy(target_mesh_target)

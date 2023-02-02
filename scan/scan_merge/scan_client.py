@@ -77,9 +77,11 @@ move_robot_only=False
 if not move_robot_only:
 	client=RRN.ConnectService('rr+tcp://192.168.55.27:64238?service=scanner')
 
+js_pose=[]
 for i in range(len(curve)):
 	# ms.exec_motions(robot,['movej'],[curve[i]],[[curve_js[i]]],5,0)
-	ms.exec_motions(robot,['movel'],[curve[i]],[[curve_js[i]]],5,0)
+	timestamp, curve_exe_js=ms.exec_motions(robot,['movel'],[curve[i]],[[curve_js[i]]],5,0)
+	js_pose.append(curve_exe_js[-1])
 	time.sleep(0.3) # stop 1 sec
 
 	if not move_robot_only:
@@ -88,3 +90,5 @@ for i in range(len(curve)):
 			scan_points = RRN.NamedArrayToArray(mesh.vertices)
 			np.savetxt(data_dir + 'points_'+str(i)+'_'+str(scan_i)+'.csv',scan_points,delimiter=',')
 			print("Pose:",i,",Scan:",scan_i,",points:",len(scan_points))
+js_pose=np.array(js_pose)
+np.savetxt(data_dir + 'curve_js_exe.csv',js_pose,delimiter=',')
