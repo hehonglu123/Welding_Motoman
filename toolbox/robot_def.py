@@ -213,11 +213,19 @@ class positioner_obj(object):
 
 			return Transform_all(pose_p_all,pose_R_all)
 
-	def inv(self,p_tcp,n):
+	def fwd_rotation(self,q_all):
+		return Ry(np.radians(-q_all[0]))@Rz((np.radians(-q_all[1])))
+
+	def inv(self,n):
 		###p_tcp: point of the desired tcp wrt. positioner eef
 		###n: normal direction at the desired tcp wrt. positioner eef
 		###[q1,q2]: result joint angles that brings n to [0,0,1]
-		return 
+
+		q2=np.arctan2(-n[1],n[0])
+		q1=np.arctan2(-n[0]*np.cos(q2)+n[1]*np.sin(q2),n[2])
+		# q1=np.arcsin(1/(-n[0]*np.cos(q2)+n[1]*np.sin(q2)+n[2]))
+
+		return np.array([q1,q2])		###2 solutions, opposite of each other
 
 class Transform_all(object):
 	def __init__(self, p_all, R_all):
@@ -312,13 +320,19 @@ def main1():
 	print(robot.inv(pose.p,pose.R,q))
 
 def main2():
-	robot=robot_obj('D500B',def_path='../config/D500B_robot_default_config.yml', pulse2deg_file_path='../config/D500B_pulse2deg.csv')
+	robot=positioner_obj('D500B',def_path='../config/D500B_robot_default_config.yml', pulse2deg_file_path='../config/D500B_pulse2deg.csv')
 	q1=30
 	q2=50
 	q=np.radians([q1,q2])
 	print(robot.fwd(q))
 
-	print(Ry(np.radians(-q1))@Rz((np.radians(-q2))))
+	print(Ry(np.radians(-q[0]))@Rz((np.radians(-q[1]))))
+
+	# n=np.array([np.sqrt(2)/2,0,np.sqrt(2)/2])
+	n=np.array([np.sqrt(3)/3,np.sqrt(3)/3,np.sqrt(3)/3])
+	q_inv=robot.inv(n)
+	print(np.degrees(q_inv))
+	print(robot.fwd_rotation(q_inv))
 
 if __name__ == '__main__':
 	main2()
