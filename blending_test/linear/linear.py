@@ -29,21 +29,21 @@ def jog2start():
 	client=MotionProgramExecClient(IP='192.168.1.31',ROBOT_CHOICE='RB1',pulse2deg=robot.pulse2deg)
 	client.MoveJ(np.degrees(q_start),1,0)
 	client.ProgEnd()
-	client.execute_motion_program("AAA.JBI")
+	# client.execute_motion_program("AAA.JBI")
 
 def blending_zone_test():
 	pl_all=np.arange(0,9)
 	for i in range(len(pl_all)):
 		jog2start()
 
-		client=MotionProgramExecClient(IP='192.168.1.31',ROBOT_CHOICE='RB1',pulse2deg=robot.pulse2deg)
+		# client=MotionProgramExecClient(IP='192.168.1.31',ROBOT_CHOICE='RB1',pulse2deg=robot.pulse2deg)
 
-		client.MoveL(np.degrees(q_mid),10,pl_all[i])
-		client.MoveL(np.degrees(q_end),10,0)
-		client.ProgEnd()
+		# client.MoveL(np.degrees(q_mid),10,pl_all[i])
+		# client.MoveL(np.degrees(q_end),10,0)
+		# client.ProgEnd()
 
-		timestamp, curve_exe_js=client.execute_motion_program("AAA.JBI")
-		np.savetxt('blending_zone_test/pl'+str(pl_all[i])+'.csv',np.hstack((timestamp.reshape(-1, 1),curve_exe_js)),delimiter=',')
+		# timestamp, curve_exe_js=client.execute_motion_program("AAA.JBI")
+		# np.savetxt('blending_zone_test/pl'+str(pl_all[i])+'.csv',np.hstack((timestamp.reshape(-1, 1),curve_exe_js)),delimiter=',')
 
 def arc_motion_test():
 	p_mid1=np.array([1648,-1265,-231])
@@ -81,4 +81,4 @@ def dense_points_test():
 
 
 if __name__ == '__main__':
-	arc_motion_test()
+	blending_zone_test()
