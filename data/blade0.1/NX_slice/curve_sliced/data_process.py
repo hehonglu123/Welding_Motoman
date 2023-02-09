@@ -2,6 +2,11 @@ import numpy as np
 
 def find_norm(p1,p2,p3):
 	#find normal vector from p1 pointing to line of p2p3
+	p2p1=p2-p1
+	p3p1=p3-p1
+	p2p3=p2-p3
+	vec=np.cross((np.cross(p2p1,p3p1),p2p3))
+	return vec/np.linalg.norm(vec)
 	
 slice1=np.readtxt('raw/slice1.csv',delimiter=',')
 slice2=np.readtxt('raw/slice2.csv',delimiter=',')
@@ -12,4 +17,6 @@ slice1_normal=[]
 for i in range(len(slice1)):
 	#find closest 2 points
 	idx_1,idx_2=np.argsort(np.linalg.norm(slice2-slice1[i],axis=1))[:2]
-	norm=
+
+	slice1_normal.append(find_norm(slice1[i],slice2[idx_1],slice2[idx_2]))
+	
