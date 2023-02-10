@@ -147,6 +147,86 @@ class robot_obj(object):
 		return q_all
 
 
+class positioner_obj(object):
+	###robot object class
+	def __init__(self,robot_name,def_path,tool_file_path='',base_transformation_file='',d=0,acc_dict_path='',pulse2deg_file_path=''):
+		#def_path: robot 			definition yaml file, name must include robot vendor
+		#tool_file_path: 			tool transformation to robot flange csv file
+		#base_transformation_file: 	base transformation to world frame csv file
+		#d: 						tool z extension
+		#acc_dict_path: 			accleration profile
+
+		self.robot_name=robot_name
+		with open(def_path, 'r') as f:
+			self.robot = rr_rox.load_robot_info_yaml_to_robot(f)
+
+		self.def_path=def_path
+		#define robot without tool
+		self.robot_def_nT=Robot(self.robot.H,self.robot.P,self.robot.joint_type)
+
+		if len(tool_file_path)>0:
+			tool_H=np.loadtxt(tool_file_path,delimiter=',')
+			self.robot.R_tool=tool_H[:3,:3]
+			self.robot.p_tool=tool_H[:3,-1]+np.dot(tool_H[:3,:3],np.array([0,0,d]))
+			self.p_tool=self.robot.p_tool
+			self.R_tool=self.robot.R_tool		
+
+		if len(base_transformation_file)>0:
+			self.base_H=np.loadtxt(base_transformation_file,delimiter=',')
+		else:
+			self.base_H=np.eye(4)
+
+		if len(pulse2deg_file_path)>0:
+			self.pulse2deg=np.abs(np.loadtxt(pulse2deg_file_path,delimiter=',')) #negate joint 2, 4, 6
+
+
+		###set attributes
+		self.upper_limit=self.robot.joint_upper_limit 
+		self.lower_limit=self.robot.joint_lower_limit 
+		self.joint_vel_limit=self.robot.joint_vel_limit 
+		self.joint_acc_limit=self.robot.joint_acc_limit
+
+	def fwd(self,q_all,world=False,qlim_override=False):
+		###robot forworld kinematics
+		#q_all:			robot joint angles or list of robot joint angles
+		#world:			bool, if want to get coordinate in world frame or robot base frame
+
+		if q_all.ndim==1:
+			q=q_all
+			pose_temp=fwdkin(self.robot,q)
+
+			if world:
+				pose_temp.p=self.base_H[:3,:3]@pose_temp.p+self.base_H[:3,-1]
+				pose_temp.R=self.base_H[:3,:3]@pose_temp.R
+			return pose_temp
+		else:
+			pose_p_all=[]
+			pose_R_all=[]
+			for q in q_all:
+				pose_temp=fwdkin(self.robot,q)
+				if world:
+					pose_temp.p=self.base_H[:3,:3]@pose_temp.p+self.base_H[:3,-1]
+					pose_temp.R=self.base_H[:3,:3]@pose_temp.R
+
+				pose_p_all.append(pose_temp.p)
+				pose_R_all.append(pose_temp.R)
+
+			return Transform_all(pose_p_all,pose_R_all)
+
+	def fwd_rotation(self,q_all):
+		return Ry(np.radians(-q_all[0]))@Rz((np.radians(-q_all[1])))
+
+	def inv(self,n):
+		###p_tcp: point of the desired tcp wrt. positioner eef
+		###n: normal direction at the desired tcp wrt. positioner eef
+		###[q1,q2]: result joint angles that brings n to [0,0,1]
+
+		q2=np.arctan2(-n[1],n[0])
+		q1=np.arctan2(-n[0]*np.cos(q2)+n[1]*np.sin(q2),n[2])
+		# q1=np.arcsin(1/(-n[0]*np.cos(q2)+n[1]*np.sin(q2)+n[2]))
+
+		return np.array([q1,q2])		###2 solutions, opposite of each other
+
 class Transform_all(object):
 	def __init__(self, p_all, R_all):
 		self.R_all=np.array(R_all)
@@ -240,20 +320,19 @@ def main1():
 	print(robot.inv(pose.p,pose.R,q))
 
 def main2():
-	robot=robot_obj('MA_1440_A0',def_path='../config/MA_1440_A0_robot_default_config.yml',tool_file_path='../config/scanner_tcp.csv',\
-	pulse2deg_file_path='../config/MA_1440_A0_pulse2deg.csv')
+	robot=positioner_obj('D500B',def_path='../config/D500B_robot_default_config.yml', pulse2deg_file_path='../config/D500B_pulse2deg.csv')
+	q1=30
+	q2=50
+	q=np.radians([q1,q2])
+	print(robot.fwd(q))
 
-	pose=robot.fwd(np.ones(6))
-	print(pose)
-	print(robot.inv(pose.p,pose.R))
+	print(Ry(np.radians(-q[0]))@Rz((np.radians(-q[1]))))
 
-def main3():
-	robot=robot_obj('MA_2010_A0',def_path='../config/MA_2010_A0_robot_default_config.yml',tool_file_path='../config/weldgun.csv',\
-	pulse2deg_file_path='../config/MA_2010_A0_pulse2deg.csv')
-
-	pose=robot.fwd(np.radians([-36.3864,55.4046,40.9005,3.4413,-51.2629,-8.9103]))
-	print(pose)
-
+	# n=np.array([np.sqrt(2)/2,0,np.sqrt(2)/2])
+	n=np.array([np.sqrt(3)/3,np.sqrt(3)/3,np.sqrt(3)/3])
+	q_inv=robot.inv(n)
+	print(np.degrees(q_inv))
+	print(robot.fwd_rotation(q_inv))
 
 if __name__ == '__main__':
-	main3()
+	main2()

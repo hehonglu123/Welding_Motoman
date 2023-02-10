@@ -5,14 +5,12 @@ from robot_def import *
 from pandas import read_csv
 from dx200_motion_program_exec_client import *
 
-# from error_check import *
-# from toolbox_circular_fit import *
 # from lambda_calc import *
 
 class MotionSend(object):
 	def __init__(self,IP='192.168.1.31') -> None:
 		self.IP=IP
-		self.ROBOT_CHOICE_MAP={'MA_2010_A0':'RB1','MA_1440_A0':'RB2','D500B':'S1'}
+		self.ROBOT_CHOICE_MAP={'MA_2010_A0':'RB1','MA_1440_A0':'RB2','D500B':'ST1'}
 
 
 	def extract_data_from_cmd(self,filename):
@@ -112,10 +110,69 @@ class MotionSend(object):
 
 		return client
 
+	def form_motion_cmd_multimove(self,client,primitives_robot,p_bp_robot,q_bp_robot,primitives_positioner,p_bp_positioner,q_bp_positioner,speed,zone,arc=False):
+		for i in range(len(primitives)):
+			if 'movel' in primitives[i]:
+				###TODO: fix pose
+				if type(speed) is list:
+					if type(zone) is list:
+						client.MoveL(np.degrees(q_bp[i][0]),speed[i],zone[i])
+					else:
+						client.MoveL(np.degrees(q_bp[i][0]),speed[i],zone)
+				else:
+					if type(zone) is list:
+						client.MoveL(np.degrees(q_bp[i][0]),speed,zone[i])
+					else:
+						client.MoveL(np.degrees(q_bp[i][0]),speed,zone)
+
+			elif 'movec' in primitives[i]:		###moveC needs testing
+				if type(speed) is list:
+					if type(zone) is list:
+						client.MoveC(np.degrees(q_bp[i-1][-1]),np.degrees(q_bp[i][0]),np.degrees(q_bp[i][1]),speed[i],zone[i])
+					else:
+						client.MoveC(np.degrees(q_bp[i-1][-1]),np.degrees(q_bp[i][0]),np.degrees(q_bp[i][1]),speed[i],zone)
+				else:
+					if type(zone) is list:
+						client.MoveC(np.degrees(q_bp[i-1][-1]),np.degrees(q_bp[i][0]),np.degrees(q_bp[i][1]),speed,zone[i])
+					else:
+						client.MoveC(np.degrees(q_bp[i-1][-1]),np.degrees(q_bp[i][0]),np.degrees(q_bp[i][1]),speed,zone)
+
+				
+
+			elif 'movej' in primitives[i]:
+				if type(speed) is list:
+					if type(zone) is list:
+						client.MoveJ(np.degrees(q_bp[i][0]),speed[i],zone[i])
+					else:
+						client.MoveJ(np.degrees(q_bp[i][0]),speed[i],zone)
+				else:
+					if type(zone) is list:
+						client.MoveJ(np.degrees(q_bp[i][0]),speed,zone[i])
+					else:
+						client.MoveJ(np.degrees(q_bp[i][0]),speed,zone)
+				if arc==True and i==0:
+					client.SetArc(True)
+		if arc:
+			client.SetArc(False)
+
+		return client
+
 	def exec_motions(self,robot,primitives,p_bp,q_bp,speed,zone):
 		client = MotionProgramExecClient(IP=self.IP,ROBOT_CHOICE=self.ROBOT_CHOICE_MAP[robot.robot_name],pulse2deg=robot.pulse2deg)
 
 		client=self.form_motion_cmd(client,primitives,q_bp,p_bp,speed,zone)
+
+
+		client.ProgEnd()
+		client.execute_motion_program("AAA.JBI")
+		
+
+		return
+
+	def exec_motions_multimove(self,robot,positioner,primitives_robot,p_bp_robot,q_bp_robot,primitives_positioner,p_bp_positioner,q_bp_positioner,speed,zone):
+		client = MotionProgramExecClient(IP=self.IP,ROBOT_CHOICE=self.ROBOT_CHOICE_MAP[robot.robot_name],ROBOT_CHOICE2=self.ROBOT_CHOICE_MAP[positioner.robot_name],pulse2deg=robot.pulse2deg,pulse2deg2=positioner.pulse2deg)
+
+		client=self.form_motion_cmd_multimove(client,primitives,primitives_robot,p_bp_robot,q_bp_robot,primitives_positioner,p_bp_positioner,q_bp_positioner,speed,zone)
 
 
 		client.ProgEnd()

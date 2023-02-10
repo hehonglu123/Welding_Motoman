@@ -52,7 +52,7 @@ def blending_zone_test():
 
 
 def arc_motion_test():
-	data=np.loadtxt('arc_motion_test/arc_motion_test.csv',delimiter=',')
+	data=np.loadtxt('arc_motion_test/arc_motion_test_off.csv',delimiter=',')
 	curve_exe_js=np.radians(data[:,1:])
 	timestamp=data[:,0]
 	curve_exe=robot.fwd(curve_exe_js).p_all
@@ -71,8 +71,8 @@ def arc_motion_test():
 	ax.axes.set_ylim3d(bottom=-1280, top=-1200) 
 	ax.axes.set_zlim3d(bottom=-232, top=-230) 
 	ax.legend()
-	plt.title('3D Plots @ PL=8')
-	plt.savefig('arc_motion_test/trajectory_plots/pl8')
+	plt.title('3D Plots @ PL=2')
+	plt.savefig('arc_motion_test/trajectory_plots/pl2_off')
 	plt.clf()
 
 	plt.plot(lam,speed, c='green')
@@ -80,7 +80,7 @@ def arc_motion_test():
 	plt.xlabel('lambda (mm)')
 	plt.ylabel('speed (mm/s)')
 	plt.ylim(0,22)
-	plt.savefig('arc_motion_test/speed_plots/pl8')
+	plt.savefig('arc_motion_test/speed_plots/pl2_off')
 	plt.clf()
 
 
