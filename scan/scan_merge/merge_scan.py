@@ -1,4 +1,5 @@
 import sys
+import matplotlib
 
 from sklearn import cluster
 sys.path.append('../../toolbox/')
@@ -9,6 +10,7 @@ import open3d as o3d
 import numpy as np
 import cv2
 import matplotlib.pyplot as plt
+from matplotlib import colors
 import time
 from copy import deepcopy
 import colorsys
@@ -106,11 +108,14 @@ print(T_origin)
 voxel_size=0.1
 
 pcd_combined = o3d.geometry.PointCloud()
+dt=0
 for i in range(len(curve)):
 # for i in range(5):
 	for scan_i in range(scan_per_pose):
 		points = np.loadtxt(data_dir + 'points_'+str(i)+'_'+str(scan_i)+'.csv',delimiter=",", dtype=np.float64)
+		# print(len(points))
 		
+		st=time.perf_counter()
 		points = np.transpose(np.matmul(curve_R[i],np.transpose(points)))+curve[i]
 		## get the points closed to origin
 		points = np.transpose(np.matmul(T_origin.R,np.transpose(points)))+T_origin.p
@@ -125,6 +130,11 @@ for i in range(len(curve)):
 		pcd = pcd.voxel_down_sample(voxel_size=voxel_size)
 		## add to combined pcd
 		pcd_combined += pcd
+		dt=dt+time.perf_counter()-st
+
+st=time.perf_counter()
+
+crop_flag=True
 
 #### processing
 # visualize_pcd([pcd_combined])
@@ -133,10 +143,11 @@ pcd_combined = pcd_combined.voxel_down_sample(voxel_size=voxel_size)
 # visualize_pcd([pcd_combined])
 # exit()
 ## crop point clouds
-min_bound = (-1,-1,-1)
-max_bound = (143.1+5,15.8+1,30.6+1)
-bbox = o3d.geometry.AxisAlignedBoundingBox(min_bound=min_bound,max_bound=max_bound)
-pcd_combined=pcd_combined.crop(bbox)
+if crop_flag:
+	min_bound = (-1,-1,-1)
+	max_bound = (143.1+5,15.8+1,30.6+1)
+	bbox = o3d.geometry.AxisAlignedBoundingBox(min_bound=min_bound,max_bound=max_bound)
+	pcd_combined=pcd_combined.crop(bbox)
 # visualize_pcd([pcd_combined])
 ## outlier removal
 nb_neighbors=40
@@ -153,11 +164,13 @@ with o3d.utility.VerbosityContextManager(o3d.utility.VerbosityLevel.Debug) as cm
         pcd_combined.cluster_dbscan(eps=cluster_neighbor, min_points=min_points, print_progress=True))
 max_label=labels.max()
 print("Cluster count:",labels.max()+1)
-colors = plt.get_cmap("tab20")(labels / (max_label if max_label > 0 else 1))
-colors[labels < 0] = 0
-# pcd_combined.colors = o3d.utility.Vector3dVector(colors[:, :3])
+colors_mp = plt.get_cmap("tab20")(labels / (max_label if max_label > 0 else 1))
+colors_mp[labels < 0] = 0
+# pcd_combined.colors = o3d.utility.Vector3dVector(colors_mp[:, :3])
 # visualize_pcd([pcd_combined])
+# exit()
 pcd_combined=pcd_combined.select_by_index(np.argwhere(labels>=0))
+# visualize_pcd([pcd_combined])
 ## plane reconstruction
 # pcd_combined.estimate_normals(
 #     search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.1, max_nn=30))
@@ -188,25 +201,29 @@ reg_p2p = o3d.pipelines.registration.registration_icp(
     o3d.pipelines.registration.TransformationEstimationPointToPoint())
 print(reg_p2p)
 print(reg_p2p.transformation)
-visualize_pcd([pcd_combined,scan_mesh])
+# visualize_pcd([pcd_combined,scan_mesh])
 pcd_combined_reg.transform(reg_p2p.transformation)
 pcd_combined.transform(reg_p2p.transformation)
 pcd_combined_reg.paint_uniform_color([1, 0.706, 0])
 scan_mesh_points.paint_uniform_color([0, 0.651, 0.929])
 # visualize_pcd([pcd_combined_reg,scan_mesh_points])
-visualize_pcd([pcd_combined,scan_mesh])
+# visualize_pcd([pcd_combined,scan_mesh])
+
+
+
+
 ##
 
 ## crop scan mesh surfaces
-normals = np.asarray(scan_mesh.triangle_normals)
-normal_z_id = np.squeeze(np.argwhere(np.abs(normals[:,2])==1))
+# normals = np.asarray(scan_mesh.triangle_normals)
+# normal_z_id = np.squeeze(np.argwhere(np.abs(normals[:,2])==1))
 scan_mesh_target=deepcopy(scan_mesh)
-scan_mesh_target.triangles = o3d.utility.Vector3iVector(
-    np.asarray(scan_mesh.triangles)[normal_z_id, :])
-scan_mesh_target.triangle_normals = o3d.utility.Vector3dVector(
-    np.asarray(scan_mesh.triangle_normals)[normal_z_id, :])
-visualize_pcd([scan_mesh_target])
-visualize_pcd([scan_mesh_target,pcd_combined])
+# scan_mesh_target.triangles = o3d.utility.Vector3iVector(
+#     np.asarray(scan_mesh.triangles)[normal_z_id, :])
+# scan_mesh_target.triangle_normals = o3d.utility.Vector3dVector(
+#     np.asarray(scan_mesh.triangle_normals)[normal_z_id, :])
+# visualize_pcd([scan_mesh_target])
+# visualize_pcd([scan_mesh_target,pcd_combined])
 ## calculate distance to mesh
 scan_mesh_target_t = o3d.t.geometry.TriangleMesh.from_legacy(scan_mesh_target)
 scene = o3d.t.geometry.RaycastingScene()
@@ -218,13 +235,40 @@ min_dist=np.min(unsigned_distance)
 max_dist=np.max(unsigned_distance)
 print("unsigned distance", unsigned_distance)
 print("unsigned distance min", min_dist)
-print("unsigned distance min", max_dist)
+print("unsigned distance max", max_dist)
+print("Unsigned distance mean", np.mean(unsigned_distance))
+print("Unsigned distance std", np.std(unsigned_distance))
 low_bound=0
 high_bound=max_dist+0.1
 color_dist = plt.get_cmap("rainbow")((unsigned_distance-low_bound)/(high_bound-low_bound))
 pcd_combined_dist_scan=deepcopy(pcd_combined)
 pcd_combined_dist_scan.colors = o3d.utility.Vector3dVector(color_dist[:, :3])
-visualize_pcd([scan_mesh_target,pcd_combined_dist_scan])
+# visualize_pcd([scan_mesh_target,pcd_combined_dist_scan])
+# visualize_pcd([pcd_combined_dist_scan])
+
+#### histogram
+N_points = len(unsigned_distance)
+n_bins = 100
+fig = plt.figure()
+ax = fig.add_axes([0.05, 0.2, 0.9, 0.7])
+ax1 = fig.add_axes([0.05, 0.05, 0.9, 0.1])
+
+# We can set the number of bins with the *bins* keyword argument.
+N, bins, patches = ax.hist(unsigned_distance, bins=n_bins)
+# We'll color code by height, but you could use any scalar
+fracs = N / N.max()
+
+# Now, we'll loop through our objects and set the color of each accordingly
+for thisfrac, thispatch, thisbin in zip(fracs, patches,bins):
+    color = plt.cm.rainbow((thisbin-low_bound)/(high_bound-low_bound))
+    thispatch.set_facecolor(color)
+cb1 = matplotlib.colorbar.ColorbarBase(ax1, cmap=plt.cm.rainbow,
+                                norm= matplotlib.colors.Normalize(vmin=low_bound, vmax=high_bound),
+                                orientation='horizontal')
+plt.show()
+#########
+
+exit()
 
 ######## compare with target mesh
 target_mesh=o3d.io.read_triangle_mesh(data_dir+'../lego_brick/target_mesh.stl')
@@ -236,7 +280,7 @@ min_bound=min_bound-margin
 max_bound=max_bound+margin
 bbox = o3d.geometry.AxisAlignedBoundingBox(min_bound=min_bound,max_bound=max_bound)
 target_mesh_target=target_mesh.crop(bbox)
-visualize_pcd([target_mesh_target,pcd_combined])
+# visualize_pcd([target_mesh_target,pcd_combined])
 
 ## calculate distance to mesh
 target_mesh_target_t = o3d.t.geometry.TriangleMesh.from_legacy(target_mesh_target)
@@ -249,10 +293,12 @@ min_dist=np.min(unsigned_distance)
 max_dist=np.max(unsigned_distance)
 print("unsigned distance", unsigned_distance)
 print("unsigned distance min", min_dist)
-print("unsigned distance min", max_dist)
+print("unsigned distance max", max_dist)
 low_bound=0
 high_bound=max_dist+0.1
 color_dist = plt.get_cmap("rainbow")((unsigned_distance-low_bound)/(high_bound-low_bound))
 pcd_combined_dist_target=deepcopy(pcd_combined)
 pcd_combined_dist_target.colors = o3d.utility.Vector3dVector(color_dist[:, :3])
-visualize_pcd([target_mesh_target,pcd_combined_dist_target])
+# visualize_pcd([target_mesh_target,pcd_combined_dist_target])
+
+print("Total time:",time,time.perf_counter()-st+dt)
