@@ -358,3 +358,5 @@ generated_src
 .vscode/
 
 scan/scan_merge/**/points*
+data/lego_brick/**/points*
+data/wall_weld_test/**/points*
