@@ -16,7 +16,7 @@
   <joint name="D500B_pose" type="fixed">
     <parent link="world"/>
     <child link="D500B_base_link"/>
-    <origin rpy="0.0 0.260913569 1.57" xyz="1.7482 -1.3208 0.4688"/><!--MA2010 pedestal-->
+    <origin rpy="0.0 -0.260913569 -1.5708" xyz="1.7482 -1.3208 0.4688"/><!--MA2010 pedestal-->
   </joint>
 
   <joint name="MA1440_pose" type="fixed">
