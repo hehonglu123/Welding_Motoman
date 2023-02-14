@@ -138,7 +138,7 @@ class robot_obj(object):
 			return Transform_all(pose_p_all,pose_R_all)
 	
 	def jacobian(self,q):
-		return robotjacobian(self.robot_def,q)
+		return robotjacobian(self.robot,q)
 
 	def inv(self,p,R=np.eye(3),last_joints=None):
 		pose=Transform(R,p)
