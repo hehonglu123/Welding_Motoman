@@ -61,7 +61,7 @@ class MotionSend(object):
 		# client=self.form_motion_cmd(client,primitives[:num_layers],q_bp[:num_layers],p_bp[:num_layers],[1,5,10,15]+[50]*20,1,arc)
 
 		client.ProgEnd()
-		client.execute_motion_program("AAA.JBI")
+		return client.execute_motion_program("AAA.JBI")
 
 	def form_motion_cmd(self,client,primitives,q_bp,p_bp,speed,zone,arc=False):
 		for i in range(len(primitives)):
@@ -164,10 +164,7 @@ class MotionSend(object):
 
 
 		client.ProgEnd()
-		client.execute_motion_program("AAA.JBI")
-		
-
-		return
+		return client.execute_motion_program("AAA.JBI")
 
 	def exec_motions_multimove(self,robot,positioner,primitives_robot,p_bp_robot,q_bp_robot,primitives_positioner,p_bp_positioner,q_bp_positioner,speed,zone):
 		client = MotionProgramExecClient(IP=self.IP,ROBOT_CHOICE=self.ROBOT_CHOICE_MAP[robot.robot_name],ROBOT_CHOICE2=self.ROBOT_CHOICE_MAP[positioner.robot_name],pulse2deg=robot.pulse2deg,pulse2deg2=positioner.pulse2deg)
@@ -176,7 +173,4 @@ class MotionSend(object):
 
 
 		client.ProgEnd()
-		client.execute_motion_program("AAA.JBI")
-		
-
-		return
+		return client.execute_motion_program("AAA.JBI")
