@@ -23,16 +23,20 @@ class redundancy_resolution(object):
 
 	def baseline_joint(self,R_torch,curve_sliced_relative,q_init=np.zeros(6)):
 		####baseline redundancy resolution, with fixed orientation
-		positioner_js=self.positioner_resolution()		#solve for positioner first
+		positioner_js=self.positioner_resolution(curve_sliced_relative)		#solve for positioner first
 	
 		curve_sliced_js=np.zeros((len(curve_sliced_relative),len(curve_sliced_relative[0]),6))
 		for i in range(len(curve_sliced_relative)):			#solve for robot invkin
 			for j in range(len(curve_sliced_relative[i])): 
 				###get positioner TCP world pose
 				positioner_pose=self.positioner.fwd(positioner_js[i][j],world=True)
-				p=positioner_pose.R@curve_sliced_relative[i,j,:3]+positioner_pose
+				p=positioner_pose.R@curve_sliced_relative[i][j,:3]+positioner_pose.p
+				print(positioner_js[i][j])
+				print(self.positioner.fwd(positioner_js[i][j]))
+				print(positioner_pose.p)
 				###solve for invkin
 				if i==0 and j==0:
+					print(p)
 					q=self.robot.inv(p,R_torch,last_joints=q_init)
 				else:
 					q=self.robot.inv(p,R_torch,last_joints=q_prev)
@@ -67,12 +71,16 @@ class redundancy_resolution(object):
 		return H_from_RT(R,T)
 
 
-	def positioner_resolution(self):
+	def positioner_resolution(self,curve_sliced_relative):
 		###resolve 2DOF positioner joint angle 
-		positioner_js=np.zeros((len(curve_sliced_relative),len(curve_sliced_relative[0]),2))
+		positioner_js=[]
 		for i in range(len(curve_sliced_relative)):
+			positioner_js_ith=[]
 			for j in range(len(curve_sliced_relative[i])):
-				positioner_js[i][j]=self.positioner.inv(curve_sliced_relative[i,j,:3],curve_sliced_relative[i,j,3:])
+				###curve normal as torch orientation, opposite of positioner
+				positioner_js_ith.append(self.positioner.inv(-curve_sliced_relative[i][j,3:]))
+
+			positioner_js.append(positioner_js_ith)
 		return positioner_js
 
 
@@ -104,9 +112,8 @@ def main():
 	for x in range(len(rr.curve_sliced)):
 		for i in range(len(rr.curve_sliced[x])):
 			curve_sliced_relative[x][i,:3]=np.dot(H,np.hstack((rr.curve_sliced[x][i,:3],[1])).T)[:-1]
-
-		#convert curve direction to base frame
-		curve_sliced_relative[x][i,3:]=np.dot(H[:3,:3],rr.curve_sliced[x][i,3:]).T
+			#convert curve direction to base frame
+			curve_sliced_relative[x][i,3:]=np.dot(H[:3,:3],rr.curve_sliced[x][i,3:]).T
 
 		if x==0:
 			ax.plot3D(curve_sliced_relative[x][::vis_step,0],curve_sliced_relative[x][::vis_step,1],curve_sliced_relative[x][::vis_step,2],'r.-')
@@ -117,7 +124,7 @@ def main():
 
 		ax.quiver(curve_sliced_relative[x][::vis_step,0],curve_sliced_relative[x][::vis_step,1],curve_sliced_relative[x][::vis_step,2],curve_sliced_relative[x][::vis_step,3],curve_sliced_relative[x][::vis_step,4],curve_sliced_relative[x][::vis_step,5],length=0.3, normalize=True)
 	
-	print(curve_sliced_relative[0][:,3:])
+
 	plt.title('0.1 blade first 3 layers')
 	plt.show()
 
