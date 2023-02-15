@@ -23,7 +23,9 @@ class redundancy_resolution(object):
 	def baseline_joint(self,R_torch,curve_sliced_relative,q_init=np.zeros(6)):
 		####baseline redundancy resolution, with fixed orientation
 		positioner_js=self.positioner_resolution(curve_sliced_relative)		#solve for positioner first
-	
+		###override first layer positioner q2
+		positioner_js[0][:,1]=positioner_js[1][-1,1]
+
 		curve_sliced_js=[]
 		for i in range(len(curve_sliced_relative)):			#solve for robot invkin
 			curve_sliced_js_ith=[]
@@ -32,7 +34,7 @@ class redundancy_resolution(object):
 				positioner_pose=self.positioner.fwd(positioner_js[i][j],world=True)
 				p=positioner_pose.R@curve_sliced_relative[i][j,:3]+positioner_pose.p
 				# print(positioner_js[i][j])
-				# print(positioner_pose.R@curve_sliced_relative[i][j,3:])
+				print(positioner_pose.R@curve_sliced_relative[i][j,3:])
 				# print(self.positioner.fwd(positioner_js[i][j]))
 				# print(positioner_pose.p)
 				###solve for invkin
@@ -81,11 +83,14 @@ class redundancy_resolution(object):
 		positioner_js=[]
 		for i in range(len(curve_sliced_relative)):
 			positioner_js_ith=[]
-			for j in range(len(curve_sliced_relative[i])):
+			q_prev=[0,0]
+			for j in reversed(range(len(curve_sliced_relative[i]))):	###reverse, solve from the end because start may be upward
 				###curve normal as torch orientation, opposite of positioner
-				positioner_js_ith.append(self.positioner.inv(-curve_sliced_relative[i][j,3:]))
+				positioner_js_ith.append(self.positioner.inv(-curve_sliced_relative[i][j,3:],q_prev))
+				q_prev=positioner_js_ith[-1]
 
-			positioner_js.append(positioner_js_ith)
+			positioner_js_ith.reverse()
+			positioner_js.append(np.array(positioner_js_ith))
 		return positioner_js
 
 

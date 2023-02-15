@@ -233,13 +233,21 @@ class positioner_obj(object):
 		###n: normal direction at the desired tcp wrt. positioner eef
 		###[q1,q2]: result joint angles that brings n to [0,0,1]
 		if n[2]==1:	##if already up, infinite solutions
-			return np.array([0,q_seed[1]])
+			return np.array([0-np.radians(15),q_seed[1]])
 		q2=np.arctan2(n[1],n[0])
 		q1=np.arctan2(n[0]*np.cos(q2)+n[1]*np.sin(q2),n[2])
-		# q1=np.arcsin(1/(-n[0]*np.cos(q2)+n[1]*np.sin(q2)+n[2]))
 
-		# return np.array([q1,q2])		###2 solutions, 180 apart couple
-		return np.array([q1-np.radians(15),q2])		###2 solutions, 180 apart couple
+		solutions = self.get_eq_solution([q1,q2])
+		solutions[0][0]-=np.radians(15)
+		solutions[1][0]-=np.radians(15)		###manual adjustment for tilt angle
+
+		theta_dist = np.linalg.norm(np.subtract(solutions,q_seed), axis=1)
+		return solutions[np.argsort(theta_dist)[0]]
+
+	def get_eq_solution(self,q):		
+		solution2=[-q[0],q[1]-np.sign(q[1])*np.pi]
+
+		return np.array([q,solution2])
 
 class Transform_all(object):
 	def __init__(self, p_all, R_all):

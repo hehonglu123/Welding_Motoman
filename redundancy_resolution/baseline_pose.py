@@ -10,7 +10,7 @@ def main():
 	dataset='blade0.1/'
 	sliced_alg='NX_slice2/'
 	data_dir='../data/'+dataset+sliced_alg
-	num_layers=3
+	num_layers=5
 	curve_sliced=[]
 	for i in range(num_layers):
 		curve_sliced.append(np.loadtxt(data_dir+'curve_sliced/slice'+str(i)+'.csv',delimiter=','))
@@ -53,8 +53,6 @@ def main():
 	plt.show()
 
 
-
-	# positioner_js,curve_sliced_js=rr.baseline(R_torch,q_seed)
 
 if __name__ == '__main__':
 	main()
