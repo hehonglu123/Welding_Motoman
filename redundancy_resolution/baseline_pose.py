@@ -8,7 +8,7 @@ from robot_def import *
 
 def main():
 	dataset='blade0.1/'
-	sliced_alg='NX_slice/'
+	sliced_alg='NX_slice2/'
 	data_dir='../data/'+dataset+sliced_alg
 	num_layers=3
 	curve_sliced=[]
