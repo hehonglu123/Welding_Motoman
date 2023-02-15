@@ -8,7 +8,7 @@ from robot_def import *
 
 def main():
 	dataset='blade0.1/'
-	sliced_alg='NX_slice/'
+	sliced_alg='NX_slice2/'
 	data_dir='../data/'+dataset+sliced_alg
 	num_layers=3
 	curve_sliced_relative=[]
@@ -30,6 +30,10 @@ def main():
 	H=np.loadtxt(data_dir+'curve_pose.csv',delimiter=',')
 
 	positioner_js,curve_sliced_js=rr.baseline_joint(R_torch,curve_sliced_relative)
+
+	for i in range(num_layers):
+		np.savetxt(data_dir+'curve_sliced_js/D500B_js'+str(i)+'.csv',positioner_js[i],delimiter=',')
+		np.savetxt(data_dir+'curve_sliced_js/MA2010_js'+str(i)+'.csv',curve_sliced_js[i],delimiter=',')
 
 
 

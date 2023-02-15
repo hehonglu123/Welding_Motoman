@@ -24,23 +24,28 @@ class redundancy_resolution(object):
 		####baseline redundancy resolution, with fixed orientation
 		positioner_js=self.positioner_resolution(curve_sliced_relative)		#solve for positioner first
 	
-		curve_sliced_js=np.zeros((len(curve_sliced_relative),len(curve_sliced_relative[0]),6))
+		curve_sliced_js=[]
 		for i in range(len(curve_sliced_relative)):			#solve for robot invkin
+			curve_sliced_js_ith=[]
 			for j in range(len(curve_sliced_relative[i])): 
 				###get positioner TCP world pose
 				positioner_pose=self.positioner.fwd(positioner_js[i][j],world=True)
 				p=positioner_pose.R@curve_sliced_relative[i][j,:3]+positioner_pose.p
-				print(positioner_js[i][j])
-				print(positioner_pose.R@curve_sliced_relative[i][j,3:])
-				print(self.positioner.fwd(positioner_js[i][j]))
-				print(positioner_pose.p)
+				# print(positioner_js[i][j])
+				# print(positioner_pose.R@curve_sliced_relative[i][j,3:])
+				# print(self.positioner.fwd(positioner_js[i][j]))
+				# print(positioner_pose.p)
 				###solve for invkin
 				if i==0 and j==0:
 					print('starting p: ',p)
-					q=self.robot.inv(p,R_torch,last_joints=q_init)
-				else:
-					q=self.robot.inv(p,R_torch,last_joints=q_prev)
+					q=self.robot.inv(p,R_torch,last_joints=q_init)[0]
 					q_prev=q
+				else:
+					q=self.robot.inv(p,R_torch,last_joints=q_prev)[0]
+					q_prev=q
+
+				curve_sliced_js_ith.append(q)
+			curve_sliced_js.append(np.array(curve_sliced_js_ith))
 
 		return positioner_js,curve_sliced_js
 
