@@ -1,4 +1,3 @@
-from distutils.command.config import config
 import sys
 sys.path.append('../../toolbox/')
 from robot_def import *
@@ -13,7 +12,7 @@ import time
 import numpy as np
 from math import ceil
 
-data_dir='../../data/wall_weld_test/static_path_scan1'
+data_dir='../../data/wall_weld_test/static_wall_test1'
 config_dir='../../config/'
 
 scan_resolution=10 #scan every 5 mm
@@ -29,7 +28,7 @@ scanner_client=RRN.ConnectService('rr+tcp://192.168.55.27:64238?service=scanner'
 robot_client=MotionProgramExecClient(ROBOT_CHOICE='RB2',ROBOT_CHOICE2='ST1',pulse2deg=robot.pulse2deg,pulse2deg_2=turn_table.pulse2deg)
 
 # the path
-q1=np.array([43.9704, 69.2684, 39.7750, -78.7448, 25.0877, 88.1245])
+# q1=np.array([43.9704, 69.2684, 39.7750, -78.7448, 25.0877, 88.1245])
 q2=np.array([28.7058, 52.7440, 0.3853, 58.5666, 89.9525, -30.5505])
 q3=np.array([32.5383, 52.5302, 6.9630, 65.8277, 70.3430, -37.1343])
 q4=np.array([34.7476, 55.2934, 12.0979, 64.8555, 67.9181, -38.7352])
@@ -46,8 +45,8 @@ t3=[-15,260]
 t4=[-15,300]
 t5=[-15,340]
 
-robot_path=[q1,q6,q7,q8,q9,q2,q3,q4,q5,q4,q3,q2,q4,q2,q6,q7,q8,q9,q2,q3,q4,q5,q3]
-table_path=[t1,t1,t1,t1,t1,t1,t1,t1,t1,t1,t2,t3,t4,t5,t5,t5,t5,t5,t5,t5,t5,t5,t1]
+robot_path=[q6,q7,q8,q9,q2,q3,q4,q5,q4,q3,q2,q4,q2,q6,q7,q8,q9,q2,q3,q4,q5,q3]
+table_path=[t1,t1,t1,t1,t1,t1,t1,t1,t1,t2,t3,t4,t5,t5,t5,t5,t5,t5,t5,t5,t5,t1]
 
 # for path_i in range(len(robot_path)-1):
 #     print(np.linalg.norm(robot.fwd(np.radians(robot_path[path_i])).p-robot.fwd(np.radians(robot_path[path_i+1])).p))
@@ -57,7 +56,7 @@ scan_count=0
 joint_scan_poses=[]
 
 ## move to start
-robot_client.MoveJ(q1, 10, 0, target2=['MOVJ',t1,3,0])
+robot_client.MoveJ(q6, 5, 0, target2=['MOVJ',[-15,180],3,0])
 robot_client.ProgEnd()
 timestamps, joint_recording=robot_client.execute_motion_program("AAA.JBI")
 print('Current pose:',np.degrees(joint_recording[-1]), ',Scan Count:',scan_count)
@@ -76,7 +75,10 @@ for path_i in range(1,len(robot_path)):
     for this_path_i in range(1,path_steps):
         # print(this_robot_path[this_path_i],this_table_path[this_path_i])
         # time.sleep(0.5)
-        robot_client.MoveJ(this_robot_path[this_path_i], 10, 0, target2=['MOVJ',this_table_path[this_path_i],3,0])
+        robot_client = MotionProgramExecClient(ROBOT_CHOICE='RB2', ROBOT_CHOICE2='ST1', pulse2deg=robot.pulse2deg,
+                                               pulse2deg_2=turn_table.pulse2deg)
+
+        robot_client.MoveJ(this_robot_path[this_path_i], 5, 0, target2=['MOVJ',this_table_path[this_path_i],3,0])
         robot_client.ProgEnd()
         timestamps, joint_recording=robot_client.execute_motion_program("AAA.JBI")
         print('Current pose:',np.degrees(joint_recording[-1]), ',Scan Count:',scan_count)
@@ -87,4 +89,5 @@ for path_i in range(1,len(robot_path)):
         scan_count+=1
     print("change target")
 
-np.savetxt(data_dir + 'scan_js_exe.csv',scan_points,delimiter=',')
+# save poses
+np.savetxt(data_dir + 'scan_js_exe.csv',joint_scan_poses,delimiter=',')
