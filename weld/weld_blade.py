@@ -41,4 +41,4 @@ for i in range(num_layers):
 
     
 client.ProgEnd()
-# client.execute_motion_program("AAA.JBI") 
+client.execute_motion_program("AAA.JBI") 
