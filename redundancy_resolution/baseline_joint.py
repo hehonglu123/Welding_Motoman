@@ -21,6 +21,7 @@ def main():
 		pulse2deg_file_path='../config/MA_2010_A0_pulse2deg.csv',d=20)
 	positioner=positioner_obj('D500B',def_path='../config/D500B_robot_default_config.yml',pulse2deg_file_path='../config/D500B_pulse2deg.csv',base_transformation_file='../config/D500B_pose.csv')
 
+
 	R_torch=np.array([[ 0.7071, -0.7071, -0.    ],
 			[-0.7071, -0.7071,  0.    ],
 			[-0.,      0.,     -1.    ]])
