@@ -11,7 +11,7 @@ data_dir='../data/'+dataset+sliced_alg
 cmd_dir=data_dir+'cmd/50J/'
 
 num_points_layer=50
-num_layers=3
+num_layers=4
 curve_sliced_relative=[]
 curve_sliced_js=[]
 positioner_js=[]
@@ -41,4 +41,4 @@ for i in range(num_layers):
 
     
 client.ProgEnd()
-client.execute_motion_program("AAA.JBI") 
+# client.execute_motion_program("AAA.JBI") 

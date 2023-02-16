@@ -6,7 +6,7 @@ from qpsolvers import solve_qp
 
 sys.path.append('../toolbox')
 from robot_def import *
-# from lambda_calc import *
+from path_calc import *
 # from utils import *
 
 class redundancy_resolution(object):
@@ -34,7 +34,7 @@ class redundancy_resolution(object):
 				positioner_pose=self.positioner.fwd(positioner_js[i][j],world=True)
 				p=positioner_pose.R@curve_sliced_relative[i][j,:3]+positioner_pose.p
 				# print(positioner_js[i][j])
-				print(positioner_pose.R@curve_sliced_relative[i][j,3:])
+				# print(positioner_pose.R@curve_sliced_relative[i][j,3:])
 				# print(self.positioner.fwd(positioner_js[i][j]))
 				# print(positioner_pose.p)
 				###solve for invkin
@@ -90,7 +90,15 @@ class redundancy_resolution(object):
 				q_prev=positioner_js_ith[-1]
 
 			positioner_js_ith.reverse()
+			positioner_js_ith=np.array(positioner_js_ith)
+
+			###filter noise
+			positioner_js_ith[:,0]=moving_average(positioner_js_ith[:,0],padding=True)
+			positioner_js_ith[:,1]=moving_average(positioner_js_ith[:,1],padding=True)
+
 			positioner_js.append(np.array(positioner_js_ith))
+
+		
 		return positioner_js
 
 
