@@ -20,17 +20,17 @@ q3=[-15,180]
 
 	
 client=MotionProgramExecClient(IP='192.168.1.31',ROBOT_CHOICE='RB1',pulse2deg=robot1.pulse2deg)
-client.MoveJ(q1,1,0)
+client.MoveJ(q1,2,0)
 client.ProgEnd()
 client.execute_motion_program("AAA.JBI")
 
 client=MotionProgramExecClient(IP='192.168.1.31',ROBOT_CHOICE='RB2',pulse2deg=robot2.pulse2deg)
-client.MoveJ(q2,1,0)
+client.MoveJ(q2,2,0)
 client.ProgEnd()
 client.execute_motion_program("AAA.JBI")
 
 client=MotionProgramExecClient(IP='192.168.1.31',ROBOT_CHOICE='ST1',pulse2deg=station_pulse2deg)
-client.MoveJ(q3,1,0)
+client.MoveJ(q3,2,0)
 client.ProgEnd()
 client.execute_motion_program("AAA.JBI")
 
