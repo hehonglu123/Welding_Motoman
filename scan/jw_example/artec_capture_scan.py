@@ -66,7 +66,9 @@ scan_res = scan_run.get_res()
 
 model_handle = scan_res.model_handle
 
-print(model_handle)
+print(model_handle.scan_count)
+
+exit()
 
 try:
     c.model_save(model_handle, project_name)
