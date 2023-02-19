@@ -19,12 +19,29 @@ class redundancy_resolution(object):
 		self.positioner=positioner
 		self.curve_sliced=curve_sliced
 	
+	def introducing_tolerance(self,positioner_js):
+		###conditional rolling average
+		tolerance=np.radians(1)
+		steps=20
+		for i in range(1,len(positioner_js)):
+			for j in range(len(positioner_js[i])):
+				if get_angle(self.positioner.fwd(positioner_js[i][j],world=True).R[:,-1],[0,0,1])<tolerance:
+					positioner_js[i][j]=np.average(positioner_js[i][max(0,j-steps):min(len(positioner_js[i])-1,j+steps)],axis=0)
+			###reverse
+			for j in reversed(range(len(positioner_js[i]))):
+				if get_angle(self.positioner.fwd(positioner_js[i][j],world=True).R[:,-1],[0,0,1])<tolerance:
+					positioner_js[i][j]=np.average(positioner_js[i][max(0,j-steps):min(len(positioner_js[i])-1,j+steps)],axis=0)
+
+		return positioner_js
 
 	def baseline_joint(self,R_torch,curve_sliced_relative,q_init=np.zeros(6)):
 		####baseline redundancy resolution, with fixed orientation
 		positioner_js=self.positioner_resolution(curve_sliced_relative)		#solve for positioner first
-		###override first layer positioner q2
+		###TO FIX: override first layer positioner q2
 		positioner_js[0][:,1]=positioner_js[1][-1,1]
+		positioner_js=self.introducing_tolerance(positioner_js)
+		positioner_js=self.introducing_tolerance(positioner_js)
+
 
 		curve_sliced_js=[]
 		for i in range(len(curve_sliced_relative)):			#solve for robot invkin

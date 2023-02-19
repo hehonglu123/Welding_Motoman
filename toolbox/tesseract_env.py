@@ -14,7 +14,7 @@ from qpsolvers import solve_qp
 from scipy.optimize import fminbound
 
 from gazebo_model_resource_locator import GazeboModelResourceLocator
-from robots_def import *
+from robot_def import *
 
 #convert 4x4 H matrix to 3x3 H matrix and inverse for mapping obj to robot frame
 def H42H3(H):
@@ -33,14 +33,14 @@ class Tess_Env(object):
 		D500B_joint_names=["D500B_joint_1","D500B_joint_2"]
 		D500B_link_names=["D500B_base_link","D500B_link_1","D500B_link_2"]
 		#Robot dictionaries, all reference by name
-		self.robot_linkname={'MA2010':MA2010_link_names,'D500B':D500B_link_names}
-		self.robot_jointname={'MA2010':MA2010_joint_names,'D500B':D500B_joint_names}
+		self.robot_linkname={'MA2010_A0':MA2010_link_names,'D500B':D500B_link_names}
+		self.robot_jointname={'MA2010_A0':MA2010_joint_names,'D500B':D500B_joint_names}
 		
 
 		######tesseract environment setup:
-		with open(urdf_path+'combined.urdf','r') as f:
+		with open(urdf_path+'.urdf','r') as f:
 			combined_urdf = f.read()
-		with open(urdf_path+'combined.srdf','r') as f:
+		with open(urdf_path+'.srdf','r') as f:
 			combined_srdf = f.read()
 
 		self.t_env= Environment()
@@ -110,17 +110,26 @@ class Tess_Env(object):
 		trajectory_json["trajectory"] = trajectory2.tolist()
 		self.viewer.trajectory_json=json.dumps(trajectory_json)
 
+	def viewer_trajectory_dual(self,robot_name1,robot_name2,curve_js1,curve_js2):
+		trajectory_json = dict()
+		trajectory_json["use_time"] = True
+		trajectory_json["loop_time"] = 20
+		trajectory_json["joint_names"] = self.robot_jointname[robot_name1]+self.robot_jointname[robot_name2]
+		trajectory2 = np.hstack((curve_js1,curve_js2,np.linspace(0,10,num=len(curve_js1))[np.newaxis].T))
+		trajectory_json["trajectory"] = trajectory2.tolist()
+		self.viewer.trajectory_json=json.dumps(trajectory_json)
+
 
 def main():
 
 
-	t=Tess_Env('../config/urdf/')				#create obj
+	t=Tess_Env('../config/urdf/combined')				#create obj
 	
 	input("Press enter to quit")
 	#stop background checker
 
 def collision_test():
-	t=Tess_Env('../config/urdf/')				#create obj
+	t=Tess_Env('../config/urdf/combined')				#create obj
 	###place part in place
 	curve_pose=np.loadtxt('data/wood/baseline/curve_pose.csv',delimiter=',')
 	curve_pose[:3,-1]=curve_pose[:3,-1]/1000.

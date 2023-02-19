@@ -16,7 +16,7 @@
   <joint name="D500B_pose" type="fixed">
     <parent link="world"/>
     <child link="D500B_base_link"/>
-    <origin rpy="0.0 -0.260913569 -1.5708" xyz="1.7482 -1.3208 0.4688"/><!--MA2010 pedestal-->
+    <origin rpy="0.0 -0.261799 -1.5708" xyz="1.645 -0.8446 0.4688"/><!--MA2010 pedestal-->
   </joint>
 
   <joint name="MA1440_pose" type="fixed">
@@ -148,6 +148,7 @@
       </geometry>
     </collision>
   </link>
+
   <!-- end of link list -->
   <!-- joint list -->
   <joint name="MA2010_joint_1_s" type="revolute">
@@ -199,6 +200,27 @@
     <axis xyz="0 0 1"/>
   </joint>
   <!-- end of joint list -->
+  <link name="weldgun">
+    <visual>
+      <geometry>
+        <mesh filename="model://MA_2010_A0/meshes/visual/weldgun.stl" scale="0.001 0.001 0.001"/>
+      </geometry>
+      <material name="">
+        <color rgba="0.12941176470588237 0.88 0.7490196078431373 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="model://MA_2010_A0/meshes/collision/weldgun.stl" scale="0.001 0.001 0.001"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="weldgun_joint" type="fixed">
+    <parent link="MA2010_link_6_t"/>
+    <child link="weldgun"/>
+    <origin rpy="0 1.57 0" xyz="0.1 0 0"/>
+    <axis xyz="0 0 0"/>
+  </joint>
 
 
 
