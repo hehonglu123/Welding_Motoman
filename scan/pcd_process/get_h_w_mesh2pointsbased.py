@@ -22,12 +22,14 @@ import pickle
 
 table_colors = list(mcolors.TABLEAU_COLORS.values())
 
-data_dir='../../data/wall_weld_test/test3_2/'
+data_dir='../../data/wall_weld_test/test4/150_ipm_1st_layer/'
 config_dir='../../config/'
 
 ######## read the combined point clouds
-scanned_points = o3d.io.read_point_cloud(data_dir+'processed_pcd.pcd')
-print(len(scanned_points.points))
+scanned_points_mesh = o3d.io.read_triangle_mesh(data_dir+'processed_pcd.stl')
+
+scanned_points = scanned_points_mesh.sample_points_uniformly(number_of_points=1110000)
+# visualize_pcd([scanned_points_mesh,scanned_points])
 
 ###################### get the welding pieces ##################
 # This part will be replaced by welding path in the future
@@ -38,6 +40,7 @@ plane_model, inliers = scanned_points.segment_plane(distance_threshold=0.75,
                                          num_iterations=3000)
 # display_inlier_outlier(scanned_points,inliers)
 ## Transform the plane to z=0
+
 plain_norm = plane_model[:3]/np.linalg.norm(plane_model[:3])
 k = np.cross(plain_norm,[0,0,1])
 k = k/np.linalg.norm(k)
@@ -46,6 +49,7 @@ Transz0 = Transform(rot(k,theta),[0,0,0])*\
 			Transform(np.eye(3),[0,0,plane_model[3]/plane_model[2]])
 Transz0_H=H_from_RT(Transz0.R,Transz0.p)
 scanned_points.transform(Transz0_H)
+# visualize_pcd([scanned_points])
 ### now the distance to plane is the z axis
 
 # x-axis box
@@ -57,8 +61,8 @@ box_move[2,3]=-5
 x_axis_mesh.transform(box_move)
 
 ## Transform such that the path is in x-axis
-rotation_theta=np.radians(-89) ## rotation angle such that path align x-axis
-translation_p = np.array([118,5,0]) ## Translation is less matters here
+rotation_theta=np.radians(-1) ## rotation angle such that path align x-axis
+translation_p = np.array([0,0,0]) ## Translation is less matters here
 Trans_zaxis=np.eye(4)
 Trans_zaxis[:3,:3]=rot([0,0,1],rotation_theta)
 Trans_zaxis[:3,3]=translation_p
@@ -67,24 +71,27 @@ scanned_points.transform(Trans_zaxis)
 # bbox for each weld
 bbox_mesh = o3d.geometry.TriangleMesh.create_box(width=85, height=20, depth=0.1)
 box_move=np.eye(4)
-box_move[0,3]=1
-box_move[1,3]=-119
+box_move[0,3]=-32 # x-axis
+box_move[1,3]=-25 # y-axis
 box_move[2,3]=1
 bbox_mesh.transform(box_move)
 
-bbox_1_min=(1,-31,-10)
-bbox_1_max=(86,-11,100)
-bbox_2_min=(1,-57,-10)
-bbox_2_max=(86,-37,100)
-bbox_3_min=(1,-85,-10)
-bbox_3_max=(86,-65,100)
-bbox_4_min=(0,-112,-10)
-bbox_4_max=(85,-92,100)
-bbox_5_min=(0,-139,-10)
-bbox_5_max=(85,-119,100)
+bbox_1_min=(-32,-52,-10)
+bbox_1_max=(53,-32,100)
 
-boxes_min=[bbox_1_min,bbox_2_min,bbox_3_min,bbox_4_min,bbox_5_min]
-boxes_max=[bbox_1_max,bbox_2_max,bbox_3_max,bbox_4_max,bbox_5_max]
+# bbox_2_min=(1,-57,-10)
+# bbox_2_max=(86,-37,100)
+
+
+# bbox_3_min=(1,-85,-10)
+# bbox_3_max=(86,-65,100)
+# bbox_4_min=(0,-112,-10)
+# bbox_4_max=(85,-92,100)
+
+# boxes_min=[bbox_1_min,bbox_2_min,bbox_3_min,bbox_4_min]
+# boxes_max=[bbox_1_max,bbox_2_max,bbox_3_max,bbox_4_max]
+boxes_min=[bbox_1_min]
+boxes_max=[bbox_1_max]
 
 bbox = o3d.geometry.AxisAlignedBoundingBox(min_bound=(-1e5,-1e5,-1e5),max_bound=(1e5,1e5,1e5))
 scanned_points=scanned_points.crop(bbox)
@@ -103,7 +110,9 @@ for weld_i in range(len(boxes_min)):
     all_welds_height.append({})
 
 ##### cross section parameters
-z_height_start=1.5
+z_height_start=0.5
+
+
 resolution_z=0.1
 windows_z=0.2
 resolution_x=0.1
