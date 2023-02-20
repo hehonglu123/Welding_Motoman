@@ -47,7 +47,7 @@ config_dir='../../config/'
 
 
 ######## read the combined mesh
-scanned_points = o3d.io.read_point_cloud(data_dir+'processed_pcd_recursive.pcd')
+scanned_points = o3d.io.read_point_cloud(data_dir+'processed_pcd.pcd')
 # visualize_pcd([scanned_points])
 ####### plane segmentation
 

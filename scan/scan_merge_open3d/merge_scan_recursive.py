@@ -39,7 +39,7 @@ def visualize_pcd(show_pcd_list):
 	o3d.visualization.draw_geometries(show_pcd_list,width=960,height=540)
 	# o3d.visualization.draw(show_pcd_list,width=960,height=540)
 
-data_dir='../../data/wall_weld_test/test3_1/'
+data_dir='../../data/wall_weld_test/test3_2/'
 config_dir='../../config/'
 
 scan_resolution=5 #scan every 5 mm
@@ -100,7 +100,7 @@ for i in range(len(curve)):
 		### ICP registration
 		if i!=0:
 			trans_init=np.eye(4)
-			threshold = 1
+			threshold = 10
 			reg_p2p = o3d.pipelines.registration.registration_icp(
 			pcd, pcd_combined, threshold, trans_init,
 			o3d.pipelines.registration.TransformationEstimationPointToPoint())
@@ -117,10 +117,6 @@ for i in range(len(curve)):
 		pcd_combined_noicp += pcd
 		dt=dt+time.perf_counter()-st
 
-pcd_combined.paint_uniform_color([1,0,0])
-pcd_combined_noicp.paint_uniform_color([0,0.8,0])
-visualize_pcd([pcd_combined,pcd_combined_noicp])
-
 st=time.perf_counter()
 
 voxel_down_flag=True
@@ -132,6 +128,11 @@ cluster_based_outlier_remove=True
 ## voxel down sample
 if voxel_down_flag:
 	pcd_combined = pcd_combined.voxel_down_sample(voxel_size=voxel_size)
+	pcd_combined_noicp = pcd_combined_noicp.voxel_down_sample(voxel_size=voxel_size)
+
+pcd_combined.paint_uniform_color([1,0,0])
+pcd_combined_noicp.paint_uniform_color([0,0.8,0])
+visualize_pcd([pcd_combined,pcd_combined_noicp])
 
 ## crop point clouds
 if crop_flag:
