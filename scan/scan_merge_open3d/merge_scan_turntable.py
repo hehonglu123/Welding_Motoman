@@ -86,11 +86,12 @@ min_points=50
 ######################
 
 pcd_combined = o3d.geometry.PointCloud()
+pcd_combined_noicp = o3d.geometry.PointCloud()
 dt=0
 for i in range(len(curve)):
 # for i in range(5):
-	# if (joints_p[i,-1]- joints_p[0,-1])!=0:
-	# 	continue
+	if (joints_p[i,-1]- joints_p[0,-1])!=0:
+		continue
 	points = np.loadtxt(data_dir + 'points_'+str(i)+'.csv',delimiter=",", dtype=np.float64)
 	# print(len(points))
 	
@@ -105,24 +106,26 @@ for i in range(len(curve)):
 	pcd = o3d.geometry.PointCloud()
 	pcd.points=o3d.utility.Vector3dVector(points)
 	### ICP registration
-	# if joints_p[i,-1]!= joints_p[0,-1]:
-	# 	trans_init=np.eye(4)
-	# 	threshold = 10
-	# 	reg_p2p = o3d.pipelines.registration.registration_icp(
-	# 	pcd, pcd_combined, threshold, trans_init,
-	# 	o3d.pipelines.registration.TransformationEstimationPointToPoint())
-	# 	print(reg_p2p.transformation)
-	# 	pcd.transform(reg_p2p.transformation)
+	if i!=0:
+		trans_init=np.eye(4)
+		threshold = 1
+		reg_p2p = o3d.pipelines.registration.registration_icp(
+		pcd, pcd_combined, threshold, trans_init,
+		o3d.pipelines.registration.TransformationEstimationPointToPoint())
+		print(reg_p2p.transformation)
+		pcd.transform(reg_p2p.transformation)
 	## voxel down sample
 	pcd = pcd.voxel_down_sample(voxel_size=voxel_size)
 	## add to combined pcd
 	pcd_combined += pcd
+	if i!=0:
+		pcd.transform(np.linalg.inv(reg_p2p.transformation))
+	pcd_combined_noicp += pcd
 	dt=dt+time.perf_counter()-st
 
 	print("pose ",i,", dq",np.degrees(joints_p[i,-1]-joints_p[0,-1]))
 	# if joints_p[i,-1]!= joints_p[0,-1]:
 	# 	visualize_pcd([pcd_combined])
-exit()
 
 st=time.perf_counter()
 
@@ -135,6 +138,11 @@ cluster_based_outlier_remove=True
 ## voxel down sample
 if voxel_down_flag:
 	pcd_combined = pcd_combined.voxel_down_sample(voxel_size=voxel_size)
+	pcd_combined_noicp = pcd_combined_noicp.voxel_down_sample(voxel_size=voxel_size)
+
+pcd_combined.paint_uniform_color([1,0,0])
+pcd_combined_noicp.paint_uniform_color([0,0.8,0])
+visualize_pcd([pcd_combined,pcd_combined_noicp])
 
 ## crop point clouds
 if crop_flag:

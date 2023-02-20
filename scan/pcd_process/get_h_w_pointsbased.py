@@ -105,9 +105,11 @@ bbox_5_max=(124,-31,100)
 boxes_min=[bbox_1_min,bbox_2_min,bbox_3_min,bbox_4_min,bbox_5_min]
 boxes_max=[bbox_1_max,bbox_2_max,bbox_3_max,bbox_4_max,bbox_5_max]
 
-# visualize_pcd([scanned_points])
+bbox = o3d.geometry.AxisAlignedBoundingBox(min_bound=(-1e5,-118,-1e5),max_bound=(1e5,-29,1e5))
+scanned_points=scanned_points.crop(bbox)
+visualize_pcd([scanned_points])
 ##### plot
-plot_flag=False
+plot_flag=True
 
 ##### store cross section data
 all_welds_width=[]
@@ -215,7 +217,14 @@ for z in np.arange(1.5,z_max+resolution_z,resolution_z):
         # welds_points.paint_uniform_color([0, 0.8, 0])
         visualize_pcd([all_welds_points])
         axw.set_ylim([0, axw.get_ylim()[1]+axw.get_ylim()[1]/5])
+        axw.tick_params(axis="x", labelsize=14) 
+        axw.tick_params(axis="y", labelsize=14) 
+        axw.set_ylabel('width (mm)',fontsize=16)
         axh.set_ylim([0, axh.get_ylim()[1]+axh.get_ylim()[1]/5])
+        axh.tick_params(axis="x", labelsize=14) 
+        axh.tick_params(axis="y", labelsize=14) 
+        axh.set_ylabel('height (mm)',fontsize=16)
+        plt.xlabel('y-axis (mm)',fontsize=16)
         plt.legend()
         plt.show()
     # exit()

@@ -23,8 +23,8 @@ table_colors = list(mcolors.TABLEAU_COLORS.values())
 data_dir='../../data/wall_weld_test/test3_2/'
 config_dir='../../config/'
 
-all_welds_width = pickle.load(open(data_dir+'all_welds_width.pickle','rb'))
-all_welds_height = pickle.load(open(data_dir+'all_welds_height.pickle','rb'))
+all_welds_width = pickle.load(open(data_dir+'all_welds_width_recursive.pickle','rb'))
+all_welds_height = pickle.load(open(data_dir+'all_welds_height_recursive.pickle','rb'))
 
 for weld_i in range(len(all_welds_width)):
     welds_width=all_welds_width[weld_i]
