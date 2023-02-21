@@ -93,6 +93,19 @@ for weld_i in range(len(all_welds_width)):
     grid_x, grid_y = np.mgrid[z_min:z_max:z_resolution, x_min:x_max:x_resolution]
     grid_width = griddata(all_points_with_width, all_width_plot, (grid_x, grid_y), method='cubic')
     grid_width = np.clip(grid_width,0,np.max(all_width_plot))
+
+    while True:
+        h_input = input("Which height (mm) do you want? (press q to leave)")
+        if h_input == 'q':
+            break
+        h_input = float(h_input)
+        wid = np.argsort(np.abs(grid_x[:,0]-h_input))[0]
+        data = deepcopy(grid_width[wid])
+        data[data < 0.5] = np.nan
+        print("Mean Width",np.nanmean(data), "at",h_input)
+        print("Max Width",np.nanmax(data), "at",h_input)
+        print("Min Width",np.nanmin(data), "at",h_input)
+
     plt.imshow(grid_width[::-1])
     plt.xticks(np.arange(len(grid_y[0]))[::int(len(grid_y[0])/10)],np.round(grid_y[0][::int(len(grid_y[0])/10)],1),fontsize=14)
     plot_y = grid_x[:,0][::-1]
