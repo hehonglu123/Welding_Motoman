@@ -29,7 +29,7 @@ config_dir='../../config/'
 scanned_points_mesh = o3d.io.read_triangle_mesh(data_dir+'processed_pcd.stl')
 
 scanned_points = scanned_points_mesh.sample_points_uniformly(number_of_points=1110000)
-# visualize_pcd([scanned_points_mesh,scanned_points])
+visualize_pcd([scanned_points_mesh,scanned_points])
 
 ###################### get the welding pieces ##################
 # This part will be replaced by welding path in the future
