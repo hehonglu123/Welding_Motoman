@@ -95,7 +95,7 @@ for weld_i in range(len(all_welds_width)):
     grid_width = np.clip(grid_width,0,np.max(all_width_plot))
 
     while True:
-        h_input = input("Which height (mm) do you want? (press q to leave)")
+        h_input = input("Which height (mm) do you want? (press q to leave) ")
         if h_input == 'q':
             break
         h_input = float(h_input)
