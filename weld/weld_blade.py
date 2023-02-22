@@ -11,7 +11,7 @@ data_dir='../data/'+dataset+sliced_alg
 cmd_dir=data_dir+'cmd/50J/'
 
 num_points_layer=50
-num_layers=2
+num_layers=5
 curve_sliced_relative=[]
 curve_sliced_js=[]
 positioner_js=[]
@@ -28,7 +28,7 @@ client=MotionProgramExecClient(ROBOT_CHOICE='RB1',ROBOT_CHOICE2='ST1',pulse2deg=
 
 
 for i in range(num_layers):
-	if i % 2==0:
+	if i % 2==1:
 		breakpoints=np.linspace(0,len(curve_sliced_js[i])-1,num=num_points_layer).astype(int)
 	else:
 		breakpoints=np.linspace(len(curve_sliced_js[i])-1,0,num=num_points_layer).astype(int)
