@@ -38,7 +38,7 @@ class redundancy_resolution(object):
 		####baseline redundancy resolution, with fixed orientation
 		positioner_js=self.positioner_resolution(curve_sliced_relative)		#solve for positioner first
 		###TO FIX: override first layer positioner q2
-		positioner_js[0][:,1]=positioner_js[1][-1,1]
+		positioner_js[0][:,1]=positioner_js[1][0,1]
 		positioner_js=self.introducing_tolerance(positioner_js)
 		positioner_js=self.introducing_tolerance(positioner_js)
 
