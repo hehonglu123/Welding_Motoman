@@ -39,7 +39,7 @@ def visualize_pcd(show_pcd_list):
 	o3d.visualization.draw_geometries(show_pcd_list,width=960,height=540)
 	# o3d.visualization.draw(show_pcd_list,width=960,height=540)
 
-data_dir='test3_2/'
+data_dir='../../data/wall_weld_test/test3_2/'
 config_dir='../../config/'
 
 scan_resolution=5 #scan every 5 mm
@@ -48,53 +48,15 @@ scan_per_pose=3 # take 3 scan every pose
 robot=robot_obj('MA_1440_A0',def_path=config_dir+'MA_1440_A0_robot_default_config.yml',tool_file_path=config_dir+'scanner_tcp2.csv',\
 	pulse2deg_file_path=config_dir+'MA_1440_A0_pulse2deg.csv')
 
-cart_p=[]
-joints_p=np.loadtxt(data_dir+'scan_js.csv',delimiter=",", dtype=np.float64)
-for i in range(len(joints_p)):
-	joints_p[i][5] = -joints_p[i][5]
-	joints_p[i][3] = -joints_p[i][3]
-	joints_p[i][1] = 90 - joints_p[i][1]
-	joints_p[i][2] = joints_p[i][2] + joints_p[i][1]
-
-joints_p=np.radians(joints_p)
-for q in joints_p:
-	cart_p.append(robot.fwd(q))
-print("Joint Space")
-print(np.degrees(joints_p))
-print("Cart Space")
-print(cart_p)
-
+joints_p=np.loadtxt(data_dir+'scan_js_exe.csv',delimiter=",", dtype=np.float64)
+total_step=len(joints_p)
 curve=[]
 curve_R=[]
-curve_js=[]
-total_step=0
-for i in range(len(cart_p)-1):
-	travel_vec=cart_p[i+1].p-cart_p[i].p	
-	travel_dis=np.linalg.norm(travel_vec)
-	travel_vec=travel_vec/travel_dis*scan_resolution
-	print("Travel Vector:",travel_vec)
-	print("Travel Distance:",travel_dis)
+for jp in joints_p:
+	curve_T = robot.fwd(jp)
+	curve.append(curve_T.p)
+	curve_R.append(curve_T.R)
 
-	xp=np.append(np.arange(cart_p[i].p[0],cart_p[i+1].p[0],travel_vec[0]),cart_p[i+1].p[0])
-	yp=np.append(np.arange(cart_p[i].p[1],cart_p[i+1].p[1],travel_vec[1]),cart_p[i+1].p[1])
-	zp=np.append(np.arange(cart_p[i].p[2],cart_p[i+1].p[2],travel_vec[2]),cart_p[i+1].p[2])
-	print(len(xp))
-	print(len(yp))
-	print(len(zp))
-
-	for travel_i in range(len(xp)):
-		this_p=Transform(cart_p[i].R,[xp[travel_i],yp[travel_i],zp[travel_i]])
-		curve.append(this_p.p)
-		curve_R.append(this_p.R)
-		if len(curve_js)!=0:
-			curve_js.append(robot.inv(this_p.p,this_p.R,curve_js[-1])[0])
-		else:
-			curve_js.append(robot.inv(this_p.p,this_p.R,joints_p[0])[0])
-	total_step+=len(xp)
-curve=np.array(curve)
-curve_js=np.array(curve_js)
-print(curve)
-# print(np.degrees(curve_js))
 print("Total step:",total_step)
 
 T_base_frame1 = Transform(curve_R[0],curve[0])

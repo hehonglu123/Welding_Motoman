@@ -360,3 +360,4 @@ generated_src
 scan/scan_merge/**/points*
 data/lego_brick/**/points*
 data/wall_weld_test/**/points*
+scan/jw_example/deferred_captured_mesh/

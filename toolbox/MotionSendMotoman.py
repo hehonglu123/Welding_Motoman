@@ -10,7 +10,7 @@ from dx200_motion_program_exec_client import *
 class MotionSend(object):
 	def __init__(self,IP='192.168.1.31') -> None:
 		self.IP=IP
-		self.ROBOT_CHOICE_MAP={'MA_2010_A0':'RB1','MA_1440_A0':'RB2','D500B':'ST1'}
+		self.ROBOT_CHOICE_MAP={'MA_2010_A0':'RB1', 'MA2010_A0':'RB1','MA_1440_A0':'RB2','MA1440_A0':'RB2','D500B':'ST1'}
 
 
 	def extract_data_from_cmd(self,filename):
