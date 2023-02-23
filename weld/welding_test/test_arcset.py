@@ -3,8 +3,6 @@ sys.path.append('../../toolbox/')
 from robot_def import *
 from dx200_motion_program_exec_client import *
 
-socket_clear()
-print('cleared')
 robot=robot_obj('MA_2010_A0',def_path='../../config/MA_2010_A0_robot_default_config.yml',tool_file_path='../../config/weldgun.csv',\
 	pulse2deg_file_path='../../config/MA_2010_A0_pulse2deg.csv')
 
@@ -35,8 +33,7 @@ client.MoveL(np.degrees(q_dense[-1]),5,0)
 # client.SetArc(False)
 client.ProgEnd()
 
-client.StartStreaming()
+# client.StartStreaming()
 timestamp,joint_recording=client.execute_motion_program()
-client.s_MP.close()
 print(joint_recording)
-# np.savetxt('weldchange.csv',np.hstack((timestamp.reshape(-1,1),joint_recording)),delimiter=',')
+np.savetxt('weldchange.csv',np.hstack((timestamp.reshape(-1,1),joint_recording)),delimiter=',')
