@@ -60,8 +60,12 @@ if __name__=='__main__':
     cscanner = ContinuousScanner(c)
 
     cscanner.start_capture()
-    time.sleep(5)
+    time.sleep(60)
     cscanner.end_capture()
+
+    st=time.perf_counter()
     scans_meshes,timestamps=cscanner.get_capture()
+    dt=time.perf_counter()-st
+    print("prepare mesh dt:",dt)
 
     print(scans_meshes[0].vertices)
