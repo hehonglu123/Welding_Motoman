@@ -1,6 +1,7 @@
 from RobotRaconteur.Client import *
 import threading
 import time
+from contextlib import suppress
 
 class ContinuousScanner():
     def __init__(self,RRC) -> None:
@@ -10,7 +11,7 @@ class ContinuousScanner():
         self.capture_flag=False
 
         ### data
-        self.scans=[]
+        self.scan_handles=[]
         self.timestamps=[]
 
     def capture_thread(self):
@@ -23,6 +24,9 @@ class ContinuousScanner():
         while self.capture_flag:
             scans.append(self.RRC.capture_deferred(False))
             timestamps.append(time.perf_counter()-st)
+        
+        self.scan_handles=scans
+        self.timestamps=timestamps
 
     def start_capture(self):
 
@@ -32,20 +36,32 @@ class ContinuousScanner():
     def end_capture(self):
         
         self.capture_flag=False
-        time.sleep(0.01)
+        time.sleep(1)
     
     def get_capture(self):
 
-        return self.scans,self.timestamps
+        prepare_gen = self.RRC.deferred_capture_prepare_stl(self.scan_handles)
+        with suppress(RR.StopIterationException):
+            prepare_res = prepare_gen.Next()
+        
+        scans=[]
+        for i in range(len(self.scan_handles)):
+            stl_mesh = self.RRC.getf_deferred_capture(self.scan_handles[i])
+            scans.append(stl_mesh)
+
+        return scans,self.timestamps
 
 
 
 if __name__=='__main__':
     
-    c = RRN.ConnectService('rr+tcp://localhost:64238?service=scanner')
+    c = RRN.ConnectService('rr+tcp://192.168.55.27:64238?service=scanner')
+
     cscanner = ContinuousScanner(c)
 
     cscanner.start_capture()
     time.sleep(5)
     cscanner.end_capture()
-    scans,timestamps=cscanner.get_capture()
+    scans_meshes,timestamps=cscanner.get_capture()
+
+    print(scans_meshes[0].vertices)
