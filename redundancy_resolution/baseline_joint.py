@@ -8,18 +8,20 @@ from robot_def import *
 
 def main():
 	dataset='blade0.1/'
-	sliced_alg='NX_slice/'
+	sliced_alg='NX_slice2/'
 	data_dir='../data/'+dataset+sliced_alg
-	num_layers=3
+	num_layers=5
 	curve_sliced_relative=[]
 	curve_sliced=[]
 	for i in range(num_layers):
 		curve_sliced_relative.append(np.loadtxt(data_dir+'curve_sliced_relative/slice'+str(i)+'.csv',delimiter=','))
 		curve_sliced.append(np.loadtxt(data_dir+'curve_sliced/slice'+str(i)+'.csv',delimiter=','))
 
-	robot=robot_obj('MA_2010_A0',def_path='../config/MA_2010_A0_robot_default_config.yml',tool_file_path='../config/weldgun.csv',\
-		pulse2deg_file_path='../config/MA_2010_A0_pulse2deg.csv')
-	positioner=positioner_obj('D500B',def_path='../config/D500B_robot_default_config.yml',pulse2deg_file_path='../config/D500B_pulse2deg.csv',base_transformation_file='../config/D500B_pose.csv')
+	robot=robot_obj('MA2010_A0',def_path='../config/MA2010_A0_robot_default_config.yml',tool_file_path='../config/weldgun.csv',\
+		pulse2deg_file_path='../config/MA2010_A0_pulse2deg.csv',d=20)
+	positioner=positioner_obj('D500B',def_path='../config/D500B_robot_default_config.yml',tool_file_path='../config/positioner_tcp.csv',\
+		pulse2deg_file_path='../config/D500B_pulse2deg.csv',base_transformation_file='../config/D500B_pose.csv')
+
 
 	R_torch=np.array([[ 0.7071, -0.7071, -0.    ],
 			[-0.7071, -0.7071,  0.    ],
@@ -30,6 +32,10 @@ def main():
 	H=np.loadtxt(data_dir+'curve_pose.csv',delimiter=',')
 
 	positioner_js,curve_sliced_js=rr.baseline_joint(R_torch,curve_sliced_relative)
+
+	for i in range(num_layers):
+		np.savetxt(data_dir+'curve_sliced_js/D500B_js'+str(i)+'.csv',positioner_js[i],delimiter=',')
+		np.savetxt(data_dir+'curve_sliced_js/MA2010_js'+str(i)+'.csv',curve_sliced_js[i],delimiter=',')
 
 
 
