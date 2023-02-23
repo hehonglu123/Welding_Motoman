@@ -9,7 +9,6 @@ from general_robotics_toolbox import *
 import open3d as o3d
 
 import numpy as np
-import cv2
 import matplotlib.pyplot as plt
 from matplotlib import colors as mcolors
 import time
