@@ -3,7 +3,7 @@ import sys, glob
 from general_robotics_toolbox import *
  
 dataset='blade0.1/'
-sliced_alg='NX_slice/'
+sliced_alg='NX_slice2/'
 data_dir='../data/'+dataset+sliced_alg
 curve_pose = np.loadtxt(data_dir+'curve_pose.csv',delimiter=',')
 

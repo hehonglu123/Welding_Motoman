@@ -10,7 +10,7 @@ def main():
 	dataset='blade0.1/'
 	sliced_alg='NX_slice2/'
 	data_dir='../data/'+dataset+sliced_alg
-	num_layers=5
+	num_layers=50
 	num_baselayers=2
 	curve_sliced_relative_base=[]
 	curve_sliced_relative=[]
