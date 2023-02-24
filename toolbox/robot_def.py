@@ -248,6 +248,9 @@ class positioner_obj(object):
 		solution2=[-q[0],q[1]-np.sign(q[1])*np.pi]
 
 		return np.array([q,solution2])
+	
+	def jacobian(self,q):
+		return robotjacobian(self.robot,q)
 
 class Transform_all(object):
 	def __init__(self, p_all, R_all):
@@ -354,6 +357,11 @@ def main2():
 	print(np.degrees(q_inv))
 	print(robot.fwd_rotation(q_inv))
 	print(robot.fwd(q_inv).R@n)
+
+	q_temp=-2
+	print(np.sin(q_temp))
+	print(-np.cos(q_temp))
+	print(robot.jacobian([q_temp,0]))
 
 if __name__ == '__main__':
 	main2()

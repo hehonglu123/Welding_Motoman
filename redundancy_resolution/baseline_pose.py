@@ -11,6 +11,8 @@ def main():
 	sliced_alg='NX_slice2/'
 	data_dir='../data/'+dataset+sliced_alg
 	num_layers=5
+	base_thickness=3
+	num_baselayers=2
 	curve_sliced=[]
 	for i in range(num_layers):
 		curve_sliced.append(np.loadtxt(data_dir+'curve_sliced/slice'+str(i)+'.csv',delimiter=','))
@@ -27,12 +29,16 @@ def main():
 
 	rr=redundancy_resolution(robot,positioner,curve_sliced)
 	H=rr.baseline_pose()
+	H[2,-1]+=num_baselayers*base_thickness
 
 	np.savetxt(data_dir+'curve_pose.csv',H,delimiter=',')
 
 	###convert curve slices to positioner TCP frame
 	vis_step=5
 	fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
+	
+
+
 	curve_sliced_relative=copy.deepcopy(rr.curve_sliced)
 	for x in range(len(rr.curve_sliced)):
 		for i in range(len(rr.curve_sliced[x])):
@@ -50,7 +56,19 @@ def main():
 		ax.quiver(curve_sliced_relative[x][::vis_step,0],curve_sliced_relative[x][::vis_step,1],curve_sliced_relative[x][::vis_step,2],curve_sliced_relative[x][::vis_step,3],curve_sliced_relative[x][::vis_step,4],curve_sliced_relative[x][::vis_step,5],length=0.3, normalize=True)
 	
 		np.savetxt(data_dir+'curve_sliced_relative/slice'+str(x)+'.csv',curve_sliced_relative[x],delimiter=',')
-	plt.title('0.1 blade first 3 layers')
+	
+	###base layer appendant
+	curve_sliced_relative_base=[]
+	for x in range(num_baselayers):
+		curve_sliced_relative_base.append(copy.deepcopy(curve_sliced_relative[0]))
+		curve_sliced_relative_base[-1][:,2]-=(num_baselayers-x)*base_thickness
+		ax.plot3D(curve_sliced_relative_base[x][::vis_step,0],curve_sliced_relative_base[x][::vis_step,1],curve_sliced_relative_base[x][::vis_step,2],'r.-')
+		ax.quiver(curve_sliced_relative_base[x][::vis_step,0],curve_sliced_relative_base[x][::vis_step,1],curve_sliced_relative_base[x][::vis_step,2],curve_sliced_relative_base[x][::vis_step,3],curve_sliced_relative_base[x][::vis_step,4],curve_sliced_relative_base[x][::vis_step,5],length=0.3, normalize=True)
+	
+		np.savetxt(data_dir+'curve_sliced_relative/baselayer'+str(x)+'.csv',curve_sliced_relative_base[x],delimiter=',')
+
+
+	plt.title('0.1 blade first X layers')
 	plt.show()
 
 
