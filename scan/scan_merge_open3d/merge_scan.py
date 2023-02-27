@@ -1,7 +1,5 @@
 import sys
 import matplotlib
-
-from sklearn import cluster
 sys.path.append('../../toolbox/')
 from robot_def import *
 from general_robotics_toolbox import *
@@ -39,14 +37,15 @@ def visualize_pcd(show_pcd_list):
 	o3d.visualization.draw_geometries(show_pcd_list,width=960,height=540)
 	# o3d.visualization.draw(show_pcd_list,width=960,height=540)
 
-data_dir='../../data/wall_weld_test/test3_2/'
+data_dir='../../data/lego_brick/test2/'
+# data_dir='../../data/wall_weld_test/test3_2/'
 config_dir='../../config/'
 
 scan_resolution=5 #scan every 5 mm
 scan_per_pose=3 # take 3 scan every pose
 
-robot=robot_obj('MA_1440_A0',def_path=config_dir+'MA_1440_A0_robot_default_config.yml',tool_file_path=config_dir+'scanner_tcp2.csv',\
-	pulse2deg_file_path=config_dir+'MA_1440_A0_pulse2deg.csv')
+robot=robot_obj('MA_1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.yml',tool_file_path=config_dir+'scanner_tcp2.csv',\
+	pulse2deg_file_path=config_dir+'MA1440_A0_pulse2deg.csv')
 
 joints_p=np.loadtxt(data_dir+'scan_js_exe.csv',delimiter=",", dtype=np.float64)
 total_step=len(joints_p)
@@ -149,16 +148,19 @@ if cluster_based_outlier_remove:
 #         pcd_combined, depth=9)
 # pcd_combined.points=mesh.vertices
 
+print("Generate pcd Total time:",time,time.perf_counter()-st+dt)
+
 visualize_pcd([pcd_combined])
 o3d.io.write_point_cloud(data_dir+'processed_pcd.pcd',pcd_combined)
 
-exit()
+# exit()
 
+st=time.perf_counter()
 ######## compare with scan mesh
-scan_mesh=o3d.io.read_triangle_mesh(data_dir+'../lego_brick/scan_mesh.stl')
+scan_mesh=o3d.io.read_triangle_mesh(data_dir+'../cad/scan_mesh.stl')
 scan_mesh.compute_vertex_normals()
 # visualize_pcd([scan_mesh])
-scan_mesh_points = o3d.io.read_point_cloud(data_dir+'../lego_brick/scan_mesh_points.pcd')
+scan_mesh_points = o3d.io.read_point_cloud(data_dir+'../cad/scan_mesh_points.pcd')
 ## register points (dont need this after the motion trackers (?))
 min_bound = (-1,-1,19.3)
 max_bound = (143.1+5,15.8+1,30.6+1)
@@ -181,9 +183,6 @@ pcd_combined_reg.paint_uniform_color([1, 0.706, 0])
 scan_mesh_points.paint_uniform_color([0, 0.651, 0.929])
 # visualize_pcd([pcd_combined_reg,scan_mesh_points])
 # visualize_pcd([pcd_combined,scan_mesh])
-
-
-
 
 ##
 
@@ -218,6 +217,8 @@ pcd_combined_dist_scan=deepcopy(pcd_combined)
 pcd_combined_dist_scan.colors = o3d.utility.Vector3dVector(color_dist[:, :3])
 # visualize_pcd([scan_mesh_target,pcd_combined_dist_scan])
 # visualize_pcd([pcd_combined_dist_scan])
+
+print("Compare scans with mesh Total time:",time,time.perf_counter()-st)
 
 #### histogram
 N_points = len(unsigned_distance)
