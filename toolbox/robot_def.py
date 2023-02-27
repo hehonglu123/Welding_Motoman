@@ -248,6 +248,9 @@ class positioner_obj(object):
 		solution2=[-q[0],q[1]-np.sign(q[1])*np.pi]
 
 		return np.array([q,solution2])
+	
+	def jacobian(self,q):
+		return robotjacobian(self.robot,q)
 
 class Transform_all(object):
 	def __init__(self, p_all, R_all):
@@ -342,18 +345,26 @@ def main1():
 	print(robot.inv(pose.p,pose.R,q))
 
 def main2():
-	robot=positioner_obj('D500B',def_path='../config/D500B_robot_default_config.yml', pulse2deg_file_path='../config/D500B_pulse2deg.csv')
-	q1=30
-	q2=50
-	q=np.radians([q1,q2])
-	print(robot.fwd(q))
+	positioner=positioner_obj('D500B',def_path='../config/D500B_robot_default_config.yml',tool_file_path='../config/positioner_tcp.csv',\
+		pulse2deg_file_path='../config/D500B_pulse2deg.csv',base_transformation_file='../config/D500B_pose.csv')
+	
+	print(positioner.fwd(np.zeros(2)))
+	# q1=30
+	# q2=50
+	# q=np.radians([q1,q2])
+	# print(robot.fwd(q))
 
-	# n=np.array([np.sqrt(2)/2,0,np.sqrt(2)/2])
-	n=np.array([np.sqrt(3)/3,np.sqrt(3)/3,np.sqrt(3)/3])
-	q_inv=robot.inv(n)
-	print(np.degrees(q_inv))
-	print(robot.fwd_rotation(q_inv))
-	print(robot.fwd(q_inv).R@n)
+	# # n=np.array([np.sqrt(2)/2,0,np.sqrt(2)/2])
+	# n=np.array([np.sqrt(3)/3,np.sqrt(3)/3,np.sqrt(3)/3])
+	# q_inv=robot.inv(n)
+	# print(np.degrees(q_inv))
+	# print(robot.fwd_rotation(q_inv))
+	# print(robot.fwd(q_inv).R@n)
+
+	# q_temp=-2
+	# print(np.sin(q_temp))
+	# print(-np.cos(q_temp))
+	# print(robot.jacobian([q_temp,0]))
 
 if __name__ == '__main__':
 	main2()
