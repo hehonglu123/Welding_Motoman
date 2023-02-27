@@ -55,7 +55,7 @@ class ContinuousScanner():
 
 if __name__=='__main__':
     
-    c = RRN.ConnectService('rr+tcp://192.168.55.27:64238?service=scanner')
+    c = RRN.ConnectService('rr+tcp://localhost:64238?service=scanner')
 
     cscanner = ContinuousScanner(c)
 
