@@ -10,9 +10,14 @@ def main():
 	dataset='blade0.1/'
 	sliced_alg='NX_slice2/'
 	data_dir='../data/'+dataset+sliced_alg
-	num_layers=5
+	num_layers=50
+	num_baselayers=2
+	curve_sliced_relative_base=[]
 	curve_sliced_relative=[]
 	curve_sliced=[]
+	for i in range(num_baselayers):
+		curve_sliced_relative_base.append(np.loadtxt(data_dir+'curve_sliced_relative/baselayer'+str(i)+'.csv',delimiter=','))
+
 	for i in range(num_layers):
 		curve_sliced_relative.append(np.loadtxt(data_dir+'curve_sliced_relative/slice'+str(i)+'.csv',delimiter=','))
 		curve_sliced.append(np.loadtxt(data_dir+'curve_sliced/slice'+str(i)+'.csv',delimiter=','))
@@ -31,15 +36,16 @@ def main():
 	rr=redundancy_resolution(robot,positioner,curve_sliced)
 	H=np.loadtxt(data_dir+'curve_pose.csv',delimiter=',')
 
-	positioner_js,curve_sliced_js=rr.baseline_joint(R_torch,curve_sliced_relative)
+	positioner_js,curve_sliced_js,positioner_js_base,curve_sliced_js_base=rr.baseline_joint(R_torch,curve_sliced_relative,curve_sliced_relative_base)
 
 	for i in range(num_layers):
 		np.savetxt(data_dir+'curve_sliced_js/D500B_js'+str(i)+'.csv',positioner_js[i],delimiter=',')
 		np.savetxt(data_dir+'curve_sliced_js/MA2010_js'+str(i)+'.csv',curve_sliced_js[i],delimiter=',')
 
+	for i in range(num_baselayers):
+		np.savetxt(data_dir+'curve_sliced_js/D500B_base_js'+str(i)+'.csv',positioner_js_base[i],delimiter=',')
+		np.savetxt(data_dir+'curve_sliced_js/MA2010_base_js'+str(i)+'.csv',curve_sliced_js_base[i],delimiter=',')
 
-
-	# positioner_js,curve_sliced_js=rr.baseline(R_torch,q_seed)
 
 if __name__ == '__main__':
 	main()
