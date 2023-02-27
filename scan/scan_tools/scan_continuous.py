@@ -40,7 +40,7 @@ class ContinuousScanner():
     
     def get_capture(self):
 
-        prepare_gen = self.RRC.deferred_capture_prepare_stl(self.scan_handles)
+        prepare_gen = self.RRC.deferred_capture_prepare(self.scan_handles)
         with suppress(RR.StopIterationException):
             prepare_res = prepare_gen.Next()
         

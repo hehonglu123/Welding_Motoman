@@ -241,28 +241,26 @@ for path_T in all_path_T:
     robot_client.execute_motion_program("AAA.JBI")
 
     ## scanner start
-    print("here1")
     cscanner.start_capture()
     ## motion start
-    print("here2")
     robot_client=MotionProgramExecClient(ROBOT_CHOICE='RB2',pulse2deg=robot_scan.pulse2deg)
     for path_i in range(0,len(q_bp)):
         robot_client.MoveL(np.degrees(q_bp[path_i][0]), speed_bp[path_i], zone_bp[path_i])
     robot_client.ProgEnd()
-    robot_stamps,curve_js_exe = robot_client.execute_motion_program("AAA.JBI")
-    print(robot_stamps)
-    print(curve_js_exe)
+    robot_stamps,curve_pulse_exe = robot_client.execute_motion_program("AAA.JBI")
+    curve_js_exe=np.divide(curve_pulse_exe[:,6:12],robot_scan.pulse2deg)
     ## scanner end
     cscanner.end_capture()
     st=time.perf_counter()
     scans,scan_stamps=cscanner.get_capture()
     dt=time.perf_counter()-st
     print("dt:",dt)
+    print("Robot last joint:",curve_js_exe[-1])
 
     ## save traj
     # save poses
-    np.savetxt(data_dir + 'curve_js_exe.csv',curve_js_exe,delimiter=',')
-    np.savetxt(data_dir + 'robot_stamps.csv',robot_stamps,delimiter=',')
+    np.savetxt(data_dir + 'curve_js_exe.csv',np.radians(curve_js_exe),delimiter=',')
+    np.savetxt(data_dir + 'robot_stamps.csv',robot_stamps-robot_stamps[0],delimiter=',')
     scan_count=0
     for scan in scans:
         scan_points = RRN.NamedArrayToArray(scan.vertices)
