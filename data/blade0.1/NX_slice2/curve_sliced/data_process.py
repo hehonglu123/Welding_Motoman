@@ -38,7 +38,7 @@ fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
 slice_prev=np.loadtxt('raw/slice0.csv',delimiter=',')
 slice_normal0=np.zeros((len(slice_prev),3))
 slice_normal0[:,-1]=1
-num_layers=10
+num_layers=50
 slices=[slice_prev]
 slice_normal=[slice_normal0]
 

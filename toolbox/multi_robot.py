@@ -34,13 +34,12 @@ def calc_individual_speed(vd_relative,lam1,lam2,lam_relative,breakpoints):
 		speed_ratio.append((lam1[breakpoints[i]-1]-lam1[breakpoints[i-1]-1])/(lam2[breakpoints[i]-1]-lam2[breakpoints[i-1]-1]))
 		dt.append((lam_relative[breakpoints[i]]-lam_relative[breakpoints[i-1]])/vd_relative)
 	###specify speed here for robot2
-	s2_all=[200]
-	s1_all=[200]
+	s2_all=[10]
+	s1_all=[10]
 	for i in range(len(breakpoints)-1):
-
-		s2_all.append((lam2[breakpoints[i+1]]-lam2[breakpoints[i]])/dt[i])
-		s1=s2_all[i+1]*speed_ratio[i]
-		s1_all.append(s1)
+		s1_all.append((lam1[breakpoints[i+1]]-lam1[breakpoints[i]])/dt[i])
+		s2=s1_all[i+1]/speed_ratio[i]
+		s2_all.append(s2)
 
 	return s1_all,s2_all
 
