@@ -23,15 +23,16 @@ def robot_weld_path_gen(test_n):
     # y0 = -753.5	# Origin y coordinate
     # z0 = -245   # 10 mm distance to base
 
-    # x0 = 980
-    # y0 = 340
-    # z0 = 1015-1340
-
     x0 = 1684
     y0 = -753.5
     z0 = -255
     # z0 = -205
     # z0 = -305
+
+    ## tune
+    x0 = 1649
+    y0 = -745.1
+    z0 = -255
 
     all_path_T = []
     for n in range(test_n):
@@ -63,7 +64,7 @@ def get_bound_circle(p,R,pc,k,theta):
     
     return [p_bound,p_bound_2],[R_bound,R_bound_2]
 
-data_dir='../../data/wall_weld_test/scan_cont_1/'
+data_dir='../../data/wall_weld_test/scan_cont_3/'
 config_dir='../../config/'
 
 robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path=config_dir+'weldgun.csv',\
@@ -73,47 +74,28 @@ robot_scan=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_co
 turn_table=positioner_obj('D500B',def_path=config_dir+'D500B_robot_default_config.yml',base_transformation_file=config_dir+'D500B_pose.csv',\
     pulse2deg_file_path=config_dir+'D500B_pulse2deg.csv')
 
-
-# test_q = np.radians([21.3515,20.3011,-34.1789,0.0020,55.0069,-0.3364])
-# test_q = np.radians([23.1762,35.0222,-34.0818,-21.0999,71.6365,7.8284])
-# test_T=robot_scan.fwd(np.array([0.,0.,0.,0.,0.,0.]))
-# test_T=robot_scan.fwd(test_q)
-# # tool_T = Transform(robot_scan.R_tool,robot_scan.p_tool)
-# print("scanner zero-config",test_T)
 zero_config=np.array([0.,0.,0.,0.,0.,0.])
-
-# test_T_1 = deepcopy(test_T)
-# test_T_1.R = np.array([[1,0,0],
-#                        [0,-1,0],
-#                        [0,0,-1]])
-# test_T_1_q = robot_scan.inv(test_T_1.p,test_T_1.R)
-# print(np.degrees(test_T_1_q))
-# R_down = rot([1,0,0],np.pi)
-# rotate_R = np.matmul(R_down.T,test_T.R)
-# k,theta = R2rot(rotate_R)
-# print(np.degrees(theta))
-# exit()
 
 R2base_R1base_H = np.linalg.inv(robot_scan.base_H)
 R2base_table_H = np.matmul(R2base_R1base_H,turn_table.base_H)
 print("Turn table relative to R2",R2base_table_H)
 
 ### scanner hardware
-c = RRN.ConnectService('rr+tcp://192.168.55.27:64238?service=scanner')
+c = RRN.ConnectService('rr+tcp://localhost:64238?service=scanner')
 cscanner = ContinuousScanner(c)
 
 ### get welding robot path
 test_n=1 # how many test
 all_path_T = robot_weld_path_gen(test_n)
 Rz_turn_angle = np.radians(0)
-Ry_turn_angle = np.radians(-20) # rotate in y a bit, z-axis not pointing down, to have ik solution
+Ry_turn_angle = np.radians(-10) # rotate in y a bit, z-axis not pointing down, to have ik solution
 # Ry_turn_angle = np.radians(0) # rotate in y a bit, z-axis not pointing down, to have ik solution
 
 ### scan parameters
-scan_stand_off_d = 220 ## mm
-bounds_theta = np.radians(1) ## circular motion at start and end
-# all_scan_angle = np.radians([-45,0,45]) ## scanning angles
-all_scan_angle = np.radians([0]) ## scanning angles
+scan_stand_off_d = 243 ## mm
+bounds_theta = np.radians(0) ## circular motion at start and end
+all_scan_angle = np.radians([-45,0,45,0]) ## scanning angles
+# all_scan_angle = np.radians([0]) ## scanning angles
 
 for path_T in all_path_T:
 
@@ -211,7 +193,6 @@ for path_T in all_path_T:
     print(np.degrees(curve_js))
 
     #############################
-    # exit()
 
     ### motion program generation ###
     primitives=[]
@@ -223,12 +204,16 @@ for path_T in all_path_T:
         primitives.append('movel')
         q_bp.append([curve_js[path_i]])
         p_bp.append(scan_p[path_i])
-        speed_bp.append(40) ## 10 mm/sec
+        speed_bp.append(30) ## mm/sec
         if path_i != len(scan_p)-1:
             zone_bp.append(0)
         else:
             zone_bp.append(0)
     #################################
+
+    print(robot_scan.fwd(curve_js[0]))
+    print(robot_scan.fwd(np.radians([27.6768,28.7206,-39.6049,-28.0847,78.0972,10.1109])))
+
     input("Press Enter to start moving")
 
     ### execute motion ###
@@ -268,4 +253,5 @@ for path_T in all_path_T:
         if scan_count%10==0:
             print(len(scan_points))
         scan_count+=1
+    print('Total scans:',scan_count)
     np.savetxt(data_dir + 'scan_stamps.csv',scan_stamps,delimiter=',')
