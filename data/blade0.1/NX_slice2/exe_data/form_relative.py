@@ -19,8 +19,8 @@ def main():
 		pulse2deg_file_path='../../../../config/D500B_pulse2deg.csv',base_transformation_file='../../../../config/D500B_pose.csv')
 	joint_recording=np.loadtxt('joint_recording.csv',delimiter=',')
 
-	robot_js=np.radians(np.divide(joint_recording[:,1:7],robot.pulse2deg))
-	positioner_js=np.radians(np.divide(joint_recording[:,-2:],positioner.pulse2deg))
+	robot_js=joint_recording[:,1:7]
+	positioner_js=joint_recording[:,-2:]
 
 	curve_sliced_relative=[]
 	for i in range(5):
@@ -39,7 +39,7 @@ def main():
 	ax.plot3D(relative_path_exe[::vis_step,0],relative_path_exe[::vis_step,1],relative_path_exe[::vis_step,2],'r.-')
 	# ax.quiver(relative_path_exe[::vis_step,0],relative_path_exe[::vis_step,1],relative_path_exe[::vis_step,2],relative_path_exe_R[::vis_step,0,-1],relative_path_exe_R[::vis_step,1,-1],relative_path_exe_R[::vis_step,2,-1],length=0.3, normalize=True)
 
-	ax.plot3D(curve_sliced_relative[::vis_step,0],curve_sliced_relative[::vis_step,1],curve_sliced_relative[::vis_step,2],'g.-')
+	# ax.plot3D(curve_sliced_relative[::vis_step,0],curve_sliced_relative[::vis_step,1],curve_sliced_relative[::vis_step,2],'g.-')
 	# ax.quiver(curve_sliced_relative[::vis_step,0],curve_sliced_relative[::vis_step,1],curve_sliced_relative[::vis_step,2],curve_sliced_relative[::vis_step,0],curve_sliced_relative[::vis_step,1],curve_sliced_relative[::vis_step,2],length=0.3, normalize=True)
 
 
