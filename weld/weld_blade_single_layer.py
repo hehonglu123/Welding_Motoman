@@ -69,12 +69,12 @@ s1_all,_=calc_individual_speed(vd_relative,lam1,lam2,lam_relative,breakpoints)
 target2=['MOVJ',np.degrees(positioner_js[breakpoints[0]]),10]
 client.MoveL(np.degrees(curve_sliced_js[breakpoints[0]]), s1_all[0],target2=target2)
 
-# client.SetArc(True,cond_num=200)
+client.SetArc(True,cond_num=200)
 for j in range(1,len(breakpoints)):
     target2=['MOVJ',np.degrees(positioner_js[breakpoints[j]]),10]
     client.MoveL(np.degrees(curve_sliced_js[breakpoints[j]]), s1_all[j],target2=target2)
-# client.SetArc(False)
+client.SetArc(False)
 
     
 client.ProgEnd()
-client.execute_motion_program("AAA.JBI") 
+# client.execute_motion_program("AAA.JBI") 
