@@ -87,11 +87,14 @@ cscanner = ContinuousScanner(c)
 ### get welding robot path
 test_n=1 # how many test
 all_path_T = robot_weld_path_gen(test_n)
+
+### scanning speed
+scan_speed=30
+
+### scan parameters
 Rz_turn_angle = np.radians(0)
 Ry_turn_angle = np.radians(-10) # rotate in y a bit, z-axis not pointing down, to have ik solution
 # Ry_turn_angle = np.radians(0) # rotate in y a bit, z-axis not pointing down, to have ik solution
-
-### scan parameters
 scan_stand_off_d = 243 ## mm
 bounds_theta = np.radians(0) ## circular motion at start and end
 all_scan_angle = np.radians([-45,0,45,0]) ## scanning angles
@@ -200,11 +203,11 @@ for path_T in all_path_T:
     p_bp=[]
     speed_bp=[]
     zone_bp=[]
-    for path_i in range(1,len(scan_p)):
+    for path_i in range(0,len(scan_p)):
         primitives.append('movel')
         q_bp.append([curve_js[path_i]])
         p_bp.append(scan_p[path_i])
-        speed_bp.append(30) ## mm/sec
+        speed_bp.append(scan_speed) ## mm/sec
         if path_i != len(scan_p)-1:
             zone_bp.append(0)
         else:
@@ -221,7 +224,7 @@ for path_T in all_path_T:
     ## move to start
     # ms.exec_motions(robot_scan,['movej'],[scan_p[0]],[[curve_js[0]]],2,0)
     robot_client=MotionProgramExecClient(ROBOT_CHOICE='RB2',pulse2deg=robot_scan.pulse2deg)
-    robot_client.MoveJ(np.degrees(curve_js[0]), 2, 0)
+    robot_client.MoveJ(np.degrees(q_bp[0][0]), 2, 0)
     robot_client.ProgEnd()
     robot_client.execute_motion_program("AAA.JBI")
 
@@ -229,8 +232,9 @@ for path_T in all_path_T:
     cscanner.start_capture()
     ## motion start
     robot_client=MotionProgramExecClient(ROBOT_CHOICE='RB2',pulse2deg=robot_scan.pulse2deg)
-    for path_i in range(0,len(q_bp)):
-        robot_client.MoveL(np.degrees(q_bp[path_i][0]), speed_bp[path_i], zone_bp[path_i])
+    for path_i in range(1,len(q_bp)-1):
+        robot_client.MoveL(np.degrees(q_bp[path_i][0]), speed_bp[path_i])
+    robot_client.MoveL(np.degrees(q_bp[-1][0]), speed_bp[-1], 0)
     robot_client.ProgEnd()
     robot_stamps,curve_pulse_exe = robot_client.execute_motion_program("AAA.JBI")
     curve_js_exe=np.divide(curve_pulse_exe[:,6:12],robot_scan.pulse2deg)

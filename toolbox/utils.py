@@ -332,3 +332,19 @@ def unwrapped_angle_check(q_init,q_all):
     order=np.argsort(np.linalg.norm(temp_q,axis=1))
     # return q_all[order[0]]
     return temp_q[order[0]]+q_init
+
+def s_err_func(dR,s_type=0):
+	
+	match s_type:
+		case 0:
+			quat=R2q(dR)
+			return 4*quat[0]*quat[1:]
+		case 1:
+			quat=R2q(dR)
+			return 2*quat[1:]
+		case 2:
+			k,theta=R2rot(dR)
+			return 2*theta*k
+		case _:
+			print("S err function type:0~2")
+			raise AssertionError
