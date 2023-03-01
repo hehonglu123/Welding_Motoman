@@ -22,7 +22,9 @@ q3=[-15,180]
 client=MotionProgramExecClient(IP='192.168.1.31',ROBOT_CHOICE='RB1',pulse2deg=robot1.pulse2deg)
 client.MoveJ(q1,2,0)
 client.ProgEnd()
-client.execute_motion_program("AAA.JBI")
+(timestamp,joint_recording)=client.execute_motion_program("AAA.JBI")
+print(timestamp)
+print(joint_recording)
 
 client=MotionProgramExecClient(IP='192.168.1.31',ROBOT_CHOICE='RB2',pulse2deg=robot2.pulse2deg)
 client.MoveJ(q2,2,0)

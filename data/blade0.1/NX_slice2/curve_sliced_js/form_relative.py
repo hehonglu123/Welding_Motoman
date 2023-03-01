@@ -11,7 +11,7 @@ def main():
 	dataset='blade0.1/'
 	sliced_alg='NX_slice2/'
 	data_dir='../../../../data/'+dataset+sliced_alg
-	num_layers=5
+	num_layers=2
 	curve_sliced_relative=[]
 
 
@@ -30,6 +30,19 @@ def main():
 
 		ax.plot3D(relative_path_exe[::vis_step,0],relative_path_exe[::vis_step,1],relative_path_exe[::vis_step,2],'r.-')
 		ax.quiver(relative_path_exe[::vis_step,0],relative_path_exe[::vis_step,1],relative_path_exe[::vis_step,2],relative_path_exe_R[::vis_step,0,-1],relative_path_exe_R[::vis_step,1,-1],relative_path_exe_R[::vis_step,2,-1],length=0.3, normalize=True)
+
+
+		# curve_exe2_world=[]
+		# curve_exe_R2_world=[]
+		# for j in range(len(curve_sliced_js)):
+		# 	transform=positioner.fwd(positioner_js[j],world=True)
+		# 	curve_exe2_world.append(transform.p)
+		# 	curve_exe_R2_world.append(transform.R)
+		# curve_exe2_world=np.array(curve_exe2_world)
+		# curve_exe_R2_world=np.array(curve_exe_R2_world)
+		
+		# ax.plot3D(curve_exe1[::vis_step,0],curve_exe1[::vis_step,1],curve_exe1[::vis_step,2],'r.-')
+		# ax.plot3D(curve_exe2_world[::vis_step,0],curve_exe2_world[::vis_step,1],curve_exe2_world[::vis_step,2],'g.-')
 
 	# ax.set_xlim3d(-80, 80)
 	# ax.set_ylim3d(0, 80)
