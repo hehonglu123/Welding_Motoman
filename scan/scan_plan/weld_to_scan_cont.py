@@ -244,7 +244,7 @@ for path_T in all_path_T:
 
     ## save traj
     # save poses
-    np.savetxt(data_dir + 'curve_js_exe.csv',np.radians(curve_js_exe),delimiter=',')
+    np.savetxt(data_dir + 'scan_js_exe.csv',np.radians(curve_js_exe),delimiter=',')
     np.savetxt(data_dir + 'robot_stamps.csv',robot_stamps-robot_stamps[0],delimiter=',')
     scan_count=0
     for scan in scans:
