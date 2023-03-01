@@ -6,7 +6,6 @@ from general_robotics_toolbox import *
 import open3d as o3d
 
 import numpy as np
-import cv2
 import matplotlib.pyplot as plt
 from matplotlib import colors
 import time
@@ -36,6 +35,11 @@ def visualize_pcd(show_pcd_list):
 	show_pcd_list.append(points_frame)
 	o3d.visualization.draw_geometries(show_pcd_list,width=960,height=540)
 	# o3d.visualization.draw(show_pcd_list,width=960,height=540)
+
+### open3d device ###
+device = o3d.core.Device("CUDA:0")
+dtype = o3d.core.float32
+#####################
 
 data_dir='../../data/lego_brick/test2/'
 # data_dir='../../data/wall_weld_test/test3_2/'
