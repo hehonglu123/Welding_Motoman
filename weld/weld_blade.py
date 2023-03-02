@@ -57,9 +57,9 @@ for layer in range(num_layers):
 	curve_sliced_relative=np.loadtxt(data_dir+'curve_sliced_relative/slice'+str(layer)+'.csv',delimiter=',')
 
 	if layer % 2==1:
-	    breakpoints=np.linspace(0,len(curve_sliced_js)-1,num=num_points_layer).astype(int)
+		breakpoints=np.linspace(0,len(curve_sliced_js)-1,num=num_points_layer).astype(int)
 	else:
-	    breakpoints=np.linspace(len(curve_sliced_js)-1,0,num=num_points_layer).astype(int)
+		breakpoints=np.linspace(len(curve_sliced_js)-1,0,num=num_points_layer).astype(int)
 
 	vd_relative=10
 	lam1=calc_lam_js(curve_sliced_js,robot)
@@ -72,11 +72,11 @@ for layer in range(num_layers):
 
 	# client.SetArc(True,cond_num=200)
 	for j in range(1,len(breakpoints)):
-	    target2=['MOVJ',np.degrees(positioner_js[breakpoints[j]]),10]
-	    client.MoveL(np.degrees(curve_sliced_js[breakpoints[j]]), s1_all[j],target2=target2)
+		target2=['MOVJ',np.degrees(positioner_js[breakpoints[j]]),10]
+		client.MoveL(np.degrees(curve_sliced_js[breakpoints[j]]), s1_all[j],target2=target2)
 	# client.SetArc(False)
 
-    
+	
 client.ProgEnd()
 timestamp,joint_recording=client.execute_motion_program("AAA.JBI") 
 np.savetxt('joint_recording.csv',np.hstack((timestamp.reshape(-1, 1),joint_recording)),delimiter=',')

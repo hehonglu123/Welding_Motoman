@@ -23,7 +23,7 @@ else:
 dtype = o3d.core.float32
 #####################
 
-data_dir='../../data/wall_weld_test/scan_cont_3/'
+data_dir='../../data/wall_weld_test/scan_cont_3/scans/'
 config_dir='../../config/'
 
 robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path=config_dir+'weldgun.csv',\
@@ -71,13 +71,13 @@ use_tensor=False
 ##############################
 
 ### process parameters
-use_icp=True
+use_icp=False
 voxel_size=0.1
 ######################
 
 pcd_combined = None
 scan_js_exe_cor = []
-# scan_N=50
+scan_N=50
 for scan_i in range(scan_N):
     # discard scanner timestamp <0 (robot motion haven't start)
     if sca_stamps_sync_robt[scan_i]<0:
@@ -104,6 +104,10 @@ for scan_i in range(scan_N):
     ## voxel down sample
     pcd = pcd.voxel_down_sample(voxel_size=voxel_size)
 
+    ## paint pcd for visualization
+    color_dist = plt.get_cmap("rainbow")((scan_i-scan_move_stamp_i)/(scan_N-scan_move_stamp_i))
+    pcd = pcd.paint_uniform_color(color_dist[:3])
+
     if pcd_combined is None:
         if use_tensor:
             pcd_combined=pcd.clone()
@@ -112,10 +116,10 @@ for scan_i in range(scan_N):
     else:
         if use_icp:
             ###ICP
-            if scan_i>23:
+            if scan_i>0:
                 print(scan_i)
                 trans_init=np.eye(4)
-                threshold = 5
+                threshold = 10
                 if use_tensor:
                     reg_p2p = o3d.t.pipelines.registration.icp(
                     pcd, pcd_combined, threshold, trans_init,
