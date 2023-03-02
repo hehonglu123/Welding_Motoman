@@ -22,7 +22,7 @@
   <joint name="MA1440_pose" type="fixed">
     <parent link="world"/>
     <child link="MA1440_base_link"/>
-    <origin rpy="0.0 0.0 3.14159" xyz="4 0 0.908"/><!--MA2010 pedestal-->
+    <origin rpy="0.0 0.0 3.14159" xyz="2.7 -0.34 0.8"/>
   </joint>
 
 
@@ -46,7 +46,8 @@
   <link name="MA2010_base_link">
     <visual>
       <geometry>
-        <mesh filename="model://MA_2010_A0/meshes/visual/base_link.stl"/>
+        <!-- <mesh filename="model://MA_2010_A0/meshes/visual/base_link.stl"/> -->
+        <mesh filename="../../config/urdf/MA_2010_A0/meshes/visual/base_link.stl"/>
       </geometry>
       <material name="">
         <color rgba="0.12941176470588237 0.14901960784313725 0.7490196078431373 1.0"/>
@@ -414,7 +415,6 @@
       </geometry>
     </collision>
   </link>
-  <link name="MA1440_tool0"/>
   <!-- end of link list -->
   <!-- joint list -->
   <joint name="MA1440_joint_pedestal" type="fixed">
@@ -466,10 +466,28 @@
     <axis xyz="-1 0 0"/>
     <limit effort="14.80" lower="-6.2832" upper="6.2832" velocity="10.6465"/>
   </joint>
-  <joint name="MA1440_joint_6_t-tool0" type="fixed">
-    <origin rpy="0 0 0" xyz="0 0 0"/>
+  <link name="MA1440_tool0">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0.1215"/>
+      <geometry>
+        <cylinder radius="0.05" length="0.243"/>
+      </geometry>
+      <material name="">
+        <color rgba="0.12941176470588237 0.88 0.7490196078431373 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <origin rpy="0 0 0" xyz="0 0 0.28"/>
+      <geometry>
+        <cylinder radius="0.05" length="0.243"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="scanner_joint" type="fixed">
     <parent link="MA1440_link_6_t"/>
     <child link="MA1440_tool0"/>
+    <origin rpy="3.141592653589793 -1.2686793970944334 3.141592653589793" xyz="-141.053 0 132.47"/>
+    <axis xyz="0 0 0"/>
   </joint>
 
 
