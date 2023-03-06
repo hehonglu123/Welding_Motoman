@@ -46,6 +46,9 @@ np.savetxt('slice0.csv',np.hstack((slice_prev,slice_normal0)),delimiter=',')
 for i in range(1,num_layers):
 	slicei_normal=[]
 	slicei=np.loadtxt('raw/slice'+str(i)+'.csv',delimiter=',')
+	###sort order
+	if np.linalg.norm(slicei[0]-slice_prev[0])>10 and np.linalg.norm(slicei[-1]-slice_prev[-1])>10:
+		slicei=np.flip(slicei,axis=0)
 	slicei=smooth_curve(slicei)
 	slices.append(slicei)
 	for j in range(len(slicei)):
@@ -70,7 +73,7 @@ for i in range(1,num_layers):
 # ax.quiver(slices[1][::vis_step,0],slices[1][::vis_step,1],slices[1][::vis_step,2],slice_normal[1][::vis_step,0],slice_normal[1][::vis_step,1],slice_normal[1][::vis_step,2],length=0.3, normalize=True)
 # ax.plot3D(slices[2][::vis_step,0],slices[2][::vis_step,1],slices[2][::vis_step,2],'b.-')
 # ax.quiver(slices[2][::vis_step,0],slices[2][::vis_step,1],slices[2][::vis_step,2],slice_normal[2][::vis_step,0],slice_normal[2][::vis_step,1],slice_normal[2][::vis_step,2],length=0.3, normalize=True)
-plt.title('0.1 blade first 20 slices')
+plt.title('0.1 blade first X slices')
 plt.show()
 
 
