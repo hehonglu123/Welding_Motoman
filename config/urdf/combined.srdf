@@ -5,7 +5,7 @@
 -->
 <robot name="combined">
     <!--Contact Managers plugins -->
-    <contact_managers_plugin_config filename="model://MA_2010_A0/contact_manager_plugins.yaml"/>
+    <contact_managers_plugin_config filename="../../config/urdf/MA_2010_A0/contact_manager_plugins.yaml"/>
     <!--UR5-->
     <!--GROUPS: Representation of a set of joints and links. This can be useful for specifying DOF to plan for, defining arms, end effectors, etc-->
     <!--LINKS: When a link is specified, the parent joint of that link (if it exists) is automatically included-->
@@ -30,6 +30,18 @@
       <group_state name="all_zero" group="D500B">
           <joint name="D500B_joint_1" value="0" />
           <joint name="D500B_joint_2" value="0" />
+      </group_state>
+    </group>
+
+    <group name="MA1440">
+      <chain base_link="MA1440_base_link" tip_link="MA1440_link_6_t"/>
+      <group_state name="all_zero" group="ABB_1200">
+          <joint name="MA1440_joint_1_s" value="0" />
+          <joint name="MA1440_joint_2_l" value="0" />
+          <joint name="MA1440_joint_3_u" value="0" />
+          <joint name="MA1440_joint_4_r" value="0" />
+          <joint name="MA1440_joint_5_b" value="0" />
+          <joint name="MA1440_joint_6_t" value="0" />
       </group_state>
     </group>
 
