@@ -10,7 +10,7 @@ def main():
 	dataset='blade0.1/'
 	sliced_alg='NX_slice2/'
 	data_dir='../data/'+dataset+sliced_alg
-	num_layers=50
+	num_layers=70
 	base_thickness=3
 	num_baselayers=2
 	curve_sliced=[]
@@ -68,7 +68,7 @@ def main():
 		np.savetxt(data_dir+'curve_sliced_relative/baselayer'+str(x)+'.csv',curve_sliced_relative_base[x],delimiter=',')
 
 
-	plt.title('0.1 blade first X layers')
+	plt.title('0.1 blade first '+str(num_layers)+' slices')
 	plt.show()
 
 

@@ -9,6 +9,29 @@ from robot_def import *
 from path_calc import *
 # from utils import *
 
+def linear_fit(data,p_constraint=[]):
+	###no constraint
+	if len(p_constraint)==0:
+		A=np.vstack((np.ones(len(data)),np.arange(0,len(data)))).T
+		b=data
+		res=np.linalg.lstsq(A,b,rcond=None)[0]
+		start_point=res[0]
+		slope=res[1].reshape(1,-1)
+
+		data_fit=np.dot(np.arange(0,len(data)).reshape(-1,1),slope)+start_point
+	###with constraint point
+	else:
+		start_point=p_constraint
+
+		A=np.arange(1,len(data)+1).reshape(-1,1)
+		b=data-start_point
+		res=np.linalg.lstsq(A,b,rcond=None)[0]
+		slope=res.reshape(1,-1)
+
+		data_fit=np.dot(np.arange(1,len(data)+1).reshape(-1,1),slope)+start_point
+
+	return data_fit
+
 class redundancy_resolution(object):
 	###robot1 hold weld torch, positioner hold welded part
 	def __init__(self,robot,positioner,curve_sliced):
@@ -19,28 +42,76 @@ class redundancy_resolution(object):
 		self.positioner=positioner
 		self.curve_sliced=curve_sliced
 	
-	def introducing_tolerance(self,positioner_js):
+	def conditional_rolling_average(self,positioner_js):
 		###conditional rolling average
-		tolerance=np.radians(1)
-		steps=20
-		for i in range(1,len(positioner_js)):
+		tolerance=np.radians(3)
+		steps=25
+		positioner_js_new=copy.deepcopy(positioner_js)
+		for i in range(len(positioner_js)):
 			for j in range(len(positioner_js[i])):
 				if get_angle(self.positioner.fwd(positioner_js[i][j],world=True).R[:,-1],[0,0,1])<tolerance:
-					positioner_js[i][j]=np.average(positioner_js[i][max(0,j-steps):min(len(positioner_js[i])-1,j+steps)],axis=0)
+					if j-steps<0:
+						start_point=0
+						end_point=j+steps
+					elif j+steps>len(positioner_js[i]):
+						end_point=len(positioner_js[i])
+						start_point=j-steps
+					else:
+						start_point=j-steps
+						end_point=j+steps
+
+					positioner_js_new[i][j]=np.average(positioner_js[i][start_point:end_point],axis=0)
 			###reverse
+			positioner_js_new2=copy.deepcopy(positioner_js_new)
 			for j in reversed(range(len(positioner_js[i]))):
 				if get_angle(self.positioner.fwd(positioner_js[i][j],world=True).R[:,-1],[0,0,1])<tolerance:
-					positioner_js[i][j]=np.average(positioner_js[i][max(0,j-steps):min(len(positioner_js[i])-1,j+steps)],axis=0)
+					if j-steps<0:
+						start_point=0
+						end_point=j+steps
+					elif j+steps>len(positioner_js[i]):
+						end_point=len(positioner_js[i])
+						start_point=j-steps
+					else:
+						start_point=j-steps
+						end_point=j+steps
+
+					positioner_js_new2[i][j]=np.average(positioner_js[i][start_point:end_point],axis=0)
+
+		return positioner_js_new2
+
+	def introducing_tolerance(self,positioner_js):
+		### introduce tolerance to positioner inverse kinematics
+		tolerance=np.radians(3)
+		
+		for i in range(len(positioner_js)):
+			start_idx=0
+			end_idx=0
+			for j in range(len(positioner_js[i])):
+				if get_angle(self.positioner.fwd(positioner_js[i][j],world=True).R[:,-1],[0,0,1])<tolerance:
+					start_idx=j
+					for k in range(j+1,len(positioner_js[i])):
+						if get_angle(self.positioner.fwd(positioner_js[i][k],world=True).R[:,-1],[0,0,1])>tolerance:
+							end_idx=k
+							break
+					break
+
+			if start_idx==0 and (end_idx>start_idx):
+				positioner_js_temp=linear_fit(np.flip(positioner_js[i][start_idx:end_idx],axis=0),p_constraint=positioner_js[i][end_idx])
+				positioner_js[i][start_idx:end_idx]=np.flip(positioner_js_temp,axis=0)
+		
 
 		return positioner_js
+
 
 	def baseline_joint(self,R_torch,curve_sliced_relative,curve_sliced_relative_base,q_init=np.zeros(6)):
 		####baseline redundancy resolution, with fixed orientation
 		positioner_js=self.positioner_resolution(curve_sliced_relative)		#solve for positioner first
 		###TO FIX: override first layer positioner q2
 		positioner_js[0][:,1]=positioner_js[1][0,1]
+		
+		###singularity js smoothing
 		positioner_js=self.introducing_tolerance(positioner_js)
-		positioner_js=self.introducing_tolerance(positioner_js)
+		positioner_js=self.conditional_rolling_average(positioner_js)
 
 		###append base layers positioner
 		positioner_js_base=[copy.deepcopy(positioner_js[0])]*len(curve_sliced_relative_base)
