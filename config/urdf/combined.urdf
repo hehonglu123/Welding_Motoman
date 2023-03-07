@@ -46,7 +46,7 @@
   <link name="MA2010_base_link">
     <visual>
       <geometry>
-        <!-- <mesh filename="model://MA_2010_A0/meshes/visual/base_link.stl"/> -->
+        <!-- <mesh filename="../../config/urdf/MA_2010_A0/meshes/visual/base_link.stl"/> -->
         <mesh filename="../../config/urdf/MA_2010_A0/meshes/visual/base_link.stl"/>
       </geometry>
       <material name="">
@@ -55,14 +55,14 @@
     </visual>
     <collision>
       <geometry>
-        <mesh filename="model://MA_2010_A0/meshes/collision/base_link.stl"/>
+        <mesh filename="../../config/urdf/MA_2010_A0/meshes/collision/base_link.stl"/>
       </geometry>
     </collision>
   </link>
   <link name="MA2010_link_1_s">
     <visual>
       <geometry>
-        <mesh filename="model://MA_2010_A0/meshes/visual/link_1_s.stl"/>
+        <mesh filename="../../config/urdf/MA_2010_A0/meshes/visual/link_1_s.stl"/>
       </geometry>
       <material name="">
         <color rgba="0.12941176470588237 0.14901960784313725 0.7490196078431373 1.0"/>
@@ -70,14 +70,14 @@
     </visual>
     <collision>
       <geometry>
-        <mesh filename="model://MA_2010_A0/meshes/collision/link_1_s.stl"/>
+        <mesh filename="../../config/urdf/MA_2010_A0/meshes/collision/link_1_s.stl"/>
       </geometry>
     </collision>
   </link>
   <link name="MA2010_link_2_l">
     <visual>
       <geometry>
-        <mesh filename="model://MA_2010_A0/meshes/visual/link_2_l.stl"/>
+        <mesh filename="../../config/urdf/MA_2010_A0/meshes/visual/link_2_l.stl"/>
       </geometry>
       <material name="">
         <color rgba="0.12941176470588237 0.14901960784313725 0.7490196078431373 1.0"/>
@@ -85,14 +85,14 @@
     </visual>
     <collision>
       <geometry>
-        <mesh filename="model://MA_2010_A0/meshes/collision/link_2_l.stl"/>
+        <mesh filename="../../config/urdf/MA_2010_A0/meshes/collision/link_2_l.stl"/>
       </geometry>
     </collision>
   </link>
   <link name="MA2010_link_3_u">
     <visual>
       <geometry>
-        <mesh filename="model://MA_2010_A0/meshes/visual/link_3_u.stl"/>
+        <mesh filename="../../config/urdf/MA_2010_A0/meshes/visual/link_3_u.stl"/>
       </geometry>
       <material name="">
         <color rgba="0.12941176470588237 0.14901960784313725 0.7490196078431373 1.0"/>
@@ -100,14 +100,14 @@
     </visual>
     <collision>
       <geometry>
-        <mesh filename="model://MA_2010_A0/meshes/collision/link_3_u.stl"/>
+        <mesh filename="../../config/urdf/MA_2010_A0/meshes/collision/link_3_u.stl"/>
       </geometry>
     </collision>
   </link>
   <link name="MA2010_link_4_r">
     <visual>
       <geometry>
-        <mesh filename="model://MA_2010_A0/meshes/visual/link_4_r.stl"/>
+        <mesh filename="../../config/urdf/MA_2010_A0/meshes/visual/link_4_r.stl"/>
       </geometry>
       <material name="">
         <color rgba="0.12941176470588237 0.14901960784313725 0.7490196078431373 1.0"/>
@@ -115,14 +115,14 @@
     </visual>
     <collision>
       <geometry>
-        <mesh filename="model://MA_2010_A0/meshes/collision/link_4_r.stl"/>
+        <mesh filename="../../config/urdf/MA_2010_A0/meshes/collision/link_4_r.stl"/>
       </geometry>
     </collision>
   </link>
   <link name="MA2010_link_5_b">
     <visual>
       <geometry>
-        <mesh filename="model://MA_2010_A0/meshes/visual/link_5_b.stl"/>
+        <mesh filename="../../config/urdf/MA_2010_A0/meshes/visual/link_5_b.stl"/>
       </geometry>
       <material name="">
         <color rgba="0.12941176470588237 0.14901960784313725 0.7490196078431373 1.0"/>
@@ -130,14 +130,14 @@
     </visual>
     <collision>
       <geometry>
-        <mesh filename="model://MA_2010_A0/meshes/collision/link_5_b.stl"/>
+        <mesh filename="../../config/urdf/MA_2010_A0/meshes/collision/link_5_b.stl"/>
       </geometry>
     </collision>
   </link>
   <link name="MA2010_link_6_t">
     <visual>
       <geometry>
-        <mesh filename="model://MA_2010_A0/meshes/visual/link_6_t.stl"/>
+        <mesh filename="../../config/urdf/MA_2010_A0/meshes/visual/link_6_t.stl"/>
       </geometry>
       <material name="">
         <color rgba="0.12941176470588237 0.14901960784313725 0.7490196078431373 1.0"/>
@@ -145,7 +145,7 @@
     </visual>
     <collision>
       <geometry>
-        <mesh filename="model://MA_2010_A0/meshes/collision/link_6_t.stl"/>
+        <mesh filename="../../config/urdf/MA_2010_A0/meshes/collision/link_6_t.stl"/>
       </geometry>
     </collision>
   </link>
@@ -204,7 +204,7 @@
   <link name="weldgun">
     <visual>
       <geometry>
-        <mesh filename="model://MA_2010_A0/meshes/visual/weldgun.stl" scale="0.001 0.001 0.001"/>
+        <mesh filename="../../config/urdf/MA_2010_A0/meshes/visual/weldgun.stl" scale="0.001 0.001 0.001"/>
       </geometry>
       <material name="">
         <color rgba="0.12941176470588237 0.88 0.7490196078431373 1.0"/>
@@ -212,7 +212,7 @@
     </visual>
     <collision>
       <geometry>
-        <mesh filename="model://MA_2010_A0/meshes/collision/weldgun.stl" scale="0.001 0.001 0.001"/>
+        <mesh filename="../../config/urdf/MA_2010_A0/meshes/collision/weldgun.stl" scale="0.001 0.001 0.001"/>
       </geometry>
     </collision>
   </link>
@@ -234,7 +234,7 @@
   <link name="D500B_base_link">
     <visual>
       <geometry>
-        <mesh filename="model://D500B/meshes/visual/base_link.stl"/>
+        <mesh filename="../../config/urdf/D500B/meshes/visual/base_link.stl"/>
       </geometry>
       <material name="">
         <color rgba="0.12941176470588237 0.14901960784313725 0.7490196078431373 1.0"/>
@@ -242,14 +242,14 @@
     </visual>
     <collision>
       <geometry>
-        <mesh filename="model://D500B/meshes/collision/base_link.stl"/>
+        <mesh filename="../../config/urdf/D500B/meshes/collision/base_link.stl"/>
       </geometry>
     </collision>
   </link>
   <link name="D500B_link_1">
     <visual>
       <geometry>
-        <mesh filename="model://D500B/meshes/visual/link_1.stl"/>
+        <mesh filename="../../config/urdf/D500B/meshes/visual/link_1.stl"/>
       </geometry>
       <material name="">
         <color rgba="0.12941176470588237 0.14901960784313725 0.7490196078431373 1.0"/>
@@ -257,14 +257,14 @@
     </visual>
     <collision>
       <geometry>
-        <mesh filename="model://D500B/meshes/collision/link_1.stl"/>
+        <mesh filename="../../config/urdf/D500B/meshes/collision/link_1.stl"/>
       </geometry>
     </collision>
   </link>
   <link name="D500B_link_2">
     <visual>
       <geometry>
-        <mesh filename="model://D500B/meshes/visual/link_2.stl"/>
+        <mesh filename="../../config/urdf/D500B/meshes/visual/link_2.stl"/>
       </geometry>
       <material name="">
         <color rgba="0.12941176470588237 0.14901960784313725 0.7490196078431373 1.0"/>
@@ -272,7 +272,7 @@
     </visual>
     <collision>
       <geometry>
-        <mesh filename="model://D500B/meshes/collision/link_2.stl"/>
+        <mesh filename="../../config/urdf/D500B/meshes/collision/link_2.stl"/>
       </geometry>
     </collision>
   </link>
@@ -298,7 +298,7 @@
   <link name="MA1440_pedestal">
     <visual>
       <geometry>
-        <mesh filename="model://objects/meshes/ma1440_pedestal.stl" scale="0.001 0.001 0.001"/>
+        <mesh filename="../../config/urdf/objects/meshes/ma1440_pedestal.stl" scale="0.001 0.001 0.001"/>
       </geometry>
       <material name="">
         <color rgba="0.12941176470588237 0.14901960784313725 0.7490196078431373 1.0"/>
@@ -306,14 +306,14 @@
     </visual>
     <collision>
       <geometry>
-        <mesh filename="model://objects/meshes/ma1440_pedestal.stl" scale="0.001 0.001 0.001"/>
+        <mesh filename="../../config/urdf/objects/meshes/ma1440_pedestal.stl" scale="0.001 0.001 0.001"/>
       </geometry>
     </collision>
   </link>
   <link name="MA1440_base_link">
     <visual>
       <geometry>
-        <mesh filename="model://MA_1440_A0/meshes/visual/base_link.stl"/>
+        <mesh filename="../../config/urdf/MA_1440_A0/meshes/visual/base_link.stl"/>
       </geometry>
       <material name="">
         <color rgba="0.12941176470588237 0.14901960784313725 0.7490196078431373 1.0"/>
@@ -321,14 +321,14 @@
     </visual>
     <collision>
       <geometry>
-        <mesh filename="model://MA_1440_A0/meshes/collision/base_link.stl"/>
+        <mesh filename="../../config/urdf/MA_1440_A0/meshes/collision/base_link.stl"/>
       </geometry>
     </collision>
   </link>
   <link name="MA1440_link_1_s">
     <visual>
       <geometry>
-        <mesh filename="model://MA_1440_A0/meshes/visual/link_1_s.stl"/>
+        <mesh filename="../../config/urdf/MA_1440_A0/meshes/visual/link_1_s.stl"/>
       </geometry>
       <material name="">
         <color rgba="0.12941176470588237 0.14901960784313725 0.7490196078431373 1.0"/>
@@ -336,14 +336,14 @@
     </visual>
     <collision>
       <geometry>
-        <mesh filename="model://MA_1440_A0/meshes/collision/link_1_s.stl"/>
+        <mesh filename="../../config/urdf/MA_1440_A0/meshes/collision/link_1_s.stl"/>
       </geometry>
     </collision>
   </link>
   <link name="MA1440_link_2_l">
     <visual>
       <geometry>
-        <mesh filename="model://MA_1440_A0/meshes/visual/link_2_l.stl"/>
+        <mesh filename="../../config/urdf/MA_1440_A0/meshes/visual/link_2_l.stl"/>
       </geometry>
       <material name="">
         <color rgba="0.12941176470588237 0.14901960784313725 0.7490196078431373 1.0"/>
@@ -351,14 +351,14 @@
     </visual>
     <collision>
       <geometry>
-        <mesh filename="model://MA_1440_A0/meshes/collision/link_2_l.stl"/>
+        <mesh filename="../../config/urdf/MA_1440_A0/meshes/collision/link_2_l.stl"/>
       </geometry>
     </collision>
   </link>
   <link name="MA1440_link_3_u">
     <visual>
       <geometry>
-        <mesh filename="model://MA_1440_A0/meshes/visual/link_3_u.stl"/>
+        <mesh filename="../../config/urdf/MA_1440_A0/meshes/visual/link_3_u.stl"/>
       </geometry>
       <material name="">
         <color rgba="0.12941176470588237 0.14901960784313725 0.7490196078431373 1.0"/>
@@ -366,14 +366,14 @@
     </visual>
     <collision>
       <geometry>
-        <mesh filename="model://MA_1440_A0/meshes/collision/link_3_u.stl"/>
+        <mesh filename="../../config/urdf/MA_1440_A0/meshes/collision/link_3_u.stl"/>
       </geometry>
     </collision>
   </link>
   <link name="MA1440_link_4_r">
     <visual>
       <geometry>
-        <mesh filename="model://MA_1440_A0/meshes/visual/link_4_r.stl"/>
+        <mesh filename="../../config/urdf/MA_1440_A0/meshes/visual/link_4_r.stl"/>
       </geometry>
       <material name="">
         <color rgba="0.12941176470588237 0.14901960784313725 0.7490196078431373 1.0"/>
@@ -381,14 +381,14 @@
     </visual>
     <collision>
       <geometry>
-        <mesh filename="model://MA_1440_A0/meshes/collision/link_4_r.stl"/>
+        <mesh filename="../../config/urdf/MA_1440_A0/meshes/collision/link_4_r.stl"/>
       </geometry>
     </collision>
   </link>
   <link name="MA1440_link_5_b">
     <visual>
       <geometry>
-        <mesh filename="model://MA_1440_A0/meshes/visual/link_5_b.stl"/>
+        <mesh filename="../../config/urdf/MA_1440_A0/meshes/visual/link_5_b.stl"/>
       </geometry>
       <material name="">
         <color rgba="0.12941176470588237 0.14901960784313725 0.7490196078431373 1.0"/>
@@ -396,14 +396,14 @@
     </visual>
     <collision>
       <geometry>
-        <mesh filename="model://MA_1440_A0/meshes/collision/link_5_b.stl"/>
+        <mesh filename="../../config/urdf/MA_1440_A0/meshes/collision/link_5_b.stl"/>
       </geometry>
     </collision>
   </link>
   <link name="MA1440_link_6_t">
     <visual>
       <geometry>
-        <mesh filename="model://MA_1440_A0/meshes/visual/link_6_t.stl"/>
+        <mesh filename="../../config/urdf/MA_1440_A0/meshes/visual/link_6_t.stl"/>
       </geometry>
       <material name="">
         <color rgba="0.12941176470588237 0.14901960784313725 0.7490196078431373 1.0"/>
@@ -411,7 +411,24 @@
     </visual>
     <collision>
       <geometry>
-        <mesh filename="model://MA_1440_A0/meshes/collision/link_6_t.stl"/>
+        <mesh filename="../../config/urdf/MA_1440_A0/meshes/collision/link_6_t.stl"/>
+      </geometry>
+    </collision>
+  </link>
+  <link name="MA1440_tool0">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 -0.1215"/>
+      <geometry>
+        <cylinder radius="0.01" length="0.243"/>
+      </geometry>
+      <material name="">
+        <color rgba="0.12941176470588237 0.88 0.7490196078431373 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <origin rpy="0 0 0" xyz="0 0 0.28"/>
+      <geometry>
+        <cylinder radius="0.05" length="0.243"/>
       </geometry>
     </collision>
   </link>
@@ -466,27 +483,10 @@
     <axis xyz="-1 0 0"/>
     <limit effort="14.80" lower="-6.2832" upper="6.2832" velocity="10.6465"/>
   </joint>
-  <link name="MA1440_tool0">
-    <visual>
-      <origin rpy="0 0 0" xyz="0 0 0.1215"/>
-      <geometry>
-        <cylinder radius="0.05" length="0.243"/>
-      </geometry>
-      <material name="">
-        <color rgba="0.12941176470588237 0.88 0.7490196078431373 1.0"/>
-      </material>
-    </visual>
-    <collision>
-      <origin rpy="0 0 0" xyz="0 0 0.28"/>
-      <geometry>
-        <cylinder radius="0.05" length="0.243"/>
-      </geometry>
-    </collision>
-  </link>
   <joint name="scanner_joint" type="fixed">
     <parent link="MA1440_link_6_t"/>
     <child link="MA1440_tool0"/>
-    <origin rpy="3.141592653589793 -1.2686793970944334 3.141592653589793" xyz="-141.053 0 132.47"/>
+    <origin rpy="-0.30211692970046267  -0.0  -1.5707963267948966" xyz="0.21347     0.    -0.222053"/>
     <axis xyz="0 0 0"/>
   </joint>
 
@@ -497,7 +497,7 @@
   <link name="Controller">
     <visual>
       <geometry>
-        <mesh filename="model://objects/meshes/controller.stl" scale="0.001 0.001 0.001"/>
+        <mesh filename="../../config/urdf/objects/meshes/controller.stl" scale="0.001 0.001 0.001"/>
       </geometry>
       <material name="">
         <color rgba="0.72941176470588237 0.14901960784313725 0.1490196078431373 1.0"/>
@@ -505,7 +505,7 @@
     </visual>
     <collision>
       <geometry>
-        <mesh filename="model://objects/meshes/controller.stl" scale="0.001 0.001 0.001"/>
+        <mesh filename="../../config/urdf/objects/meshes/controller.stl" scale="0.001 0.001 0.001"/>
       </geometry>
     </collision>
   </link>
