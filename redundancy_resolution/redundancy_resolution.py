@@ -102,6 +102,27 @@ class redundancy_resolution(object):
 
 		return positioner_js
 
+	def introducing_tolerance2(self,positioner_js):
+		### introduce tolerance to positioner inverse kinematics
+		tolerance=np.radians(2)
+		
+		for i in range(len(positioner_js)):
+			start_idx=0
+			end_idx=0
+			for j in range(len(positioner_js[i])):
+				if get_angle(self.positioner.fwd(positioner_js[i][j],world=True).R[:,-1],[0,0,1])<tolerance:
+					start_idx=j
+					for k in range(j+1,len(positioner_js[i])):
+						if get_angle(self.positioner.fwd(positioner_js[i][k],world=True).R[:,-1],[0,0,1])>tolerance:
+							end_idx=k
+							break
+					break
+
+			if start_idx==0 and (end_idx>start_idx):
+				positioner_js[i][start_idx:end_idx]=positioner_js[i][end_idx]
+
+		return positioner_js
+
 
 	def baseline_joint(self,R_torch,curve_sliced_relative,curve_sliced_relative_base,q_init=np.zeros(6)):
 		####baseline redundancy resolution, with fixed orientation
@@ -110,9 +131,10 @@ class redundancy_resolution(object):
 		positioner_js[0][:,1]=positioner_js[1][0,1]
 		
 		###singularity js smoothing
-		positioner_js=self.conditional_rolling_average(positioner_js)
-		positioner_js=self.introducing_tolerance(positioner_js)
 		# positioner_js=self.conditional_rolling_average(positioner_js)
+		positioner_js=self.introducing_tolerance2(positioner_js)
+		positioner_js=self.conditional_rolling_average(positioner_js)
+		positioner_js[0][:,1]=positioner_js[1][0,1]
 
 		###append base layers positioner
 		positioner_js_base=[copy.deepcopy(positioner_js[0])]*len(curve_sliced_relative_base)

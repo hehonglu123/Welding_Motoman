@@ -50,8 +50,8 @@ client=MotionProgramExecClient(ROBOT_CHOICE='RB1',ROBOT_CHOICE2='ST1',pulse2deg=
 # 	client.SetArc(False)
 
 ###########################################layer welding############################################
-num_layer_start=39
-num_layer_end=40
+num_layer_start=69
+num_layer_end=70
 for layer in range(num_layer_start,num_layer_end):
 
 	curve_sliced_js=np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(layer)+'.csv',delimiter=',')
@@ -72,11 +72,11 @@ for layer in range(num_layer_start,num_layer_end):
 	target2=['MOVJ',np.degrees(positioner_js[breakpoints[0]]),10]
 	client.MoveL(np.degrees(curve_sliced_js[breakpoints[0]]), s1_all[0],target2=target2)
 
-	# client.SetArc(True,cond_num=160)
+	client.SetArc(True,cond_num=140)
 	for j in range(1,len(breakpoints)):
 	    target2=['MOVJ',np.degrees(positioner_js[breakpoints[j]]),10]
 	    client.MoveL(np.degrees(curve_sliced_js[breakpoints[j]]), s1_all[j],target2=target2)
-	# client.SetArc(False)
+	client.SetArc(False)
 
     
 client.ProgEnd()
