@@ -110,8 +110,9 @@ class redundancy_resolution(object):
 		positioner_js[0][:,1]=positioner_js[1][0,1]
 		
 		###singularity js smoothing
-		positioner_js=self.introducing_tolerance(positioner_js)
 		positioner_js=self.conditional_rolling_average(positioner_js)
+		positioner_js=self.introducing_tolerance(positioner_js)
+		# positioner_js=self.conditional_rolling_average(positioner_js)
 
 		###append base layers positioner
 		positioner_js_base=[copy.deepcopy(positioner_js[0])]*len(curve_sliced_relative_base)
