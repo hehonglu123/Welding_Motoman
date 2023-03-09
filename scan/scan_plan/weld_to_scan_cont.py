@@ -164,9 +164,9 @@ curve_sliced_relative=np.array(curve_sliced_relative)
 
 ### scan parameters
 scan_speed=30 # scanning speed
-Rz_turn_angle = np.radians(0) # point direction w.r.t welds
-Ry_turn_angle = np.radians(-10) # rotate in y a bit, z-axis not pointing down, to have ik solution
-# Ry_turn_angle = np.radians(0) # rotate in y a bit, z-axis not pointing down, to have ik solution
+Rz_turn_angle = np.radians(-45) # point direction w.r.t welds
+# Ry_turn_angle = np.radians(-10) # rotate in y a bit, z-axis not pointing down, to have ik solution
+Ry_turn_angle = np.radians(0) # rotate in y a bit, z-axis not pointing down, to have ik solution
 scan_stand_off_d = 243 ## mm
 bounds_theta = np.radians(45) ## circular motion at start and end
 # all_scan_angle = np.radians([-45,0,45,0]) ## scanning angles
@@ -305,7 +305,7 @@ if method==0:
 elif method==1:
     ### Method 2: stepwise qp, turntable involved
     rrs = redundancy_resolution_scanner(robot_scan,turn_table,scan_p,scan_R)
-    q_init_table=np.radians([60,-60])
+    q_init_table=np.radians([-70,150])
     pose_R2_table=Transform(R2base_table_H[:3,:3],R2base_table_H[:3,-1])*turn_table.fwd(q_init_table)
     print(np.matmul(pose_R2_table.R,scan_p[0])+pose_R2_table.p,np.matmul(pose_R2_table.R,scan_R[0]))
     q_init_robot = robot_scan.inv(np.matmul(pose_R2_table.R,scan_p[0])+pose_R2_table.p,np.matmul(pose_R2_table.R,scan_R[0]),zero_config)[0]
@@ -334,6 +334,7 @@ elif method==1:
 
     visualize_frames(scan_R_show,scan_p_show,size=5)
 
+# print(len(q_out1))
 if sim:
     t=Tess_Env('../../config/urdf/combined')				#create obj
     # for i in range(num_layers):
