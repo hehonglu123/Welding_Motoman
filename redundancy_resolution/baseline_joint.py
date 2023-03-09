@@ -10,7 +10,7 @@ def main():
 	dataset='blade0.1/'
 	sliced_alg='NX_slice2/'
 	data_dir='../data/'+dataset+sliced_alg
-	num_layers=50
+	num_layers=70
 	num_baselayers=2
 	curve_sliced_relative_base=[]
 	curve_sliced_relative=[]
@@ -23,7 +23,7 @@ def main():
 		curve_sliced.append(np.loadtxt(data_dir+'curve_sliced/slice'+str(i)+'.csv',delimiter=','))
 
 	robot=robot_obj('MA2010_A0',def_path='../config/MA2010_A0_robot_default_config.yml',tool_file_path='../config/weldgun.csv',\
-		pulse2deg_file_path='../config/MA2010_A0_pulse2deg.csv',d=20)
+		pulse2deg_file_path='../config/MA2010_A0_pulse2deg.csv',d=15)
 	positioner=positioner_obj('D500B',def_path='../config/D500B_robot_default_config.yml',tool_file_path='../config/positioner_tcp.csv',\
 		pulse2deg_file_path='../config/D500B_pulse2deg.csv',base_transformation_file='../config/D500B_pose.csv')
 
