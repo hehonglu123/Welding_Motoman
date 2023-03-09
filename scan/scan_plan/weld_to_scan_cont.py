@@ -51,6 +51,38 @@ def robot_weld_path_gen(test_n):
     
     return all_path_T
 
+def robot_weld_path_gen_2():
+    R=np.array([[ 0.7071, -0.7071, -0.    ],
+			[-0.7071, -0.7071,  0.    ],
+			[-0.,      0.,     -1.    ]])
+    # x0 =  1684	# Origin x coordinate
+    # y0 = -753.5	# Origin y coordinate
+    # z0 = -245   # 10 mm distance to base
+
+    # weld_p = np.array([[1651, -771, -255],[1651, -856, -255],[1651, -856, -254],
+    # [1651, -771, -254],[1651, -771, -253],[1651, -856, -253],
+    # [1651, -856, -252],[1651, -771, -252],[1651, -771, -251],
+    # [1651, -856, -251],[1651, -856, -250],[1651, -771, -250],
+    # [1651, -771, -249],[1651, -856, -249],[1651, -856, -248],
+    # [1651, -771, -248],[1651, -771, -247],[1651, -856, -247],
+    # [1651, -856, -246],[1651, -771, -246],[1651, -771, -245],
+    # [1651, -856, -245],[1651, -856, -244],[1651, -771, -244]])
+    weld_p = np.array([[1651, -771, -255],[1651, -856, -255]])
+
+    ## tune
+    dx = 0
+    dy = 0
+    dz = 0
+    dp = np.array([dx,dy,dz])
+
+    path_T=[]
+    for p in weld_p:
+        path_T.append(Transform(R,p+dp))
+
+    all_path_T = [path_T]
+    
+    return all_path_T
+
 def get_bound_circle(p,R,pc,k,theta):
 
     p=np.array(p)
@@ -95,6 +127,8 @@ zero_config=np.array([0.,0.,0.,0.,0.,0.])
 
 R2base_R1base_H = np.linalg.inv(robot_scan.base_H)
 TBase_R1Base_H = np.linalg.inv(turn_table.base_H)
+Table_home_T = turn_table.fwd(np.radians([-15,180]))
+TBase_R1TCP_H = np.linalg.inv(np.matmul(turn_table.base_H,H_from_RT(Table_home_T.R,Table_home_T.p)))
 R2base_table_H = np.matmul(R2base_R1base_H,turn_table.base_H)
 print("Turn table relative to R2",R2base_table_H)
 
@@ -110,12 +144,22 @@ print("Turn table relative to R2",R2base_table_H)
 #     this_n = np.matmul(TBase_R1Base_H[:3,:3],path_p[3:])
 #     curve_sliced_relative.append(np.append(this_p,this_n))
 # curve_sliced_relative=np.array(curve_sliced_relative)
+## wall test 2
+data_dir='../../data/wall_weld_test/scan_cont_3/'
+all_path_T = robot_weld_path_gen_2()
+curve_sliced_R1=np.array(all_path_T[0])
+curve_sliced_relative=[]
+for path_p in curve_sliced_R1:
+    this_p = np.matmul(TBase_R1TCP_H[:3,:3],path_p.p)+TBase_R1TCP_H[:3,-1]
+    this_n = np.matmul(TBase_R1TCP_H[:3,:3],path_p.R[:,-1])
+    curve_sliced_relative.append(np.append(this_p,this_n))
+curve_sliced_relative=np.array(curve_sliced_relative)
 ## blade
-dataset='blade0.1/'
-sliced_alg='NX_slice2/'
-data_dir='../../data/'+dataset+sliced_alg
-out_dir=data_dir+'scans/'
-curve_sliced_relative=np.loadtxt(data_dir+'curve_sliced_relative/slice0.csv',delimiter=',')
+# dataset='blade0.1/'
+# sliced_alg='NX_slice2/'
+# data_dir='../../data/'+dataset+sliced_alg
+# out_dir=data_dir+'scans/'
+# curve_sliced_relative=np.loadtxt(data_dir+'curve_sliced_relative/slice0.csv',delimiter=',')
 ##############################
 
 ### scan parameters
@@ -124,7 +168,7 @@ Rz_turn_angle = np.radians(0) # point direction w.r.t welds
 Ry_turn_angle = np.radians(-10) # rotate in y a bit, z-axis not pointing down, to have ik solution
 # Ry_turn_angle = np.radians(0) # rotate in y a bit, z-axis not pointing down, to have ik solution
 scan_stand_off_d = 243 ## mm
-bounds_theta = np.radians(0) ## circular motion at start and end
+bounds_theta = np.radians(45) ## circular motion at start and end
 # all_scan_angle = np.radians([-45,0,45,0]) ## scanning angles
 all_scan_angle = np.radians([0]) ## scanning angles
 
@@ -145,7 +189,7 @@ for scan_angle in all_scan_angle:
 
         if pT_i == len(curve_sliced_relative)-1:
             this_scan_R = deepcopy(sub_scan_R[-1])
-            this_scan_p = this_p - this_scan_R[:,-1]*scan_stand_off_d # stand off distance to scan
+            this_scan_p = this_p + this_scan_R[:,-1]*scan_stand_off_d # stand off distance to scan
             sub_scan_p.append(this_scan_p)
             sub_scan_R.append(this_scan_R)
             k = deepcopy(this_scan_R[:,0])
@@ -198,7 +242,48 @@ scan_R=np.array(scan_R)
 scan_R = np.matmul(scan_R,rot([0.,0.,1.],Rz_turn_angle))
 scan_R = np.matmul(scan_R,rot([0.,1.,0.],Ry_turn_angle))
 
-visualize_frames(scan_R[::10],scan_p[::10],size=5)
+####### add detail path ################
+delta_p = 0.1
+scan_p_detail=None
+scan_R_detail=None
+for scan_p_i in range(len(scan_p)-1):
+    this_scan_p=deepcopy(scan_p[scan_p_i])
+    next_scan_p=deepcopy(scan_p[scan_p_i+1])
+
+    if np.all(this_scan_p==next_scan_p):
+        continue
+
+    travel_v=next_scan_p-this_scan_p
+    total_l=np.linalg.norm(travel_v)
+    travel_v=travel_v/total_l
+    travel_v=travel_v*delta_p
+
+    scan_p_mid=[]
+    this_scan_p_mid=deepcopy(this_scan_p)
+    while True:
+        scan_p_mid.append(deepcopy(this_scan_p_mid))
+        this_scan_p_mid+=travel_v
+        if np.linalg.norm(this_scan_p_mid-this_scan_p)>=total_l:
+            break
+    scan_p_mid=np.array(scan_p_mid)
+    scan_R_mid = np.tile(scan_R[scan_p_i],(len(scan_p_mid),1,1))
+    if scan_p_detail is None:
+        scan_p_detail=deepcopy(scan_p_mid)
+        scan_R_detail=deepcopy(scan_R_mid)
+    else:
+        scan_p_detail = np.vstack((scan_p_detail,scan_p_mid))
+        scan_R_detail = np.vstack((scan_R_detail,scan_R_mid))
+########################################
+scan_p_detail=np.vstack((scan_p_detail,[scan_p[-1]]))
+scan_R_detail=np.vstack((scan_R_detail,[scan_R[-1]]))
+scan_p=deepcopy(scan_p_detail)
+scan_R=deepcopy(scan_R_detail)
+
+####### add extension for time sync ####
+
+########################################
+
+# visualize_frames(scan_R[::10],scan_p[::10],size=1)
 ############# path gen finish ################
 
 ############ redundancy resolution ###
@@ -220,8 +305,9 @@ if method==0:
 elif method==1:
     ### Method 2: stepwise qp, turntable involved
     rrs = redundancy_resolution_scanner(robot_scan,turn_table,scan_p,scan_R)
-    q_init_table=np.radians([15,90])
+    q_init_table=np.radians([60,-60])
     pose_R2_table=Transform(R2base_table_H[:3,:3],R2base_table_H[:3,-1])*turn_table.fwd(q_init_table)
+    print(np.matmul(pose_R2_table.R,scan_p[0])+pose_R2_table.p,np.matmul(pose_R2_table.R,scan_R[0]))
     q_init_robot = robot_scan.inv(np.matmul(pose_R2_table.R,scan_p[0])+pose_R2_table.p,np.matmul(pose_R2_table.R,scan_R[0]),zero_config)[0]
     print(np.degrees(q_init_robot))
     # q_out1, q_out2, j_out1, j_out2=rrs.arm_table_stepwise_opt(q_init_robot,q_init_table,w2=0.03)
@@ -240,11 +326,11 @@ elif method==1:
     scan_act_R=np.array(scan_act_R)
     scan_act_p=np.array(scan_act_p)
 
-    scan_R_show=scan_R[::10]
-    scan_p_show=scan_p[::10]
+    scan_R_show=scan_R[::50]
+    scan_p_show=scan_p[::50]
 
-    scan_R_show=np.vstack((scan_R_show,scan_act_R[::10]))
-    scan_p_show=np.vstack((scan_p_show,scan_act_p[::10]))
+    # scan_R_show=np.vstack((scan_R_show,scan_act_R[::10]))
+    # scan_p_show=np.vstack((scan_p_show,scan_act_p[::10]))
 
     visualize_frames(scan_R_show,scan_p_show,size=5)
 
