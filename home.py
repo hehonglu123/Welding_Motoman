@@ -8,7 +8,7 @@ robot1=robot_obj('MA2010_A0',def_path='config/MA2010_A0_robot_default_config.yml
 	pulse2deg_file_path='config/MA2010_A0_pulse2deg.csv')
 
 robot2=robot_obj('MA2010_A0',def_path='config/MA2010_A0_robot_default_config.yml',tool_file_path='config/weldgun.csv',\
-	pulse2deg_file_path='config/MA2010_A0_pulse2deg.csv')
+	pulse2deg_file_path='config/MA1440_A0_pulse2deg.csv')
 
 station_pulse2deg=np.abs(np.loadtxt('config/D500B_pulse2deg.csv'))
 
@@ -23,16 +23,19 @@ client=MotionProgramExecClient(IP='192.168.1.31',ROBOT_CHOICE='RB1',pulse2deg=ro
 client.MoveJ(q1,2,0)
 client.ProgEnd()
 (timestamp,joint_recording)=client.execute_motion_program("AAA.JBI")
-print(timestamp)
-print(joint_recording)
+np.savetxt('js_recording.csv',np.hstack((timestamp.reshape(-1, 1),joint_recording)),delimiter=',')
+# print(timestamp)
+# print(joint_recording)
 
 client=MotionProgramExecClient(IP='192.168.1.31',ROBOT_CHOICE='RB2',pulse2deg=robot2.pulse2deg)
 client.MoveJ(q2,2,0)
 client.ProgEnd()
-client.execute_motion_program("AAA.JBI")
+(timestamp,joint_recording)=client.execute_motion_program("AAA.JBI")
+
 
 client=MotionProgramExecClient(IP='192.168.1.31',ROBOT_CHOICE='ST1',pulse2deg=station_pulse2deg)
-client.MoveJ(q3,2,0)
+client.MoveJ(q3,5,0)
 client.ProgEnd()
-client.execute_motion_program("AAA.JBI")
+(timestamp,joint_recording)=client.execute_motion_program("AAA.JBI")
+
 

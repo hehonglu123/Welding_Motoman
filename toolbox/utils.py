@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.interpolate import interp1d
 from scipy import signal
-import scipy
+import scipy, math
 
 def get_speed(curve_exe,timestamp):
 	d_curve_exe=np.gradient(curve_exe,axis=0)
