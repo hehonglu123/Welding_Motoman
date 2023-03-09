@@ -6,6 +6,7 @@ sys.path.append('../../toolbox/')
 sys.path.append('../../redundancy_resolution/')
 sys.path.append('../scan_tools/')
 from robot_def import *
+from multi_robot import *
 from scan_utils import *
 from scan_continuous import *
 from redundancy_resolution_scanner import *
@@ -90,15 +91,21 @@ def get_bound_circle(p,R,pc,k,theta):
     pc=np.array(pc)
     k=np.array(k)
     
-    rot_R_2 = rot(k,theta/2)
+    all_p_bound=[]
+    all_R_bound=[]
+    for th in np.arange(0,theta,np.sign(theta)*np.radians(1)):
+        rot_R = rot(k,th)
+        p_bound = np.matmul(rot_R,(p-pc))+pc
+        R_bound = np.matmul(rot_R,R)
+        all_p_bound.append(p_bound)
+        all_R_bound.append(R_bound)
     rot_R = rot(k,theta)
-    p_bound = np.matmul(rot_R,(p-pc))+pc
-    p_bound_2 = np.matmul(rot_R_2,(p-pc))+pc
-    R_bound = np.matmul(rot_R,R)
-    # R_bound = np.matmul(rot_R,R)
-    R_bound_2 = np.matmul(rot_R_2,R)
+    all_p_bound.append(np.matmul(rot_R,(p-pc))+pc)
+    all_R_bound.append(np.matmul(rot_R,R))
+    all_p_bound=all_p_bound[::-1]
+    all_R_bound=all_R_bound[::-1]
     
-    return [p_bound,p_bound_2],[R_bound,R_bound_2]
+    return all_p_bound,all_R_bound
 
 config_dir='../../config/'
 
@@ -112,7 +119,7 @@ turn_table=positioner_obj('D500B',def_path=config_dir+'D500B_robot_default_confi
     pulse2deg_file_path=config_dir+'D500B_pulse2deg.csv')
 
 ## sim or real robot
-sim=True
+sim=False
 
 zero_config=np.array([0.,0.,0.,0.,0.,0.])
 # print(robot_scan.fwd(zero_config))
@@ -294,24 +301,23 @@ if method==0:
     scan_p_T=[]
     scan_p = np.matmul(R2base_table_H[:3,:3],scan_p.T).T + R2base_table_H[:3,-1]
     scan_R = np.matmul(R2base_table_H[:3,:3],scan_R)
-    curve_js = []
+    q_out1 = []
     # ik
     q_init=robot_scan.inv(scan_p[0],scan_R[0],zero_config)[0]
-    curve_js.append(q_init)
+    q_out1.append(q_init)
     for path_i in range(len(scan_p)):
-        this_js = robot_scan.inv(scan_p[path_i],scan_R[path_i],curve_js[-1])[0]
-        curve_js.append(this_js)
-    curve_js=np.array(curve_js)
+        this_js = robot_scan.inv(scan_p[path_i],scan_R[path_i],q_out1[-1])[0]
+        q_out1.append(this_js)
+    q_out1=np.array(q_out1)
 elif method==1:
     ### Method 2: stepwise qp, turntable involved
     rrs = redundancy_resolution_scanner(robot_scan,turn_table,scan_p,scan_R)
     q_init_table=np.radians([-70,150])
     pose_R2_table=Transform(R2base_table_H[:3,:3],R2base_table_H[:3,-1])*turn_table.fwd(q_init_table)
-    print(np.matmul(pose_R2_table.R,scan_p[0])+pose_R2_table.p,np.matmul(pose_R2_table.R,scan_R[0]))
     q_init_robot = robot_scan.inv(np.matmul(pose_R2_table.R,scan_p[0])+pose_R2_table.p,np.matmul(pose_R2_table.R,scan_R[0]),zero_config)[0]
     print(np.degrees(q_init_robot))
     # q_out1, q_out2, j_out1, j_out2=rrs.arm_table_stepwise_opt(q_init_robot,q_init_table,w2=0.03)
-    q_out1, q_out2, j_out1, j_out2=rrs.arm_table_stepwise_opt_Rz(q_init_robot,q_init_table,w2=0.03)
+    q_out1, q_out2, j_out1, j_out2=rrs.arm_table_stepwise_opt_Rz(q_init_robot,q_init_table,w2=0.003)
 
     scan_act_R=[]
     scan_act_p=[]
@@ -332,7 +338,7 @@ elif method==1:
     # scan_R_show=np.vstack((scan_R_show,scan_act_R[::10]))
     # scan_p_show=np.vstack((scan_p_show,scan_act_p[::10]))
 
-    visualize_frames(scan_R_show,scan_p_show,size=5)
+    # visualize_frames(scan_R_show,scan_p_show,size=5)
 
 # print(len(q_out1))
 if sim:
@@ -347,62 +353,80 @@ if sim:
 #############################
 
 ### motion program generation ###
+
 primitives=[]
-q_bp=[]
-p_bp=[]
+q_bp1=[]
+q_bp2=[]
+p_bp1=[]
+p_bp2=[]
 speed_bp=[]
 zone_bp=[]
-for path_i in range(0,len(scan_p)):
-    primitives.append('movel')
-    q_bp.append([curve_js[path_i]])
-    p_bp.append(scan_p[path_i])
-    speed_bp.append(scan_speed) ## mm/sec
-    if path_i != len(scan_p)-1:
-        zone_bp.append(0)
-    else:
-        zone_bp.append(0)
+if method==0:
+    for path_i in range(0,len(scan_p)):
+        primitives.append('movel')
+        q_bp1.append([q_out1[path_i]])
+        q_bp2.append([np.radians([-15,180])])
+        p_bp1.append(scan_p[path_i])
+        speed_bp.append(scan_speed) ## mm/sec
+        if path_i != len(scan_p)-1:
+            zone_bp.append(0)
+        else:
+            zone_bp.append(0)
+elif method==1:
+    for path_i in range(0,len(scan_p),20):
+        primitives.append('movel')
+        q_bp1.append([q_out1[path_i]])
+        q_bp2.append([q_out2[path_i]])
+        p_bp1.append(scan_p[path_i])
+        speed_bp.append(scan_speed) ## mm/sec
 #################################
 
-print(robot_scan.fwd(curve_js[0]))
-print(robot_scan.fwd(np.radians([27.6768,28.7206,-39.6049,-28.0847,78.0972,10.1109])))
+vd_relative=30
+lam1=calc_lam_js(q_out1,robot_scan)
+lam2=calc_lam_js(q_out2,turn_table)
+lam_relative=calc_lam_cs(scan_p)
+print(lam1[::20])
+s1_all,_=calc_individual_speed(vd_relative,lam1,lam2,lam_relative,np.arange(0,len(scan_p),20).astype(int))
+print(s1_all)
 
 input("Press Enter to start moving")
 
 ### scanner hardware
-c = RRN.ConnectService('rr+tcp://localhost:64238?service=scanner')
-cscanner = ContinuousScanner(c)
+# c = RRN.ConnectService('rr+tcp://localhost:64238?service=scanner')
+# cscanner = ContinuousScanner(c)
 
 ### execute motion ###
-# ms=MotionSend()
 ## move to start
-# ms.exec_motions(robot_scan,['movej'],[scan_p[0]],[[curve_js[0]]],2,0)
-robot_client=MotionProgramExecClient(ROBOT_CHOICE='RB2',pulse2deg=robot_scan.pulse2deg)
-robot_client.MoveJ(np.degrees(q_bp[0][0]), 2, 0)
+robot_client=MotionProgramExecClient(ROBOT_CHOICE='RB2',ROBOT_CHOICE2='ST1',pulse2deg=robot_scan.pulse2deg,pulse2deg_2=turn_table.pulse2deg)
+target2=['MOVJ',np.degrees(q_bp2[0][0]),10]
+robot_client.MoveJ(np.degrees(q_bp1[0][0]), s1_all[0], 0, target2=target2)
 robot_client.ProgEnd()
 robot_client.execute_motion_program("AAA.JBI")
 
 ## scanner start
-cscanner.start_capture()
+# cscanner.start_capture()
 ## motion start
-robot_client=MotionProgramExecClient(ROBOT_CHOICE='RB2',pulse2deg=robot_scan.pulse2deg)
-for path_i in range(1,len(q_bp)-1):
-    robot_client.MoveL(np.degrees(q_bp[path_i][0]), speed_bp[path_i])
-robot_client.MoveL(np.degrees(q_bp[-1][0]), speed_bp[-1], 0)
+robot_client=MotionProgramExecClient(ROBOT_CHOICE='RB2',ROBOT_CHOICE2='ST1',pulse2deg=robot_scan.pulse2deg,pulse2deg_2=turn_table.pulse2deg)
+for path_i in range(1,len(q_bp1)-1):
+    target2=['MOVJ',np.degrees(q_bp2[path_i][0]),10]
+    robot_client.MoveL(np.degrees(q_bp1[path_i][0]), s1_all[path_i], target2=target2)
+target2=['MOVJ',np.degrees(q_bp2[-1][0]),10]
+robot_client.MoveL(np.degrees(q_bp1[-1][0]), s1_all[-1], 0, target2=target2)
 robot_client.ProgEnd()
 robot_stamps,curve_pulse_exe = robot_client.execute_motion_program("AAA.JBI")
-curve_js_exe=np.divide(curve_pulse_exe[:,6:12],robot_scan.pulse2deg)
+q_out1_exe=np.divide(curve_pulse_exe[:,6:12],robot_scan.pulse2deg)
 ## scanner end
 cscanner.end_capture()
 st=time.perf_counter()
 scans,scan_stamps=cscanner.get_capture()
 dt=time.perf_counter()-st
 print("dt:",dt)
-print("Robot last joint:",curve_js_exe[-1])
+print("Robot last joint:",q_out1_exe[-1])
 
 ## save traj
 Path(out_dir).mkdir(exist_ok=True)
 # save poses
-np.savetxt(out_dir + 'scan_js_exe.csv',np.radians(curve_js_exe),delimiter=',')
+np.savetxt(out_dir + 'scan_js_exe.csv',np.radians(q_out1_exe),delimiter=',')
 np.savetxt(out_dir + 'robot_stamps.csv',robot_stamps-robot_stamps[0],delimiter=',')
 scan_count=0
 for scan in scans:
