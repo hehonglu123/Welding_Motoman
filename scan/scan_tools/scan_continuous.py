@@ -18,15 +18,11 @@ class ContinuousScanner():
         
         # data
         scans=[]
-        timestamps=[]
 
-        st = time.perf_counter()
         while self.capture_flag:
             scans.append(self.RRC.capture_deferred(False))
-            timestamps.append(time.perf_counter()-st)
         
         self.scan_handles=scans
-        self.timestamps=timestamps
 
     def start_capture(self):
 
@@ -45,11 +41,14 @@ class ContinuousScanner():
             prepare_res = prepare_gen.Next()
         
         scans=[]
+        timestamps=[]
         for i in range(len(self.scan_handles)):
             stl_mesh = self.RRC.getf_deferred_capture(self.scan_handles[i])
             scans.append(stl_mesh)
+            framestamp=self.RRC.getf_deferred_capture_stamps(self.scan_handles[i])
+            timestamps.append(framestamp.seconds+framestamp.micro_seconds*1e-6)
 
-        return scans,self.timestamps
+        return scans,timestamps
 
 
 
@@ -60,7 +59,7 @@ if __name__=='__main__':
     cscanner = ContinuousScanner(c)
 
     cscanner.start_capture()
-    time.sleep(60)
+    time.sleep(10)
     cscanner.end_capture()
 
     st=time.perf_counter()
@@ -68,4 +67,4 @@ if __name__=='__main__':
     dt=time.perf_counter()-st
     print("prepare mesh dt:",dt)
 
-    print(scans_meshes[0].vertices)
+    print(timestamps)
