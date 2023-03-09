@@ -50,8 +50,8 @@ client=MotionProgramExecClient(ROBOT_CHOICE='RB1',ROBOT_CHOICE2='ST1',pulse2deg=
 # 	client.SetArc(False)
 
 ###########################################layer welding############################################
-num_layer_start=69
-num_layer_end=70
+num_layer_start=57
+num_layer_end=58
 for layer in range(num_layer_start,num_layer_end):
 
 	curve_sliced_js=np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(layer)+'.csv',delimiter=',')
@@ -80,5 +80,5 @@ for layer in range(num_layer_start,num_layer_end):
 
     
 client.ProgEnd()
-timestamp,joint_recording=client.execute_motion_program("AAA.JBI") 
-np.savetxt('joint_recording.csv',np.hstack((timestamp.reshape(-1, 1),joint_recording)),delimiter=',')
+# timestamp,joint_recording=client.execute_motion_program("AAA.JBI") 
+# np.savetxt('joint_recording.csv',np.hstack((timestamp.reshape(-1, 1),joint_recording)),delimiter=',')
