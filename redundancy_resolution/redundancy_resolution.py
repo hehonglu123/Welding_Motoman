@@ -80,7 +80,7 @@ class redundancy_resolution(object):
 		return positioner_js_new2
 
 	def introducing_tolerance(self,positioner_js):
-		### introduce tolerance to positioner inverse kinematics
+		### introduce tolerance to positioner inverse kinematics by linear fit
 		tolerance=np.radians(3)
 		
 		for i in range(len(positioner_js)):
@@ -103,7 +103,7 @@ class redundancy_resolution(object):
 		return positioner_js
 
 	def introducing_tolerance2(self,positioner_js):
-		### introduce tolerance to positioner inverse kinematics
+		### introduce tolerance to positioner inverse kinematics by setting a constant 
 		tolerance=np.radians(2)
 		
 		for i in range(len(positioner_js)):
@@ -122,6 +122,7 @@ class redundancy_resolution(object):
 				positioner_js[i][start_idx:end_idx]=positioner_js[i][end_idx]
 
 		return positioner_js
+
 
 
 	def baseline_joint(self,R_torch,curve_sliced_relative,curve_sliced_relative_base,q_init=np.zeros(6)):
@@ -221,6 +222,83 @@ class redundancy_resolution(object):
 
 		
 		return positioner_js
+
+
+	def positioner_qp(self,q_now,ez_relative):
+		R_now=self.positioner.fwd(q_now,world=True).R
+		n_now=R_now[:,-1]
+		error_angle=get_angle(n_now,[0,0,1])
+		
+		J=self.positioner.jacobian(q_now)        #calculate current Jacobian
+		JR=J[:3,:]
+		JR_mod=-np.dot(hat(R_now),JR)
+
+		H=np.dot(np.transpose(JR_mod),JR_mod)
+		H=(H+np.transpose(H))/2
+
+		ezdotd=(curve_normal[i]-pose_now.R[:,-1])
+
+		f=-np.transpose(JR_mod)@ezdotd
+		qdot=solve_qp(H,f)
+
+		###line search
+		alpha=fminbound(self.error_calc,0,0.999999999999999999999,args=(q_all[-1],qdot,curve_sliced_relative[i],))
+		if alpha<0.01:
+			break
+
+			
+	def positioner_qp_smooth(self,positioner_js, curve_sliced_relative):
+		### positioner trajectory smoothing with QP
+		positioner_js_out=[]
+		tolerance=np.radians(3)
+
+		for i in range(len(curve_sliced_relative)):
+			positioner_js_ith_out=[positioner_js[i][0]]
+			q_all=[positioner_js[i][0]]
+			Kw=1
+			for i in range(len(curve)):
+				# print(i)
+				try:
+					now=time.time()
+					error_angle=999
+
+					while error_angle>tolerance:
+
+						R_now=self.positioner.fwd(q_all[-1],world=True).R
+						n_now=R_now[:,-1]
+						error_angle=get_angle(n_now,[0,0,1])
+						
+						J=self.positioner.jacobian(q_all[-1])        #calculate current Jacobian
+						JR=J[:3,:]
+						JR_mod=-np.dot(hat(R_now),JR)
+
+						H=np.dot(np.transpose(JR_mod),JR_mod)
+						H=(H+np.transpose(H))/2
+
+						vd=curve[i]-pose_now.p
+						ezdotd=(curve_normal[i]-pose_now.R[:,-1])
+
+						f=-np.transpose(JR_mod)@ezdotd
+						qdot=solve_qp(H,f)
+
+						###line search
+						alpha=fminbound(self.error_calc,0,0.999999999999999999999,args=(q_all[-1],qdot,curve_sliced_relative[i],))
+						if alpha<0.01:
+							break
+						q_all.append(q_all[-1]+alpha*qdot)
+						# print(q_all[-1])
+				except:
+					q_out.append(q_all[-1])
+					traceback.print_exc()
+					raise AssertionError
+					break
+
+				positioner_js_ith_out.append(q_all[-1])
+
+			positioner_js_out.append(np.array(positioner_js_ith_out))
+		
+
+		return positioner_js_out
 
 
 def main():
