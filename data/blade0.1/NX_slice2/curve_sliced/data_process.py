@@ -38,7 +38,8 @@ fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
 slice_prev=np.loadtxt('raw/slice0.csv',delimiter=',')
 slice_normal0=np.zeros((len(slice_prev),3))
 slice_normal0[:,-1]=1
-num_layers=70
+num_layers=71
+num_upper_layers=22
 slices=[slice_prev]
 slice_normal=[slice_normal0]
 
@@ -58,14 +59,38 @@ for i in range(1,num_layers):
 
 	slice_prev=slicei
 	slicei_normal=np.array(slicei_normal)
-	# slicei_normal[0]=moving_average(slicei_normal[0],padding=True)
-	# slicei_normal[1]=moving_average(slicei_normal[1],padding=True)
-	# slicei_normal[2]=moving_average(slicei_normal[2],padding=True)
 
 	slice_normal.append(slicei_normal)
 	ax.plot3D(slicei[::vis_step,0],slicei[::vis_step,1],slicei[::vis_step,2],'r.-')
 	ax.quiver(slicei[::vis_step,0],slicei[::vis_step,1],slicei[::vis_step,2],slicei_normal[::vis_step,0],slicei_normal[::vis_step,1],slicei_normal[::vis_step,2],length=0.3, normalize=True)
 	np.savetxt('slice'+str(i)+'.csv',np.hstack((slicei,slicei_normal)),delimiter=',')
+
+
+for i in range(num_layers,num_layers+num_upper_layers):
+	for x in ['u','d']:
+
+		slicei_normal=[]
+		slicei=np.loadtxt('raw/slice'+str(i)+x+'.csv',delimiter=',')
+		if i>num_layers:
+			slice_prev=np.loadtxt('raw/slice'+str(i-1)+x+'.csv',delimiter=',')
+
+		###sort order
+		if np.linalg.norm(slicei[0]-slice_prev[0])>10 and np.linalg.norm(slicei[-1]-slice_prev[-1])>10:
+			slicei=np.flip(slicei,axis=0)
+		slicei=smooth_curve(slicei)
+		slices.append(slicei)
+		for j in range(len(slicei)):
+			#find closest 2 points
+			idx_1,idx_2=np.argsort(np.linalg.norm(slicei[j]-slice_prev,axis=1))[:2]
+			slicei_normal.append(find_norm(slicei[j],slice_prev[idx_1],slice_prev[idx_2]))
+
+		slicei_normal=np.array(slicei_normal)
+
+		slice_normal.append(slicei_normal)
+		ax.plot3D(slicei[::vis_step,0],slicei[::vis_step,1],slicei[::vis_step,2],'r.-')
+		ax.quiver(slicei[::vis_step,0],slicei[::vis_step,1],slicei[::vis_step,2],slicei_normal[::vis_step,0],slicei_normal[::vis_step,1],slicei_normal[::vis_step,2],length=0.3, normalize=True)
+		np.savetxt('slice'+str(i)+x+'.csv',np.hstack((slicei,slicei_normal)),delimiter=',')
+
 
 # ax.plot3D(slices[0][::vis_step,0],slices[0][::vis_step,1],slices[0][::vis_step,2],'r.-')
 # ax.quiver(slices[0][::vis_step,0],slices[0][::vis_step,1],slices[0][::vis_step,2],slice_normal[0][::vis_step,0],slice_normal[0][::vis_step,1],slice_normal[0][::vis_step,2],length=0.3, normalize=True)
