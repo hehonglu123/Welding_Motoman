@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.interpolate import interp1d
 from scipy import signal
-import scipy
+import scipy, math
 
 def get_speed(curve_exe,timestamp):
 	d_curve_exe=np.gradient(curve_exe,axis=0)
@@ -332,3 +332,18 @@ def unwrapped_angle_check(q_init,q_all):
     order=np.argsort(np.linalg.norm(temp_q,axis=1))
     # return q_all[order[0]]
     return temp_q[order[0]]+q_init
+
+def s_err_func(dR,s_type=0):
+	
+	if s_type==0:
+		quat=R2q(dR)
+		return 4*quat[0]*quat[1:]
+	elif s_type==1:
+		quat=R2q(dR)
+		return 2*quat[1:]
+	elif s_type==2:
+		k,theta=R2rot(dR)
+		return 2*theta*k
+	else:
+		print("S err function type:0~2")
+		raise AssertionError
