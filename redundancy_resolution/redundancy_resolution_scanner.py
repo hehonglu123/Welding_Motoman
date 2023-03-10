@@ -25,7 +25,7 @@ class redundancy_resolution_scanner(object):
         R2base_table_H = np.matmul(R2base_R1base_H,positioner.base_H)
         self.R2baseR_table=Transform(R2base_table_H[:3,:3],R2base_table_H[:3,-1])
     
-        self.lim_factor=np.radians(1)
+        self.lim_factor=np.radians(5)
 
     def arm_table_stepwise_opt(self,q_init1,q_init2,w1=0.01,w2=0.01):
         
@@ -138,8 +138,8 @@ class redundancy_resolution_scanner(object):
         lower_limit=np.hstack((self.robot.lower_limit,self.positioner.lower_limit))
 
         for i in range(len(self.scan_p)):
-            # if i%100==0:
-            #     print(i)
+            if i%100==0:
+                print(i)
             try:
                 error_fb=999
                 while error_fb>0.01:
