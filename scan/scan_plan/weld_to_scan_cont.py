@@ -180,8 +180,6 @@ bounds_theta = np.radians(45) ## circular motion at start and end
 all_scan_angle = np.radians([0]) ## scanning angles
 
 ### path gen ###
-scan_path=[]
-
 scan_p=[]
 scan_R=[]
 reverse_path_flag=False
@@ -235,11 +233,21 @@ for scan_angle in all_scan_angle:
         sub_scan_R.append(this_scan_R)
     
     if reverse_path_flag:
-        scan_p.extend(sub_scan_p[::-1])
-        scan_R.extend(sub_scan_R[::-1])
-    else:
-        scan_p.extend(sub_scan_p)
-        scan_R.extend(sub_scan_R)
+        sub_scan_p=sub_scan_p[::-1]
+        sub_scan_R=sub_scan_R[::-1]
+    
+    ## add connection path
+    last_end_p = scan_p[-1]
+    last_end_R = scan_R[-1]
+    this_start_p = sub_scan_p[0]
+    this_start_R = sub_scan_R[0]
+
+    k = np.cross((this_start_p-last_end_p),last_end_R[:,-1])
+    k = k/np.linalg.norm(k)
+    ######################
+
+    scan_p.extend(sub_scan_p)
+    scan_R.extend(sub_scan_R)
     reverse_path_flag= not reverse_path_flag
 
 scan_p=np.array(scan_p)
