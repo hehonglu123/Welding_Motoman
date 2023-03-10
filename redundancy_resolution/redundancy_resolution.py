@@ -177,10 +177,11 @@ class redundancy_resolution(object):
 		###where to place the welded part on positioner
 		###assume first layer normal z always vertical
 		###baseline, only look at first layer
-		COM=np.average(self.curve_sliced[0][:,:3],axis=0)
+		first_layer=np.concatenate(self.curve_sliced[0],axis=0)
+		COM=np.average(first_layer[:,:3],axis=0)
 
 		###determine Vx by eig(cov)
-		curve_cov=np.cov(self.curve_sliced[0][:,:3].T)
+		curve_cov=np.cov(first_layer[:,:3].T)
 		eigenValues, eigenVectors = np.linalg.eig(curve_cov)
 		idx = eigenValues.argsort()[::-1]   
 		eigenValues = eigenValues[idx]
@@ -188,7 +189,7 @@ class redundancy_resolution(object):
 		Vx=eigenVectors[0]
 
 		###put normal along G direction
-		N=-np.sum(self.curve_sliced[0][:,3:],axis=0)
+		N=-np.sum(first_layer[:,3:],axis=0)
 		N=N/np.linalg.norm(N)
 
 		Vx=VectorPlaneProjection(Vx,N)
@@ -224,27 +225,27 @@ class redundancy_resolution(object):
 		return positioner_js
 
 
-	def positioner_qp(self,q_now,ez_relative):
-		R_now=self.positioner.fwd(q_now,world=True).R
-		n_now=R_now[:,-1]
-		error_angle=get_angle(n_now,[0,0,1])
+	# def positioner_qp(self,q_now,ez_relative):
+	# 	R_now=self.positioner.fwd(q_now,world=True).R
+	# 	n_now=R_now[:,-1]
+	# 	error_angle=get_angle(n_now,[0,0,1])
 		
-		J=self.positioner.jacobian(q_now)        #calculate current Jacobian
-		JR=J[:3,:]
-		JR_mod=-np.dot(hat(R_now),JR)
+	# 	J=self.positioner.jacobian(q_now)        #calculate current Jacobian
+	# 	JR=J[:3,:]
+	# 	JR_mod=-np.dot(hat(R_now),JR)
 
-		H=np.dot(np.transpose(JR_mod),JR_mod)
-		H=(H+np.transpose(H))/2
+	# 	H=np.dot(np.transpose(JR_mod),JR_mod)
+	# 	H=(H+np.transpose(H))/2
 
-		ezdotd=(curve_normal[i]-pose_now.R[:,-1])
+	# 	ezdotd=(curve_normal[i]-pose_now.R[:,-1])
 
-		f=-np.transpose(JR_mod)@ezdotd
-		qdot=solve_qp(H,f)
+	# 	f=-np.transpose(JR_mod)@ezdotd
+	# 	qdot=solve_qp(H,f)
 
-		###line search
-		alpha=fminbound(self.error_calc,0,0.999999999999999999999,args=(q_all[-1],qdot,curve_sliced_relative[i],))
-		if alpha<0.01:
-			break
+	# 	###line search
+	# 	alpha=fminbound(self.error_calc,0,0.999999999999999999999,args=(q_all[-1],qdot,curve_sliced_relative[i],))
+	# 	if alpha<0.01:
+	# 		break
 
 			
 	def positioner_qp_smooth(self,positioner_js, curve_sliced_relative):

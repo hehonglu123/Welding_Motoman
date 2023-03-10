@@ -1,5 +1,5 @@
 import numpy as np
-import sys, traceback, time, copy
+import sys, traceback, time, copy, glob
 from general_robotics_toolbox import *
 from redundancy_resolution import *
 sys.path.append('../toolbox')
@@ -16,11 +16,21 @@ def main():
 	curve_sliced_relative=[]
 	curve_sliced=[]
 	for i in range(num_baselayers):
-		curve_sliced_relative_base.append(np.loadtxt(data_dir+'curve_sliced_relative/baselayer'+str(i)+'.csv',delimiter=','))
+		num_sections=len(glob.glob(data_dir+'curve_sliced_relative/baselayer'+str(i)+'_*.csv'))
+		curve_sliced_relative_base_ith_layer=[]
+		for x in range(num_sections):
+			curve_sliced_relative_base_ith_layer.append(np.loadtxt(data_dir+'curve_sliced_relative/baselayer'+str(i)+'.csv',delimiter=','))
+		curve_sliced_relative_base.append(curve_sliced_relative_base_ith_layer)
 
 	for i in range(num_layers):
-		curve_sliced_relative.append(np.loadtxt(data_dir+'curve_sliced_relative/slice'+str(i)+'.csv',delimiter=','))
-		curve_sliced.append(np.loadtxt(data_dir+'curve_sliced/slice'+str(i)+'.csv',delimiter=','))
+		num_sections=len(glob.glob(data_dir+'curve_sliced_relative/slice'+str(i)+'_*.csv'))
+		curve_sliced_relative_ith_layer=[]
+		curve_sliced_ith_layer=[]
+		for x in range(num_sections):
+			curve_sliced_relative_ith_layer.append(np.loadtxt(data_dir+'curve_sliced_relative/slice'+str(i)+'.csv',delimiter=','))
+			curve_sliced_ith_layer.append(np.loadtxt(data_dir+'curve_sliced/slice'+str(i)+'.csv',delimiter=','))
+		curve_sliced_relative.append(curve_sliced_relative_ith_layer)
+		curve_sliced.append(curve_sliced_ith_layer)
 
 	robot=robot_obj('MA2010_A0',def_path='../config/MA2010_A0_robot_default_config.yml',tool_file_path='../config/weldgun.csv',\
 		pulse2deg_file_path='../config/MA2010_A0_pulse2deg.csv',d=15)
