@@ -24,6 +24,13 @@ def smooth_curve(curve):
 
 	return curve_smooth
 
+def smooth_normal(curve_normal,n=15):
+	curve_normal_new=copy.deepcopy(curve_normal)
+	for i in range(len(curve_normal)):
+		curve_normal_new[i]=np.average(curve_normal[max(0,i-n):min(len(curve_normal),i+n)],axis=0)
+		curve_normal_new[i]=curve_normal_new[i]/np.linalg.norm(curve_normal_new[i])
+	return curve_normal_new
+
 def moving_average(a, n=11, padding=False):
 	#n needs to be odd for padding
 	if padding:
@@ -61,7 +68,7 @@ for i in range(1,num_layers):
 			idx_1,idx_2=np.argsort(np.linalg.norm(slicei[j]-slice_prev,axis=1))[:2]
 			slicei_normal.append(find_norm(slicei[j],slice_prev[idx_1],slice_prev[idx_2]))
 
-		slicei_normal=np.array(slicei_normal)
+		slicei_normal=smooth_normal(np.array(slicei_normal))
 
 		slice_normal.append(slicei_normal)
 		ax.plot3D(slicei[::vis_step,0],slicei[::vis_step,1],slicei[::vis_step,2],'r.-')

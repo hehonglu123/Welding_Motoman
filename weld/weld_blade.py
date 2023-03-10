@@ -1,4 +1,4 @@
-import sys
+import sys, glob
 sys.path.append('../toolbox/')
 from robot_def import *
 from path_calc import *
@@ -12,7 +12,7 @@ sliced_alg='NX_slice2/'
 data_dir='../data/'+dataset+sliced_alg
 cmd_dir=data_dir+'cmd/50J/'
 
-num_points_layer=50
+waypoint_distance=5 	###waypoint separation
 curve_sliced_js=[]
 positioner_js=[]
 
@@ -26,57 +26,64 @@ client=MotionProgramExecClient(ROBOT_CHOICE='RB1',ROBOT_CHOICE2='ST1',pulse2deg=
 ###########################################base layer welding############################################
 # num_baselayer=2
 # for base_layer in range(num_baselayer):
-# 	curve_sliced_js=np.loadtxt(data_dir+'curve_sliced_js/MA2010_base_js'+str(base_layer)+'.csv',delimiter=',')
-# 	positioner_js=np.loadtxt(data_dir+'curve_sliced_js/D500B_base_js'+str(base_layer)+'.csv',delimiter=',')
-# 	curve_sliced_relative=np.loadtxt(data_dir+'curve_sliced_relative/baselayer'+str(base_layer)+'.csv',delimiter=',')
+# 	num_sections=len(glob.glob(data_dir+'curve_sliced_relative/baselayer'+str(base_layer)+'_*.csv'))
+# 	for x in range(num_sections):
+# 		curve_sliced_js=np.loadtxt(data_dir+'curve_sliced_js/MA2010_base_js'+str(base_layer)+'_'+str(x)+'.csv',delimiter=',')
+# 		positioner_js=np.loadtxt(data_dir+'curve_sliced_js/D500B_base_js'+str(base_layer)+'_'+str(x)+'.csv',delimiter=',')
+# 		curve_sliced_relative=np.loadtxt(data_dir+'curve_sliced_relative/baselayer'+str(base_layer)+'_'+str(x)+'.csv',delimiter=',')
 
-# 	if base_layer % 2==1:
-# 	    breakpoints=np.linspace(0,len(curve_sliced_js)-1,num=num_points_layer).astype(int)
-# 	else:
-# 	    breakpoints=np.linspace(len(curve_sliced_js)-1,0,num=num_points_layer).astype(int)
+# 		vd_relative=5
+# 		lam1=calc_lam_js(curve_sliced_js,robot)
+# 		lam2=calc_lam_js(positioner_js,positioner)
+# 		lam_relative=calc_lam_cs(curve_sliced_relative)
 
-# 	vd_relative=5
-# 	lam1=calc_lam_js(curve_sliced_js,robot)
-# 	lam2=calc_lam_js(positioner_js,positioner)
-# 	lam_relative=calc_lam_cs(curve_sliced_relative)
-# 	s1_all,_=calc_individual_speed(vd_relative,lam1,lam2,lam_relative,breakpoints)
+# 		num_points_layer=max(2,int(lam_relative[-1]/waypoint_distance))
+# 		if base_layer % 2==1:
+# 		    breakpoints=np.linspace(0,len(curve_sliced_js)-1,num=num_points_layer).astype(int)
+# 		else:
+# 		    breakpoints=np.linspace(len(curve_sliced_js)-1,0,num=num_points_layer).astype(int)
 
-# 	target2=['MOVJ',np.degrees(positioner_js[breakpoints[0]]),10]
-# 	client.MoveL(np.degrees(curve_sliced_js[breakpoints[0]]), s1_all[0],target2=target2)
-# 	client.SetArc(True,cond_num=250)
-# 	for j in range(1,len(breakpoints)):
-# 	    target2=['MOVJ',np.degrees(positioner_js[breakpoints[j]]),10]
-# 	    client.MoveL(np.degrees(curve_sliced_js[breakpoints[j]]), s1_all[j],target2=target2)
-# 	client.SetArc(False)
+# 		s1_all,_=calc_individual_speed(vd_relative,lam1,lam2,lam_relative,breakpoints)
+
+# 		target2=['MOVJ',np.degrees(positioner_js[breakpoints[0]]),10]
+# 		client.MoveL(np.degrees(curve_sliced_js[breakpoints[0]]), s1_all[0],target2=target2)
+# 		# client.SetArc(True,cond_num=250)
+# 		for j in range(1,len(breakpoints)):
+# 		    target2=['MOVJ',np.degrees(positioner_js[breakpoints[j]]),10]
+# 		    client.MoveL(np.degrees(curve_sliced_js[breakpoints[j]]), s1_all[j],target2=target2)
+# 		# client.SetArc(False)
 
 ###########################################layer welding############################################
-num_layer_start=57
-num_layer_end=58
+num_layer_start=90
+num_layer_end=94
 for layer in range(num_layer_start,num_layer_end):
+	num_sections=len(glob.glob(data_dir+'curve_sliced_relative/slice'+str(layer)+'_*.csv'))
+	for x in range(num_sections):
+		curve_sliced_js=np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
+		positioner_js=np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
+		curve_sliced_relative=np.loadtxt(data_dir+'curve_sliced_relative/slice'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
 
-	curve_sliced_js=np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(layer)+'.csv',delimiter=',')
-	positioner_js=np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(layer)+'.csv',delimiter=',')
-	curve_sliced_relative=np.loadtxt(data_dir+'curve_sliced_relative/slice'+str(layer)+'.csv',delimiter=',')
+		vd_relative=5
+		lam1=calc_lam_js(curve_sliced_js,robot)
+		lam2=calc_lam_js(positioner_js,positioner)
+		lam_relative=calc_lam_cs(curve_sliced_relative)
 
-	if layer % 2==1:
-	    breakpoints=np.linspace(0,len(curve_sliced_js)-1,num=num_points_layer).astype(int)
-	else:
-	    breakpoints=np.linspace(len(curve_sliced_js)-1,0,num=num_points_layer).astype(int)
+		num_points_layer=max(2,int(lam_relative[-1]/waypoint_distance))
+		if layer % 2==1:
+		    breakpoints=np.linspace(0,len(curve_sliced_js)-1,num=num_points_layer).astype(int)
+		else:
+		    breakpoints=np.linspace(len(curve_sliced_js)-1,0,num=num_points_layer).astype(int)
 
-	vd_relative=20
-	lam1=calc_lam_js(curve_sliced_js,robot)
-	lam2=calc_lam_js(positioner_js,positioner)
-	lam_relative=calc_lam_cs(curve_sliced_relative)
-	s1_all,_=calc_individual_speed(vd_relative,lam1,lam2,lam_relative,breakpoints)
-	# print(s1_all)
-	target2=['MOVJ',np.degrees(positioner_js[breakpoints[0]]),10]
-	client.MoveL(np.degrees(curve_sliced_js[breakpoints[0]]), s1_all[0],target2=target2)
+		s1_all,_=calc_individual_speed(vd_relative,lam1,lam2,lam_relative,breakpoints)
+		# print(s1_all)
+		target2=['MOVJ',np.degrees(positioner_js[breakpoints[0]]),10]
+		client.MoveL(np.degrees(curve_sliced_js[breakpoints[0]]), s1_all[0],target2=target2)
 
-	client.SetArc(True,cond_num=140)
-	for j in range(1,len(breakpoints)):
-	    target2=['MOVJ',np.degrees(positioner_js[breakpoints[j]]),10]
-	    client.MoveL(np.degrees(curve_sliced_js[breakpoints[j]]), s1_all[j],target2=target2)
-	client.SetArc(False)
+		# client.SetArc(True,cond_num=140)
+		for j in range(1,len(breakpoints)):
+		    target2=['MOVJ',np.degrees(positioner_js[breakpoints[j]]),10]
+		    client.MoveL(np.degrees(curve_sliced_js[breakpoints[j]]), s1_all[j],target2=target2)
+		# client.SetArc(False)
 
     
 client.ProgEnd()

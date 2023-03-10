@@ -48,34 +48,35 @@ class redundancy_resolution(object):
 		steps=25
 		positioner_js_new=copy.deepcopy(positioner_js)
 		for i in range(len(positioner_js)):
-			for j in range(len(positioner_js[i])):
-				if get_angle(self.positioner.fwd(positioner_js[i][j],world=True).R[:,-1],[0,0,1])<tolerance:
-					if j-steps<0:
-						start_point=0
-						end_point=j+steps
-					elif j+steps>len(positioner_js[i]):
-						end_point=len(positioner_js[i])
-						start_point=j-steps
-					else:
-						start_point=j-steps
-						end_point=j+steps
+			for x in range(len(positioner_js[i])):
+				for j in range(len(positioner_js[i][x])):
+					if get_angle(self.positioner.fwd(positioner_js[i][x][j],world=True).R[:,-1],[0,0,1])<tolerance:
+						if j-steps<0:
+							start_point=0
+							end_point=j+steps
+						elif j+steps>len(positioner_js[i][x]):
+							end_point=len(positioner_js[i][x])
+							start_point=j-steps
+						else:
+							start_point=j-steps
+							end_point=j+steps
 
-					positioner_js_new[i][j]=np.average(positioner_js[i][start_point:end_point],axis=0)
-			###reverse
-			positioner_js_new2=copy.deepcopy(positioner_js_new)
-			for j in reversed(range(len(positioner_js[i]))):
-				if get_angle(self.positioner.fwd(positioner_js[i][j],world=True).R[:,-1],[0,0,1])<tolerance:
-					if j-steps<0:
-						start_point=0
-						end_point=j+steps
-					elif j+steps>len(positioner_js[i]):
-						end_point=len(positioner_js[i])
-						start_point=j-steps
-					else:
-						start_point=j-steps
-						end_point=j+steps
+						positioner_js_new[i][x][j]=np.average(positioner_js[i][x][start_point:end_point],axis=0)
+				###reverse
+				positioner_js_new2=copy.deepcopy(positioner_js_new)
+				for j in reversed(range(len(positioner_js[i]))):
+					if get_angle(self.positioner.fwd(positioner_js[i][x][j],world=True).R[:,-1],[0,0,1])<tolerance:
+						if j-steps<0:
+							start_point=0
+							end_point=j+steps
+						elif j+steps>len(positioner_js[i][x]):
+							end_point=len(positioner_js[i][x])
+							start_point=j-steps
+						else:
+							start_point=j-steps
+							end_point=j+steps
 
-					positioner_js_new2[i][j]=np.average(positioner_js[i][start_point:end_point],axis=0)
+						positioner_js_new2[i][x][j]=np.average(positioner_js[i][x][start_point:end_point],axis=0)
 
 		return positioner_js_new2
 
@@ -109,17 +110,18 @@ class redundancy_resolution(object):
 		for i in range(len(positioner_js)):
 			start_idx=0
 			end_idx=0
-			for j in range(len(positioner_js[i])):
-				if get_angle(self.positioner.fwd(positioner_js[i][j],world=True).R[:,-1],[0,0,1])<tolerance:
-					start_idx=j
-					for k in range(j+1,len(positioner_js[i])):
-						if get_angle(self.positioner.fwd(positioner_js[i][k],world=True).R[:,-1],[0,0,1])>tolerance:
-							end_idx=k
-							break
-					break
+			for x in range(len(positioner_js[i])):
+				for j in range(len(positioner_js[i][x])):
+					if get_angle(self.positioner.fwd(positioner_js[i][x][j],world=True).R[:,-1],[0,0,1])<tolerance:
+						start_idx=j
+						for k in range(j+1,len(positioner_js[i][x])):
+							if get_angle(self.positioner.fwd(positioner_js[i][x][k],world=True).R[:,-1],[0,0,1])>tolerance:
+								end_idx=k
+								break
+						break
 
-			if start_idx==0 and (end_idx>start_idx):
-				positioner_js[i][start_idx:end_idx]=positioner_js[i][end_idx]
+				if start_idx==0 and (end_idx>start_idx):
+					positioner_js[i][x][start_idx:end_idx]=positioner_js[i][x][end_idx]
 
 		return positioner_js
 
@@ -129,47 +131,57 @@ class redundancy_resolution(object):
 		####baseline redundancy resolution, with fixed orientation
 		positioner_js=self.positioner_resolution(curve_sliced_relative)		#solve for positioner first
 		###TO FIX: override first layer positioner q2
-		positioner_js[0][:,1]=positioner_js[1][0,1]
+		for x in range(len(positioner_js[0])):
+			positioner_js[0][x][:,1]=positioner_js[1][x][0,-1]
 		
 		###singularity js smoothing
 		# positioner_js=self.conditional_rolling_average(positioner_js)
 		positioner_js=self.introducing_tolerance2(positioner_js)
 		positioner_js=self.conditional_rolling_average(positioner_js)
-		positioner_js[0][:,1]=positioner_js[1][0,1]
+		for x in range(len(positioner_js[0])):
+			positioner_js[0][x][:,1]=positioner_js[1][x][0,-1]
 
+		
 		###append base layers positioner
 		positioner_js_base=[copy.deepcopy(positioner_js[0])]*len(curve_sliced_relative_base)
+		curve_sliced_js_base=[]
+		for i in range(len(curve_sliced_relative_base)):			#solve for robot invkin
+			curve_sliced_js_base_ith_layer=[]
+			for x in range(len(curve_sliced_relative_base[i])):
+				curve_sliced_js_base_ith_xth_section=[]
+				for j in range(len(curve_sliced_relative_base[i][x])): 
+					###get positioner TCP world pose
+					positioner_pose=self.positioner.fwd(positioner_js_base[i][x][j],world=True)
+					p=positioner_pose.R@curve_sliced_relative_base[i][x][j,:3]+positioner_pose.p
+					###solve for invkin
+					q=self.robot.inv(p,R_torch,last_joints=q_init)[0]
+
+					curve_sliced_js_base_ith_xth_section.append(q)
+				curve_sliced_js_base_ith_layer.append(np.array(curve_sliced_js_base_ith_xth_section))
+			curve_sliced_js_base.append(curve_sliced_js_base_ith_layer)
+
 
 		curve_sliced_js=[]
 		for i in range(len(curve_sliced_relative)):			#solve for robot invkin
-			curve_sliced_js_ith=[]
-			for j in range(len(curve_sliced_relative[i])): 
-				###get positioner TCP world pose
-				positioner_pose=self.positioner.fwd(positioner_js[i][j],world=True)
-				p=positioner_pose.R@curve_sliced_relative[i][j,:3]+positioner_pose.p
-				###solve for invkin
-				if i==0 and j==0:
-					q=self.robot.inv(p,R_torch,last_joints=q_init)[0]
-					q_prev=q
-				else:
-					q=self.robot.inv(p,R_torch,last_joints=q_prev)[0]
-					q_prev=q
+			curve_sliced_js_ith_layer=[]
+			for x in range(len(curve_sliced_relative[i])):
+				curve_sliced_js_ith_layer_xth_section=[]
+				for j in range(len(curve_sliced_relative[i][x])): 
+					###get positioner TCP world pose
+					positioner_pose=self.positioner.fwd(positioner_js[i][x][j],world=True)
+					p=positioner_pose.R@curve_sliced_relative[i][x][j,:3]+positioner_pose.p
+					###solve for invkin
+					if i==0 and x==0 and j==0:
+						q=self.robot.inv(p,R_torch,last_joints=q_init)[0]
+						q_prev=q
+					else:
+						q=self.robot.inv(p,R_torch,last_joints=q_prev)[0]
+						q_prev=q
 
-				curve_sliced_js_ith.append(q)
-			curve_sliced_js.append(np.array(curve_sliced_js_ith))
-		
-		curve_sliced_js_base=[]
-		for i in range(len(curve_sliced_relative_base)):			#solve for robot invkin
-			curve_sliced_js_base_ith=[]
-			for j in range(len(curve_sliced_relative_base[i])): 
-				###get positioner TCP world pose
-				positioner_pose=self.positioner.fwd(positioner_js_base[i][j],world=True)
-				p=positioner_pose.R@curve_sliced_relative_base[i][j,:3]+positioner_pose.p
-				###solve for invkin
-				q=self.robot.inv(p,R_torch,last_joints=q_init)[0]
+					curve_sliced_js_ith_layer_xth_section.append(q)
+				curve_sliced_js_ith_layer.append(np.array(curve_sliced_js_ith_layer_xth_section))
+			curve_sliced_js.append(curve_sliced_js_ith_layer)
 
-				curve_sliced_js_base_ith.append(q)
-			curve_sliced_js_base.append(np.array(curve_sliced_js_base_ith))
 
 		return positioner_js,curve_sliced_js,positioner_js_base,curve_sliced_js_base
 
@@ -204,22 +216,28 @@ class redundancy_resolution(object):
 	def positioner_resolution(self,curve_sliced_relative):
 		###resolve 2DOF positioner joint angle 
 		positioner_js=[]
+		q_prev=[0,-0.5]
 		for i in range(len(curve_sliced_relative)):
-			positioner_js_ith=[]
-			q_prev=[0,0]
-			for j in reversed(range(len(curve_sliced_relative[i]))):	###reverse, solve from the end because start may be upward
-				###curve normal as torch orientation, opposite of positioner
-				positioner_js_ith.append(self.positioner.inv(-curve_sliced_relative[i][j,3:],q_prev))
-				q_prev=positioner_js_ith[-1]
+			positioner_js_ith_layer=[]
+			for x in range(len(curve_sliced_relative[i])):
+				positioner_js_ith_layer_xth_section=[]
+				
+				for j in reversed(range(len(curve_sliced_relative[i][x]))):	###reverse, solve from the end because start may be upward
+					###curve normal as torch orientation, opposite of positioner
+					positioner_js_ith_layer_xth_section.append(self.positioner.inv(-curve_sliced_relative[i][x][j,3:],q_prev))
+				
+				q_prev=np.average(positioner_js_ith_layer_xth_section,axis=0)
 
-			positioner_js_ith.reverse()
-			positioner_js_ith=np.array(positioner_js_ith)
+				positioner_js_ith_layer_xth_section.reverse()
+				positioner_js_ith_layer_xth_section=np.array(positioner_js_ith_layer_xth_section)
 
-			###filter noise
-			positioner_js_ith[:,0]=moving_average(positioner_js_ith[:,0],padding=True)
-			positioner_js_ith[:,1]=moving_average(positioner_js_ith[:,1],padding=True)
+				###filter noise
+				positioner_js_ith_layer_xth_section[:,0]=moving_average(positioner_js_ith_layer_xth_section[:,0],padding=True)
+				positioner_js_ith_layer_xth_section[:,1]=moving_average(positioner_js_ith_layer_xth_section[:,1],padding=True)
 
-			positioner_js.append(np.array(positioner_js_ith))
+				positioner_js_ith_layer.append(np.array(positioner_js_ith_layer_xth_section))
+
+			positioner_js.append(positioner_js_ith_layer)
 
 		
 		return positioner_js
