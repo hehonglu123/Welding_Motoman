@@ -72,8 +72,8 @@ def robot_weld_path_gen_2():
 
     ## tune
     dx = 0
-    dy = 0
-    dz = 0
+    dy = 60
+    dz = -15
     dp = np.array([dx,dy,dz])
 
     path_T=[]
@@ -148,11 +148,11 @@ robot_scan=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_co
 	base_transformation_file=config_dir+'MA1440_pose.csv',pulse2deg_file_path=config_dir+'MA1440_A0_pulse2deg.csv')
 robot_scan_notool=robot_obj('MA_1440_A0_notool',def_path=config_dir+'MA1440_A0_robot_default_config.yml',\
 	base_transformation_file=config_dir+'MA1440_pose.csv',pulse2deg_file_path=config_dir+'MA1440_A0_pulse2deg.csv')
-turn_table=positioner_obj('D500B',def_path=config_dir+'D500B_robot_default_config.yml',base_transformation_file=config_dir+'D500B_pose.csv',\
-    pulse2deg_file_path=config_dir+'D500B_pulse2deg.csv')
+turn_table=positioner_obj('D500B',def_path=config_dir+'D500B_robot_default_config.yml',tool_file_path=config_dir+'positioner_tcp.csv',\
+    base_transformation_file=config_dir+'D500B_pose.csv',pulse2deg_file_path=config_dir+'D500B_pulse2deg.csv')
 
 ## sim or real robot
-sim=True
+sim=False
 
 zero_config=np.array([0.,0.,0.,0.,0.,0.])
 # print(robot_scan.fwd(zero_config))
@@ -166,12 +166,21 @@ zero_config=np.array([0.,0.,0.,0.,0.,0.])
 # input("Press enter to quit")
 
 R2base_R1base_H = np.linalg.inv(robot_scan.base_H)
+# R2base_R1base_H[1,3] = R2base_R1base_H[1,3]-100
 TBase_R1Base_H = np.linalg.inv(turn_table.base_H)
 Table_home_T = turn_table.fwd(np.radians([-15,180]))
 TBase_R1TCP_H = np.linalg.inv(np.matmul(turn_table.base_H,H_from_RT(Table_home_T.R,Table_home_T.p)))
 R2base_table_H = np.matmul(R2base_R1base_H,turn_table.base_H)
 print("Turn table relative to R2",R2base_table_H)
 
+R2base_tableJ1_H = Transform(rpy2R(np.radians([-1.9178,-13.5699,87.8922])),[1049.384,418.432,-512.403])
+tableJ1_base_H = Transform(np.eye(3),[0,0,-380])
+R2base_tablebase_H = R2base_tableJ1_H*tableJ1_base_H
+# R2base_table_H_act = R2base_tablebase_H*turn_table.fwd(np.array([0,0]))
+R2base_table_H_act=H_from_RT(R2base_tablebase_H.R,R2base_tablebase_H.p)
+print("ACt table relative to R2",R2base_table_H_act)
+
+# exit()
 ### get welding robot path
 ## welding wall test
 # data_dir='../../data/wall_weld_test/scan_cont_3/'
@@ -185,7 +194,7 @@ print("Turn table relative to R2",R2base_table_H)
 #     curve_sliced_relative.append(np.append(this_p,this_n))
 # curve_sliced_relative=np.array(curve_sliced_relative)
 ## wall test 2
-data_dir='../../data/wall_weld_test/scan_cont_3/'
+data_dir='../../data/wall_weld_test/wal_param_1/'
 all_path_T = robot_weld_path_gen_2()
 curve_sliced_R1=np.array(all_path_T[0])
 curve_sliced_relative=[]
@@ -194,6 +203,8 @@ for path_p in curve_sliced_R1:
     this_n = np.matmul(TBase_R1TCP_H[:3,:3],path_p.R[:,-1])
     curve_sliced_relative.append(np.append(this_p,this_n))
 curve_sliced_relative=np.array(curve_sliced_relative)
+curve_sliced_relative_origin=deepcopy(curve_sliced_relative)
+print(curve_sliced_relative[:,:3])
 ## blade
 # dataset='blade0.1/'
 # sliced_alg='NX_slice2/'
@@ -207,89 +218,104 @@ scan_speed=30 # scanning speed
 Rz_turn_angle = np.radians(-45) # point direction w.r.t welds
 # Ry_turn_angle = np.radians(-10) # rotate in y a bit, z-axis not pointing down, to have ik solution
 Ry_turn_angle = np.radians(0) # rotate in y a bit, z-axis not pointing down, to have ik solution
+# scan_stand_off_d = 243 ## mm
 scan_stand_off_d = 243 ## mm
 bounds_theta = np.radians(45) ## circular motion at start and end
 # all_scan_angle = np.radians([-45,0,45,0]) ## scanning angles
-all_scan_angle = np.radians([0,45,-45]) ## scanning angles
+# all_scan_angle = np.radians([0]) ## scanning angles
+all_scan_angle = np.radians([-45,45]) ## scanning angles
+
+######### enter your wanted z height ########
+all_layer_z=[0,30] ## all layer z height
+#############################################
 
 ### path gen ###
 scan_p=[]
 scan_R=[]
 reverse_path_flag=False
-for scan_angle in all_scan_angle:
+reverse_scan_angle_flag=True
+for layer_z in all_layer_z:
     
-    sub_scan_p=[]
-    sub_scan_R=[]
-    for pT_i in range(len(curve_sliced_relative)):
+    curve_sliced_relative[:,2] = curve_sliced_relative_origin[:,2]+layer_z
+    all_scan_angle=all_scan_angle[::-1]
+    if layer_z==all_layer_z[-1]: # last layer scan
+        all_scan_angle = np.append(all_scan_angle,0)
+    scan_angle_i=0
+    for scan_angle in all_scan_angle:
+        
+        sub_scan_p=[]
+        sub_scan_R=[]
+        for pT_i in range(len(curve_sliced_relative)):
 
-        this_p = curve_sliced_relative[pT_i][:3]
-        this_n = curve_sliced_relative[pT_i][3:]
+            this_p = curve_sliced_relative[pT_i][:3]
+            this_n = curve_sliced_relative[pT_i][3:]
 
-        if pT_i == len(curve_sliced_relative)-1:
-            this_scan_R = deepcopy(sub_scan_R[-1])
-            this_scan_p = this_p + this_scan_R[:,-1]*scan_stand_off_d # stand off distance to scan
+            if pT_i == len(curve_sliced_relative)-1:
+                this_scan_R = deepcopy(sub_scan_R[-1])
+                this_scan_p = this_p + this_scan_R[:,-1]*scan_stand_off_d # stand off distance to scan
+                sub_scan_p.append(this_scan_p)
+                sub_scan_R.append(this_scan_R)
+                k = deepcopy(this_scan_R[:,0])
+                p_bound_path,R_bound_path=get_bound_circle(this_scan_p,this_scan_R,this_p,k,-bounds_theta)
+                sub_scan_p.extend(p_bound_path[::-1])
+                sub_scan_R.extend(R_bound_path[::-1])
+                break
+
+            next_p = curve_sliced_relative[pT_i+1][:3]
+            travel_v = (next_p-this_p)
+            travel_v = travel_v/np.linalg.norm(travel_v)
+
+            # get scan R
+            Rz = -deepcopy(this_n) # assume weld is perpendicular to the plane
+            Rz = Rz/np.linalg.norm(Rz)
+            Ry = travel_v
+            Ry = (Ry-np.dot(Ry,Rz)*Rz)
+            # rotate z-axis around y-axis
+            Rz = np.matmul(rot(Ry,scan_angle),Rz)
+
+            Rx = np.cross(Ry,Rz)
+            Rx = Rx/np.linalg.norm(Rx)
+            this_scan_R = np.array([Rx,Ry,Rz]).T
+            # get scan p)
+            this_scan_p = this_p + Rz*scan_stand_off_d # stand off distance to scan
+
+            # add start bound condition
+            if pT_i == 0:
+                k = deepcopy(Rx)
+                p_bound_path,R_bound_path=get_bound_circle(this_scan_p,this_scan_R,this_p,k,bounds_theta)
+                sub_scan_p.extend(p_bound_path)
+                sub_scan_R.extend(R_bound_path)
+            
+            # add scan p R to path
             sub_scan_p.append(this_scan_p)
             sub_scan_R.append(this_scan_R)
-            k = deepcopy(this_scan_R[:,0])
-            p_bound_path,R_bound_path=get_bound_circle(this_scan_p,this_scan_R,this_p,k,-bounds_theta)
-            sub_scan_p.extend(p_bound_path[::-1])
-            sub_scan_R.extend(R_bound_path[::-1])
-            break
-
-        next_p = curve_sliced_relative[pT_i+1][:3]
-        travel_v = (next_p-this_p)
-        travel_v = travel_v/np.linalg.norm(travel_v)
-
-        # get scan R
-        Rz = -deepcopy(this_n) # assume weld is perpendicular to the plane
-        Rz = Rz/np.linalg.norm(Rz)
-        Ry = travel_v
-        Ry = (Ry-np.dot(Ry,Rz)*Rz)
-        # rotate z-axis around y-axis
-        Rz = np.matmul(rot(Ry,scan_angle),Rz)
-
-        Rx = np.cross(Ry,Rz)
-        Rx = Rx/np.linalg.norm(Rx)
-        this_scan_R = np.array([Rx,Ry,Rz]).T
-        # get scan p)
-        this_scan_p = this_p + Rz*scan_stand_off_d # stand off distance to scan
-
-        # add start bound condition
-        if pT_i == 0:
-            k = deepcopy(Rx)
-            p_bound_path,R_bound_path=get_bound_circle(this_scan_p,this_scan_R,this_p,k,bounds_theta)
-            sub_scan_p.extend(p_bound_path)
-            sub_scan_R.extend(R_bound_path)
         
-        # add scan p R to path
-        sub_scan_p.append(this_scan_p)
-        sub_scan_R.append(this_scan_R)
-    
-    if reverse_path_flag:
-        sub_scan_p=sub_scan_p[::-1]
-        sub_scan_R=sub_scan_R[::-1]
-    
-    if len(scan_p)!=0:
-        ## add connection path
-        last_end_p = scan_p[-1]
-        last_end_R = scan_R[-1]
-        this_start_p = sub_scan_p[0]
-        this_start_R = sub_scan_R[0]
-
-        curve_slice_start_p = deepcopy(curve_sliced_relative[0][:3])
         if reverse_path_flag:
-            curve_slice_start_p = deepcopy(curve_sliced_relative[-1][:3])
+            sub_scan_p=sub_scan_p[::-1]
+            sub_scan_R=sub_scan_R[::-1]
+        
+        if scan_angle_i!=0:
+            ## add connection path
+            last_end_p = scan_p[-1]
+            last_end_R = scan_R[-1]
+            this_start_p = sub_scan_p[0]
+            this_start_R = sub_scan_R[0]
 
-        p_bound_path,R_bound_path=get_connect_circle(last_end_p,last_end_R,this_start_p,this_start_R,curve_slice_start_p)
-        p_bound_path.extend(sub_scan_p)
-        sub_scan_p=deepcopy(p_bound_path)
-        R_bound_path.extend(sub_scan_R)
-        sub_scan_R=deepcopy(R_bound_path)
-        ######################
+            curve_slice_start_p = deepcopy(curve_sliced_relative[0][:3])
+            if reverse_path_flag:
+                curve_slice_start_p = deepcopy(curve_sliced_relative[-1][:3])
 
-    scan_p.extend(sub_scan_p)
-    scan_R.extend(sub_scan_R)
-    reverse_path_flag= not reverse_path_flag
+            p_bound_path,R_bound_path=get_connect_circle(last_end_p,last_end_R,this_start_p,this_start_R,curve_slice_start_p)
+            p_bound_path.extend(sub_scan_p)
+            sub_scan_p=deepcopy(p_bound_path)
+            R_bound_path.extend(sub_scan_R)
+            sub_scan_R=deepcopy(R_bound_path)
+            ######################
+
+        scan_p.extend(sub_scan_p)
+        scan_R.extend(sub_scan_R)
+        reverse_path_flag= not reverse_path_flag
+        scan_angle_i+=1
 
 scan_p=np.array(scan_p)
 scan_R=np.array(scan_R)
@@ -341,7 +367,7 @@ scan_R=deepcopy(scan_R_detail)
 
 ########################################
 
-# visualize_frames(scan_R[::20],scan_p[::20],size=1)
+# visualize_frames(scan_R[::20],scan_p[::20],size=3)
 ############# path gen finish ################
 
 ############ redundancy resolution ###
@@ -368,7 +394,8 @@ elif method==1:
     q_init_robot = robot_scan.inv(np.matmul(pose_R2_table.R,scan_p[0])+pose_R2_table.p,np.matmul(pose_R2_table.R,scan_R[0]),zero_config)[0]
     print(np.degrees(q_init_robot))
     # q_out1, q_out2, j_out1, j_out2=rrs.arm_table_stepwise_opt(q_init_robot,q_init_table,w2=0.03)
-    q_out1, q_out2, j_out1, j_out2=rrs.arm_table_stepwise_opt_Rz(q_init_robot,q_init_table,w2=0.003)
+    q_out1, q_out2, j_out1, j_out2=rrs.arm_table_stepwise_opt_Rz(q_init_robot,q_init_table,w2=0.03)
+    # q_out1, q_out2, j_out1, j_out2=rrs.arm_table_stepwise_opt_Rz(q_init_robot,q_init_table,w2=5)
 
     scan_act_R=[]
     scan_act_p=[]
@@ -385,6 +412,8 @@ elif method==1:
 
     scan_R_show=scan_R[::50]
     scan_p_show=scan_p[::50]
+
+    print(np.degrees(q_out2[::100]))
 
     # scan_R_show=np.vstack((scan_R_show,scan_act_R[::10]))
     # scan_p_show=np.vstack((scan_p_show,scan_act_p[::10]))
@@ -433,13 +462,12 @@ elif method==1:
         speed_bp.append(scan_speed) ## mm/sec
 #################################
 
-vd_relative=30
+vd_relative=scan_speed
 lam1=calc_lam_js(q_out1,robot_scan)
 lam2=calc_lam_js(q_out2,turn_table)
 lam_relative=calc_lam_cs(scan_p)
-print(lam1[::20])
 s1_all,_=calc_individual_speed(vd_relative,lam1,lam2,lam_relative,np.arange(0,len(scan_p),20).astype(int))
-print(s1_all)
+# print(s1_all)
 
 input("Press Enter to start moving")
 
@@ -451,9 +479,11 @@ input("Press Enter to start moving")
 ## move to start
 robot_client=MotionProgramExecClient(ROBOT_CHOICE='RB2',ROBOT_CHOICE2='ST1',pulse2deg=robot_scan.pulse2deg,pulse2deg_2=turn_table.pulse2deg)
 target2=['MOVJ',np.degrees(q_bp2[0][0]),10]
-robot_client.MoveJ(np.degrees(q_bp1[0][0]), s1_all[0], 0, target2=target2)
+robot_client.MoveJ(np.degrees(q_bp1[0][0]), 5, 0, target2=target2)
 robot_client.ProgEnd()
 robot_client.execute_motion_program("AAA.JBI")
+
+input("Open Artec Studio or Scanner and Press Enter to start moving")
 
 ## scanner start
 # cscanner.start_capture()
