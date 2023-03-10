@@ -86,6 +86,9 @@ def robot_weld_path_gen_2():
 
 def get_bound_circle(p,R,pc,k,theta):
 
+    if theta==0:
+        return [p,p],[R,R]
+
     p=np.array(p)
     R=np.array(R)
     pc=np.array(pc)
@@ -107,6 +110,36 @@ def get_bound_circle(p,R,pc,k,theta):
     
     return all_p_bound,all_R_bound
 
+def get_connect_circle(start_p,start_R,end_p,end_R,pc):
+
+    k = np.cross((end_p-start_p),start_R[:,-1])
+    k = k/np.linalg.norm(k)
+
+    theta = -2*np.arcsin(np.linalg.norm(end_p-start_p)/2/scan_stand_off_d)
+    print(np.degrees(theta))
+
+    dR = np.matmul(start_R.T,end_R)
+    dRk,dRtheta = R2rot(dR)
+    
+    trans_theta = np.arange(0,theta,np.sign(theta)*np.radians(1))
+    rot_theta = np.linspace(0,dRtheta,len(trans_theta)+1)
+
+    all_p_bound=[]
+    all_R_bound=[]
+    for i in range(len(trans_theta)):
+        rot_R = rot(k,trans_theta[i])
+        p_bound = np.matmul(rot_R,(start_p-pc))+pc
+        R_bound = np.matmul(start_R,rot(dRk,rot_theta[i]))
+        all_p_bound.append(p_bound)
+        all_R_bound.append(R_bound)
+    rot_R = rot(k,theta)
+    p_bound = np.matmul(rot_R,(start_p-pc))+pc
+    R_bound = np.matmul(start_R,rot(dRk,rot_theta[-1]))
+    all_p_bound.append(p_bound)
+    all_R_bound.append(R_bound)
+
+    return all_p_bound,all_R_bound
+
 config_dir='../../config/'
 
 robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path=config_dir+'weldgun.csv',\
@@ -119,7 +152,7 @@ turn_table=positioner_obj('D500B',def_path=config_dir+'D500B_robot_default_confi
     pulse2deg_file_path=config_dir+'D500B_pulse2deg.csv')
 
 ## sim or real robot
-sim=False
+sim=True
 
 zero_config=np.array([0.,0.,0.,0.,0.,0.])
 # print(robot_scan.fwd(zero_config))
@@ -177,7 +210,7 @@ Ry_turn_angle = np.radians(0) # rotate in y a bit, z-axis not pointing down, to 
 scan_stand_off_d = 243 ## mm
 bounds_theta = np.radians(45) ## circular motion at start and end
 # all_scan_angle = np.radians([-45,0,45,0]) ## scanning angles
-all_scan_angle = np.radians([0]) ## scanning angles
+all_scan_angle = np.radians([0,45,-45]) ## scanning angles
 
 ### path gen ###
 scan_p=[]
@@ -236,15 +269,23 @@ for scan_angle in all_scan_angle:
         sub_scan_p=sub_scan_p[::-1]
         sub_scan_R=sub_scan_R[::-1]
     
-    ## add connection path
-    last_end_p = scan_p[-1]
-    last_end_R = scan_R[-1]
-    this_start_p = sub_scan_p[0]
-    this_start_R = sub_scan_R[0]
+    if len(scan_p)!=0:
+        ## add connection path
+        last_end_p = scan_p[-1]
+        last_end_R = scan_R[-1]
+        this_start_p = sub_scan_p[0]
+        this_start_R = sub_scan_R[0]
 
-    k = np.cross((this_start_p-last_end_p),last_end_R[:,-1])
-    k = k/np.linalg.norm(k)
-    ######################
+        curve_slice_start_p = deepcopy(curve_sliced_relative[0][:3])
+        if reverse_path_flag:
+            curve_slice_start_p = deepcopy(curve_sliced_relative[-1][:3])
+
+        p_bound_path,R_bound_path=get_connect_circle(last_end_p,last_end_R,this_start_p,this_start_R,curve_slice_start_p)
+        p_bound_path.extend(sub_scan_p)
+        sub_scan_p=deepcopy(p_bound_path)
+        R_bound_path.extend(sub_scan_R)
+        sub_scan_R=deepcopy(R_bound_path)
+        ######################
 
     scan_p.extend(sub_scan_p)
     scan_R.extend(sub_scan_R)
@@ -252,6 +293,8 @@ for scan_angle in all_scan_angle:
 
 scan_p=np.array(scan_p)
 scan_R=np.array(scan_R)
+
+# visualize_frames(scan_R,scan_p,size=3)
 
 ## turn Rx direction (in Rz direction)
 scan_R = np.matmul(scan_R,rot([0.,0.,1.],Rz_turn_angle))
@@ -298,7 +341,7 @@ scan_R=deepcopy(scan_R_detail)
 
 ########################################
 
-# visualize_frames(scan_R[::10],scan_p[::10],size=1)
+# visualize_frames(scan_R[::20],scan_p[::20],size=1)
 ############# path gen finish ################
 
 ############ redundancy resolution ###
@@ -381,7 +424,8 @@ if method==0:
         else:
             zone_bp.append(0)
 elif method==1:
-    for path_i in range(0,len(scan_p),20):
+    step_motion=50
+    for path_i in range(0,len(scan_p),step_motion):
         primitives.append('movel')
         q_bp1.append([q_out1[path_i]])
         q_bp2.append([q_out2[path_i]])
