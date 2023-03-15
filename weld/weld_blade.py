@@ -75,17 +75,25 @@ for layer in range(num_layer_start,num_layer_end):
 		    breakpoints=np.linspace(len(curve_sliced_js)-1,0,num=num_points_layer).astype(int)
 
 		s1_all,_=calc_individual_speed(vd_relative,lam1,lam2,lam_relative,breakpoints)
-		# print(s1_all)
+		
+		###move to intermidieate waypoint for collision avoidance
+		if num_sections>1:
+			target2=['MOVJ',np.degrees(positioner_js[breakpoints[0]]),10]
+			waypoint_pose=robot.fwd(curve_sliced_js[breakpoints[0]])
+			waypoint_pose.p[-1]+=100
+			waypoint_q=robot.inv(waypoint_pose.p,waypoint_pose.R,curve_sliced_js[breakpoints[0]])[0]
+			client.MoveL(np.degrees(waypoint_q), 25,target2=target2)
+
 		target2=['MOVJ',np.degrees(positioner_js[breakpoints[0]]),10]
 		client.MoveL(np.degrees(curve_sliced_js[breakpoints[0]]), s1_all[0],target2=target2)
 
-		client.SetArc(True,cond_num=140)
+		# client.SetArc(True,cond_num=140)
 		for j in range(1,len(breakpoints)):
 		    target2=['MOVJ',np.degrees(positioner_js[breakpoints[j]]),10]
 		    client.MoveL(np.degrees(curve_sliced_js[breakpoints[j]]), s1_all[j],target2=target2)
-		client.SetArc(False)
+		# client.SetArc(False)
 
     
 client.ProgEnd()
-timestamp,joint_recording=client.execute_motion_program("AAA.JBI") 
+# timestamp,joint_recording=client.execute_motion_program("AAA.JBI") 
 # np.savetxt('joint_recording.csv',np.hstack((timestamp.reshape(-1, 1),joint_recording)),delimiter=',')
