@@ -54,8 +54,8 @@ client=MotionProgramExecClient(ROBOT_CHOICE='RB1',ROBOT_CHOICE2='ST1',pulse2deg=
 # 		client.SetArc(False)
 
 ###########################################layer welding############################################
-num_layer_start=85
-num_layer_end=94
+num_layer_start=0
+num_layer_end=30
 for layer in range(num_layer_start,num_layer_end):
 	num_sections=len(glob.glob(data_dir+'curve_sliced_relative/slice'+str(layer)+'_*.csv'))
 	for x in range(num_sections):
@@ -87,13 +87,13 @@ for layer in range(num_layer_start,num_layer_end):
 		target2=['MOVJ',np.degrees(positioner_js[breakpoints[0]]),30]
 		client.MoveL(np.degrees(curve_sliced_js[breakpoints[0]]), s1_all[0],target2=target2)
 
-		client.SetArc(True,cond_num=140)
+		# client.SetArc(True,cond_num=140)
 		for j in range(1,len(breakpoints)):
 		    target2=['MOVJ',np.degrees(positioner_js[breakpoints[j]]),10]
 		    client.MoveL(np.degrees(curve_sliced_js[breakpoints[j]]), s1_all[j],target2=target2)
-		client.SetArc(False)
+		# client.SetArc(False)
 
     
 client.ProgEnd()
 timestamp,joint_recording=client.execute_motion_program("AAA.JBI") 
-# np.savetxt('joint_recording.csv',np.hstack((timestamp.reshape(-1, 1),joint_recording)),delimiter=',')
+np.savetxt('joint_recording.csv',np.hstack((timestamp.reshape(-1, 1),joint_recording)),delimiter=',')
