@@ -6,6 +6,8 @@ from general_robotics_toolbox import *
 sys.path.append('../../../../toolbox')
 from robot_def import *
 from multi_robot import *
+from error_check import *
+from path_calc import *
 
 def main():
 	dataset='blade0.1/'
@@ -41,11 +43,42 @@ def main():
 	curve_sliced_relative=np.concatenate(curve_sliced_relative,axis=0)
 
 
-	vis_step=5
-	fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
+	
 
 	
 	curve_exe1,curve_exe2,curve_exe_R1,curve_exe_R2,relative_path_exe,relative_path_exe_R=form_relative_path(robot_js,positioner_js,robot,positioner)
+	lam_exe=calc_lam_cs(relative_path_exe[:,:3])
+	speed=np.gradient(lam_exe)/np.gradient(timestamp)
+
+	###calculate error
+	error=[]
+	for p in relative_path_exe:
+		error.append(calc_error(p,curve_sliced_relative[:,:3])[0])
+	
+
+	##############################plot error#####################################
+	fig, ax1 = plt.subplots()
+	ax2 = ax1.twinx()
+	ax1.plot(lam_exe, speed, 'g-', label='Speed')
+	ax2.plot(lam_exe, error, 'b-',label='Error')
+	# ax2.plot(lam, np.degrees(angle_error), 'y-',label='Normal Error')
+	ax2.axis(ymin=0,ymax=1)
+	ax1.axis(ymin=0,ymax=30)
+
+	ax1.set_xlabel('Path Length (mm)')
+	ax1.set_ylabel('Speed/lamdot (mm/s)', color='g')
+	ax2.set_ylabel('Error/Normal Error (mm/deg)', color='b')
+	plt.title("Speed and Error Plot")
+	h1, l1 = ax1.get_legend_handles_labels()
+	h2, l2 = ax2.get_legend_handles_labels()
+	ax1.legend(h1+h2, l1+l2, loc=1)
+
+
+
+	vis_step=5
+	fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
+	
+
 
 	ax.plot3D(relative_path_exe[::vis_step,0],relative_path_exe[::vis_step,1],relative_path_exe[::vis_step,2],'r.-')
 	# ax.quiver(relative_path_exe[::vis_step,0],relative_path_exe[::vis_step,1],relative_path_exe[::vis_step,2],relative_path_exe_R[::vis_step,0,-1],relative_path_exe_R[::vis_step,1,-1],relative_path_exe_R[::vis_step,2,-1],length=0.3, normalize=True)
@@ -53,10 +86,6 @@ def main():
 	ax.plot3D(curve_sliced_relative[::vis_step,0],curve_sliced_relative[::vis_step,1],curve_sliced_relative[::vis_step,2],'g.-')
 	# ax.quiver(curve_sliced_relative[::vis_step,0],curve_sliced_relative[::vis_step,1],curve_sliced_relative[::vis_step,2],curve_sliced_relative[::vis_step,0],curve_sliced_relative[::vis_step,1],curve_sliced_relative[::vis_step,2],length=0.3, normalize=True)
 
-
-	# ax.set_xlim3d(-80, 80)
-	# ax.set_ylim3d(0, 80)
-	# ax.set_zlim3d(-80, 80)
 	plt.show()
 if __name__ == '__main__':
 	main()
