@@ -89,7 +89,7 @@ use_tensor=False
 ##############################
 
 ### process parameters
-use_icp=False
+use_icp=True
 timestep_search=False
 timestep_search_2=False
 search_start_i=50
@@ -117,6 +117,7 @@ scan_points_t1_origin = np.load(data_dir + 'points_'+str(scan_move_stamp_i)+'.np
 
 rmse_i = 0
 rmse_low = 999
+all_rmse = []
 for search_i in range(0,rmse_search_step):
     # print(search_i)
     #### t1 pcd
@@ -135,13 +136,19 @@ for search_i in range(0,rmse_search_step):
     if evaluation.inlier_rmse<rmse_low:
         rmse_low=evaluation.inlier_rmse
         rmse_i=search_i
+    all_rmse.append(evaluation.inlier_rmse)
 
     # print(evaluation)
     pcd_t0.paint_uniform_color([0,1,0])
     pcd_t1.paint_uniform_color([1,0,0])
-    # if evaluation.inlier_rmse<0.787:
-    # visualize_pcd([pcd_t1,pcd_t0])
+    # if evaluation.inlier_rmse<0.63:
+    #     visualize_pcd([pcd_t1,pcd_t0])
 ###
+# plt.plot(all_rmse,'o-')
+# plt.xlabel('Closest Timestamps Index')
+# plt.ylabel('Inlier RMSE')
+# plt.title('Inlier RMSE Using Robot Pose at Different Timestamps')
+# plt.show()
 # exit()
 # rmse_i+=2
 sca_stamps_sync_robt=sca_stamps_sync_robt+(rob_stamps[robt_move_t1_i+rmse_i]-sca_stamps_sync_robt[scan_move_stamp_i])
@@ -153,7 +160,7 @@ sca_stamps_sync_robt=sca_stamps_sync_robt+(rob_stamps[robt_move_t1_i+rmse_i]-sca
 pcd_combined = None
 scan_js_exe_cor = []
 scan_i_start=None
-# scan_N=100
+# scan_N=50
 for scan_i in range(scan_N):
     print("Scan:",scan_i)
     # discard scanner timestamp <0 (robot motion haven't start)
@@ -287,6 +294,7 @@ for scan_i in range(scan_N):
 
 pcd_combined_down = pcd_combined.voxel_down_sample(voxel_size=0.5)
 visualize_pcd([pcd_combined_down])
+# exit()
 
 o3d.io.write_point_cloud(data_dir+'processed_pcd_raw.pcd',pcd_combined)
 
