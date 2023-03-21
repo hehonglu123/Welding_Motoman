@@ -194,7 +194,7 @@ print("ACt table relative to R2",R2base_table_H_act)
 #     curve_sliced_relative.append(np.append(this_p,this_n))
 # curve_sliced_relative=np.array(curve_sliced_relative)
 ## wall test 2
-data_dir='../../data/wall_weld_test/wal_param_1/'
+data_dir='../../data/wall_weld_test/wall_param_1/'
 all_path_T = robot_weld_path_gen_2()
 curve_sliced_R1=np.array(all_path_T[0])
 curve_sliced_relative=[]
@@ -205,6 +205,7 @@ for path_p in curve_sliced_R1:
 curve_sliced_relative=np.array(curve_sliced_relative)
 curve_sliced_relative_origin=deepcopy(curve_sliced_relative)
 print(curve_sliced_relative[:,:3])
+out_dir=data_dir+'scans/'
 ## blade
 # dataset='blade0.1/'
 # sliced_alg='NX_slice2/'
@@ -225,9 +226,21 @@ bounds_theta = np.radians(45) ## circular motion at start and end
 # all_scan_angle = np.radians([0]) ## scanning angles
 all_scan_angle = np.radians([-45,45]) ## scanning angles
 
-######### enter your wanted z height ########
-all_layer_z=[0,30] ## all layer z height
 #############################################
+#############################################
+#############################################
+#############################################
+#############################################
+#############################################
+######### enter your wanted z height ########
+all_layer_z=[0,23] ## all layer z height
+#############################################
+#############################################
+#############################################
+#############################################
+#############################################
+#############################################
+
 
 ### path gen ###
 scan_p=[]
@@ -420,6 +433,10 @@ elif method==1:
 
     # visualize_frames(scan_R_show,scan_p_show,size=5)
 
+## save redundancy resolution results
+np.savetxt(data_dir + 'scan_js1.csv',q_out1,delimiter=',')
+np.savetxt(data_dir + 'scan_js2.csv',q_out2,delimiter=',')
+
 # print(len(q_out1))
 if sim:
     t=Tess_Env('../../config/urdf/combined')				#create obj
@@ -477,9 +494,10 @@ input("Press Enter to start moving")
 
 ### execute motion ###
 ## move to start
+to_start_speed=10
 robot_client=MotionProgramExecClient(ROBOT_CHOICE='RB2',ROBOT_CHOICE2='ST1',pulse2deg=robot_scan.pulse2deg,pulse2deg_2=turn_table.pulse2deg)
 target2=['MOVJ',np.degrees(q_bp2[0][0]),10]
-robot_client.MoveJ(np.degrees(q_bp1[0][0]), 5, 0, target2=target2)
+robot_client.MoveJ(np.degrees(q_bp1[0][0]), to_start_speed, 0, target2=target2)
 robot_client.ProgEnd()
 robot_client.execute_motion_program("AAA.JBI")
 
@@ -497,13 +515,32 @@ robot_client.MoveL(np.degrees(q_bp1[-1][0]), s1_all[-1], 0, target2=target2)
 robot_client.ProgEnd()
 robot_stamps,curve_pulse_exe = robot_client.execute_motion_program("AAA.JBI")
 q_out1_exe=np.divide(curve_pulse_exe[:,6:12],robot_scan.pulse2deg)
+
 ## scanner end
-cscanner.end_capture()
-st=time.perf_counter()
-scans,scan_stamps=cscanner.get_capture()
-dt=time.perf_counter()-st
-print("dt:",dt)
-print("Robot last joint:",q_out1_exe[-1])
+# cscanner.end_capture()
+# st=time.perf_counter()
+# scans,scan_stamps=cscanner.get_capture()
+# dt=time.perf_counter()-st
+# print("dt:",dt)
+# print("Robot last joint:",q_out1_exe[-1])
+
+# input("Press Stop on Artec Studio and Move Home")
+
+## move robot to home
+# q2=np.zeros(6)
+# q2[0]=90
+# q3=[-15,180]
+# client=MotionProgramExecClient(ROBOT_CHOICE='RB2',pulse2deg=robot_scan.pulse2deg)
+# client.MoveJ(q2,to_start_speed,0)
+# client.ProgEnd()
+# client.execute_motion_program("AAA.JBI")
+
+# client=MotionProgramExecClient(IP='192.168.1.31',ROBOT_CHOICE='ST1',pulse2deg=turn_table.pulse2deg)
+# client.MoveJ(q3,to_start_speed,0)
+# client.ProgEnd()
+# client.execute_motion_program("AAA.JBI")
+#####################
+exit()
 
 ## save traj
 Path(out_dir).mkdir(exist_ok=True)
