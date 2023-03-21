@@ -8,6 +8,7 @@ sys.path.append('../toolbox')
 from robot_def import *
 from path_calc import *
 # from utils import *
+from math import floor
 
 class redundancy_resolution_scanner(object):
     ###robot1 hold weld torch, positioner hold welded part
@@ -137,9 +138,16 @@ class redundancy_resolution_scanner(object):
         upper_limit=np.hstack((self.robot.upper_limit,self.positioner.upper_limit))
         lower_limit=np.hstack((self.robot.lower_limit,self.positioner.lower_limit))
 
+        show_perc = True
+        show_perc_before=-1
         for i in range(len(self.scan_p)):
-            if i%100==0:
-                print(i)
+            # if show_perc_before<floor(i/len(self.scan_p)*100):
+            #     show_perc = True
+            # if floor(i/len(self.scan_p)*100)%10==0 and show_perc:
+            #     print("Solve Redundancy:",str(floor(i/len(self.scan_p)*100))+"%")
+            #     show_perc=False
+            if i % 1000 ==0:
+                print("Solve Redundancy:",str(floor(i/len(self.scan_p)*100))+"%")
             try:
                 error_fb=999
                 while error_fb>0.01:

@@ -1,5 +1,5 @@
 import numpy as np
-import sys, traceback, time, copy
+import sys, traceback, time, copy, glob
 from general_robotics_toolbox import *
 from redundancy_resolution import *
 sys.path.append('../toolbox')
@@ -10,12 +10,20 @@ def main():
 	dataset='blade0.1/'
 	sliced_alg='NX_slice2/'
 	data_dir='../data/'+dataset+sliced_alg
-	num_layers=70
+	num_layers=94
 	base_thickness=3
 	num_baselayers=2
 	curve_sliced=[]
 	for i in range(num_layers):
-		curve_sliced.append(np.loadtxt(data_dir+'curve_sliced/slice'+str(i)+'.csv',delimiter=','))
+		###get number of disconnected sections
+		num_sections=len(glob.glob(data_dir+'curve_sliced/raw/slice'+str(i)+'_*.csv'))
+		curve_sliced_ith_layer=[]
+		for x in range(num_sections):
+			curve_sliced_ith_layer.append(np.loadtxt(data_dir+'curve_sliced/slice'+str(i)+'_'+str(x)+'.csv',delimiter=','))
+
+		curve_sliced.append(curve_sliced_ith_layer)
+
+	print(curve_sliced)
 
 	robot=robot_obj('MA2010_A0',def_path='../config/MA2010_A0_robot_default_config.yml',tool_file_path='../config/weldgun.csv',\
 		pulse2deg_file_path='../config/MA2010_A0_pulse2deg.csv',d=15)
@@ -40,32 +48,35 @@ def main():
 
 
 	curve_sliced_relative=copy.deepcopy(rr.curve_sliced)
-	for x in range(len(rr.curve_sliced)):
-		for i in range(len(rr.curve_sliced[x])):
-			curve_sliced_relative[x][i,:3]=np.dot(H,np.hstack((rr.curve_sliced[x][i,:3],[1])).T)[:-1]
-			#convert curve direction to base frame
-			curve_sliced_relative[x][i,3:]=np.dot(H[:3,:3],rr.curve_sliced[x][i,3:]).T
+	for i in range(len(rr.curve_sliced)):
+		for x in range(len(rr.curve_sliced[i])):
+			for j in range(len(rr.curve_sliced[i][x])):
+				curve_sliced_relative[i][x][j,:3]=np.dot(H,np.hstack((rr.curve_sliced[i][x][j,:3],[1])).T)[:-1]
+				#convert curve direction to base frame
+				curve_sliced_relative[i][x][j,3:]=np.dot(H[:3,:3],rr.curve_sliced[i][x][j,3:]).T
 
-		if x==0:
-			ax.plot3D(curve_sliced_relative[x][::vis_step,0],curve_sliced_relative[x][::vis_step,1],curve_sliced_relative[x][::vis_step,2],'r.-')
-		elif x==1:
-			ax.plot3D(curve_sliced_relative[x][::vis_step,0],curve_sliced_relative[x][::vis_step,1],curve_sliced_relative[x][::vis_step,2],'g.-')
-		else:
-			ax.plot3D(curve_sliced_relative[x][::vis_step,0],curve_sliced_relative[x][::vis_step,1],curve_sliced_relative[x][::vis_step,2],'b.-')
+			if i==0:
+				ax.plot3D(curve_sliced_relative[i][x][::vis_step,0],curve_sliced_relative[i][x][::vis_step,1],curve_sliced_relative[i][x][::vis_step,2],'r.-')
+			elif i==1:
+				ax.plot3D(curve_sliced_relative[i][x][::vis_step,0],curve_sliced_relative[i][x][::vis_step,1],curve_sliced_relative[i][x][::vis_step,2],'g.-')
+			else:
+				ax.plot3D(curve_sliced_relative[i][x][::vis_step,0],curve_sliced_relative[i][x][::vis_step,1],curve_sliced_relative[i][x][::vis_step,2],'b.-')
 
-		ax.quiver(curve_sliced_relative[x][::vis_step,0],curve_sliced_relative[x][::vis_step,1],curve_sliced_relative[x][::vis_step,2],curve_sliced_relative[x][::vis_step,3],curve_sliced_relative[x][::vis_step,4],curve_sliced_relative[x][::vis_step,5],length=0.3, normalize=True)
-	
-		np.savetxt(data_dir+'curve_sliced_relative/slice'+str(x)+'.csv',curve_sliced_relative[x],delimiter=',')
+			ax.quiver(curve_sliced_relative[i][x][::vis_step,0],curve_sliced_relative[i][x][::vis_step,1],curve_sliced_relative[i][x][::vis_step,2],curve_sliced_relative[i][x][::vis_step,3],curve_sliced_relative[i][x][::vis_step,4],curve_sliced_relative[i][x][::vis_step,5],length=0.3, normalize=True)
+		
+			np.savetxt(data_dir+'curve_sliced_relative/slice'+str(i)+'_'+str(x)+'.csv',curve_sliced_relative[i][x],delimiter=',')
 	
 	###base layer appendant
 	curve_sliced_relative_base=[]
-	for x in range(num_baselayers):
+	for i in range(num_baselayers):
 		curve_sliced_relative_base.append(copy.deepcopy(curve_sliced_relative[0]))
-		curve_sliced_relative_base[-1][:,2]-=(num_baselayers-x)*base_thickness
-		ax.plot3D(curve_sliced_relative_base[x][::vis_step,0],curve_sliced_relative_base[x][::vis_step,1],curve_sliced_relative_base[x][::vis_step,2],'r.-')
-		ax.quiver(curve_sliced_relative_base[x][::vis_step,0],curve_sliced_relative_base[x][::vis_step,1],curve_sliced_relative_base[x][::vis_step,2],curve_sliced_relative_base[x][::vis_step,3],curve_sliced_relative_base[x][::vis_step,4],curve_sliced_relative_base[x][::vis_step,5],length=0.3, normalize=True)
+		for x in range(len(curve_sliced_relative[0])):
+
+			curve_sliced_relative_base[-1][x][:,2]-=(num_baselayers-i)*base_thickness
+			ax.plot3D(curve_sliced_relative_base[i][x][::vis_step,0],curve_sliced_relative_base[i][x][::vis_step,1],curve_sliced_relative_base[i][x][::vis_step,2],'r.-')
+			ax.quiver(curve_sliced_relative_base[i][x][::vis_step,0],curve_sliced_relative_base[i][x][::vis_step,1],curve_sliced_relative_base[i][x][::vis_step,2],curve_sliced_relative_base[i][x][::vis_step,3],curve_sliced_relative_base[i][x][::vis_step,4],curve_sliced_relative_base[i][x][::vis_step,5],length=0.3, normalize=True)
 	
-		np.savetxt(data_dir+'curve_sliced_relative/baselayer'+str(x)+'.csv',curve_sliced_relative_base[x],delimiter=',')
+			np.savetxt(data_dir+'curve_sliced_relative/baselayer'+str(i)+'_'+str(x)+'.csv',curve_sliced_relative_base[i][x],delimiter=',')
 
 
 	plt.title('0.1 blade first '+str(num_layers)+' slices')

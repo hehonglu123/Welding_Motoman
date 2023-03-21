@@ -5,7 +5,7 @@ for fname in glob.glob('raw/*.txt'):
 
 	f = open(fname, "r")
 	curve=[]
-	for line in f.readlines()[9:]:
+	for line in f.readlines()[3:]:
 		curve.append(list(map(float,line.split())))
 	#convert to mm from inch
 	curve=25.4*np.array(curve)
