@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import cm
-import sys
+import sys, glob
 sys.path.append('../../../../toolbox')
 from path_calc import *
 
@@ -24,6 +24,13 @@ def smooth_curve(curve):
 
 	return curve_smooth
 
+def smooth_normal(curve_normal,n=15):
+	curve_normal_new=copy.deepcopy(curve_normal)
+	for i in range(len(curve_normal)):
+		curve_normal_new[i]=np.average(curve_normal[max(0,i-n):min(len(curve_normal),i+n)],axis=0)
+		curve_normal_new[i]=curve_normal_new[i]/np.linalg.norm(curve_normal_new[i])
+	return curve_normal_new
+
 def moving_average(a, n=11, padding=False):
 	#n needs to be odd for padding
 	if padding:
@@ -35,44 +42,44 @@ def moving_average(a, n=11, padding=False):
 vis_step=5
 fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
 
-slice_prev=np.loadtxt('raw/slice0.csv',delimiter=',')
+slice_prev=np.loadtxt('raw/slice0_0.csv',delimiter=',')
 slice_normal0=np.zeros((len(slice_prev),3))
 slice_normal0[:,-1]=1
-num_layers=70
-slices=[slice_prev]
+num_layers=94
 slice_normal=[slice_normal0]
 
-np.savetxt('slice0.csv',np.hstack((slice_prev,slice_normal0)),delimiter=',')
+np.savetxt('slice0_0.csv',np.hstack((slice_prev,slice_normal0)),delimiter=',')
 for i in range(1,num_layers):
-	slicei_normal=[]
-	slicei=np.loadtxt('raw/slice'+str(i)+'.csv',delimiter=',')
-	###sort order
-	if np.linalg.norm(slicei[0]-slice_prev[0])>10 and np.linalg.norm(slicei[-1]-slice_prev[-1])>10:
-		slicei=np.flip(slicei,axis=0)
-	slicei=smooth_curve(slicei)
-	slices.append(slicei)
-	for j in range(len(slicei)):
-		#find closest 2 points
-		idx_1,idx_2=np.argsort(np.linalg.norm(slicei[j]-slice_prev,axis=1))[:2]
-		slicei_normal.append(find_norm(slicei[j],slice_prev[idx_1],slice_prev[idx_2]))
+	###get number of disconnected sections
+	num_sections=len(glob.glob('raw/slice'+str(i)+'_*.csv'))
 
-	slice_prev=slicei
-	slicei_normal=np.array(slicei_normal)
-	# slicei_normal[0]=moving_average(slicei_normal[0],padding=True)
-	# slicei_normal[1]=moving_average(slicei_normal[1],padding=True)
-	# slicei_normal[2]=moving_average(slicei_normal[2],padding=True)
+	slicei_complete=[]
+	for x in range(num_sections):
 
-	slice_normal.append(slicei_normal)
-	ax.plot3D(slicei[::vis_step,0],slicei[::vis_step,1],slicei[::vis_step,2],'r.-')
-	ax.quiver(slicei[::vis_step,0],slicei[::vis_step,1],slicei[::vis_step,2],slicei_normal[::vis_step,0],slicei_normal[::vis_step,1],slicei_normal[::vis_step,2],length=0.3, normalize=True)
-	np.savetxt('slice'+str(i)+'.csv',np.hstack((slicei,slicei_normal)),delimiter=',')
+		slicei_normal=[]
+		slicei=np.loadtxt('raw/slice'+str(i)+'_'+str(x)+'.csv',delimiter=',')
+		###sort order
+		if np.linalg.norm(slicei[0]-slice_prev[0])>10 and np.linalg.norm(slicei[-1]-slice_prev[-1])>10:
+			slicei=np.flip(slicei,axis=0)
+		slicei=smooth_curve(slicei)
+		slicei_complete.append(slicei)
+		for j in range(len(slicei)):
+			#find closest 2 points
+			idx_1,idx_2=np.argsort(np.linalg.norm(slicei[j]-slice_prev,axis=1))[:2]
+			slicei_normal.append(find_norm(slicei[j],slice_prev[idx_1],slice_prev[idx_2]))
 
-# ax.plot3D(slices[0][::vis_step,0],slices[0][::vis_step,1],slices[0][::vis_step,2],'r.-')
-# ax.quiver(slices[0][::vis_step,0],slices[0][::vis_step,1],slices[0][::vis_step,2],slice_normal[0][::vis_step,0],slice_normal[0][::vis_step,1],slice_normal[0][::vis_step,2],length=0.3, normalize=True)
-# ax.plot3D(slices[1][::vis_step,0],slices[1][::vis_step,1],slices[1][::vis_step,2],'g.-')
-# ax.quiver(slices[1][::vis_step,0],slices[1][::vis_step,1],slices[1][::vis_step,2],slice_normal[1][::vis_step,0],slice_normal[1][::vis_step,1],slice_normal[1][::vis_step,2],length=0.3, normalize=True)
-# ax.plot3D(slices[2][::vis_step,0],slices[2][::vis_step,1],slices[2][::vis_step,2],'b.-')
-# ax.quiver(slices[2][::vis_step,0],slices[2][::vis_step,1],slices[2][::vis_step,2],slice_normal[2][::vis_step,0],slice_normal[2][::vis_step,1],slice_normal[2][::vis_step,2],length=0.3, normalize=True)
+		slicei_normal=smooth_normal(np.array(slicei_normal))
+
+		slice_normal.append(slicei_normal)
+		ax.plot3D(slicei[::vis_step,0],slicei[::vis_step,1],slicei[::vis_step,2],'r.-')
+		ax.quiver(slicei[::vis_step,0],slicei[::vis_step,1],slicei[::vis_step,2],slicei_normal[::vis_step,0],slicei_normal[::vis_step,1],slicei_normal[::vis_step,2],length=0.3, normalize=True)
+		np.savetxt('slice'+str(i)+'_'+str(x)+'.csv',np.hstack((slicei,slicei_normal)),delimiter=',')
+
+
+	slicei_complete=np.concatenate(slicei_complete,axis=0)
+	slice_prev=slicei_complete
+
+
 plt.title('0.1 blade first '+str(num_layers)+' slices')
 plt.show()
 

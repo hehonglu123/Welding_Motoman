@@ -145,9 +145,9 @@ config_dir='../../config/'
 robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path=config_dir+'weldgun.csv',\
 	pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg.csv')
 robot_scan=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.yml',tool_file_path=config_dir+'scanner_tcp2.csv',\
-	base_transformation_file=config_dir+'MA1440_pose.csv',pulse2deg_file_path=config_dir+'MA1440_A0_pulse2deg.csv')
+	base_transformation_file=config_dir+'MA1440_pose_fake.csv',pulse2deg_file_path=config_dir+'MA1440_A0_pulse2deg.csv')
 robot_scan_notool=robot_obj('MA_1440_A0_notool',def_path=config_dir+'MA1440_A0_robot_default_config.yml',\
-	base_transformation_file=config_dir+'MA1440_pose.csv',pulse2deg_file_path=config_dir+'MA1440_A0_pulse2deg.csv')
+	base_transformation_file=config_dir+'MA1440_pose_fake.csv',pulse2deg_file_path=config_dir+'MA1440_A0_pulse2deg.csv')
 turn_table=positioner_obj('D500B',def_path=config_dir+'D500B_robot_default_config.yml',tool_file_path=config_dir+'positioner_tcp.csv',\
     base_transformation_file=config_dir+'D500B_pose.csv',pulse2deg_file_path=config_dir+'D500B_pulse2deg.csv')
 
@@ -179,6 +179,10 @@ R2base_tablebase_H = R2base_tableJ1_H*tableJ1_base_H
 # R2base_table_H_act = R2base_tablebase_H*turn_table.fwd(np.array([0,0]))
 R2base_table_H_act=H_from_RT(R2base_tablebase_H.R,R2base_tablebase_H.p)
 print("ACt table relative to R2",R2base_table_H_act)
+
+use_R2S1=False
+if use_R2S1:
+    R2base_table_H=R2base_table_H_act
 
 # exit()
 ### get welding robot path
@@ -233,7 +237,7 @@ all_scan_angle = np.radians([-45,45]) ## scanning angles
 #############################################
 #############################################
 ######### enter your wanted z height ########
-all_layer_z=[0,23] ## all layer z height
+all_layer_z=[0, 25] ## all layer z height
 #############################################
 #############################################
 #############################################
@@ -380,7 +384,9 @@ scan_R=deepcopy(scan_R_detail)
 
 ########################################
 
-# visualize_frames(scan_R[::20],scan_p[::20],size=3)
+## visualize scanning path in positioner tool frame
+# visualize_frames(scan_R[::20],scan_p[::20],size=10)
+# exit()
 ############# path gen finish ################
 
 ############ redundancy resolution ###
@@ -426,7 +432,9 @@ elif method==1:
     scan_R_show=scan_R[::50]
     scan_p_show=scan_p[::50]
 
-    print(np.degrees(q_out2[::100]))
+    if np.any(q_out2[:,0]<np.radians(-76)):
+        print("The output table traj is too tilted. Dont use this result.")
+        exit()
 
     # scan_R_show=np.vstack((scan_R_show,scan_act_R[::10]))
     # scan_p_show=np.vstack((scan_p_show,scan_act_p[::10]))
@@ -524,21 +532,21 @@ q_out1_exe=np.divide(curve_pulse_exe[:,6:12],robot_scan.pulse2deg)
 # print("dt:",dt)
 # print("Robot last joint:",q_out1_exe[-1])
 
-# input("Press Stop on Artec Studio and Move Home")
+input("Press Stop on Artec Studio and Move Home")
+robot_client=MotionProgramExecClient(ROBOT_CHOICE='RB2',ROBOT_CHOICE2='ST1',pulse2deg=robot_scan.pulse2deg,pulse2deg_2=turn_table.pulse2deg)
+# move robot to home
+q2=np.zeros(6)
+q2[0]=90
+q3=[-15,180]
+robot_client=MotionProgramExecClient(ROBOT_CHOICE='RB2',pulse2deg=robot_scan.pulse2deg)
+robot_client.MoveJ(q2,to_start_speed,0)
+robot_client.ProgEnd()
+robot_stamps,curve_pulse_exe = robot_client.execute_motion_program("AAA.JBI")
 
-## move robot to home
-# q2=np.zeros(6)
-# q2[0]=90
-# q3=[-15,180]
-# client=MotionProgramExecClient(ROBOT_CHOICE='RB2',pulse2deg=robot_scan.pulse2deg)
-# client.MoveJ(q2,to_start_speed,0)
-# client.ProgEnd()
-# client.execute_motion_program("AAA.JBI")
-
-# client=MotionProgramExecClient(IP='192.168.1.31',ROBOT_CHOICE='ST1',pulse2deg=turn_table.pulse2deg)
-# client.MoveJ(q3,to_start_speed,0)
-# client.ProgEnd()
-# client.execute_motion_program("AAA.JBI")
+robot_client=MotionProgramExecClient(IP='192.168.1.31',ROBOT_CHOICE='ST1',pulse2deg=turn_table.pulse2deg)
+robot_client.MoveJ(q3,to_start_speed,0)
+robot_client.ProgEnd()
+robot_stamps,curve_pulse_exe = robot_client.execute_motion_program("AAA.JBI")
 #####################
 exit()
 
