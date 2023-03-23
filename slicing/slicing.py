@@ -7,6 +7,33 @@ sys.path.append('../toolbox')
 from path_calc import *
 from error_check import *
 
+
+def check_boundary(p,stl_pc):
+    ###find closest 10 points
+    num_points=10
+    indices=np.argsort(np.linalg.norm(stl_pc-p,axis=1))[:num_points]
+    p_avg=np.average(stl_pc[indices],axis=0)
+
+    distance=np.linalg.norm(stl_pc[indices]-p,axis=1)
+    threshold = 1e-1
+
+    ###if all neighbors are in 1 direction, this will return true, meaning point is likely outside the stl boundary
+    # direction_check=np.all((stl_pc[indices]-np.tile([p],(num_points,1)))@(p_avg-p)>0)
+
+    # vectors=stl_pc[indices]-np.tile([p],(num_points,1))
+    # vectors=vectors / np.linalg.norm(vectors, axis=1, keepdims=True)
+    # avg_vector=(p_avg-p)/np.linalg.norm(p_avg-p)
+    # direction_check=np.all(vectors@avg_vector>0.2)
+
+    # if np.min(distance)>threshold and direction_check:
+    #     return False
+
+    threshold=1
+    if np.min(distance)>threshold:
+        return False
+    
+    return True
+
 def extract_bottom_edge(stl_file):
     # Load the STL mesh
     model_mesh = mesh.Mesh.from_file(stl_file)
@@ -59,6 +86,10 @@ def project_point_onto_plane(point, normal, centroid):
 
     return projected_point
 
+def project_point_on_stl(point,stl_pc):     ###project a point on stl surface
+    indices=np.argsort(np.linalg.norm(stl_pc-point,axis=1))[:10]
+    normal,centroid=fit_plane(stl_pc[indices])
+    return project_point_onto_plane(point,normal,centroid)
 
 def slicing_uniform(stl_pc,z,threshold = 1e-6):
 
@@ -87,23 +118,93 @@ def slice_next_layer(curve,stl_pc,direction,slice_height):
     curve_normal=get_curve_normal(curve,stl_pc,direction)
     slice_next=[]
     for i in range(len(curve)):
-        p_plus=curve[i]+slice_height*curve_normal[i]
-
-        indices=np.argsort(np.linalg.norm(stl_pc-p_plus,axis=1))[:10]
-        normal,centroid=fit_plane(stl_pc[indices])
-        p_plus=project_point_onto_plane(p_plus,normal,centroid)
-
+        p_plus=project_point_on_stl(curve[i]+slice_height*curve_normal[i],stl_pc)
         slice_next.append(p_plus)
 
     return np.array(slice_next)
 
+def fit_to_length(curve,stl_pc): 
+    # print('start point check')   
+    
+    if check_boundary(curve[0],stl_pc):
+        ###extend to fit on boundary
+        next_p=project_point_on_stl(2*curve[0]-curve[1],stl_pc)        
+
+        while check_boundary(next_p,stl_pc):
+            curve=np.insert(curve,0,copy.deepcopy(next_p),axis=0)
+            next_p=project_point_on_stl(2*curve[0]-curve[1],stl_pc)
+        start_idx=0
+
+    else:
+        ###shrink to fit on boundary
+        i=1
+        while not check_boundary(curve[i],stl_pc): 
+            i+=1
+            if i>len(curve)-1:
+                break
+        start_idx=i
+
+    # print('end point check')
+    if check_boundary(curve[-1],stl_pc):
+        ###extend to fit on boundary
+        next_p=project_point_on_stl(2*curve[-1]-curve[-2],stl_pc)
+        while check_boundary(next_p,stl_pc):
+            curve=np.append(curve,[copy.deepcopy(next_p)],axis=0)
+            next_p=project_point_on_stl(2*curve[-1]-curve[-2],stl_pc)
+
+        end_idx=len(curve)-1
+    else:
+        ###shrink to fit on boundary
+        i=len(curve)-1
+        while not check_boundary(curve[i],stl_pc): 
+            i-=1
+            if i<1:
+                break
+        end_idx=i
+    
+    # print(start_idx,end_idx)
+    return curve[start_idx:end_idx+1]
+
+def split_slices(curve,stl_pc):
+    indices=[]
+    continuous_count=0
+    continuous_threshold=0      ###more than x continuous points not on stl means a gap 
+    continuous_threshold2=1     ###curve must contain more than x points
+    for i in range(len(curve)):
+        if not check_boundary(curve[i],stl_pc):
+            if i-1 in indices:
+                continuous_count+=1
+            else:
+                continuous_count=0
+            indices.append(i)
+        else:
+            ###filter small gaps
+            if continuous_count<continuous_threshold and i-1 in indices:
+                indices=indices[:-(continuous_count+1)]
+    sub_curves=np.split(curve, indices)
+
+
+
+    sub_curves=[sub_curve for sub_curve in sub_curves if len(sub_curve) > continuous_threshold2]
+    for sub_curve in sub_curves:
+        print(len(sub_curve))
+    return sub_curves
 
 def slice(bottom_curve,stl_pc,direction,slice_height):
     direction=np.array([0,0,-1])
     bottom_curve_normal=get_curve_normal(bottom_curve,stl_pc,direction)
-    slice_all=[bottom_curve]
-    for i in range(50):
-        slice_all.append(slice_next_layer(slice_all[-1],stl_pc,direction,slice_height) )
+    slice_all=[[bottom_curve]]
+    for i in range(70):
+        print(i, 'th layer')
+        slice_ith_layer=[]
+        for x in range(len(slice_all[-1])):
+            curve_next=slice_next_layer(slice_all[-1][x],stl_pc,direction,slice_height)
+            if x==0 or x==len(slice_all[-1])-1: ###only extend or shrink if first or last segment for now, need to address later
+                curve_next=fit_to_length(curve_next,stl_pc)
+
+            slice_ith_layer.extend(split_slices(curve_next,stl_pc))
+
+        slice_all.append(slice_ith_layer)
 
     return slice_all
 
@@ -136,7 +237,8 @@ vis_step=5
 # ax.scatter(stl_pc[:,0], stl_pc[:,1], stl_pc[:,2], c='b', marker='o', label='Original points')
 
 for i in range(len(slice_all)):
-    ax.plot3D(slice_all[i][::vis_step,0],slice_all[i][::vis_step,1],slice_all[i][::vis_step,2],'r.-')
+    for x in range(len(slice_all[i])):
+        ax.plot3D(slice_all[i][x][::vis_step,0],slice_all[i][x][::vis_step,1],slice_all[i][x][::vis_step,2],'r.-')
 
 ax.set_xlabel('X')
 ax.set_ylabel('Y')
