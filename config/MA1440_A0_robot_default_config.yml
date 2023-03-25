@@ -5,7 +5,7 @@ device_info:
     name: YASKAWA
     uuid: 2561e825-f4b7-46ff-881d-3190a688f0c1
   model:
-    name: MA_1440_A0
+    name: MA1440_A0
     uuid: 2561e825-f4b7-46ff-881d-3190a688f0c2
   user_description: MOTOMAN Robot
   serial_number: 123456789
