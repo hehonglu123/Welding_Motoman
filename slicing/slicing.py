@@ -168,8 +168,8 @@ def fit_to_length(curve,stl_pc):
 def split_slices(curve,stl_pc):
     indices=[]
     continuous_count=0
-    continuous_threshold=0      ###more than x continuous points not on stl means a gap 
-    continuous_threshold2=1     ###curve must contain more than x points
+    continuous_threshold=1      ###more than x continuous points not on stl means a gap 
+    continuous_threshold2=2     ###curve must contain more than x points
     for i in range(len(curve)):
         if not check_boundary(curve[i],stl_pc):
             if i-1 in indices:

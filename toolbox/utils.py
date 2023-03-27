@@ -76,9 +76,16 @@ def direction2R(v_norm,v_tang):
 	v_norm=v_norm/np.linalg.norm(v_norm)
 	v_tang=VectorPlaneProjection(v_tang,v_norm)
 	y=np.cross(v_norm,v_tang)
-
+	y=y/np.linalg.norm(y)
 	R=np.vstack((v_tang,y,v_norm)).T
+	return R
 
+def direction2R_y(v_norm,v_tang):
+	v_norm=v_norm/np.linalg.norm(v_norm)
+	v_tang=VectorPlaneProjection(v_tang,v_norm)
+	x=np.cross(v_tang,v_norm)
+	x=x/np.linalg.norm(x)
+	R=np.vstack((x,v_tang,v_norm)).T
 	return R
 
 def LinePlaneCollision(planeNormal, planePoint, rayDirection, rayPoint, epsilon=1e-6):
