@@ -43,8 +43,8 @@ while True:
         print("")
         print("")
 
-        # timestamp.append(state.ts['microseconds'][0])
-        timestamp.append(time.time())
+        timestamp.append(state.ts['microseconds'][0])
+        # timestamp.append(time.time())
         voltage.append(state.welding_voltage)
         current.append(state.welding_current)
         feedrate.append(state.wire_speed)
