@@ -86,18 +86,30 @@ def project_point_onto_plane(point, normal, centroid):
 
     return projected_point
 
+def project_point_onto_triangle(point, a,b,c):
+    normal = np.cross(b - a, c - a)
+    normal /= np.linalg.norm(normal)
+    projected_point = point - np.dot(point - a, normal) * normal
+    return projected_point
+
 def project_point_on_stl(point,stl_pc):     ###project a point on stl surface
-    indices=np.argsort(np.linalg.norm(stl_pc-point,axis=1))[:10]
+    indices=np.argsort(np.linalg.norm(stl_pc-point,axis=1))[:50]
     normal,centroid=fit_plane(stl_pc[indices])
     return project_point_onto_plane(point,normal,centroid)
 
+    # indices=np.argsort(np.linalg.norm(stl_pc-point,axis=1))[:3]
+    # return project_point_onto_triangle(point,stl_pc[indices[0]],stl_pc[indices[1]],stl_pc[indices[2]])
+
 def slicing_uniform(stl_pc,z,threshold = 1e-6):
-
-    
-
     bottom_edge_vertices = stl_pc[np.where(np.abs(stl_pc[:,2] - z) <threshold)[0]]
 
     return bottom_edge_vertices
+
+def smooth_curve(curve):
+    lam=np.insert(np.cumsum(np.linalg.norm(np.diff(curve,axis=0),axis=1)),0,0)
+    polyfit=np.polyfit(lam,curve,deg=47)
+
+    return np.vstack((np.poly1d(polyfit[:,0])(lam), np.poly1d(polyfit[:,1])(lam), np.poly1d(polyfit[:,2])(lam))).T
 
 def get_curve_normal(curve,stl_pc,direction):
     ###provide the curve and complete stl point cloud, a rough normal direction
@@ -123,14 +135,30 @@ def slice_next_layer(curve,stl_pc,direction,slice_height):
 
     return np.array(slice_next)
 
-def fit_to_length(curve,stl_pc): 
+def split_slice1(curve):    
+    # Calculate distances between consecutive points
+    distances = np.sqrt(np.sum(np.diff(curve, axis=0) ** 2, axis=1))
+    threshold=5*np.average(distances)
+
+    # Find outlier indices
+    outlier_indices = np.where(distances > threshold)[0]
+    print('num outlier indices: ',len(outlier_indices))
+    if len(outlier_indices)>0:
+
+        return [curve[:outlier_indices[0]], curve[outlier_indices[-1]+1:]]
+
+    else:
+        return [curve]
+
+
+def fit_to_length(curve,stl_pc,threshold=1): 
     # print('start point check')   
     
     if check_boundary(curve[0],stl_pc):
         ###extend to fit on boundary
         next_p=project_point_on_stl(2*curve[0]-curve[1],stl_pc)        
 
-        while check_boundary(next_p,stl_pc):
+        while check_boundary(next_p,stl_pc) and np.linalg.norm(next_p-curve[0])<threshold:
             curve=np.insert(curve,0,copy.deepcopy(next_p),axis=0)
             next_p=project_point_on_stl(2*curve[0]-curve[1],stl_pc)
         start_idx=0
@@ -148,7 +176,7 @@ def fit_to_length(curve,stl_pc):
     if check_boundary(curve[-1],stl_pc):
         ###extend to fit on boundary
         next_p=project_point_on_stl(2*curve[-1]-curve[-2],stl_pc)
-        while check_boundary(next_p,stl_pc):
+        while check_boundary(next_p,stl_pc) and np.linalg.norm(next_p-curve[-1])<threshold:
             curve=np.append(curve,[copy.deepcopy(next_p)],axis=0)
             next_p=project_point_on_stl(2*curve[-1]-curve[-2],stl_pc)
 
@@ -181,6 +209,13 @@ def split_slices(curve,stl_pc):
             ###filter small gaps
             if continuous_count<continuous_threshold and i-1 in indices:
                 indices=indices[:-(continuous_count+1)]
+    
+    ###point distance thresholding
+    distances = np.sqrt(np.sum(np.diff(curve, axis=0) ** 2, axis=1))
+    threshold=10*np.average(distances)
+    # Find outlier indices
+    indices=np.hstack((np.array(indices),np.where(distances > threshold)[0])).astype(int)
+    ###split curve
     sub_curves=np.split(curve, indices)
 
 
@@ -194,15 +229,26 @@ def slice(bottom_curve,stl_pc,direction,slice_height):
     direction=np.array([0,0,-1])
     bottom_curve_normal=get_curve_normal(bottom_curve,stl_pc,direction)
     slice_all=[[bottom_curve]]
-    for i in range(70):
+    for i in range(92):
         print(i, 'th layer')
         slice_ith_layer=[]
         for x in range(len(slice_all[-1])):
+            ###push curve 1 layer up
             curve_next=slice_next_layer(slice_all[-1][x],stl_pc,direction,slice_height)
+
             if x==0 or x==len(slice_all[-1])-1: ###only extend or shrink if first or last segment for now, need to address later
                 curve_next=fit_to_length(curve_next,stl_pc)
 
-            slice_ith_layer.extend(split_slices(curve_next,stl_pc))
+            
+
+            ###split the curve based on projection error
+            sub_curves_next=split_slices(curve_next,stl_pc)
+
+            for j in range(len(sub_curves_next)):
+                sub_curves_next[j]=smooth_curve(sub_curves_next[j])
+            
+            slice_ith_layer.extend(sub_curves_next)
+
 
         slice_all.append(slice_ith_layer)
 
