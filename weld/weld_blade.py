@@ -94,6 +94,5 @@ for layer in range(num_layer_start,num_layer_end):
 		# client.SetArc(False)
 
     
-client.ProgEnd()
 timestamp,joint_recording=client.execute_motion_program("AAA.JBI") 
 np.savetxt('joint_recording.csv',np.hstack((timestamp.reshape(-1, 1),joint_recording)),delimiter=',')
