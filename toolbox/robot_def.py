@@ -20,7 +20,8 @@ ez=np.array([[0.],[0.],[1.]])
 
 class robot_obj(object):
 	###robot object class
-	def __init__(self,robot_name,def_path,tool_file_path='',base_transformation_file='',d=0,acc_dict_path='',pulse2deg_file_path=''):
+	def __init__(self,robot_name,def_path,tool_file_path='',base_transformation_file='',d=0,acc_dict_path='',pulse2deg_file_path='',
+				base_marker_config_file='',tool_marker_config_file=''):
 		#def_path: robot 			definition yaml file, name must include robot vendor
 		#tool_file_path: 			tool transformation to robot flange csv file
 		#base_transformation_file: 	base transformation to world frame csv file
@@ -79,6 +80,30 @@ class robot_obj(object):
 				q3_acc_p.append(value[5%len(value)])
 			self.q2q3_config=np.array([q2_config,q3_config]).T
 			self.q1q2q3_acc=np.array([q1_acc_n,q1_acc_p,q2_acc_n,q2_acc_p,q3_acc_n,q3_acc_p]).T
+		
+		### load mocap marker config
+		self.base_marker_config_file=base_marker_config_file
+		self.T_base_basemarker = None # T^base_basemaker
+		if len(base_marker_config_file)>0:
+			with open(base_marker_config_file,'r') as file:
+				marker_data = yaml.safe_load(file)
+				self.base_markers_id = marker_data['base_markers']
+				self.calib_markers_id = marker_data['calibration_markers']
+				if 'Calib_base_basemarker_pose' in marker_data.keys():
+					p = [marker_data['Calib_base_basemarker_pose']['position']['x'],
+						marker_data['Calib_base_basemarker_pose']['position']['y'],
+						marker_data['Calib_base_basemarker_pose']['position']['z']]
+					q = [marker_data['Calib_base_basemarker_pose']['position']['w'],
+						marker_data['Calib_base_basemarker_pose']['position']['x'],
+						marker_data['Calib_base_basemarker_pose']['position']['y'],
+						marker_data['Calib_base_basemarker_pose']['position']['z']]
+					self.T_base_basemarker = Transform(q2R(q),p)
+		self.tool_marker_config_file=tool_marker_config_file
+		self.T_tool_toolmarker = None # T^tool_toolmarker
+		if len(tool_marker_config_file)>0:
+			with open(tool_marker_config_file,'r') as file:
+				self.tool_markers = yaml.safe_load(file)
+				self.tool_markers_id = self.tool_markers.keys()
 
 	def get_acc(self,q_all,direction=[]):
 		###get acceleration limit from q config, assume last 3 joints acc fixed direction is 3 length vector, 0 is -, 1 is +

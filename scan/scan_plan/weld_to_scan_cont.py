@@ -151,6 +151,9 @@ robot_scan_notool=robot_obj('MA_1440_A0_notool',def_path=config_dir+'MA1440_A0_r
 turn_table=positioner_obj('D500B',def_path=config_dir+'D500B_robot_default_config.yml',tool_file_path=config_dir+'positioner_tcp.csv',\
     base_transformation_file=config_dir+'D500B_pose.csv',pulse2deg_file_path=config_dir+'D500B_pulse2deg.csv')
 
+print(robot_weld.fwd(np.array([0.,0.,0.,0.,0.,0.])))
+exit()
+
 ## sim or real robot
 sim=False
 
