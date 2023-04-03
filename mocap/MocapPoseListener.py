@@ -1,6 +1,10 @@
+import numpy as np
+from general_robotics_toolbox import *
 from RobotRaconteur.Client import *
+import time
+from threading import Thread
 
-class RRMocapClient():
+class MocapPoseListener():
     def __init__(self,rr_mocap,robots):
 
         self.rr_mocap = rr_mocap
@@ -59,4 +63,41 @@ class RRMocapClient():
 
     def run_pose_listener(self):
 
-        pass
+        # clear previous logged data
+        self.clear_traj()
+        # start a new collect point/pose thread
+        self.cp_thread = Thread( target = self.collect_point_thread)
+        self.collect_thread_end = False
+        self.cp_thread.start()
+
+    def stop_pose_listener(self):
+        
+        # end the thread
+        self.collect_thread_end = True
+        self.cp_thread.join()
+
+    def get_robots_traj(self):
+
+        return self.robots_traj_p,self.robots_traj_R,self.robots_traj_stamps
+
+if __name__=='__main__':
+
+    config_dir='../config/'
+    robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path=config_dir+'weldgun.csv',\
+	pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg.csv',\
+    base_marker_config_file=config_dir+'MA2010_marker_config.yaml',tool_marker_config_file=config_dir+'weldgun_marker_config.yaml')
+
+    mocap_url = 'rr+tcp://localhost:59823?service=optitrack_mocap'
+    mocap_url = mocap_url
+    mocap_cli = RRN.ConnectService(mocap_url)
+
+    mpl_obj = MocapPoseListener(mocap_cli,[robot_weld])
+    mpl_obj.run_pose_listener()
+    time.sleep(5)
+    mpl_obj.stop_pose_listener()
+    curve_p,curve_R,timestamps = mpl_obj.get_robots_traj()
+
+    ## robots traj
+    print('curve p:',curve_p[robot_weld.robot_name][:10])
+    print('curve R:',curve_R[robot_weld.robot_name][:10])
+    print('curve stamps:',timestamps[robot_weld.robot_name][:10])
