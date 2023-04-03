@@ -5,7 +5,7 @@ device_info:
     name: YASKAWA
     uuid: e2cba3d4-5fa3-11ed-9b6a-0242ac120001
   model:
-    name: MA_2010_A0
+    name: MA2010_A0
     uuid: e2cba3d4-5fa3-11ed-9b6a-0242ac120002
   user_description: MOTOMAN Robot
   serial_number: 123456789
@@ -112,8 +112,8 @@ joint_info:
   joint_identifier: joint_3
   joint_limits:
     effort: 1000.0
-    lower: -2.96705973
-    upper: 3.83972435
+    lower: -1.50098
+    upper: 2.79253
     velocity: 3.66519143
     acceleration: 15
   joint_type: revolute
