@@ -12,10 +12,10 @@ import time
 from fitting_3dcircle import fitting_3dcircle
 
 class CalibRobotBase:
-    def __init__(self,mocap_url,calib_marker_ids,base_marker_ids,j1_rough_axis_direction,j2_rough_axis_direction):
+    def __init__(self,mocap_cli,calib_marker_ids,base_marker_ids,j1_rough_axis_direction,j2_rough_axis_direction):
 
-        self.mocap_url = mocap_url
-        self.mocap_cli = RRN.ConnectService(self.mocap_url)
+        # self.mocap_url = mocap_url
+        self.mocap_cli = mocap_cli
         
         self.calib_marker_ids = calib_marker_ids
         self.base_markers_ids = base_marker_ids
@@ -59,7 +59,7 @@ class CalibRobotBase:
                     else:
                         last_position = np.array(list(self.marker_position_table[this_marker_id][-1]))
                         last_orientation = np.array(list(self.marker_orientation_table[this_marker_id][-1]))
-                        if np.linalg.norm(this_position-last_position)>=self.sample_threshold np.linalg.norm(this_orientation-last_orientation):
+                        if np.linalg.norm(this_position-last_position)>=self.sample_threshold or np.linalg.norm(this_orientation-last_orientation)>=self.sample_threshold:
                             self.marker_position_table[this_marker_id].append(this_position)
                             self.marker_orientation_table[this_marker_id].append(this_orientation)
         sensor_data_srv.Close()
@@ -178,10 +178,11 @@ if __name__=='__main__':
 	pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg.csv',base_marker_config_file=config_dir+'MA2010_marker_config.yaml')
 
     mocap_url = 'rr+tcp://localhost:59823?service=optitrack_mocap'
+    mocap_cli = RRN.ConnectService(mocap_url)
 
     j1_rough_axis_direction = np.array([0,1,0])
     j2_rough_axis_direction = np.array([1,0,0])
-    calib_obj = CalibRobotBase(mocap_url,robot_weld.calib_markers_id,robot_weld.base_markers_id,j1_rough_axis_direction,j2_rough_axis_direction)
+    calib_obj = CalibRobotBase(mocap_cli,robot_weld.calib_markers_id,robot_weld.base_markers_id,j1_rough_axis_direction,j2_rough_axis_direction)
 
     # start calibration
     calib_obj.run_calib()
