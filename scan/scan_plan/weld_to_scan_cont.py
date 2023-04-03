@@ -71,7 +71,7 @@ def robot_weld_path_gen_2():
     weld_p = np.array([[1651, -771, -255],[1651, -856, -255]])
 
     ## tune
-    dx = 0
+    dx = 20
     dy = 60
     dz = -15
     dp = np.array([dx,dy,dz])
@@ -152,7 +152,7 @@ turn_table=positioner_obj('D500B',def_path=config_dir+'D500B_robot_default_confi
     base_transformation_file=config_dir+'D500B_pose.csv',pulse2deg_file_path=config_dir+'D500B_pulse2deg.csv')
 
 print(robot_weld.fwd(np.array([0.,0.,0.,0.,0.,0.])))
-exit()
+# exit()
 
 ## sim or real robot
 sim=False
