@@ -9,16 +9,18 @@ from RobotRaconteur.Client import *
 from threading import Thread
 import numpy as np
 import time
+import yaml
 from fitting_3dcircle import fitting_3dcircle
 
 class CalibRobotBase:
-    def __init__(self,mocap_cli,calib_marker_ids,base_marker_ids,j1_rough_axis_direction,j2_rough_axis_direction):
+    def __init__(self,mocap_cli,calib_marker_ids,base_marker_ids,base_rigid_id,j1_rough_axis_direction,j2_rough_axis_direction):
 
         # self.mocap_url = mocap_url
         self.mocap_cli = mocap_cli
         
         self.calib_marker_ids = calib_marker_ids
         self.base_markers_ids = base_marker_ids
+        self.base_rigid_id = base_rigid_id
         self.clear_samples()
         self.sample_threshold = 0.3 # mm
 
@@ -50,7 +52,7 @@ class CalibRobotBase:
                 continue
             for i in range(len(data.fiducials.recognized_fiducials)):
                 this_marker_id = data.fiducials.recognized_fiducials[i].fiducial_marker
-                if this_marker_id in self.calib_marker_ids or this_marker_id in self.base_marker_ids:
+                if this_marker_id in self.calib_marker_ids or this_marker_id in self.base_marker_ids or this_marker_id==self.base_rigid_id:
                     this_position = np.array(list(data.fiducials.recognized_fiducials[i].pose.pose.pose[0]['position']))
                     this_orientation = np.array(list(data.fiducials.recognized_fiducials[i].pose.pose.pose[0]['orientation']))
                     if len(self.marker_position_table[this_marker_id]) == 0:
@@ -95,15 +97,13 @@ class CalibRobotBase:
 
         T_base_mocap = Transform(np.array([x_axis,y_axis,z_axis]).T,j1_center)
 
-        base_id = self.base_marker_ids[0].split('_')[0]
-
-        T_basemarker_mocap = Transform(q2R(self.marker_orientation_table[base_id][0]),self.self.marker_position_table[base_id][0])
+        T_basemarker_mocap = Transform(q2R(self.marker_orientation_table[self.base_rigid_id][0]),self.self.marker_position_table[self.base_rigid_id][0])
 
         T_base_basemarker = T_basemarker_mocap.inv()*T_base_mocap
 
         return T_base_mocap,T_base_basemarker
 
-    def run_calib(self):
+    def run_calib(self,base_marker_config_file):
 
         # check where's joint axis 1
         j1_thread = Thread( target = self.collect_point_thread)
@@ -140,16 +140,14 @@ class CalibRobotBase:
         print("total sample",len(self.marker_position_table[self.calib_marker_ids[0]]))
         j2_p,j2_normal = self.detect_axis(self.j2_rough_axis_direction)
 
-        for i in range(len(self.base_marker_ids)):
-            if len(self.marker_position_table[self.base_marker_ids[i]]) == 0:
-                base_thread = Thread( target = self.collect_point_thread)
-                self.collect_thread_end = False
-                time.sleep(3)
-                self.collect_thread_end = True
-                base_thread.join()
-        for i in range(len(self.base_marker_ids)):
-            if len(self.marker_position_table[self.base_marker_ids[i]]) == 0:
-                raise("problem!!! No base markers!")
+        if len(self.marker_position_table[self.base_rigid_id]) == 0:
+            base_thread = Thread( target = self.collect_point_thread)
+            self.collect_thread_end = False
+            time.sleep(3)
+            self.collect_thread_end = True
+            base_thread.join()
+        if len(self.marker_position_table[self.base_rigid_id]) == 0:
+            raise("problem!!! No base rigid!")
 
         T_base_mocap,T_base_basemarker = self.find_base(j1_p,j1_normal,j2_p,j2_normal) # T^base_mocap, T^base_basemarker
         T_base_H = H_from_RT(T_base_basemarker.R,T_base_basemarker.p)
@@ -182,7 +180,8 @@ if __name__=='__main__':
 
     j1_rough_axis_direction = np.array([0,1,0])
     j2_rough_axis_direction = np.array([1,0,0])
-    calib_obj = CalibRobotBase(mocap_cli,robot_weld.calib_markers_id,robot_weld.base_markers_id,j1_rough_axis_direction,j2_rough_axis_direction)
+    calib_obj = CalibRobotBase(mocap_cli,robot_weld.calib_markers_id,robot_weld.base_markers_id,robot_weld.base_rigid_id,j1_rough_axis_direction,j2_rough_axis_direction)
 
     # start calibration
-    calib_obj.run_calib()
+    # find transformation matrix from the base marker rigid body (defined in motiv) to the actual robot base
+    calib_obj.run_calib(config_dir+'MA2010_marker_config.yaml') # save calib config to file
