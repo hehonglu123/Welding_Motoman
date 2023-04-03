@@ -75,8 +75,4 @@ for j in range(1,len(breakpoints)):
     client.MoveL(np.degrees(curve_sliced_js[breakpoints[j]]), s1_all[j],target2=target2)
 client.SetArc(False)
 
-    
-
-
-client.ProgEnd()
 client.execute_motion_program("AAA.JBI") 

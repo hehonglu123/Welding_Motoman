@@ -5,6 +5,14 @@ from scipy.interpolate import interp1d
 from scipy import signal
 import scipy, math
 
+def find_norm(p1,p2,p3):
+	#find normal vector from p1 pointing to line of p2p3
+	p2p1=p2-p1
+	p3p1=p3-p1
+	p2p3=p2-p3
+	vec=np.cross(np.cross(p2p1,p3p1),p2p3)
+	return vec/np.linalg.norm(vec)
+
 def get_speed(curve_exe,timestamp):
 	d_curve_exe=np.gradient(curve_exe,axis=0)
 	speed=np.linalg.norm(d_curve_exe,axis=1)/np.gradient(timestamp)
@@ -68,9 +76,16 @@ def direction2R(v_norm,v_tang):
 	v_norm=v_norm/np.linalg.norm(v_norm)
 	v_tang=VectorPlaneProjection(v_tang,v_norm)
 	y=np.cross(v_norm,v_tang)
-
+	y=y/np.linalg.norm(y)
 	R=np.vstack((v_tang,y,v_norm)).T
+	return R
 
+def direction2R_y(v_norm,v_tang):
+	v_norm=v_norm/np.linalg.norm(v_norm)
+	v_tang=VectorPlaneProjection(v_tang,v_norm)
+	x=np.cross(v_tang,v_norm)
+	x=x/np.linalg.norm(x)
+	R=np.vstack((x,v_tang,v_norm)).T
 	return R
 
 def LinePlaneCollision(planeNormal, planePoint, rayDirection, rayPoint, epsilon=1e-6):
