@@ -41,14 +41,14 @@ class MocapPoseListener():
             for i in range(len(data.fiducials.recognized_fiducials)):
                 this_marker_id = data.fiducials.recognized_fiducials[i].fiducial_marker
                 for robot_name in range(len(self.robots.keys())):
-                    if this_marker_id == self.robots[robot_name].base_markers_id.split('_')[0]:
+                    if this_marker_id == self.robots[robot_name].base_rigid_id:
                         this_position = np.array(list(data.fiducials.recognized_fiducials[i].pose.pose.pose[0]['position']))
                         this_orientation = np.array(list(data.fiducials.recognized_fiducials[i].pose.pose.pose[0]['orientation']))
                         # (T^basemarker_world * T^base_basemarker).inv()
                         # T^world_base
                         self.robots_base[robot_name] = Transform(q2R(this_orientation),this_position)*self.robots[robot_name].T_base_basemarker
                         self.robots_base[robot_name] = self.robots_base[robot_name].inv()
-                    if this_marker_id == self.robots[robot_name].tool_markers_id.split('_')[0]:
+                    if this_marker_id == self.robots[robot_name].tool_rigid_id:
                         if self.robots_base[robot_name] is not None:
                             this_position = np.array(list(data.fiducials.recognized_fiducials[i].pose.pose.pose[0]['position']))
                             this_orientation = np.array(list(data.fiducials.recognized_fiducials[i].pose.pose.pose[0]['orientation']))
@@ -101,3 +101,4 @@ if __name__=='__main__':
     print('curve p:',curve_p[robot_weld.robot_name][:10])
     print('curve R:',curve_R[robot_weld.robot_name][:10])
     print('curve stamps:',timestamps[robot_weld.robot_name][:10])
+    
