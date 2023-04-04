@@ -214,6 +214,32 @@ class CalibRobotBase:
         print(T_base_basemarker)
         print("Done. Please check file:",base_marker_config_file)
 
+
+def calib_R2():
+
+    auto = True
+
+    config_dir='../config/'
+    robot=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.yml',tool_file_path=config_dir+'scanner_tcp2.csv',\
+	pulse2deg_file_path=config_dir+'MA1440_A0_pulse2deg.csv',base_marker_config_file=config_dir+'MA1440_marker_config.yaml')
+
+    mocap_url = 'rr+tcp://localhost:59823?service=optitrack_mocap'
+    mocap_cli = RRN.ConnectService(mocap_url)
+
+    j1_rough_axis_direction = np.array([0,1,0])
+    j2_rough_axis_direction = np.array([-1,0,0])
+    calib_obj = CalibRobotBase(mocap_cli,robot.calib_markers_id,robot.base_markers_id,robot.base_rigid_id,j1_rough_axis_direction,j2_rough_axis_direction)
+
+    q1_1=np.array([-21.2066,-23.0282,0,0,11,0])
+    q1_2=np.array([114.9,-23.0282,0,0,11,0])
+    q2_1=np.array([73,42,0,0,-48,0])
+    q2_2=np.array([73,-81,0,0,-48,0])
+    q_paths = [[q1_1,q1_2],[q2_1,q2_2]]
+
+    # start calibration
+    # find transformation matrix from the base marker rigid body (defined in motiv) to the actual robot base
+    calib_obj.run_calib(config_dir+'MA1440_marker_config.yaml',auto,'192.168.1.31','RB2',robot.pulse2deg,q_paths) # save calib config to file
+
 def calib_R1():
 
     auto = True
@@ -241,4 +267,5 @@ def calib_R1():
 
 if __name__=='__main__':
 
-    calib_R1()
+    # calib_R1()
+    calib_R2()
