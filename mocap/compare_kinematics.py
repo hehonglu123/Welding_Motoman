@@ -26,29 +26,36 @@ test_qs = np.array([[0.,0.,0.,0.,0.,0.],[0,69,57,0,0,0],[0,-68,-68,0,0,0],[-36.6
 mocap_url = 'rr+tcp://localhost:59823?service=optitrack_mocap'
 mocap_url = mocap_url
 mocap_cli = RRN.ConnectService(mocap_url)
-mpl_obj = MocapPoseListener(mocap_cli,[robot_weld])
+mpl_obj = MocapPoseListener(mocap_cli,[robot_weld],collect_base_stop=1e3)
+mpl_obj.run_pose_listener()
+time.sleep(5)
+mpl_obj.stop_pose_listener()
 
+repeats_N = 20
+rob_speed = 15
 all_robot_ctrl_pose = []
 all_robot_mocap_pose = []
-for test_q in test_qs:
-    # move robot
-    robot_client = MotionProgramExecClient(IP='192.168.1.31',ROBOT_CHOICE='RB1',pulse2deg=robot_weld.pulse2deg)
-    robot_client.MoveJ(test_q,5,0)
-    robot_client.ProgEnd()
-    robot_stamps,curve_exe = robot_client.execute_motion_program("AAA.JBI")
-    encoder_T = robot_weld.fwd(curve_exe[-1,:6])
-    all_robot_ctrl_pose.append(np.append(encoder_T.p,R2q(encoder_T.R)))
+for N in range(repeats_N):
+    print("N:",N)
+    for test_q in test_qs:
+        # move robot
+        robot_client = MotionProgramExecClient(IP='192.168.1.31',ROBOT_CHOICE='RB1',pulse2deg=robot_weld.pulse2deg)
+        robot_client.MoveJ(test_q,rob_speed,0)
+        robot_client.ProgEnd()
+        robot_stamps,curve_exe = robot_client.execute_motion_program("AAA.JBI")
+        encoder_T = robot_weld.fwd(curve_exe[-1,:6])
+        all_robot_ctrl_pose.append(np.append(encoder_T.p,R2q(encoder_T.R)))
 
-    mpl_obj.run_pose_listener()
-    time.sleep(1)
-    mpl_obj.stop_pose_listener()
-    curve_p,curve_R,timestamps = mpl_obj.get_robots_traj()
-    mocap_T = Transform(curve_R[robot_weld.robot_name][-1],curve_p[robot_weld.robot_name][-1])
-    all_robot_mocap_pose.append(np.append(mocap_T.p,R2q(mocap_T.R)))
+        mpl_obj.run_pose_listener()
+        time.sleep(0.1)
+        mpl_obj.stop_pose_listener()
+        curve_p,curve_R,timestamps = mpl_obj.get_robots_traj()
+        mocap_T = Transform(curve_R[robot_weld.robot_name][-1],curve_p[robot_weld.robot_name][-1])
+        all_robot_mocap_pose.append(np.append(mocap_T.p,R2q(mocap_T.R)))
 
 # move robot
 robot_client = MotionProgramExecClient(IP='192.168.1.31',ROBOT_CHOICE='RB1',pulse2deg=robot_weld.pulse2deg)
-robot_client.MoveJ(test_qs[2],5,0)
+robot_client.MoveJ(test_qs[2],rob_speed,0)
 robot_client.ProgEnd()
 robot_stamps,curve_exe = robot_client.execute_motion_program("AAA.JBI")
 encoder_T = robot_weld.fwd(curve_exe[-1,:6])
@@ -62,6 +69,6 @@ mocap_T = Transform(curve_R[robot_weld.robot_name][-1],curve_p[robot_weld.robot_
 print(encoder_T)
 print(mocap_T)
 
-np.savetxt('data/compare_results_ctrl.csv',all_robot_ctrl_pose,delimiter=',')
-np.savetxt('data/compare_results_mocap.csv',all_robot_mocap_pose,delimiter=',')
+np.savetxt('data/compare_results_ctrl_basefix.csv',all_robot_ctrl_pose,delimiter=',')
+np.savetxt('data/compare_results_mocap_basefix.csv',all_robot_mocap_pose,delimiter=',')
 

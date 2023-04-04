@@ -15,7 +15,7 @@ from fitting_3dcircle import fitting_3dcircle
 from dx200_motion_program_exec_client import *
 
 class CalibRobotBase:
-    def __init__(self,mocap_cli,calib_marker_ids,base_marker_ids,base_rigid_id,j1_rough_axis_direction,j2_rough_axis_direction):
+    def __init__(self,mocap_cli,calib_marker_ids,base_marker_ids,base_rigid_id,j1_rough_axis_direction,j2_rough_axis_direction,positioner=False):
 
         # self.mocap_url = mocap_url
         self.mocap_cli = mocap_cli
@@ -28,6 +28,7 @@ class CalibRobotBase:
 
         self.j1_rough_axis_direction=j1_rough_axis_direction
         self.j2_rough_axis_direction=j2_rough_axis_direction
+        self.positioner = positioner
 
         self.collect_markers = False
         self.collect_thread_end = True
@@ -98,16 +99,35 @@ class CalibRobotBase:
                                     -(j1_p-j2_p))
         j1_center = j1_p+ab_coefficient[0]*j1_normal
         j2_center = j2_p+ab_coefficient[1]*j2_normal
-        z_axis = j1_normal
-        x_axis = j2_center-j1_center
-        x_axis = x_axis-np.dot(x_axis,z_axis)*z_axis
-        x_axis = x_axis/np.linalg.norm(x_axis)
-        y_axis = np.cross(z_axis,x_axis)
-        y_axis = y_axis/np.linalg.norm(y_axis)
+
+        if not self.positioner: # robot axis definition
+            z_axis = j1_normal
+            y_axis = j2_normal
+            y_axis = y_axis-np.dot(y_axis,z_axis)*z_axis
+            y_axis = y_axis/np.linalg.norm(y_axis)
+            x_axis = np.cross(y_axis,z_axis)
+            x_axis = x_axis/np.linalg.norm(x_axis)
+
+            # x_axis = j2_center-j1_center
+            # x_axis = x_axis-np.dot(x_axis,z_axis)*z_axis
+            # x_axis = x_axis/np.linalg.norm(x_axis)
+            # y_axis = np.cross(z_axis,x_axis)
+            # y_axis = y_axis/np.linalg.norm(y_axis)
+        else: # positioner axis definition
+            z_axis = j2_normal
+            y_axis = j1_normal
+            y_axis = y_axis-np.dot(y_axis,z_axis)*z_axis
+            y_axis = y_axis/np.linalg.norm(y_axis)
+            x_axis = np.cross(y_axis,z_axis)
+            x_axis = x_axis/np.linalg.norm(x_axis)
 
         T_base_mocap = Transform(np.array([x_axis,y_axis,z_axis]).T,j1_center)
 
-        T_basemarker_mocap = Transform(q2R(self.marker_orientation_table[self.base_rigid_id][0]),np.mean(self.marker_position_table[self.base_rigid_id],axis=0))
+        base_orientation_rpy = []
+        for quat in self.marker_orientation_table[self.base_rigid_id]:
+            base_orientation_rpy.append(R2rpy(q2R(quat)))
+
+        T_basemarker_mocap = Transform(rpy2R(np.mean(base_orientation_rpy,axis=0)),np.mean(self.marker_position_table[self.base_rigid_id],axis=0))
 
         T_base_basemarker = T_basemarker_mocap.inv()*T_base_mocap
 
@@ -214,6 +234,30 @@ class CalibRobotBase:
         print(T_base_basemarker)
         print("Done. Please check file:",base_marker_config_file)
 
+def calib_S1():
+
+    auto = True
+
+    config_dir='../config/'
+    turn_table=positioner_obj('D500B',def_path=config_dir+'D500B_robot_default_config.yml',tool_file_path=config_dir+'positioner_tcp.csv'\
+        ,pulse2deg_file_path=config_dir+'D500B_pulse2deg.csv',base_marker_config_file=config_dir+'D500B_marker_config.yaml')
+
+    mocap_url = 'rr+tcp://localhost:59823?service=optitrack_mocap'
+    mocap_cli = RRN.ConnectService(mocap_url)
+
+    j1_rough_axis_direction = np.array([0,0,1])
+    j2_rough_axis_direction = np.array([0,1,0])
+    calib_obj = CalibRobotBase(mocap_cli,turn_table.calib_markers_id,turn_table.base_markers_id,turn_table.base_rigid_id,j1_rough_axis_direction,j2_rough_axis_direction)
+
+    q1_1=np.array([-15,180])
+    q1_2=np.array([-15,180])
+    q2_1=np.array([-15,180])
+    q2_2=np.array([-15,180])
+    q_paths = [[q1_1,q1_2],[q2_1,q2_2]]
+
+    # start calibration
+    # find transformation matrix from the base marker rigid body (defined in motiv) to the actual robot base
+    calib_obj.run_calib(config_dir+'MA1440_marker_config.yaml',auto,'192.168.1.31','ST1',turn_table.pulse2deg,q_paths) # save calib config to file
 
 def calib_R2():
 
@@ -267,5 +311,5 @@ def calib_R1():
 
 if __name__=='__main__':
 
-    # calib_R1()
-    calib_R2()
+    calib_R1()
+    # calib_R2()
