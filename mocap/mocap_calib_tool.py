@@ -154,6 +154,21 @@ class CalibRobotTool:
         print(T_tool_toolmarker)
         print("Done. Please check file:",tool_marker_config_file)
 
+def calib_scanner():
+
+    config_dir='../config/'
+    robot=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.yml',tool_file_path=config_dir+'scanner_tcp2.csv',\
+	pulse2deg_file_path=config_dir+'MA1440_A0_pulse2deg.csv',\
+    base_marker_config_file=config_dir+'MA1440_marker_config.yaml',tool_marker_config_file=config_dir+'scanner_marker_config.yaml')
+
+    mocap_url = 'rr+tcp://localhost:59823?service=optitrack_mocap'
+    mocap_cli = RRN.ConnectService(mocap_url)
+
+    calib_obj = CalibRobotTool(mocap_cli,robot.tool_markers,robot.tool_markers_id,robot.tool_rigid_id)
+
+    # start calibration
+    calib_obj.run_calib(config_dir+'scanner_marker_config.yaml')
+
 def calib_weldgun():
 
     config_dir='../config/'
@@ -171,4 +186,5 @@ def calib_weldgun():
 
 if __name__=='__main__':
 
-    calib_weldgun()
+    # calib_weldgun()
+    calib_scanner()
