@@ -10,16 +10,18 @@ from error_check import *
 from path_calc import *
 
 def main():
-	
-	curve=np.loadtxt('tenth_scale_blade_gcode.csv',delimiter=',')
-	print(curve.shape)
-
 	vis_step=5
 	fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
 	
 
 
-	ax.plot3D(curve[::vis_step,0],curve[::vis_step,1],curve[::vis_step,2],'r.-')
+	
+	for i in range(1,90):
+		print(i)
+		slice_i=np.loadtxt(str(i)+'.csv',delimiter=',')
+		ax.plot3D(slice_i[::vis_step,0],slice_i[::vis_step,1],slice_i[::vis_step,2],'r.-')
+
+	
 	# ax.quiver(curve[::vis_step,0],curve[::vis_step,1],curve[::vis_step,2],curve[::vis_step,0],curve[::vis_step,1],curve[::vis_step,2],length=0.3, normalize=True)
 
 	plt.show()
