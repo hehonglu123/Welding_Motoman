@@ -144,6 +144,8 @@ config_dir='../../config/'
 
 robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path=config_dir+'weldgun.csv',\
 	pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg.csv')
+# robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path=config_dir+'weldgun.csv',d=15,\
+# 	pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg.csv')
 robot_scan=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.yml',tool_file_path=config_dir+'scanner_tcp2.csv',\
 	base_transformation_file=config_dir+'MA1440_pose_fake.csv',pulse2deg_file_path=config_dir+'MA1440_A0_pulse2deg.csv')
 robot_scan_notool=robot_obj('MA_1440_A0_notool',def_path=config_dir+'MA1440_A0_robot_default_config.yml',\
