@@ -88,24 +88,34 @@ class robot_obj(object):
 			with open(base_marker_config_file,'r') as file:
 				marker_data = yaml.safe_load(file)
 				self.base_markers_id = marker_data['base_markers']
-				self.base_rigid_id = self.base_markers_id[0].split('_')[0]
+				self.base_rigid_id = self.base_markers_id[0].split('_')[1]
 				self.calib_markers_id = marker_data['calibration_markers']
-				if 'Calib_base_basemarker_pose' in marker_data.keys():
-					p = [marker_data['Calib_base_basemarker_pose']['position']['x'],
-						marker_data['Calib_base_basemarker_pose']['position']['y'],
-						marker_data['Calib_base_basemarker_pose']['position']['z']]
-					q = [marker_data['Calib_base_basemarker_pose']['position']['w'],
-						marker_data['Calib_base_basemarker_pose']['position']['x'],
-						marker_data['Calib_base_basemarker_pose']['position']['y'],
-						marker_data['Calib_base_basemarker_pose']['position']['z']]
+				if 'calib_base_basemarker_pose' in marker_data.keys():
+					p = [marker_data['calib_base_basemarker_pose']['position']['x'],
+						marker_data['calib_base_basemarker_pose']['position']['y'],
+						marker_data['calib_base_basemarker_pose']['position']['z']]
+					q = [marker_data['calib_base_basemarker_pose']['orientation']['w'],
+						marker_data['calib_base_basemarker_pose']['orientation']['x'],
+						marker_data['calib_base_basemarker_pose']['orientation']['y'],
+						marker_data['calib_base_basemarker_pose']['orientation']['z']]
 					self.T_base_basemarker = Transform(q2R(q),p)
 		self.tool_marker_config_file=tool_marker_config_file
 		self.T_tool_toolmarker = None # T^tool_toolmarker
 		if len(tool_marker_config_file)>0:
 			with open(tool_marker_config_file,'r') as file:
-				self.tool_markers = yaml.safe_load(file)
-				self.tool_markers_id = self.tool_markers.keys()
-				self.tool_rigid_id = self.tool_markers_id[0].split('_')[0]
+				marker_data = yaml.safe_load(file)
+				self.tool_markers = marker_data['tool_markers']
+				self.tool_markers_id = list(self.tool_markers.keys())
+				self.tool_rigid_id = self.tool_markers_id[0].split('_')[1]
+				if 'calib_tool_toolmarker_pose' in marker_data.keys():
+					p = [marker_data['calib_tool_toolmarker_pose']['position']['x'],
+						marker_data['calib_tool_toolmarker_pose']['position']['y'],
+						marker_data['calib_tool_toolmarker_pose']['position']['z']]
+					q = [marker_data['calib_tool_toolmarker_pose']['orientation']['w'],
+						marker_data['calib_tool_toolmarker_pose']['orientation']['x'],
+						marker_data['calib_tool_toolmarker_pose']['orientation']['y'],
+						marker_data['calib_tool_toolmarker_pose']['orientation']['z']]
+					self.T_tool_toolmarker = Transform(q2R(q),p)
 
 	def get_acc(self,q_all,direction=[]):
 		###get acceleration limit from q config, assume last 3 joints acc fixed direction is 3 length vector, 0 is -, 1 is +
