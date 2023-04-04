@@ -186,7 +186,8 @@ class robot_obj(object):
 
 class positioner_obj(object):
 	###robot object class
-	def __init__(self,robot_name,def_path,tool_file_path='',base_transformation_file='',d=0,acc_dict_path='',pulse2deg_file_path=''):
+	def __init__(self,robot_name,def_path,tool_file_path='',base_transformation_file='',d=0,acc_dict_path='',pulse2deg_file_path='',\
+				base_marker_config_file='',tool_marker_config_file=''):
 		#def_path: robot 			definition yaml file, name must include robot vendor
 		#tool_file_path: 			tool transformation to robot flange csv file
 		#base_transformation_file: 	base transformation to world frame csv file
@@ -222,6 +223,42 @@ class positioner_obj(object):
 		self.lower_limit=self.robot.joint_lower_limit 
 		self.joint_vel_limit=self.robot.joint_vel_limit 
 		self.joint_acc_limit=self.robot.joint_acc_limit
+
+		### load mocap marker config
+		self.base_marker_config_file=base_marker_config_file
+		self.T_base_basemarker = None # T^base_basemaker
+		if len(base_marker_config_file)>0:
+			with open(base_marker_config_file,'r') as file:
+				marker_data = yaml.safe_load(file)
+				self.base_markers_id = marker_data['base_markers']
+				self.base_rigid_id = self.base_markers_id[0].split('_')[1]
+				self.calib_markers_id = marker_data['calibration_markers']
+				if 'calib_base_basemarker_pose' in marker_data.keys():
+					p = [marker_data['calib_base_basemarker_pose']['position']['x'],
+						marker_data['calib_base_basemarker_pose']['position']['y'],
+						marker_data['calib_base_basemarker_pose']['position']['z']]
+					q = [marker_data['calib_base_basemarker_pose']['orientation']['w'],
+						marker_data['calib_base_basemarker_pose']['orientation']['x'],
+						marker_data['calib_base_basemarker_pose']['orientation']['y'],
+						marker_data['calib_base_basemarker_pose']['orientation']['z']]
+					self.T_base_basemarker = Transform(q2R(q),p)
+		self.tool_marker_config_file=tool_marker_config_file
+		self.T_tool_toolmarker = None # T^tool_toolmarker
+		if len(tool_marker_config_file)>0:
+			with open(tool_marker_config_file,'r') as file:
+				marker_data = yaml.safe_load(file)
+				self.tool_markers = marker_data['tool_markers']
+				self.tool_markers_id = list(self.tool_markers.keys())
+				self.tool_rigid_id = self.tool_markers_id[0].split('_')[1]
+				if 'calib_tool_toolmarker_pose' in marker_data.keys():
+					p = [marker_data['calib_tool_toolmarker_pose']['position']['x'],
+						marker_data['calib_tool_toolmarker_pose']['position']['y'],
+						marker_data['calib_tool_toolmarker_pose']['position']['z']]
+					q = [marker_data['calib_tool_toolmarker_pose']['orientation']['w'],
+						marker_data['calib_tool_toolmarker_pose']['orientation']['x'],
+						marker_data['calib_tool_toolmarker_pose']['orientation']['y'],
+						marker_data['calib_tool_toolmarker_pose']['orientation']['z']]
+					self.T_tool_toolmarker = Transform(q2R(q),p)
 
 	def fwd(self,q_all,world=False,qlim_override=False):
 		###robot forworld kinematics
