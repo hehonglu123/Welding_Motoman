@@ -3,6 +3,7 @@ import sys
 sys.path.append('../toolbox/')
 sys.path.append('../redundancy_resolution/')
 from utils import *
+from robot_def import * 
 
 from general_robotics_toolbox import *
 from RobotRaconteur.Client import *
@@ -11,6 +12,7 @@ import numpy as np
 import time
 import yaml
 from fitting_3dcircle import fitting_3dcircle
+from dx200_motion_program_exec_client import *
 
 class CalibRobotBase:
     def __init__(self,mocap_cli,calib_marker_ids,base_marker_ids,base_rigid_id,j1_rough_axis_direction,j2_rough_axis_direction):
@@ -27,18 +29,21 @@ class CalibRobotBase:
         self.j1_rough_axis_direction=j1_rough_axis_direction
         self.j2_rough_axis_direction=j2_rough_axis_direction
 
+        self.collect_markers = False
         self.collect_thread_end = True
     
     def clear_samples(self):
 
         self.marker_position_table = {}
         self.marker_orientation_table = {}
-        for i in range(len(self.calib_marker_ids)):
-            self.marker_position_table[self.calib_marker_ids[i]]=[]
-            self.marker_orientation_table[self.calib_marker_ids[i]]=[]
-        for i in range(len(self.base_markers_ids)):
-            self.marker_position_table[self.base_markers_ids[i]]=[]
-            self.marker_orientation_table[self.base_markers_ids[i]]=[]
+        for marker_id in self.calib_marker_ids:
+            self.marker_position_table[marker_id]=[]
+            self.marker_orientation_table[marker_id]=[]
+        for marker_id in self.base_markers_ids:
+            self.marker_position_table[marker_id]=[]
+            self.marker_orientation_table[marker_id]=[]
+        self.marker_position_table[self.base_rigid_id]=[]
+        self.marker_orientation_table[self.base_rigid_id]=[]
 
     def collect_point_thread(self):
         
@@ -50,20 +55,25 @@ class CalibRobotBase:
                 data = sensor_data_srv.ReceivePacketWait(timeout=10)
             except:
                 continue
-            for i in range(len(data.fiducials.recognized_fiducials)):
-                this_marker_id = data.fiducials.recognized_fiducials[i].fiducial_marker
-                if this_marker_id in self.calib_marker_ids or this_marker_id in self.base_marker_ids or this_marker_id==self.base_rigid_id:
-                    this_position = np.array(list(data.fiducials.recognized_fiducials[i].pose.pose.pose[0]['position']))
-                    this_orientation = np.array(list(data.fiducials.recognized_fiducials[i].pose.pose.pose[0]['orientation']))
-                    if len(self.marker_position_table[this_marker_id]) == 0:
+            if self.collect_markers:
+                for i in range(len(data.fiducials.recognized_fiducials)):
+                    this_marker_id = data.fiducials.recognized_fiducials[i].fiducial_marker
+                    if this_marker_id in self.calib_marker_ids or this_marker_id in self.base_markers_ids or this_marker_id==self.base_rigid_id:
+                        this_position = np.array(list(data.fiducials.recognized_fiducials[i].pose.pose.pose[0]['position']))
+                        this_orientation = np.array(list(data.fiducials.recognized_fiducials[i].pose.pose.pose[0]['orientation']))
+                        if np.all(this_position == np.array([0.,0.,0.])):
+                            continue
+                        # if len(self.marker_position_table[this_marker_id]) == 0:
+                        #     self.marker_position_table[this_marker_id].append(this_position)
+                        #     self.marker_orientation_table[this_marker_id].append(this_orientation)
+                        # else:
+                        #     last_position = np.array(list(self.marker_position_table[this_marker_id][-1]))
+                        #     last_orientation = np.array(list(self.marker_orientation_table[this_marker_id][-1]))
+                        #     if np.linalg.norm(this_position-last_position)>=self.sample_threshold or np.linalg.norm(this_orientation-last_orientation)>=self.sample_threshold:
+                        #         self.marker_position_table[this_marker_id].append(this_position)
+                        #         self.marker_orientation_table[this_marker_id].append(this_orientation)
                         self.marker_position_table[this_marker_id].append(this_position)
                         self.marker_orientation_table[this_marker_id].append(this_orientation)
-                    else:
-                        last_position = np.array(list(self.marker_position_table[this_marker_id][-1]))
-                        last_orientation = np.array(list(self.marker_orientation_table[this_marker_id][-1]))
-                        if np.linalg.norm(this_position-last_position)>=self.sample_threshold or np.linalg.norm(this_orientation-last_orientation)>=self.sample_threshold:
-                            self.marker_position_table[this_marker_id].append(this_position)
-                            self.marker_orientation_table[this_marker_id].append(this_orientation)
         sensor_data_srv.Close()
         # print("end thread")
     def detect_axis(self,rough_axis_direction):
@@ -97,24 +107,41 @@ class CalibRobotBase:
 
         T_base_mocap = Transform(np.array([x_axis,y_axis,z_axis]).T,j1_center)
 
-        T_basemarker_mocap = Transform(q2R(self.marker_orientation_table[self.base_rigid_id][0]),self.self.marker_position_table[self.base_rigid_id][0])
+        T_basemarker_mocap = Transform(q2R(self.marker_orientation_table[self.base_rigid_id][0]),np.mean(self.marker_position_table[self.base_rigid_id],axis=0))
 
         T_base_basemarker = T_basemarker_mocap.inv()*T_base_mocap
 
         return T_base_mocap,T_base_basemarker
 
-    def run_calib(self,base_marker_config_file):
+    def run_calib(self,base_marker_config_file,auto=False,rob_IP=None,ROBOT_CHOICE=None,rob_p2d=None,paths=[],rob_speed=3):
 
         # check where's joint axis 1
-        j1_thread = Thread( target = self.collect_point_thread)
+        self.clear_samples()
+        cp_thread = Thread( target = self.collect_point_thread,daemon=True)
         self.collect_thread_end = False
-        input("Press Enter and start moving J1")
+        cp_thread.start()
+        input("Press Enter and start moving ONLY J1")
         time.sleep(0.5)
-        j1_thread.start()
-        input("Press Enter if you collect enough samples")
+        if auto:
+            print("Robot is collecting samples")
+            # move robot to start
+            client=MotionProgramExecClient(IP=rob_IP,ROBOT_CHOICE=ROBOT_CHOICE,pulse2deg=rob_p2d)
+            client.MoveJ(paths[0][0],rob_speed,0)
+            client.ProgEnd()
+            client.execute_motion_program("AAA.JBI")
+            # collect data
+            self.collect_markers = True
+            time.sleep(0.5)
+            client=MotionProgramExecClient(IP=rob_IP,ROBOT_CHOICE=ROBOT_CHOICE,pulse2deg=rob_p2d)
+            client.MoveJ(paths[0][1],rob_speed,0)
+            client.MoveJ(paths[0][0],rob_speed,0)
+            client.ProgEnd()
+            client.execute_motion_program("AAA.JBI")
+        else:
+            self.collect_markers = True
+            input("Press Enter if you collect enough samples")
         time.sleep(0.5)
-        self.collect_thread_end = True
-        j1_thread.join()
+        self.collect_markers = False
         for i in range(len(self.calib_marker_ids)):
             if len(self.marker_position_table[self.calib_marker_ids[i]]) == 0:
                 raise("problem!!! No J1 Calib markers!")
@@ -125,15 +152,29 @@ class CalibRobotBase:
         if len(self.marker_position_table[self.calib_marker_ids[0]]) != 0:
             raise("problem!!! Did not clear J1 Calib markers")
         # check where's joint axis 2
-        j2_thread = Thread( target = self.collect_point_thread)
-        self.collect_thread_end = False
-        input("Press Enter and start moving J2")
+        input("Press Enter and start moving ONLY J2")
         time.sleep(0.5)
-        j2_thread.start()
-        input("Press Enter if you collect enough samples")
+        if auto:
+            print("Robot is collecting samples")
+            # move robot to start
+            client=MotionProgramExecClient(IP=rob_IP,ROBOT_CHOICE=ROBOT_CHOICE,pulse2deg=rob_p2d)
+            client.MoveJ(paths[1][0],rob_speed,0)
+            client.ProgEnd()
+            client.execute_motion_program("AAA.JBI")
+            # collect data
+            self.collect_markers = True
+            time.sleep(0.5)
+            client=MotionProgramExecClient(IP=rob_IP,ROBOT_CHOICE=ROBOT_CHOICE,pulse2deg=rob_p2d)
+            client.MoveJ(paths[1][0],rob_speed,0)
+            client.MoveJ(paths[1][1],rob_speed,0)
+            client.MoveJ(paths[1][0],rob_speed,0)
+            client.ProgEnd()
+            client.execute_motion_program("AAA.JBI")
+        else:
+            self.collect_markers = True
+            input("Press Enter if you collect enough samples")
         time.sleep(0.5)
-        self.collect_thread_end = True
-        j2_thread.join()
+        self.collect_markers = False
         for i in range(len(self.calib_marker_ids)):
             if len(self.marker_position_table[self.calib_marker_ids[i]]) == 0:
                 raise("problem!!! No J2 Calib markers!")
@@ -141,11 +182,9 @@ class CalibRobotBase:
         j2_p,j2_normal = self.detect_axis(self.j2_rough_axis_direction)
 
         if len(self.marker_position_table[self.base_rigid_id]) == 0:
-            base_thread = Thread( target = self.collect_point_thread)
-            self.collect_thread_end = False
+            self.collect_markers = True
             time.sleep(3)
-            self.collect_thread_end = True
-            base_thread.join()
+            self.collect_markers = False
         if len(self.marker_position_table[self.base_rigid_id]) == 0:
             raise("problem!!! No base rigid!")
 
@@ -154,22 +193,30 @@ class CalibRobotBase:
 
         with open(base_marker_config_file,'r') as file:
             base_marker_data = yaml.safe_load(file)
-        base_marker_data['Calib_base_basemarker_pose'] = {}
-        base_marker_data['Calib_base_basemarker_pose']['position'] = {}
-        base_marker_data['Calib_base_basemarker_pose']['position']['x'] = T_base_basemarker.p[0]
-        base_marker_data['Calib_base_basemarker_pose']['position']['y'] = T_base_basemarker.p[0]
-        base_marker_data['Calib_base_basemarker_pose']['position']['z'] = T_base_basemarker.p[0]
+        base_marker_data['calib_base_basemarker_pose'] = {}
+        base_marker_data['calib_base_basemarker_pose']['position'] = {}
+        base_marker_data['calib_base_basemarker_pose']['position']['x'] = float(T_base_basemarker.p[0])
+        base_marker_data['calib_base_basemarker_pose']['position']['y'] = float(T_base_basemarker.p[1])
+        base_marker_data['calib_base_basemarker_pose']['position']['z'] = float(T_base_basemarker.p[2])
         quat = R2q(T_base_basemarker.R)
-        base_marker_data['Calib_base_basemarker_pose']['orientation'] = {}
-        base_marker_data['Calib_base_basemarker_pose']['orientation']['w'] = quat[0]
-        base_marker_data['Calib_base_basemarker_pose']['orientation']['x'] = quat[1]
-        base_marker_data['Calib_base_basemarker_pose']['orientation']['y'] = quat[2]
-        base_marker_data['Calib_base_basemarker_pose']['orientation']['z'] = quat[3]
+        base_marker_data['calib_base_basemarker_pose']['orientation'] = {}
+        base_marker_data['calib_base_basemarker_pose']['orientation']['w'] = float(quat[0])
+        base_marker_data['calib_base_basemarker_pose']['orientation']['x'] = float(quat[1])
+        base_marker_data['calib_base_basemarker_pose']['orientation']['y'] = float(quat[2])
+        base_marker_data['calib_base_basemarker_pose']['orientation']['z'] = float(quat[3])
 
         with open(base_marker_config_file,'w') as file:
-            yaml.safe_load(base_marker_data,file)
+            yaml.safe_dump(base_marker_data,file)
+        
+        self.collect_thread_end=True
+        cp_thread.join()
+        print("Result T_base_basemarker:")
+        print(T_base_basemarker)
+        print("Done. Please check file:",base_marker_config_file)
 
-if __name__=='__main__':
+def calib_R1():
+
+    auto = True
 
     config_dir='../config/'
     robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path=config_dir+'weldgun.csv',\
@@ -182,6 +229,16 @@ if __name__=='__main__':
     j2_rough_axis_direction = np.array([1,0,0])
     calib_obj = CalibRobotBase(mocap_cli,robot_weld.calib_markers_id,robot_weld.base_markers_id,robot_weld.base_rigid_id,j1_rough_axis_direction,j2_rough_axis_direction)
 
+    q1_1=np.array([-42.6985,-50.2617,-9.1801,0,-47.6771,0])
+    q1_2=np.array([95.1139,-50.2617,-9.1801,0,-47.6771,0])
+    q2_1=np.array([0.4003,-60.2277,-9.1801,0,-47.6771,0])
+    q2_2=np.array([0.4003,22.1919,-9.1801,0,-47.6771,0])
+    q_paths = [[q1_1,q1_2],[q2_1,q2_2]]
+
     # start calibration
     # find transformation matrix from the base marker rigid body (defined in motiv) to the actual robot base
-    calib_obj.run_calib(config_dir+'MA2010_marker_config.yaml') # save calib config to file
+    calib_obj.run_calib(config_dir+'MA2010_marker_config.yaml',auto,'192.168.1.31','RB1',robot_weld.pulse2deg,q_paths) # save calib config to file
+
+if __name__=='__main__':
+
+    calib_R1()
