@@ -224,6 +224,17 @@ class CalibRobotBase:
         base_marker_data['calib_base_basemarker_pose']['orientation']['x'] = float(quat[1])
         base_marker_data['calib_base_basemarker_pose']['orientation']['y'] = float(quat[2])
         base_marker_data['calib_base_basemarker_pose']['orientation']['z'] = float(quat[3])
+        base_marker_data['calib_base_mocap_pose'] = {}
+        base_marker_data['calib_base_mocap_pose']['position'] = {}
+        base_marker_data['calib_base_mocap_pose']['position']['x'] = float(T_base_mocap.p[0])
+        base_marker_data['calib_base_mocap_pose']['position']['y'] = float(T_base_mocap.p[1])
+        base_marker_data['calib_base_mocap_pose']['position']['z'] = float(T_base_mocap.p[2])
+        quat = R2q(T_base_mocap.R)
+        base_marker_data['calib_base_mocap_pose']['orientation'] = {}
+        base_marker_data['calib_base_mocap_pose']['orientation']['w'] = float(quat[0])
+        base_marker_data['calib_base_mocap_pose']['orientation']['x'] = float(quat[1])
+        base_marker_data['calib_base_mocap_pose']['orientation']['y'] = float(quat[2])
+        base_marker_data['calib_base_mocap_pose']['orientation']['z'] = float(quat[3])
 
         with open(base_marker_config_file,'w') as file:
             yaml.safe_dump(base_marker_data,file)

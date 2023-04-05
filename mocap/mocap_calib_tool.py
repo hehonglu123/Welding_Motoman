@@ -11,7 +11,7 @@ from threading import Thread
 import numpy as np
 import time
 import yaml
-from fitting_3dcircle import fitting_3dcircle
+from dx200_motion_program_exec_client import *
 
 class CalibRobotTool:
     def __init__(self,mocap_cli,tool_markers,tool_marker_ids,tool_rigid_id):
@@ -116,21 +116,40 @@ class CalibRobotTool:
 
         return T_tool_toolmarker
 
-    def run_calib(self,tool_marker_config_file):
+    def run_calib(self,tool_marker_config_file,auto=False,rob_IP=None,ROBOT_CHOICE=None,rob_p2d=None,paths=[],rob_speed=3):
 
-        input("Please move the tool to be seen by as many camera as possible.")
+        input("Enter to start calibrate tool")
         cp_thread = Thread( target = self.collect_point_thread,daemon=True)
         self.collect_thread_end = False
-        self.collect_markers = True
-        # 
         cp_thread.start()
-        time.sleep(3)
+        if auto:
+            print("Robot is collecting samples")
+            # move robot to start
+            client=MotionProgramExecClient(IP=rob_IP,ROBOT_CHOICE=ROBOT_CHOICE,pulse2deg=rob_p2d)
+            client.MoveJ(paths[0],rob_speed,0)
+            client.ProgEnd()
+            client.execute_motion_program("AAA.JBI")
+            # collect data
+            self.collect_markers = True
+            time.sleep(0.5)
+            client=MotionProgramExecClient(IP=rob_IP,ROBOT_CHOICE=ROBOT_CHOICE,pulse2deg=rob_p2d)
+            for i in range(1,len(paths)):
+                client.MoveJ(paths[i],rob_speed,0)
+            client.MoveJ(paths[0],rob_speed,0)
+            client.ProgEnd()
+            client.execute_motion_program("AAA.JBI")
+        else:
+            input("Please move the tool to be seen by as many camera as possible.")
+            self.collect_markers = True
+            # 
+            time.sleep(3)
+        
         self.collect_markers = False
         self.collect_thread_end = True
         cp_thread.join()
         for tool_marker_id in self.tool_marker_ids:
             if len(self.marker_position_table[tool_marker_id]) == 0:
-                raise("problem!!! No base markers!")
+                raise("problem!!! No tool markers!")
 
         T_tool_toolmarker = self.find_tool() # T^base_mocap, T^tool_toolmarker
 
@@ -171,6 +190,8 @@ def calib_scanner():
 
 def calib_weldgun():
 
+    auto = True
+
     config_dir='../config/'
     robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path=config_dir+'weldgun.csv',\
 	pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg.csv',\
@@ -181,10 +202,15 @@ def calib_weldgun():
 
     calib_obj = CalibRobotTool(mocap_cli,robot_weld.tool_markers,robot_weld.tool_markers_id,robot_weld.tool_rigid_id)
 
+    q1=np.array([0,-68,-68,0,0,0])
+    q2=np.array([-36.6018,12.4119,-12.1251,-43.3579,-45.4297,68.1203])
+    q3=np.array([21.0753,-1.8803,-27.3509,13.1122,-25.1173,-25.2466])
+    q_paths=[q1,q2,q3]
+
     # start calibration
-    calib_obj.run_calib(config_dir+'weldgun_marker_config.yaml')
+    calib_obj.run_calib(config_dir+'weldgun_marker_config.yaml',auto,'192.168.1.31','RB1',robot_weld.pulse2deg,q_paths)
 
 if __name__=='__main__':
 
-    # calib_weldgun()
-    calib_scanner()
+    calib_weldgun()
+    # calib_scanner()

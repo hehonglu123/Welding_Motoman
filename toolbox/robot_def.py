@@ -84,6 +84,7 @@ class robot_obj(object):
 		### load mocap marker config
 		self.base_marker_config_file=base_marker_config_file
 		self.T_base_basemarker = None # T^base_basemaker
+		self.T_base_mocap = None # T^base_mocap
 		if len(base_marker_config_file)>0:
 			with open(base_marker_config_file,'r') as file:
 				marker_data = yaml.safe_load(file)
@@ -99,6 +100,15 @@ class robot_obj(object):
 						marker_data['calib_base_basemarker_pose']['orientation']['y'],
 						marker_data['calib_base_basemarker_pose']['orientation']['z']]
 					self.T_base_basemarker = Transform(q2R(q),p)
+				if 'calib_base_mocap_pose' in marker_data.keys():
+					p = [marker_data['calib_base_mocap_pose']['position']['x'],
+						marker_data['calib_base_mocap_pose']['position']['y'],
+						marker_data['calib_base_mocap_pose']['position']['z']]
+					q = [marker_data['calib_base_mocap_pose']['orientation']['w'],
+						marker_data['calib_base_mocap_pose']['orientation']['x'],
+						marker_data['calib_base_mocap_pose']['orientation']['y'],
+						marker_data['calib_base_mocap_pose']['orientation']['z']]
+					self.T_base_mocap = Transform(q2R(q),p)
 		self.tool_marker_config_file=tool_marker_config_file
 		self.T_tool_toolmarker = None # T^tool_toolmarker
 		if len(tool_marker_config_file)>0:
@@ -227,6 +237,7 @@ class positioner_obj(object):
 		### load mocap marker config
 		self.base_marker_config_file=base_marker_config_file
 		self.T_base_basemarker = None # T^base_basemaker
+		self.T_base_mocap = None # T^base_mocap
 		if len(base_marker_config_file)>0:
 			with open(base_marker_config_file,'r') as file:
 				marker_data = yaml.safe_load(file)
@@ -242,6 +253,15 @@ class positioner_obj(object):
 						marker_data['calib_base_basemarker_pose']['orientation']['y'],
 						marker_data['calib_base_basemarker_pose']['orientation']['z']]
 					self.T_base_basemarker = Transform(q2R(q),p)
+				if 'calib_base_mocap_pose' in marker_data.keys():
+					p = [marker_data['calib_base_mocap_pose']['position']['x'],
+						marker_data['calib_base_mocap_pose']['position']['y'],
+						marker_data['calib_base_mocap_pose']['position']['z']]
+					q = [marker_data['calib_base_mocap_pose']['orientation']['w'],
+						marker_data['calib_base_mocap_pose']['orientation']['x'],
+						marker_data['calib_base_mocap_pose']['orientation']['y'],
+						marker_data['calib_base_mocap_pose']['orientation']['z']]
+					self.T_base_mocap = Transform(q2R(q),p)
 		self.tool_marker_config_file=tool_marker_config_file
 		self.T_tool_toolmarker = None # T^tool_toolmarker
 		if len(tool_marker_config_file)>0:
