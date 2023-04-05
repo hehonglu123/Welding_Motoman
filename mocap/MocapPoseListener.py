@@ -10,7 +10,7 @@ from utils import *
 from robot_def import * 
 
 class MocapPoseListener():
-    def __init__(self,rr_mocap,robots,collect_base_stop=1e4):
+    def __init__(self,rr_mocap,robots,collect_base_stop=1e4,use_static_base=False):
 
         self.rr_mocap = rr_mocap
 
@@ -35,6 +35,10 @@ class MocapPoseListener():
 
         # determined base pose
         self.collect_base_stop = collect_base_stop
+        self.use_static_base = use_static_base
+        if use_static_base:
+            for robot_name in self.robots_base:
+                self.robots_base[robot_name] = self.robots[robot_name].T_base_mocap.inv()
 
     def clear_traj(self):
         self.robots_traj_p={}
@@ -59,7 +63,7 @@ class MocapPoseListener():
                 for i in range(len(data.fiducials.recognized_fiducials)):
                     this_marker_id = data.fiducials.recognized_fiducials[i].fiducial_marker
                     for robot_name in self.robots.keys():
-                        if this_marker_id == self.robots[robot_name].base_rigid_id and len(self.robots_base_p[robot_name])<self.collect_base_stop:
+                        if this_marker_id == self.robots[robot_name].base_rigid_id and len(self.robots_base_p[robot_name])<self.collect_base_stop and not self.use_static_base:
                             this_position = np.array(list(data.fiducials.recognized_fiducials[i].pose.pose.pose[0]['position']))
                             if np.all(this_position == np.array([0.,0.,0.])):
                                 continue

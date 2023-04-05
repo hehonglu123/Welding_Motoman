@@ -21,12 +21,13 @@ base_marker_config_file=config_dir+'MA2010_marker_config.yaml',tool_marker_confi
 
 test_qs = np.array([[0.,0.,0.,0.,0.,0.],[0,69,57,0,0,0],[0,-68,-68,0,0,0],[-36.6018,12.4119,-12.1251,-43.3579,-45.4297,68.1203],
                 [21.0753,-1.8803,-27.3509,13.1122,-25.1173,-25.2466]])
+# test_qs = np.array([[0,69,57,0,0,0],[0,-68,-68,0,0,0]])
 
 # mocap pose listener
 mocap_url = 'rr+tcp://localhost:59823?service=optitrack_mocap'
 mocap_url = mocap_url
 mocap_cli = RRN.ConnectService(mocap_url)
-mpl_obj = MocapPoseListener(mocap_cli,[robot_weld],collect_base_stop=1e3)
+mpl_obj = MocapPoseListener(mocap_cli,[robot_weld],collect_base_stop=1e3,use_static_base=True)
 mpl_obj.run_pose_listener()
 time.sleep(5)
 mpl_obj.stop_pose_listener()
@@ -55,7 +56,7 @@ for N in range(repeats_N):
 
 # move robot
 robot_client = MotionProgramExecClient(IP='192.168.1.31',ROBOT_CHOICE='RB1',pulse2deg=robot_weld.pulse2deg)
-robot_client.MoveJ(test_qs[2],rob_speed,0)
+robot_client.MoveJ(test_qs[1],rob_speed,0)
 robot_client.ProgEnd()
 robot_stamps,curve_exe = robot_client.execute_motion_program("AAA.JBI")
 encoder_T = robot_weld.fwd(curve_exe[-1,:6])
@@ -68,6 +69,11 @@ mocap_T = Transform(curve_R[robot_weld.robot_name][-1],curve_p[robot_weld.robot_
 
 print(encoder_T)
 print(mocap_T)
+
+# for i in range(len(all_robot_mocap_pose)):
+#     print("Test i:",i)
+#     print(all_robot_ctrl_pose[i])
+#     print(all_robot_mocap_pose[i])
 
 np.savetxt('data/compare_results_ctrl_basefix.csv',all_robot_ctrl_pose,delimiter=',')
 np.savetxt('data/compare_results_mocap_basefix.csv',all_robot_mocap_pose,delimiter=',')
