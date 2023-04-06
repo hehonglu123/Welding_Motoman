@@ -85,8 +85,6 @@ class CalibRobotTool:
             marker_B[marker_id] = np.mean(self.marker_position_table[marker_id],axis=0)
         # find center of A B
         marker_A = deepcopy(self.tool_markers)
-        print(marker_A)
-        print(marker_B)
         center_A = []
         center_B = []
         A = []
@@ -108,6 +106,7 @@ class CalibRobotTool:
         R = np.matmul(vT.T,u.T)
         if np.linalg.det(R)<0:
             u,s,v = np.linalg.svd(R)
+            v=v.T
             v[:,2] = v[:,2]*-1
             R = np.matmul(v,u.T)
 
