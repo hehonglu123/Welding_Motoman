@@ -133,7 +133,7 @@ class CalibRobotBase:
 
         return T_base_mocap,T_base_basemarker
 
-    def run_calib(self,base_marker_config_file,auto=False,rob_IP=None,ROBOT_CHOICE=None,rob_p2d=None,paths=[],rob_speed=3):
+    def run_calib(self,base_marker_config_file,auto=False,rob_IP=None,ROBOT_CHOICE=None,rob_p2d=None,paths=[],rob_speed=3,repeat_N=1):
 
         # check where's joint axis 1
         self.clear_samples()
@@ -153,8 +153,9 @@ class CalibRobotBase:
             self.collect_markers = True
             time.sleep(0.5)
             client=MotionProgramExecClient(IP=rob_IP,ROBOT_CHOICE=ROBOT_CHOICE,pulse2deg=rob_p2d)
-            client.MoveJ(paths[0][1],rob_speed,0)
-            client.MoveJ(paths[0][0],rob_speed,0)
+            for N in range(repeat_N):
+                client.MoveJ(paths[0][1],rob_speed,0)
+                client.MoveJ(paths[0][0],rob_speed,0)
             client.ProgEnd()
             client.execute_motion_program("AAA.JBI")
         else:
@@ -185,9 +186,9 @@ class CalibRobotBase:
             self.collect_markers = True
             time.sleep(0.5)
             client=MotionProgramExecClient(IP=rob_IP,ROBOT_CHOICE=ROBOT_CHOICE,pulse2deg=rob_p2d)
-            client.MoveJ(paths[1][0],rob_speed,0)
-            client.MoveJ(paths[1][1],rob_speed,0)
-            client.MoveJ(paths[1][0],rob_speed,0)
+            for N in range(repeat_N):
+                client.MoveJ(paths[1][1],rob_speed,0)
+                client.MoveJ(paths[1][0],rob_speed,0)
             client.ProgEnd()
             client.execute_motion_program("AAA.JBI")
         else:
@@ -318,7 +319,7 @@ def calib_R1():
 
     # start calibration
     # find transformation matrix from the base marker rigid body (defined in motiv) to the actual robot base
-    calib_obj.run_calib(config_dir+'MA2010_marker_config.yaml',auto,'192.168.1.31','RB1',robot_weld.pulse2deg,q_paths) # save calib config to file
+    calib_obj.run_calib(config_dir+'MA2010_marker_config.yaml',auto,'192.168.1.31','RB1',robot_weld.pulse2deg,q_paths,rob_speed=3,repeat_N=3) # save calib config to file
 
 if __name__=='__main__':
 

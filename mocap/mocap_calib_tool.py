@@ -170,7 +170,9 @@ class CalibRobotTool:
         with open(tool_marker_config_file,'w') as file:
             yaml.safe_dump(tool_marker_data,file)
         print("Result T_tool_toolmarker:")
-        print(T_tool_toolmarker)
+        print(np.degrees(R2rpy(T_tool_toolmarker.R)))
+        print(T_tool_toolmarker.p)
+
         print("Done. Please check file:",tool_marker_config_file)
 
 def calib_scanner():
