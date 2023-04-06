@@ -319,7 +319,7 @@ def calib_R1():
 
     # start calibration
     # find transformation matrix from the base marker rigid body (defined in motiv) to the actual robot base
-    calib_obj.run_calib(config_dir+'MA2010_marker_config.yaml',auto,'192.168.1.31','RB1',robot_weld.pulse2deg,q_paths,rob_speed=3,repeat_N=3) # save calib config to file
+    calib_obj.run_calib(config_dir+'MA2010_marker_config.yaml',auto,'192.168.1.31','RB1',robot_weld.pulse2deg,q_paths,rob_speed=3,repeat_N=1) # save calib config to file
 
 if __name__=='__main__':
 
