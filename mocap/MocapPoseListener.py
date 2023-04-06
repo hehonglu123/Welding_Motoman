@@ -43,11 +43,19 @@ class MocapPoseListener():
     def clear_traj(self):
         self.robots_traj_p={}
         self.robots_traj_R={}
+        self.robots_tool_mocap_p={}
+        self.robots_tool_mocap_R={}
+        self.robots_base_mocap_p={}
+        self.robots_base_mocap_R={}
         self.robots_traj_stamps={}
         for robot_name in self.robots.keys():
             self.robots_traj_p[robot_name] = []
             self.robots_traj_R[robot_name] = []
             self.robots_traj_stamps[robot_name]=[]
+            self.robots_tool_mocap_p[robot_name]=[]
+            self.robots_tool_mocap_R[robot_name]=[]
+            self.robots_base_mocap_p[robot_name]=[]
+            self.robots_base_mocap_R[robot_name]=[]
     
     def collect_point_thread(self):
 
@@ -67,7 +75,8 @@ class MocapPoseListener():
                             this_position = np.array(list(data.fiducials.recognized_fiducials[i].pose.pose.pose[0]['position']))
                             if np.all(this_position == np.array([0.,0.,0.])):
                                 continue
-                            this_orientation_rpy = R2rpy(q2R(np.array(list(data.fiducials.recognized_fiducials[i].pose.pose.pose[0]['orientation']))))
+                            this_orientation_R = q2R(np.array(list(data.fiducials.recognized_fiducials[i].pose.pose.pose[0]['orientation'])))
+                            this_orientation_rpy = R2rpy(this_orientation_R)
                             self.robots_base_p[robot_name].append(this_position)
                             self.robots_base_rpy[robot_name].append(this_orientation_rpy)
 
@@ -77,6 +86,9 @@ class MocapPoseListener():
                             rpy_ave = np.mean(self.robots_base_rpy[robot_name],axis=0)
                             self.robots_base[robot_name] = Transform(rpy2R(rpy_ave),pos_ave)*self.robots[robot_name].T_base_basemarker
                             self.robots_base[robot_name] = self.robots_base[robot_name].inv()
+
+                            self.robots_base_mocap_p[robot_name].append(this_position)
+                            self.robots_base_mocap_R[robot_name].append(this_orientation_R)
                         if this_marker_id == self.robots[robot_name].tool_rigid_id:
                             if self.robots_base[robot_name] is not None:
                                 this_position = np.array(list(data.fiducials.recognized_fiducials[i].pose.pose.pose[0]['position']))
@@ -91,6 +103,10 @@ class MocapPoseListener():
                                 self.robots_traj_p[robot_name].append(T_tool_base.p)
                                 self.robots_traj_R[robot_name].append(T_tool_base.R)
                                 self.robots_traj_stamps[robot_name].append(float(data.sensor_data.ts[0]['seconds'])+data.sensor_data.ts[0]['nanoseconds']*1e-9)
+
+                                self.robots_tool_mocap_p[robot_name].append(this_position)
+                                self.robots_tool_mocap_R[robot_name].append(q2R(this_orientation))
+
         sensor_data_srv.Close()
 
     def run_pose_listener(self):
@@ -119,6 +135,10 @@ class MocapPoseListener():
     def get_robots_traj(self):
 
         return self.robots_traj_p,self.robots_traj_R,self.robots_traj_stamps
+    
+    def get_rigid_pose(self):
+
+        return self.robots_base_mocap_p,self.robots_base_mocap_R,self.robots_tool_mocap_p,self.robots_tool_mocap_R,self.robots_traj_stamps
 
 if __name__=='__main__':
 
