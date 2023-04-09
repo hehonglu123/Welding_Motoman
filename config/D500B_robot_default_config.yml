@@ -64,8 +64,8 @@ joint_info:
   joint_identifier: joint_1
   joint_limits:
     effort: 1000.0
-    lower: -1.65806
-    upper: 1.65806
+    lower: -1.3962634015954636
+    upper: 1.3962634015954636
     velocity: 1.4
     acceleration: 10
   joint_type: revolute
