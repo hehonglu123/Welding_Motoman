@@ -14,7 +14,7 @@ from qpsolvers import solve_qp
 from scipy.optimize import fminbound
 
 from gazebo_model_resource_locator import GazeboModelResourceLocator
-from robots_def import *
+from robot_def import *
 
 #convert 4x4 H matrix to 3x3 H matrix and inverse for mapping obj to robot frame
 def H42H3(H):

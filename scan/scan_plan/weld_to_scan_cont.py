@@ -148,27 +148,13 @@ robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_co
 # 	pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg.csv')
 robot_scan=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.yml',tool_file_path=config_dir+'scanner_tcp2.csv',\
 	base_transformation_file=config_dir+'MA1440_pose_fake.csv',pulse2deg_file_path=config_dir+'MA1440_A0_pulse2deg.csv')
-robot_scan_notool=robot_obj('MA_1440_A0_notool',def_path=config_dir+'MA1440_A0_robot_default_config.yml',\
-	base_transformation_file=config_dir+'MA1440_pose_fake.csv',pulse2deg_file_path=config_dir+'MA1440_A0_pulse2deg.csv')
 turn_table=positioner_obj('D500B',def_path=config_dir+'D500B_robot_default_config.yml',tool_file_path=config_dir+'positioner_tcp.csv',\
     base_transformation_file=config_dir+'D500B_pose.csv',pulse2deg_file_path=config_dir+'D500B_pulse2deg.csv')
-
-print(robot_weld.fwd(np.array([0.,0.,0.,0.,0.,0.])))
-# exit()
 
 ## sim or real robot
 sim=False
 
 zero_config=np.array([0.,0.,0.,0.,0.,0.])
-# print(robot_scan.fwd(zero_config))
-# print(robot_scan_notool.fwd(zero_config))
-# toolT=(Transform(np.array([[0,0,1],[0,-1,0],[1,0,0]]).T,[0,0,0])*robot_scan_notool.fwd(zero_config)).inv()*robot_scan.fwd(zero_config)
-# print(toolT.p)
-# print(R2rpy(toolT.R))
-# exit()
-# t=Tess_Env('../../config/urdf/combined')
-# t.viewer_trajectory_dual(robot_scan.robot_name,turn_table.robot_name,[zero_config],[zero_config])
-# input("Press enter to quit")
 
 R2base_R1base_H = np.linalg.inv(robot_scan.base_H)
 # R2base_R1base_H[1,3] = R2base_R1base_H[1,3]-100
