@@ -23,7 +23,8 @@ else:
 dtype = o3d.core.float32
 #####################
 
-data_dir='../../data/wall_weld_test/scan_cont_6/scans/'
+# data_dir='../../data/wall_weld_test/scan_cont_6/scans/'
+data_dir='../../data/wall_weld_test/wall_param_1/scans/'
 config_dir='../../config/'
 
 robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path=config_dir+'weldgun.csv',\
