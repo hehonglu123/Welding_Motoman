@@ -22,7 +22,28 @@
   <joint name="MA1440_pose" type="fixed">
     <parent link="world"/>
     <child link="MA1440_base_link"/>
-    <origin rpy="0.0 0.0 3.14159" xyz="4 0 0.908"/><!--MA2010 pedestal-->
+    <origin rpy="0.0 0.0 3.14159" xyz="2.689552 -0.39515 0.908"/><!--MA2010 pedestal-->
+  </joint>
+
+  <link name="Ground">
+    <visual>
+      <geometry>
+        <box size="4.953 6.4 0.01"/>
+      </geometry>
+      <material name="">
+        <color rgba="0.1490196078431373 0.14901960784313725 0.72941176470588237 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="4.953 6.4 0.01"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="Ground_pose" type="fixed">
+    <parent link="world"/>
+    <child link="Ground"/>
+    <origin rpy="0.0 0.0 0" xyz="1.3462 0 -0.005"/>
   </joint>
 
 
@@ -149,6 +170,23 @@
     </collision>
   </link>
 
+  <link name="MA2010_filler">
+    <visual>
+      <geometry>
+        <box size="0.4 0.2 0.3"/>
+      </geometry>
+      <material name="">
+        <color rgba="0.72941176470588237 0.14901960784313725 0.1490196078431373 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.3 0.5 0.3"/>
+      </geometry>
+    </collision>
+  </link>
+
+
   <!-- end of link list -->
   <!-- joint list -->
   <joint name="MA2010_joint_1_s" type="revolute">
@@ -200,6 +238,12 @@
     <axis xyz="0 0 1"/>
   </joint>
   <!-- end of joint list -->
+  <joint name="filler_joint" type="fixed">
+    <parent link="MA2010_link_2_l"/>
+    <child link="MA2010_filler"/>
+    <origin rpy="0 0 0" xyz="0.0 -0.36 0.4"/>
+    <axis xyz="0 0 0"/>
+  </joint>
   <link name="weldgun">
     <visual>
       <geometry>
