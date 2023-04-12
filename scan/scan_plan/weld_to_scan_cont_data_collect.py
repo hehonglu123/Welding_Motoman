@@ -520,7 +520,7 @@ lam_relative=calc_lam_cs(scan_p)
 s1_all,_=calc_individual_speed(vd_relative,lam1,lam2,lam_relative,np.arange(0,len(scan_p),20).astype(int))
 # print(s1_all)
 
-use_artec_studio=False
+use_artec_studio=True
 input("Press Enter to start moving")
 
 if not use_artec_studio:
