@@ -22,9 +22,7 @@ q3=[-15,180]
 client=MotionProgramExecClient(IP='192.168.1.31',ROBOT_CHOICE='RB1',pulse2deg=robot1.pulse2deg)
 client.MoveJ(q1,5,0)
 client.execute_motion_program("AAA.JBI")
-np.savetxt('js_recording.csv',np.hstack((timestamp.reshape(-1, 1),joint_recording)),delimiter=',')
-# print(timestamp)
-# print(joint_recording)
+
 
 client=MotionProgramExecClient(IP='192.168.1.31',ROBOT_CHOICE='RB2',pulse2deg=robot2.pulse2deg)
 client.MoveJ(q2,5,0)
