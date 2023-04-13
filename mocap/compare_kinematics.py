@@ -82,4 +82,6 @@ for i in range(len(all_robot_mocap_pose)):
 
 # np.savetxt('data/compare_results_ctrl_basefix.csv',all_robot_ctrl_pose,delimiter=',')
 # np.savetxt('data/compare_results_mocap_basefix.csv',all_robot_mocap_pose,delimiter=',')
+np.savetxt('data/compare_results_ctrl_basefix_toolT.csv',all_robot_ctrl_pose,delimiter=',')
+np.savetxt('data/compare_results_mocap_basefix_toolT.csv',all_robot_mocap_pose,delimiter=',')
 
