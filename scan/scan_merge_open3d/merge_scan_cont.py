@@ -23,16 +23,16 @@ else:
 dtype = o3d.core.float32
 #####################
 
-# data_dir='../../data/wall_weld_test/scan_cont_6/scans/'
-data_dir='../../data/wall_weld_test/wall_param_1/scans/'
+# data_dir='../../data/wall_weld_test/scan_cont_newdx_1/scans/'
+# data_dir='../../data/wall_weld_test/scan_cont_6_backup/scans/'
+# data_dir='../../data/wall_weld_test/wall_param_1/scans/'
+data_dir='../../data/wall_weld_test/wall_param_data_collection/path_Rz-45_Ry0_stand_off_d243_b_theta45_scan_angle-45_45_z0_35_/scans/'
 config_dir='../../config/'
 
-robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path=config_dir+'weldgun.csv',\
-    pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg.csv')
 robot_scan=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.yml',tool_file_path=config_dir+'scanner_tcp2.csv',\
     base_transformation_file=config_dir+'MA1440_pose.csv',pulse2deg_file_path=config_dir+'MA1440_A0_pulse2deg.csv')
-turn_table=positioner_obj('D500B',def_path=config_dir+'D500B_robot_default_config.yml',base_transformation_file=config_dir+'D500B_pose.csv',\
-    pulse2deg_file_path=config_dir+'D500B_pulse2deg.csv')
+turn_table=positioner_obj('D500B',def_path=config_dir+'D500B_robot_default_config.yml',tool_file_path=config_dir+'positioner_tcp.csv',\
+    base_transformation_file=config_dir+'D500B_pose.csv',pulse2deg_file_path=config_dir+'D500B_pulse2deg.csv')
 
 scan_js_exe = np.loadtxt(data_dir+'scan_js_exe.csv',delimiter=",", dtype=np.float64)
 rob_stamps = np.loadtxt(data_dir+'robot_stamps.csv',delimiter=",", dtype=np.float64)
@@ -43,39 +43,47 @@ sca_stamps=sca_stamps-sca_stamps[0]
 scan_N = len(sca_stamps) ## total scans
 
 ## TODO:auto get timestamp where scans/robot start moving
-# pcd_combined = None
-# for scan_i in range(15,scan_N):
-#     print(scan_i)
-#     scan_points = np.load(data_dir + 'points_'+str(scan_i)+'.npy')
+scan_start_rmse=1
+scan_move_stamp_i=None
+pcd_combined = None
+for scan_i in range(1,50):
+    # print(scan_i)
+    scan_points = np.load(data_dir + 'points_'+str(scan_i)+'.npy')
 
-#     pcd = o3d.t.geometry.PointCloud(device)
-#     pcd.point.positions=o3d.core.Tensor(scan_points, dtype, device)
-#     pcd=pcd.paint_uniform_color([0.8, 0.0, 0.0])
+    pcd = o3d.geometry.PointCloud()
+    pcd.points=o3d.utility.Vector3dVector(scan_points)
+    # pcd=pcd.paint_uniform_color([0.8, 0.0, 0.0])
 
-#     if pcd_combined is None:
-#         pcd_combined=pcd.clone()
-#     else:
-#         pcd_combined=pcd_combined.paint_uniform_color([0, 0.8, 0.0])
-#         pcd_combined=pcd_combined.append(pcd)
-    
-#     visualize_pcd([pcd_combined])
+    if pcd_combined is None:
+        pcd_combined=deepcopy(pcd)
+    else:
+        # pcd_combined=pcd_combined.paint_uniform_color([0, 0.8, 0.0])
+        # pcd_combined=pcd_combined+pcd
+        evaluation = o3d.pipelines.registration.evaluate_registration(
+                    pcd_combined, pcd, 5, np.eye(4))
 
-# for robt_i in range(1,50):
-#     print("robt i:",robt_i)
-#     print(rob_stamps[robt_i])
-#     print(np.degrees(scan_js_exe[robt_i]-scan_js_exe[robt_i-1]))
-# exit()
+        # print(evaluation.inlier_rmse)
+        if evaluation.inlier_rmse >= scan_start_rmse:
+            scan_move_stamp_i=scan_i
+            break
+    # visualize_pcd([pcd_combined])
+    pcd_combined=deepcopy(pcd)
+rob_start_norm=1e-3
+rob_move_stamp_i=None
+for robt_i in range(1,50):
+    # print("robt i:",robt_i)
+    # print(rob_stamps[robt_i])
+    # print(np.degrees(scan_js_exe[robt_i]-scan_js_exe[robt_i-1]))
+    # print(np.linalg.norm(np.degrees(scan_js_exe[robt_i]-scan_js_exe[robt_i-1])))
+    if np.linalg.norm(np.degrees(scan_js_exe[robt_i]-scan_js_exe[robt_i-1]))>=rob_start_norm:
+        rob_move_stamp_i=robt_i
+        break
 
-scan_move_stamp_i=22 # where scans are different
+print("Scan Start index:",scan_move_stamp_i) # where scans are different
+print("Robot Start index:",rob_move_stamp_i) # where robot starts moving
 
-# sca_stamps=np.append(sca_stamps[0],sca_stamps)
-# scan_move_stamp_i=20 # where scans are different
-
-rob_move_stamp_i=8 # where robot starts moving
 robot_scanner_t_diff=sca_stamps[scan_move_stamp_i]-rob_stamps[rob_move_stamp_i] ## (sec) timer start different between the robot and the scanner
-delay_scanner_loop=0 ## (sec) timer delay record in scanner loop (see scan_continuous.py)
-sca_stamps_sync_robt = sca_stamps-delay_scanner_loop-robot_scanner_t_diff
-# sca_stamps_sync_robt = sca_stamps-delay_scanner_loop-robot_scanner_t_diff-0.10863497946777212
+sca_stamps_sync_robt = sca_stamps-robot_scanner_t_diff
 
 # print(rob_stamps[:30])
 # print(sca_stamps_sync_robt[:30])
@@ -90,7 +98,7 @@ use_tensor=False
 ##############################
 
 ### process parameters
-use_icp=True
+use_icp=False
 timestep_search=False
 timestep_search_2=False
 search_start_i=50
@@ -103,10 +111,8 @@ voxel_size=0.1
 ####
 scan_points_t0_origin = np.load(data_dir + 'points_'+str(scan_move_stamp_i-1)+'.npy')
 #### t1 pcd
-robt_T = robot_scan.fwd(scan_js_exe[rob_move_stamp_i-1])
+robt_T = robot_scan.fwd(scan_js_exe[rob_move_stamp_i-1][:6])
 scan_points_t0 = np.transpose(np.matmul(robt_T.R,np.transpose(scan_points_t0_origin)))+robt_T.p
-## get the points closed to origin
-scan_points_t0 = np.transpose(np.matmul(T_origin.R,np.transpose(scan_points_t0)))+T_origin.p
 ## pcd
 pcd_t0 = o3d.geometry.PointCloud()
 pcd_t0.points=o3d.utility.Vector3dVector(scan_points_t0)
@@ -122,10 +128,8 @@ all_rmse = []
 for search_i in range(0,rmse_search_step):
     # print(search_i)
     #### t1 pcd
-    robt_T = robot_scan.fwd(scan_js_exe[robt_move_t1_i+search_i])
+    robt_T = robot_scan.fwd(scan_js_exe[robt_move_t1_i+search_i][:6])
     scan_points_t1 = np.transpose(np.matmul(robt_T.R,np.transpose(scan_points_t1_origin)))+robt_T.p
-    ## get the points closed to origin
-    scan_points_t1 = np.transpose(np.matmul(T_origin.R,np.transpose(scan_points_t1)))+T_origin.p
     ## pcd
     pcd_t1 = o3d.geometry.PointCloud()
     pcd_t1.points=o3d.utility.Vector3dVector(scan_points_t1)
@@ -140,8 +144,8 @@ for search_i in range(0,rmse_search_step):
     all_rmse.append(evaluation.inlier_rmse)
 
     # print(evaluation)
-    pcd_t0.paint_uniform_color([0,1,0])
-    pcd_t1.paint_uniform_color([1,0,0])
+    # pcd_t0.paint_uniform_color([0,1,0])
+    # pcd_t1.paint_uniform_color([1,0,0])
     # if evaluation.inlier_rmse<0.63:
     #     visualize_pcd([pcd_t1,pcd_t0])
 ###
@@ -150,6 +154,7 @@ for search_i in range(0,rmse_search_step):
 # plt.ylabel('Inlier RMSE')
 # plt.title('Inlier RMSE Using Robot Pose at Different Timestamps')
 # plt.show()
+# print(rmse_i)
 # exit()
 # rmse_i+=2
 sca_stamps_sync_robt=sca_stamps_sync_robt+(rob_stamps[robt_move_t1_i+rmse_i]-sca_stamps_sync_robt[scan_move_stamp_i])
@@ -161,9 +166,9 @@ sca_stamps_sync_robt=sca_stamps_sync_robt+(rob_stamps[robt_move_t1_i+rmse_i]-sca
 pcd_combined = None
 scan_js_exe_cor = []
 scan_i_start=None
-# scan_N=50
+scan_N=70
 for scan_i in range(scan_N):
-    print("Scan:",scan_i)
+    # print("Scan:",scan_i)
     # discard scanner timestamp <0 (robot motion haven't start)
     if sca_stamps_sync_robt[scan_i]<0:
         scan_js_exe_cor.append(scan_js_exe[0])
@@ -175,11 +180,16 @@ for scan_i in range(scan_N):
     closest_i_sort=np.argsort(np.abs(rob_stamps-sca_stamps_sync_robt[scan_i]))
     closest_i = closest_i_sort[0]
     scan_js_exe_cor.append(scan_js_exe[closest_i])
-    robt_T = robot_scan.fwd(scan_js_exe[closest_i])
-    scan_points = np.transpose(np.matmul(robt_T.R,np.transpose(scan_points_origin)))+robt_T.p
-    ## get the points closed to origin
-    scan_points = np.transpose(np.matmul(T_origin.R,np.transpose(scan_points)))+T_origin.p
 
+    if len(scan_js_exe[closest_i])<=6:
+        robt_T = robot_scan.fwd(scan_js_exe[closest_i],world=True) # T_world^r2tool
+        T_origin = turn_table.fwd(np.radians([-15,180]),world=True).inv() # T_tabletool^world
+    else:
+        robt_T = robot_scan.fwd(scan_js_exe[closest_i][:6],world=True) # T_world^r2tool
+        T_origin = turn_table.fwd(scan_js_exe[closest_i][6:],world=True).inv() # T_tabletool^world
+    T_rob_positioner_top = T_origin*robt_T
+    ## get the points closed to origin
+    scan_points = np.transpose(np.matmul(T_rob_positioner_top.R,np.transpose(scan_points_origin)))+T_rob_positioner_top.p
     if use_tensor:
         # use tensor
         pcd = o3d.t.geometry.PointCloud(device)

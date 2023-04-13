@@ -589,17 +589,18 @@ robot_stamps,curve_pulse_exe = robot_client.execute_motion_program("AAA.JBI")
 
 print(q_out_exe)
 if not use_artec_studio:
+    out_scan_dir = out_dir+'scans/'
     ## save traj
-    Path(out_dir).mkdir(exist_ok=True)
+    Path(out_scan_dir).mkdir(exist_ok=True)
     # save poses
-    np.savetxt(out_dir + 'scan_js_exe.csv',np.radians(q_out_exe),delimiter=',')
-    np.savetxt(out_dir + 'robot_stamps.csv',robot_stamps-robot_stamps[0],delimiter=',')
+    np.savetxt(out_scan_dir + 'scan_js_exe.csv',q_out_exe,delimiter=',')
+    np.savetxt(out_scan_dir + 'robot_stamps.csv',robot_stamps,delimiter=',')
     scan_count=0
     for scan in scans:
         scan_points = RRN.NamedArrayToArray(scan.vertices)
-        np.save(out_dir + 'points_'+str(scan_count)+'.npy',scan_points)
+        np.save(out_scan_dir + 'points_'+str(scan_count)+'.npy',scan_points)
         if scan_count%10==0:
-            print(len(scan_points))
+            print("scan counts:",len(scan_points))
         scan_count+=1
     print('Total scans:',scan_count)
-    np.savetxt(out_dir + 'scan_stamps.csv',scan_stamps,delimiter=',')
+    np.savetxt(out_scan_dir + 'scan_stamps.csv',scan_stamps,delimiter=',')

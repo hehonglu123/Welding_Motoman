@@ -1,5 +1,5 @@
-from audioop import reverse
 from copy import deepcopy
+from pathlib import Path
 import sys
 sys.path.append('../../toolbox/')
 sys.path.append('../scan_tools/')
@@ -64,13 +64,14 @@ def get_bound_circle(p,R,pc,k,theta):
     
     return [p_bound,p_bound_2],[R_bound,R_bound_2]
 
-data_dir='../../data/wall_weld_test/scan_cont_6/'
+data_dir='../../data/wall_weld_test/scan_cont_newdx_1/'
+out_dir=data_dir+'scans/'
 config_dir='../../config/'
 
 robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path=config_dir+'weldgun.csv',\
 	pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg.csv')
 robot_scan=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.yml',tool_file_path=config_dir+'scanner_tcp.csv',\
-	base_transformation_file=config_dir+'MA1440_pose.csv',pulse2deg_file_path=config_dir+'MA1440_A0_pulse2deg.csv')
+	base_transformation_file=config_dir+'MA1440_pose_fake.csv',pulse2deg_file_path=config_dir+'MA1440_A0_pulse2deg.csv')
 turn_table=positioner_obj('D500B',def_path=config_dir+'D500B_robot_default_config.yml',base_transformation_file=config_dir+'D500B_pose.csv',\
     pulse2deg_file_path=config_dir+'D500B_pulse2deg.csv')
 
@@ -251,15 +252,16 @@ for path_T in all_path_T:
 
     ## save traj
     # save poses
-    np.savetxt(data_dir + 'curve_js_exe.csv',curve_js_exe,delimiter=',')
-    np.savetxt(data_dir + 'robot_stamps.csv',robot_stamps,delimiter=',')
+    Path(data_dir).mkdir(exist_ok=True)
+    Path(out_dir).mkdir(exist_ok=True)
+    np.savetxt(out_dir + 'scan_js_exe.csv',curve_js_exe,delimiter=',')
+    np.savetxt(out_dir + 'robot_stamps.csv',robot_stamps,delimiter=',')
     scan_count=0
     for scan in scans:
         scan_points = RRN.NamedArrayToArray(scan.vertices)
-        np.save(data_dir + 'points_'+str(scan_count)+'.npy',scan_points)
+        np.save(out_dir + 'points_'+str(scan_count)+'.npy',scan_points)
         if scan_count%10==0:
             print(len(scan_points))
         scan_count+=1
     print('Total scans:',scan_count)
-    np.savetxt(data_dir + 'scan_stamps.csv',scan_stamps,delimiter=',')
-    print(scan_stamps[:10])
+    np.savetxt(out_dir + 'scan_stamps.csv',scan_stamps,delimiter=',')

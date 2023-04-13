@@ -1,15 +1,19 @@
 import numpy as np
 from general_robotics_toolbox import *
 
-robot_T = np.loadtxt('compare_results_ctrl_basefix.csv',delimiter=',')
-mocap_T = np.loadtxt('compare_results_mocap_basefix.csv',delimiter=',')
+# robot_T = np.loadtxt('compare_results_ctrl_basefix.csv',delimiter=',')
+# mocap_T = np.loadtxt('compare_results_mocap_basefix.csv',delimiter=',')
+robot_T = np.loadtxt('compare_results_ctrl_basefix_toolT.csv',delimiter=',')
+mocap_T = np.loadtxt('compare_results_mocap_basefix_toolT.csv',delimiter=',')
+total_pose= 2
 
-for j in range(5):
+for j in range(total_pose):
     position_error=[]
     mocap_position=[]
     orientation_error=[]
     mocap_orientation=[]
-    for i in range(0,len(robot_T),5):
+    for i in range(0,len(robot_T),total_pose):
+        print(i)
         rob_R = q2R(robot_T[i+j,3:])
         moc_R = q2R(mocap_T[i+j,3:])
         mocap_position.append(mocap_T[i+j,:3])

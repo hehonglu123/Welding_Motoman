@@ -43,10 +43,14 @@ class ContinuousScanner():
         scans=[]
         timestamps=[]
         for i in range(len(self.scan_handles)):
-            stl_mesh = self.RRC.getf_deferred_capture(self.scan_handles[i])
-            scans.append(stl_mesh)
-            framestamp=self.RRC.getf_deferred_capture_stamps(self.scan_handles[i])
-            timestamps.append(framestamp.seconds+framestamp.micro_seconds*1e-6)
+            try:
+                stl_mesh = self.RRC.getf_deferred_capture(self.scan_handles[i])
+                scans.append(stl_mesh)
+                framestamp=self.RRC.getf_deferred_capture_stamps(self.scan_handles[i])
+                timestamps.append(framestamp.seconds+framestamp.micro_seconds*1e-6)
+            except:
+                print("Fail to capture frame",i)
+                continue
 
         return scans,timestamps
 
