@@ -3,9 +3,11 @@ from general_robotics_toolbox import *
 
 # robot_T = np.loadtxt('compare_results_ctrl_basefix.csv',delimiter=',')
 # mocap_T = np.loadtxt('compare_results_mocap_basefix.csv',delimiter=',')
-robot_T = np.loadtxt('compare_results_ctrl_basefix_toolT.csv',delimiter=',')
-mocap_T = np.loadtxt('compare_results_mocap_basefix_toolT.csv',delimiter=',')
-total_pose= 2
+# robot_T = np.loadtxt('compare_results_ctrl_basefix_toolT_rotateJcalib.csv',delimiter=',')
+# mocap_T = np.loadtxt('compare_results_mocap_basefix_toolT_rotateJcalib.csv',delimiter=',')
+robot_T = np.loadtxt('compare_results_ctrl_basefix_toolT_rmsecalib.csv',delimiter=',')
+mocap_T = np.loadtxt('compare_results_mocap_basefix_toolT_rmsecalib.csv',delimiter=',')
+total_pose= 5
 
 for j in range(total_pose):
     position_error=[]
