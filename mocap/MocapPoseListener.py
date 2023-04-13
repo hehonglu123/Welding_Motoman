@@ -145,7 +145,7 @@ class MocapPoseListener():
         return self.robots_base_mocap_p,self.robots_base_mocap_R,self.robots_tool_mocap_p,self.robots_tool_mocap_R,self.robots_traj_stamps
 
 class MocapFrameListener():
-    def __init__(self,rr_mocap,source_frame,target_frames):
+    def __init__(self,rr_mocap,target_frames,source_frame='world'):
 
         self.rr_mocap = rr_mocap
         
@@ -179,15 +179,18 @@ class MocapFrameListener():
                 continue
             if self.collect_marker:
                 T_world_source = None
-                for i in range(len(data.fiducials.recognized_fiducials)):
-                    this_marker_id = data.fiducials.recognized_fiducials[i].fiducial_marker
-                    if this_marker_id == self.source_frame:
-                        this_position = np.array(list(data.fiducials.recognized_fiducials[i].pose.pose.pose[0]['position']))
-                        if np.all(this_position == np.array([0.,0.,0.])):
-                            continue
-                        this_orientation_R = q2R(np.array(list(data.fiducials.recognized_fiducials[i].pose.pose.pose[0]['orientation'])))
-                        T_world_source = Transform(this_orientation_R,this_position).inv()
-                        break
+                if self.source_frame=='world':
+                    T_world_source = Transform(np.eye(3),[0,0,0])
+                else:
+                    for i in range(len(data.fiducials.recognized_fiducials)):
+                        this_marker_id = data.fiducials.recognized_fiducials[i].fiducial_marker
+                        if this_marker_id == self.source_frame:
+                            this_position = np.array(list(data.fiducials.recognized_fiducials[i].pose.pose.pose[0]['position']))
+                            if np.all(this_position == np.array([0.,0.,0.])):
+                                continue
+                            this_orientation_R = q2R(np.array(list(data.fiducials.recognized_fiducials[i].pose.pose.pose[0]['orientation'])))
+                            T_world_source = Transform(this_orientation_R,this_position).inv()
+                            break
                 if T_world_source is None:
                     continue
                 for i in range(len(data.fiducials.recognized_fiducials)):
@@ -273,7 +276,7 @@ def framelistener():
     mocap_url = mocap_url
     mocap_cli = RRN.ConnectService(mocap_url)
 
-    mpl_obj = MocapFrameListener(mocap_cli,'rigid7',['rigid3'])
+    mpl_obj = MocapFrameListener(mocap_cli,['rigid3'],'rigid7')
     mpl_obj.run_pose_listener()
     time.sleep(5)
     mpl_obj.stop_pose_listener()
@@ -285,8 +288,27 @@ def framelistener():
     print('curve R:',curve_R['rigid3'][-1])
     print('curve stamps:',timestamps['rigid3'][-1])
 
+def markerlistener():
+    
+    mocap_url = 'rr+tcp://localhost:59823?service=optitrack_mocap'
+    mocap_url = mocap_url
+    mocap_cli = RRN.ConnectService(mocap_url)
+
+    mpl_obj = MocapFrameListener(mocap_cli,['marker1_rigid3'],'world')
+    mpl_obj.run_pose_listener()
+    time.sleep(5)
+    mpl_obj.stop_pose_listener()
+
+    curve_p,curve_R,timestamps = mpl_obj.get_frames_traj()
+    ## robots traj
+    print('curve p:',np.mean(curve_p['marker1_rigid3'],axis=0))
+    print('std curve p:',np.std(curve_p['marker1_rigid3'],axis=0))
+    print('curve R:',curve_R['marker1_rigid3'][-1])
+    print('curve stamps:',timestamps['marker1_rigid3'][:5])
+
 if __name__=='__main__':
 
     # robotposelistener()
-    framelistener()
+    # framelistener()
+    markerlistener()
 
