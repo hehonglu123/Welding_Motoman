@@ -51,6 +51,7 @@
   <disable_collisions link1="MA2010_link_4_r" link2="MA2010_link_5_b" reason="Adjacent" />
   <disable_collisions link1="MA2010_link_5_b" link2="MA2010_link_6_t" reason="Adjacent" />
   <disable_collisions link1="MA2010_link_6_t" link2="weldgun" reason="Adjacent" />
+  <disable_collisions link1="MA2010_link_2_l" link2="MA2010_filler" reason="Adjacent" />
 
   <disable_collisions link1="MA2010_pedestal" link2="MA2010_link_1_s" reason="Adjacent" />
   <disable_collisions link1="MA2010_base_link" link2="MA2010_link_2_l" reason="Adjacent" />
@@ -58,6 +59,11 @@
   <disable_collisions link1="MA2010_link_2_l" link2="MA2010_link_4_r" reason="Adjacent" />
   <disable_collisions link1="MA2010_link_3_u" link2="MA2010_link_5_b" reason="Adjacent" />
   <disable_collisions link1="MA2010_link_4_r" link2="MA2010_link_6_t" reason="Adjacent" />
+  <disable_collisions link1="MA2010_link_1_s" link2="MA2010_filler" reason="Adjacent" />
+  <disable_collisions link1="MA2010_link_3_u" link2="MA2010_filler" reason="Adjacent" />
+
+  <disable_collisions link1="MA2010_link_4_r" link2="weldgun" reason="Custom" />
+  <disable_collisions link1="MA2010_link_5_b" link2="weldgun" reason="Custom" />
 
   <disable_collisions link1="MA1440_pedestal" link2="MA1440_base_link" reason="Adjacent" />
   <disable_collisions link1="MA1440_base_link" link2="MA1440_link_1_s" reason="Adjacent" />
