@@ -17,14 +17,13 @@ from dx200_motion_program_exec_client import *
 class CalibRobotBase:
     def __init__(self,mocap_cli,calib_marker_ids,base_marker_ids,base_rigid_id,j1_rough_axis_direction,j2_rough_axis_direction,positioner=False):
 
-        # self.mocap_url = mocap_url
         self.mocap_cli = mocap_cli
         
         self.calib_marker_ids = calib_marker_ids
         self.base_markers_ids = base_marker_ids
         self.base_rigid_id = base_rigid_id
         self.clear_samples()
-        self.sample_threshold = 0.3 # mm
+        self.sample_threshold = 1e-10 # mm
 
         self.j1_rough_axis_direction=j1_rough_axis_direction
         self.j2_rough_axis_direction=j2_rough_axis_direction
@@ -64,15 +63,6 @@ class CalibRobotBase:
                         this_orientation = np.array(list(data.fiducials.recognized_fiducials[i].pose.pose.pose[0]['orientation']))
                         if np.all(this_position == np.array([0.,0.,0.])):
                             continue
-                        # if len(self.marker_position_table[this_marker_id]) == 0:
-                        #     self.marker_position_table[this_marker_id].append(this_position)
-                        #     self.marker_orientation_table[this_marker_id].append(this_orientation)
-                        # else:
-                        #     last_position = np.array(list(self.marker_position_table[this_marker_id][-1]))
-                        #     last_orientation = np.array(list(self.marker_orientation_table[this_marker_id][-1]))
-                        #     if np.linalg.norm(this_position-last_position)>=self.sample_threshold or np.linalg.norm(this_orientation-last_orientation)>=self.sample_threshold:
-                        #         self.marker_position_table[this_marker_id].append(this_position)
-                        #         self.marker_orientation_table[this_marker_id].append(this_orientation)
                         self.marker_position_table[this_marker_id].append(this_position)
                         self.marker_orientation_table[this_marker_id].append(this_orientation)
         sensor_data_srv.Close()
