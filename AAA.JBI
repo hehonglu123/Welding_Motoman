@@ -7,11 +7,7 @@
 ///PULSE
 C00000=0,0,0,0,0,0
 //INST
-<<<<<<< HEAD
-///DATE 2023/04/12 20:44
-=======
 ///DATE 2023/04/12 17:04
->>>>>>> 70aa08efe71379a0f35a8af2ffefd06591d1542f
 ///ATTR SC,RW
 ///GROUP1 RB1
 NOP
