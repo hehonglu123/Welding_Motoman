@@ -170,7 +170,6 @@ class CalibRobotBase:
             # move robot to start
             client=MotionProgramExecClient(IP=rob_IP,ROBOT_CHOICE=ROBOT_CHOICE,pulse2deg=rob_p2d)
             client.MoveJ(paths[1][0],rob_speed,0)
-            client.ProgEnd()
             client.execute_motion_program("AAA.JBI")
             # collect data
             self.collect_markers = True
@@ -179,7 +178,6 @@ class CalibRobotBase:
             for N in range(repeat_N):
                 client.MoveJ(paths[1][1],rob_speed,0)
                 client.MoveJ(paths[1][0],rob_speed,0)
-            client.ProgEnd()
             client.execute_motion_program("AAA.JBI")
         else:
             self.collect_markers = True

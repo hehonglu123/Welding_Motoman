@@ -47,7 +47,6 @@ for N in range(repeats_N):
         # move robot
         robot_client = MotionProgramExecClient(IP='192.168.1.31',ROBOT_CHOICE='RB1',pulse2deg=robot_weld.pulse2deg)
         robot_client.MoveJ(test_q,rob_speed,0)
-        robot_client.ProgEnd()
         robot_stamps,curve_exe = robot_client.execute_motion_program("AAA.JBI")
         encoder_T = robot_weld.fwd(curve_exe[-1,:6])
         all_robot_ctrl_pose.append(np.append(encoder_T.p,R2q(encoder_T.R)))
@@ -65,7 +64,6 @@ for N in range(repeats_N):
 # move robot
 robot_client = MotionProgramExecClient(IP='192.168.1.31',ROBOT_CHOICE='RB1',pulse2deg=robot_weld.pulse2deg)
 robot_client.MoveJ(test_qs[2],rob_speed,0)
-robot_client.ProgEnd()
 robot_stamps,curve_exe = robot_client.execute_motion_program("AAA.JBI")
 encoder_T = robot_weld.fwd(curve_exe[-1,:6])
 

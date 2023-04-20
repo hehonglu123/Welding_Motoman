@@ -79,7 +79,6 @@ class CalibRobotBaseRMSE:
             for i in range(0,len(paths)):
                 client=MotionProgramExecClient(IP=rob_IP,ROBOT_CHOICE=ROBOT_CHOICE,pulse2deg=self.robot.pulse2deg)
                 client.MoveJ(paths[i],rob_speed,0)
-                client.ProgEnd()
                 robot_stamps,curve_js_exe = client.execute_motion_program("AAA.JBI")
                 T_tool_robot = self.robot.fwd(curve_js_exe[-1][:6])
 
