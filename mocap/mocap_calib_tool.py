@@ -126,7 +126,6 @@ class CalibRobotTool:
             # move robot to start
             client=MotionProgramExecClient(IP=rob_IP,ROBOT_CHOICE=ROBOT_CHOICE,pulse2deg=rob_p2d)
             client.MoveJ(paths[0],rob_speed,0)
-            client.ProgEnd()
             client.execute_motion_program("AAA.JBI")
             # collect data
             self.collect_markers = True
@@ -135,7 +134,6 @@ class CalibRobotTool:
             for i in range(1,len(paths)):
                 client.MoveJ(paths[i],rob_speed,0)
             client.MoveJ(paths[0],rob_speed,0)
-            client.ProgEnd()
             client.execute_motion_program("AAA.JBI")
         else:
             input("Please move the tool to be seen by as many camera as possible.")

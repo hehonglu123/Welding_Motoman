@@ -27,7 +27,6 @@ test_qs = np.array([[0,69,57,0,0,0],[0,-68,-68,0,0,0]])
 
 robot_client = MotionProgramExecClient(IP='192.168.1.31',ROBOT_CHOICE='RB1',pulse2deg=robot_weld.pulse2deg)
 robot_client.MoveJ(test_qs[-1],15,0)
-robot_client.ProgEnd()
 robot_client.execute_motion_program("AAA.JBI")
 
 # mocap pose listener
