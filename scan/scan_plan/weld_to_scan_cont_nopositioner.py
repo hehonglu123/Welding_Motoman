@@ -69,11 +69,11 @@ out_dir=data_dir+'scans/'
 config_dir='../../config/'
 
 robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path=config_dir+'weldgun.csv',\
-	pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg.csv')
+	pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv')
 robot_scan=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.yml',tool_file_path=config_dir+'scanner_tcp.csv',\
-	base_transformation_file=config_dir+'MA1440_pose_fake.csv',pulse2deg_file_path=config_dir+'MA1440_A0_pulse2deg.csv')
+	base_transformation_file=config_dir+'MA1440_pose_fake.csv',pulse2deg_file_path=config_dir+'MA1440_A0_pulse2deg_real.csv')
 turn_table=positioner_obj('D500B',def_path=config_dir+'D500B_robot_default_config.yml',base_transformation_file=config_dir+'D500B_pose.csv',\
-    pulse2deg_file_path=config_dir+'D500B_pulse2deg.csv')
+    pulse2deg_file_path=config_dir+'D500B_pulse2deg_real.csv')
 
 zero_config=np.array([0.,0.,0.,0.,0.,0.])
 
@@ -229,7 +229,6 @@ for path_T in all_path_T:
     # ms.exec_motions(robot_scan,['movej'],[scan_p[0]],[[curve_js[0]]],2,0)
     robot_client=MotionProgramExecClient(ROBOT_CHOICE='RB2',pulse2deg=robot_scan.pulse2deg)
     robot_client.MoveJ(np.degrees(curve_js[0]), 2, 0)
-    robot_client.ProgEnd()
     robot_client.execute_motion_program("AAA.JBI")
 
     ## scanner start
@@ -238,8 +237,7 @@ for path_T in all_path_T:
     robot_client=MotionProgramExecClient(ROBOT_CHOICE='RB2',pulse2deg=robot_scan.pulse2deg)
     for path_i in range(0,len(q_bp)):
         robot_client.MoveL(np.degrees(q_bp[path_i][0]), speed_bp[path_i], zone_bp[path_i])
-    robot_client.ProgEnd()
-    robot_stamps,curve_pulse_exe = robot_client.execute_motion_program("AAA.JBI")
+    robot_stamps,curve_pulse_exe,_,_ = robot_client.execute_motion_program("AAA.JBI")
     # curve_js_exe=np.divide(curve_pulse_exe[:,6:12],robot_scan.pulse2deg)
     curve_js_exe=deepcopy(curve_pulse_exe[:,6:12])
     ## scanner end
