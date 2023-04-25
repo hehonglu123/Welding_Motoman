@@ -193,7 +193,7 @@ def calib_weldgun():
 
     config_dir='../config/'
     robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path=config_dir+'weldgun.csv',\
-	pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg.csv',\
+	pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',\
     base_marker_config_file=config_dir+'MA2010_marker_config.yaml',tool_marker_config_file=config_dir+'weldgun_marker_config.yaml')
 
     mocap_url = 'rr+tcp://localhost:59823?service=optitrack_mocap'
