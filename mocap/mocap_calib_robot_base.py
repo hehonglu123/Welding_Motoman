@@ -137,7 +137,6 @@ class CalibRobotBase:
             # move robot to start
             client=MotionProgramExecClient(IP=rob_IP,ROBOT_CHOICE=ROBOT_CHOICE,pulse2deg=rob_p2d)
             client.MoveJ(paths[0][0],rob_speed,0)
-            client.ProgEnd()
             client.execute_motion_program("AAA.JBI")
             # collect data
             self.collect_markers = True
@@ -146,7 +145,6 @@ class CalibRobotBase:
             for N in range(repeat_N):
                 client.MoveJ(paths[0][1],rob_speed,0)
                 client.MoveJ(paths[0][0],rob_speed,0)
-            client.ProgEnd()
             client.execute_motion_program("AAA.JBI")
         else:
             self.collect_markers = True
@@ -290,7 +288,7 @@ def calib_R1():
 
     config_dir='../config/'
     robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path=config_dir+'weldgun.csv',\
-	pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg.csv',base_marker_config_file=config_dir+'MA2010_marker_config.yaml')
+	pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',base_marker_config_file=config_dir+'MA2010_marker_config.yaml')
 
     mocap_url = 'rr+tcp://localhost:59823?service=optitrack_mocap'
     mocap_cli = RRN.ConnectService(mocap_url)

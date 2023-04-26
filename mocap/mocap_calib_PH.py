@@ -14,6 +14,7 @@ import yaml
 from fitting_3dcircle import fitting_3dcircle
 from dx200_motion_program_exec_client import *
 from MocapPoseListener import *
+import pickle
 
 class CalibRobotPH:
     def __init__(self,mocap_cli,robot,nominal_robot_base) -> None:
@@ -53,7 +54,8 @@ class CalibRobotPH:
 
         return center_mean,normal_mean
 
-    def run_calib(self,base_marker_config_file,rob_IP=None,ROBOT_CHOICE=None,rob_p2d=None,start_p=None,paths=[],rob_speed=3,repeat_N=1):
+    def run_calib(self,base_marker_config_file,rob_IP=None,ROBOT_CHOICE=None,rob_p2d=None,start_p=None,paths=[],rob_speed=3,repeat_N=1,
+                  save_raw_data=False,raw_data_dir=''):
 
         self.H_act = deepcopy(self.H_nom)
         self.axis_p = deepcopy(self.H_nom)
@@ -77,6 +79,10 @@ class CalibRobotPH:
             self.axis_p[:,j] = axis_p
             print(self.H_nom[:,j])
             print(axis_normal)
+
+            if save_raw_data:
+                with open(raw_data_dir+'_'+str(j+1)+'.pickle', 'wb') as handle:
+                    pickle.dump(curve_p, handle, protocol=pickle.HIGHEST_PROTOCOL)
         
         with open(base_marker_config_file,'r') as file:
             base_marker_data = yaml.safe_load(file)
@@ -116,16 +122,24 @@ def calib_R1():
     calib_obj = CalibRobotPH(mocap_cli,robot_weld,nominal_robot_base)
 
     # calibration
-    start_p = np.array([[0,-30,-40,0,0,0],
-                        [0,0,-34,0,0,0],
+    # start_p = np.array([[0,-30,-40,0,0,0],
+    #                     [0,0,-34,0,0,0],
+    #                     [0,0,0,0,0,0],
+    #                     [0,0,0,0,-80,0],
+    #                     [0,0,0,0,0,0],
+    #                     [0,0,0,0,0,0]])
+    start_p = np.array([[0,0,0,0,0,0],
                         [0,0,0,0,0,0],
-                        [0,0,0,0,-80,0],
+                        [0,0,0,0,0,0],
+                        [0,0,0,0,0,0],
                         [0,0,0,0,0,0],
                         [0,0,0,0,0,0]])
     q1_1=start_p[0] + np.array([-80,0,0,0,0,0])
     q1_2=start_p[0] + np.array([70,0,0,0,0,0])
-    q2_1=start_p[1] + np.array([0,-60,0,0,0,0])
-    q2_2=start_p[1] + np.array([0,30,0,0,0,0])
+    # q2_1=start_p[1] + np.array([0,-60,0,0,0,0])
+    # q2_2=start_p[1] + np.array([0,30,0,0,0,0])
+    q2_1=start_p[1] + np.array([0,50,0,0,0,0])
+    q2_2=start_p[1] + np.array([0,-10,0,0,0,0])
     q3_1=start_p[2] + np.array([0,0,-60,0,0,0])
     q3_2=start_p[2] + np.array([0,0,10,0,0,0])
     q4_1=start_p[3] + np.array([0,0,0,-120,0,0])
@@ -136,7 +150,15 @@ def calib_R1():
     q6_2=start_p[5] + np.array([0,0,0,0,0,180])
     q_paths = [[q1_1,q1_2],[q2_1,q2_2],[q3_1,q3_2],[q4_1,q4_2],[q5_1,q5_2],[q6_1,q6_2]]
 
-    calib_obj.run_calib(config_dir+'MA2010_marker_config.yaml','192.168.1.31','RB1',robot_weld.pulse2deg,start_p,q_paths,rob_speed=3,repeat_N=1) # save calib config to file
+
+    # collecting raw data
+    # raw_data_dir='PH_raw_data/train_data'
+    # raw_data_dir='PH_raw_data/valid_data_1'
+    raw_data_dir='PH_raw_data/valid_data_2'
+    #####################
+
+    calib_obj.run_calib(config_dir+'MA2010_marker_config.yaml','192.168.1.31','RB1',robot_weld.pulse2deg,start_p,q_paths,rob_speed=3,repeat_N=1,
+                        save_raw_data=True,raw_data_dir=raw_data_dir) # save calib config to file
 
 
 if __name__=='__main__':

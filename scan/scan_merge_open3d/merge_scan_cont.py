@@ -23,16 +23,16 @@ else:
 dtype = o3d.core.float32
 #####################
 
-# data_dir='../../data/wall_weld_test/scan_cont_newdx_1/scans/'
 # data_dir='../../data/wall_weld_test/scan_cont_6_backup/scans/'
 # data_dir='../../data/wall_weld_test/wall_param_1/scans/'
-data_dir='../../data/wall_weld_test/wall_param_data_collection/path_Rz-45_Ry0_stand_off_d243_b_theta45_scan_angle-45_45_z0_35_/scans/'
+data_dir='../../data/wall_weld_test/scan_cont_newdx_1/scans/'
+# data_dir='../../data/wall_weld_test/wall_param_data_collection/path_Rz-45_Ry0_stand_off_d243_b_theta45_scan_angle-45_45_z0_35_/scans/'
 config_dir='../../config/'
 
 robot_scan=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.yml',tool_file_path=config_dir+'scanner_tcp2.csv',\
-    base_transformation_file=config_dir+'MA1440_pose.csv',pulse2deg_file_path=config_dir+'MA1440_A0_pulse2deg.csv')
+    base_transformation_file=config_dir+'MA1440_pose.csv',pulse2deg_file_path=config_dir+'MA1440_A0_pulse2deg_real.csv')
 turn_table=positioner_obj('D500B',def_path=config_dir+'D500B_robot_default_config.yml',tool_file_path=config_dir+'positioner_tcp.csv',\
-    base_transformation_file=config_dir+'D500B_pose.csv',pulse2deg_file_path=config_dir+'D500B_pulse2deg.csv')
+    base_transformation_file=config_dir+'D500B_pose.csv',pulse2deg_file_path=config_dir+'D500B_pulse2deg_real.csv')
 
 scan_js_exe = np.loadtxt(data_dir+'scan_js_exe.csv',delimiter=",", dtype=np.float64)
 rob_stamps = np.loadtxt(data_dir+'robot_stamps.csv',delimiter=",", dtype=np.float64)
@@ -68,19 +68,20 @@ for scan_i in range(1,50):
             break
     # visualize_pcd([pcd_combined])
     pcd_combined=deepcopy(pcd)
-rob_start_norm=1e-3
+rob_start_norm=1e-3*2
 rob_move_stamp_i=None
-for robt_i in range(1,50):
-    # print("robt i:",robt_i)
-    # print(rob_stamps[robt_i])
-    # print(np.degrees(scan_js_exe[robt_i]-scan_js_exe[robt_i-1]))
-    # print(np.linalg.norm(np.degrees(scan_js_exe[robt_i]-scan_js_exe[robt_i-1])))
+for robt_i in range(10,50):
+    print("robt i:",robt_i)
+    print(rob_stamps[robt_i])
+    print(np.degrees(scan_js_exe[robt_i]-scan_js_exe[robt_i-1]))
+    print(np.linalg.norm(np.degrees(scan_js_exe[robt_i]-scan_js_exe[robt_i-1])))
     if np.linalg.norm(np.degrees(scan_js_exe[robt_i]-scan_js_exe[robt_i-1]))>=rob_start_norm:
         rob_move_stamp_i=robt_i
         break
 
 print("Scan Start index:",scan_move_stamp_i) # where scans are different
 print("Robot Start index:",rob_move_stamp_i) # where robot starts moving
+# exit()
 
 robot_scanner_t_diff=sca_stamps[scan_move_stamp_i]-rob_stamps[rob_move_stamp_i] ## (sec) timer start different between the robot and the scanner
 sca_stamps_sync_robt = sca_stamps-robot_scanner_t_diff
@@ -104,7 +105,7 @@ timestep_search_2=False
 search_start_i=50
 
 threshold = 5
-rmse_search_step=20
+rmse_search_step=100
 voxel_size=0.1
 ######################
 
@@ -166,7 +167,7 @@ sca_stamps_sync_robt=sca_stamps_sync_robt+(rob_stamps[robt_move_t1_i+rmse_i]-sca
 pcd_combined = None
 scan_js_exe_cor = []
 scan_i_start=None
-scan_N=70
+# scan_N=70
 for scan_i in range(scan_N):
     # print("Scan:",scan_i)
     # discard scanner timestamp <0 (robot motion haven't start)
