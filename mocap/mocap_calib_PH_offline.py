@@ -4,38 +4,69 @@ sys.path.append('../toolbox/')
 sys.path.append('../redundancy_resolution/')
 from utils import *
 from robot_def import * 
+from general_robotics_toolbox import *
 
 import numpy as np
 import time
 import yaml
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
+import pickle
+from fitting_3dcircle import *
+
+def detect_axis(points,rough_axis_direction,calib_marker_ids):
+
+    all_normals=[]
+    all_centers=[]
+    for i in range(len(calib_marker_ids)):
+        center, normal = fitting_3dcircle(points[calib_marker_ids[i]])
+        if np.sum(np.multiply(normal,rough_axis_direction)) < 0:
+            normal = -1*normal
+        all_normals.append(normal)
+        all_centers.append(center)
+    normal_mean = np.mean(all_normals,axis=0)
+    normal_mean = normal_mean/np.linalg.norm(normal_mean)
+    center_mean = np.mean(all_centers,axis=0)
+
+    return center_mean,normal_mean
 
 config_dir='../config/'
 robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path=config_dir+'weldgun.csv',\
 pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',\
 base_marker_config_file=config_dir+'MA2010_marker_config.yaml',tool_marker_config_file=config_dir+'weldgun_marker_config.yaml')
 
-base_marker_config_file=config_dir+'MA2010_marker_config.yaml'
-with open(base_marker_config_file,'r') as file:
-    base_marker_data = yaml.safe_load(file)
+# only R matter
+nominal_robot_base = Transform(np.array([[1,0,0],
+                                        [0,1,0],
+                                        [0,0,1]]),[0,0,0]) 
+H_nom = np.matmul(nominal_robot_base.R,robot_weld.robot.H)
+H_act = deepcopy(H_nom)
+axis_p = deepcopy(H_nom)
 
-H = []
-H_point = []
-for i in range(6):
-    H.append(np.array([base_marker_data['H'][i]['x'],
-                       base_marker_data['H'][i]['y'],
-                       base_marker_data['H'][i]['z']]))
-    H_point.append(np.array([base_marker_data['H_point'][i]['x'],
-                       base_marker_data['H_point'][i]['y'],
-                       base_marker_data['H_point'][i]['z']]))
-H=np.array(H).T
-H_point=np.array(H_point).T
+for j in range(6):
+    # read raw data
+    raw_data_dir = 'PH_raw_data/train_data'
+    with open(raw_data_dir+'_'+str(j+1)+'.pickle', 'rb') as handle:
+        curve_p = pickle.load(handle)
+    # convert to a usual frame
+    R_zaxis_up = np.array([[0,0,1],
+                            [1,0,0],
+                            [0,1,0]])
+    for marker_id in curve_p.keys():
+        curve_p[marker_id] = np.array(curve_p[marker_id])
+        curve_p[marker_id] = np.matmul(R_zaxis_up,curve_p[marker_id].T).T
 
-print(H)
+    # detect axis
+    this_axis_p,this_axis_normal = detect_axis(curve_p,H_nom[:,j],robot_weld.tool_markers_id)
+    H_act[:,j] = this_axis_normal
+    axis_p[:,j] = this_axis_p
 
+H = H_act
+H_point = axis_p
 for i in range(6):
     H[:,i]=H[:,i]/np.linalg.norm(H[:,i])
+
+print(np.round(H,5).T)
 
 # rotate R
 z_axis = H[:,0]
@@ -43,10 +74,12 @@ y_axis = H[:,1]
 y_axis = y_axis-np.dot(z_axis,y_axis)*z_axis
 y_axis = y_axis/np.linalg.norm(y_axis)
 x_axis = np.cross(y_axis,z_axis)
+x_axis = x_axis/np.linalg.norm(x_axis)
 R = np.array([x_axis,y_axis,z_axis])
 
 H = np.matmul(R,H)
 print(H.T)
+print(np.round(H,5).T)
 H_point = (H_point.T-H_point[:,0]).T
 H_point = np.matmul(R,H_point)
 print(H_point.T)
