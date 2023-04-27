@@ -12,7 +12,6 @@ from RobotRaconteur.Client import *
 from threading import Thread
 import numpy as np
 import time
-import pickle
 from MocapPoseListener import *
 
 config_dir='../config/'
@@ -33,51 +32,58 @@ test_qs = np.array([[0.,0.,0.,0.,0.,0.],[0,69,57,0,0,0],[0,-68,-68,0,0,0],[-36.6
 mocap_url = 'rr+tcp://localhost:59823?service=optitrack_mocap'
 mocap_url = mocap_url
 mocap_cli = RRN.ConnectService(mocap_url)
-# mpl_obj = MocapPoseListener(mocap_cli,[robot_weld],collect_base_stop=1e3,use_static_base=True)
-all_ids=[]
-all_ids.extend(robot_weld.tool_markers_id)
-all_ids.extend(robot_weld.base_markers_id)
-all_ids.append(robot_weld.base_rigid_id)
-all_ids.append()
-mpl_obj = MocapFrameListener(mocap_cli,all_ids,'world')
+mpl_obj = MocapPoseListener(mocap_cli,[robot_weld],collect_base_stop=1e3,use_static_base=True)
 mpl_obj.run_pose_listener()
 time.sleep(5)
 mpl_obj.stop_pose_listener()
-
-data_dir = 'kinematic_raw_data/'
 
 repeats_N = 1
 rob_speed = 15
 all_robot_ctrl_pose = []
 all_robot_mocap_pose = []
-robot_q = {}
 for N in range(repeats_N):
     print("N:",N)
-    pose_N = 0
     for test_q in test_qs:
         # move robot
         robot_client = MotionProgramExecClient(IP='192.168.1.31',ROBOT_CHOICE='RB1',pulse2deg=robot_weld.pulse2deg)
         robot_client.MoveJ(test_q,rob_speed,0)
-        robot_client.setWaitTime(1)
         robot_stamps,curve_exe, job_line,job_step = robot_client.execute_motion_program("AAA.JBI")
         encoder_T = robot_weld.fwd(curve_exe[-1,:6])
         all_robot_ctrl_pose.append(np.append(encoder_T.p,R2q(encoder_T.R)))
 
         mpl_obj.run_pose_listener()
-        time.sleep(0.5)
+        time.sleep(0.1)
         mpl_obj.stop_pose_listener()
-        curve_p,curve_R,timestamps = mpl_obj.get_frames_traj()
+        curve_p,curve_R,timestamps = mpl_obj.get_robots_traj()
         mocap_T = Transform(curve_R[robot_weld.robot_name][-1],curve_p[robot_weld.robot_name][-1])
         all_robot_mocap_pose.append(np.append(mocap_T.p,R2q(mocap_T.R)))
-        
-        if N not in robot_q.keys():
-            robot_q[N]={}
-        robot_q[N][pose_N] = curve_exe[-1,:6]
+    # for i in range(len(curve_p[robot_weld.robot_name])):
+    #     print(curve_p[robot_weld.robot_name][i])
+    # exit()
 
-        with open(data_dir+'pose'+str(pose_N)+'_N'+str(N)+'.pickle', 'wb') as handle:
-            pickle.dump(curve_p, handle, protocol=pickle.HIGHEST_PROTOCOL)
-        
-        pose_N+=1
+# move robot
+robot_client = MotionProgramExecClient(IP='192.168.1.31',ROBOT_CHOICE='RB1',pulse2deg=robot_weld.pulse2deg)
+robot_client.MoveJ(test_qs[1],rob_speed,0)
+robot_stamps,curve_exe, job_line,job_step = robot_client.execute_motion_program("AAA.JBI")
+encoder_T = robot_weld.fwd(curve_exe[-1,:6])
 
-with open(data_dir+'robot_q.pickle', 'wb') as handle:
-    pickle.dump(robot_q, handle, protocol=pickle.HIGHEST_PROTOCOL)
+mpl_obj.run_pose_listener()
+time.sleep(1)
+mpl_obj.stop_pose_listener()
+curve_p,curve_R,timestamps = mpl_obj.get_robots_traj()
+mocap_T = Transform(curve_R[robot_weld.robot_name][-1],curve_p[robot_weld.robot_name][-1])
+
+print(encoder_T)
+print(mocap_T)
+
+for i in range(len(all_robot_mocap_pose)):
+    print("Test i:",i)
+    print(all_robot_ctrl_pose[i])
+    print(all_robot_mocap_pose[i])
+
+exit()
+# np.savetxt('data/compare_results_ctrl_basefix.csv',all_robot_ctrl_pose,delimiter=',')
+# np.savetxt('data/compare_results_mocap_basefix.csv',all_robot_mocap_pose,delimiter=',')
+np.savetxt('data/compare_results_ctrl_basefix_toolT.csv',all_robot_ctrl_pose,delimiter=',')
+np.savetxt('data/compare_results_mocap_basefix_toolT.csv',all_robot_mocap_pose,delimiter=',')
+
