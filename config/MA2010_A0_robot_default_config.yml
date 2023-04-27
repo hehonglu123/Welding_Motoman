@@ -151,3 +151,10 @@ joint_info:
     acceleration: 24.11
   joint_type: revolute
   passive: false
+supported_commands:
+  - MoveJ
+  - MoveL
+  - MoveC
+  - setWaitTime
+  - setArc
+  - changeArc
