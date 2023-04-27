@@ -21,10 +21,20 @@ robot=robot_obj('MA2010_A0',def_path='../config/MA2010_A0_robot_default_config.y
 positioner=positioner_obj('D500B',def_path='../config/D500B_robot_default_config.yml',tool_file_path='../config/positioner_tcp.csv',\
 	pulse2deg_file_path='../config/D500B_pulse2deg_real.csv',base_transformation_file='../config/D500B_pose.csv')
 
-client=MotionProgramExecClient(ROBOT_CHOICE='RB1',ROBOT_CHOICE2='ST1',pulse2deg=robot.pulse2deg,pulse2deg_2=positioner.pulse2deg)
+mp=MotionProgram(ROBOT_CHOICE='RB1',ROBOT_CHOICE2='ST1',pulse2deg=robot.pulse2deg,pulse2deg_2=positioner.pulse2deg, tool_num = 12)
+client=MotionProgramExecClient()
 
 ###########################################base layer welding############################################
+###move to starting position
+# curve_sliced_js=np.loadtxt(data_dir+'curve_sliced_js/MA2010_base_js0_0.csv',delimiter=',')
+# positioner_js=np.loadtxt(data_dir+'curve_sliced_js/D500B_base_js0_0.csv',delimiter=',')
+# target2=['MOVJ',np.degrees(positioner_js[breakpoints[0]]),10]
+# mp.MoveJ(np.degrees(curve_sliced_js[breakpoints[0]]), 5,target2=target2)
+# client.execute_motion_program(mp)
+
+###baselayer
 # num_baselayer=2
+# mp=MotionProgram(ROBOT_CHOICE='RB1',ROBOT_CHOICE2='ST1',pulse2deg=robot.pulse2deg,pulse2deg_2=positioner.pulse2deg, tool_num = 12)
 # for base_layer in range(num_baselayer):
 # 	num_sections=len(glob.glob(data_dir+'curve_sliced_relative/baselayer'+str(base_layer)+'_*.csv'))
 # 	for x in range(num_sections):
@@ -46,16 +56,17 @@ client=MotionProgramExecClient(ROBOT_CHOICE='RB1',ROBOT_CHOICE2='ST1',pulse2deg=
 # 		s1_all,_=calc_individual_speed(vd_relative,lam1,lam2,lam_relative,breakpoints)
 
 # 		target2=['MOVJ',np.degrees(positioner_js[breakpoints[0]]),10]
-# 		client.MoveL(np.degrees(curve_sliced_js[breakpoints[0]]), s1_all[0],target2=target2)
-# 		client.SetArc(True,cond_num=310)
+# 		mp.MoveL(np.degrees(curve_sliced_js[breakpoints[0]]), s1_all[0],target2=target2)
+# 		mp.setArc(True,cond_num=410)
 # 		for j in range(1,len(breakpoints)):
 # 		    target2=['MOVJ',np.degrees(positioner_js[breakpoints[j]]),10]
-# 		    client.MoveL(np.degrees(curve_sliced_js[breakpoints[j]]), s1_all[j],target2=target2)
-# 		client.SetArc(False)
+# 		    mp.MoveL(np.degrees(curve_sliced_js[breakpoints[j]]), s1_all[j],target2=target2)
+# 		mp.setArc(False)
 
 ###########################################layer welding############################################
-num_layer_start=91
-num_layer_end=93
+mp=MotionProgram(ROBOT_CHOICE='RB1',ROBOT_CHOICE2='ST1',pulse2deg=robot.pulse2deg,pulse2deg_2=positioner.pulse2deg, tool_num = 12)
+num_layer_start=90
+num_layer_end=94
 for layer in range(num_layer_start,num_layer_end):
 	num_sections=len(glob.glob(data_dir+'curve_sliced_relative/slice'+str(layer)+'_*.csv'))
 	for x in range(num_sections):
@@ -82,17 +93,17 @@ for layer in range(num_layer_start,num_layer_end):
 			waypoint_pose=robot.fwd(curve_sliced_js[breakpoints[0]])
 			waypoint_pose.p[-1]+=80
 			waypoint_q=robot.inv(waypoint_pose.p,waypoint_pose.R,curve_sliced_js[breakpoints[0]])[0]
-			client.MoveL(np.degrees(waypoint_q), 25,target2=target2)
+			mp.MoveL(np.degrees(waypoint_q), 25,target2=target2)
 
 		target2=['MOVJ',np.degrees(positioner_js[breakpoints[0]]),30]
-		client.MoveL(np.degrees(curve_sliced_js[breakpoints[0]]), s1_all[0],target2=target2)
+		mp.MoveL(np.degrees(curve_sliced_js[breakpoints[0]]), s1_all[0],target2=target2)
 
-		client.SetArc(True,cond_num=306)
+		mp.setArc(True,cond_num=404)
 		for j in range(1,len(breakpoints)):
 		    target2=['MOVJ',np.degrees(positioner_js[breakpoints[j]]),10]
-		    client.MoveL(np.degrees(curve_sliced_js[breakpoints[j]]), s1_all[j],target2=target2)
-		client.SetArc(False)
+		    mp.MoveL(np.degrees(curve_sliced_js[breakpoints[j]]), s1_all[j],target2=target2)
+		mp.setArc(False)
 
     
-timestamp,joint_recording,job_line,_=client.execute_motion_program("AAA.JBI") 
+timestamp,joint_recording,job_line,_=client.execute_motion_program(mp) 
 np.savetxt('joint_recording.csv',np.hstack((timestamp.reshape(-1, 1),job_line.reshape(-1, 1),joint_recording)),delimiter=',')
