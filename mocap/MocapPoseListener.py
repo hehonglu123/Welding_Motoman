@@ -245,7 +245,8 @@ def robotposelistener():
     mocap_url = mocap_url
     mocap_cli = RRN.ConnectService(mocap_url)
 
-    mpl_obj = MocapPoseListener(mocap_cli,[robot_weld],collect_base_stop=1000)
+    # mpl_obj = MocapPoseListener(mocap_cli,[robot_weld],collect_base_stop=1000)
+    mpl_obj = MocapPoseListener(mocap_cli,[robot_weld],collect_base_stop=1,use_static_base=True)
     mpl_obj.run_pose_listener()
     time.sleep(1)
     mpl_obj.stop_pose_listener()
