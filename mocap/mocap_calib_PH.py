@@ -56,33 +56,45 @@ class CalibRobotPH:
 
     def run_calib(self,base_marker_config_file,rob_IP=None,ROBOT_CHOICE=None,rob_p2d=None,start_p=None,paths=[],rob_speed=3,repeat_N=1,
                   save_raw_data=False,raw_data_dir=''):
+        
+        client = MotionProgramExecClient()
 
         self.H_act = deepcopy(self.H_nom)
         self.axis_p = deepcopy(self.H_nom)
 
         input("Press Enter and the robot will start moving.")
         for j in range(len(self.H_nom[0])-1,-1,-1): # from axis 6 to axis 1
-            client=MotionProgramExecClient(IP=rob_IP,ROBOT_CHOICE=ROBOT_CHOICE,pulse2deg=rob_p2d)
-            client.MoveJ(start_p[j],rob_speed,0)
-            client.execute_motion_program("AAA.JBI")
+            mp=MotionProgram(ROBOT_CHOICE=ROBOT_CHOICE,pulse2deg=rob_p2d)
+            mp.MoveJ(start_p[j],rob_speed,0)
+            client.execute_motion_program(mp)
 
             self.mpl_obj.run_pose_listener()
-            client=MotionProgramExecClient(IP=rob_IP,ROBOT_CHOICE=ROBOT_CHOICE,pulse2deg=rob_p2d)
+            mp=MotionProgram(ROBOT_CHOICE=ROBOT_CHOICE,pulse2deg=rob_p2d)
             for N in range(repeat_N):
-                client.MoveJ(paths[j][0],rob_speed,0)
-                client.MoveJ(paths[j][1],rob_speed,0)
-            client.execute_motion_program("AAA.JBI")
+                mp.MoveJ(paths[j][0],rob_speed,0)
+                mp.MoveJ(paths[j][1],rob_speed,0)
+            client.execute_motion_program(mp)
             self.mpl_obj.stop_pose_listener()
             curve_p,curve_R,timestamps = self.mpl_obj.get_frames_traj()
             axis_p,axis_normal = self.detect_axis(curve_p,self.H_nom[:,j])
             self.H_act[:,j] = axis_normal
             self.axis_p[:,j] = axis_p
-            print(self.H_nom[:,j])
-            print(axis_normal)
 
             if save_raw_data:
                 with open(raw_data_dir+'_'+str(j+1)+'.pickle', 'wb') as handle:
                     pickle.dump(curve_p, handle, protocol=pickle.HIGHEST_PROTOCOL)
+        
+        # save zero config
+        mp=MotionProgram(ROBOT_CHOICE=ROBOT_CHOICE,pulse2deg=rob_p2d)
+        mp.MoveJ(start_p[-1],rob_speed,0)
+        client.execute_motion_program(mp)
+        self.mpl_obj.run_pose_listener()
+        time.sleep(5)
+        self.mpl_obj.stop_pose_listener()
+        curve_p,curve_R,timestamps = self.mpl_obj.get_frames_traj()
+        if save_raw_data:
+            with open(raw_data_dir+'_zero_config.pickle', 'wb') as handle:
+                pickle.dump(curve_p, handle, protocol=pickle.HIGHEST_PROTOCOL)
         
         with open(base_marker_config_file,'r') as file:
             base_marker_data = yaml.safe_load(file)
@@ -135,7 +147,7 @@ def calib_R1():
                         [0,0,0,0,0,0],
                         [0,0,0,0,0,0]])
     q1_1=start_p[0] + np.array([-80,0,0,0,0,0])
-    q1_2=start_p[0] + np.array([70,0,0,0,0,0])
+    q1_2=start_p[0] + np.array([56,0,0,0,0,0])
     # q2_1=start_p[1] + np.array([0,-60,0,0,0,0])
     # q2_2=start_p[1] + np.array([0,30,0,0,0,0])
     q2_1=start_p[1] + np.array([0,50,0,0,0,0])
@@ -152,9 +164,9 @@ def calib_R1():
 
 
     # collecting raw data
-    # raw_data_dir='PH_raw_data/train_data'
+    raw_data_dir='PH_raw_data/train_data'
     # raw_data_dir='PH_raw_data/valid_data_1'
-    raw_data_dir='PH_raw_data/valid_data_2'
+    # raw_data_dir='PH_raw_data/valid_data_2'
     #####################
 
     calib_obj.run_calib(config_dir+'MA2010_marker_config.yaml','192.168.1.31','RB1',robot_weld.pulse2deg,start_p,q_paths,rob_speed=3,repeat_N=1,

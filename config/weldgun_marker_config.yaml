@@ -9,11 +9,11 @@ calib_tool_toolmarker_pose:
     y: -152.89910556679916
     z: 284.87811671539686
 tool_markers:
-  marker1_rigid3:
+  marker2_rigid3:
   - -98.25084147
   - -68.5
   - -253.47603479
-  marker2_rigid3:
+  marker4_rigid3:
   - -181.2975596
   - 7.8978
   - -247.65653292
@@ -21,7 +21,7 @@ tool_markers:
   - -98.25084147
   - 68.5
   - -253.47603479
-  marker4_rigid3:
+  marker1_rigid3:
   - -56.10951248
   - -39.3455
   - -463.4844584
