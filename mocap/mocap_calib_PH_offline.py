@@ -31,9 +31,10 @@ def detect_axis(points,rough_axis_direction,calib_marker_ids):
     return center_mean,normal_mean
 
 config_dir='../config/'
+base_marker_config_file=config_dir+'MA2010_marker_config.yaml'
 robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path=config_dir+'weldgun.csv',\
 pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',\
-base_marker_config_file=config_dir+'MA2010_marker_config.yaml',tool_marker_config_file=config_dir+'weldgun_marker_config.yaml')
+base_marker_config_file=base_marker_config_file,tool_marker_config_file=config_dir+'weldgun_marker_config.yaml')
 
 # only R matter
 nominal_robot_base = Transform(np.array([[1,0,0],
@@ -43,7 +44,8 @@ H_nom = np.matmul(nominal_robot_base.R,robot_weld.robot.H)
 H_act = deepcopy(H_nom)
 axis_p = deepcopy(H_nom)
 
-all_datasets=['train_data','valid_data_1','valid_data_2']
+# all_datasets=['train_data','valid_data_1','valid_data_2']
+all_datasets=['train_data']
 for dataset in all_datasets:
     print(dataset)
     for j in range(6):
@@ -80,11 +82,20 @@ for dataset in all_datasets:
     x_axis = x_axis/np.linalg.norm(x_axis)
     R = np.array([x_axis,y_axis,z_axis])
 
+    T_frame_mocap = Transform(R,np.matmul(R,-H_point[:,0]))
     H = np.matmul(R,H)
-    # print(H.T)
-    print(np.round(H,5).T)
-    H_point = (H_point.T-H_point[:,0]).T
-    H_point = np.matmul(R,H_point)
+    for i in range(6):
+        H_point[:,i] = np.matmul(T_frame_mocap.R,H_point[:,i])+T_frame_mocap.p
+    
+    P_marker_id = 'rigid3_marker1'
+    raw_data_dir = 'PH_raw_data/'+dataset
+    with open(raw_data_dir+'_zero_config.pickle', 'rb') as handle:
+        curve_p = pickle.load(handle)
+    tcp_frame = np.matmul(T_frame_mocap.R,np.mean(curve_p[P_marker_id],axis=0))+T_frame_mocap.p
+
+    # print(np.round(H,5).T)
+    # H_point = (H_point.T-H_point[:,0]).T
+    # H_point = np.matmul(R,H_point)
     # print(H_point.T)
 
     diff_H = np.linalg.norm(robot_weld.robot.H-H,axis=0)
@@ -138,3 +149,31 @@ for dataset in all_datasets:
     print(j6_center)
     print(j6_center-j1_center)
     print("====================")
+
+    P=deepcopy(H)
+    P[:,0]=np.array([0,0,0])
+    P[:,1]=j2_center-j1_center
+    P[:,2]=j3_center-j2_center
+    P[:,3]=j4_center-j3_center
+    P[:,4]=j5_center-j4_center
+    P[:,5]=j6_center-j5_center
+    P[:,6]=tcp_frame-j6_center
+
+with open(base_marker_config_file,'r') as file:
+    base_marker_data = yaml.safe_load(file)
+base_marker_data['H']=[]
+base_marker_data['P']=[]
+for j in range(len(H[0])):
+    this_H = {}
+    this_H['x']=float(H[0,j])
+    this_H['y']=float(H[1,j])
+    this_H['z']=float(H[2,j])
+    base_marker_data['H'].append(this_H)
+for j in range(len(P[0])):
+    this_P = {}
+    this_P['x']=float(P[0,j])
+    this_P['y']=float(P[1,j])
+    this_P['z']=float(P[2,j])
+    base_marker_data['P'].append(this_P)
+with open(base_marker_config_file,'w') as file:
+    yaml.safe_dump(base_marker_data,file)

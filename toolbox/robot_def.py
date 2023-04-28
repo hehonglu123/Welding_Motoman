@@ -109,6 +109,18 @@ class robot_obj(object):
 						marker_data['calib_base_mocap_pose']['orientation']['y'],
 						marker_data['calib_base_mocap_pose']['orientation']['z']]
 					self.T_base_mocap = Transform(q2R(q),p)
+				if 'P' in marker_data.keys():
+					self.calib_P = np.zeros(self.robot.P.shape)
+					for i in range(len(marker_data['P'])):
+						self.calib_P[0,i] = marker_data['P'][i]['x']
+						self.calib_P[1,i] = marker_data['P'][i]['y']
+						self.calib_P[2,i] = marker_data['P'][i]['z']
+				if 'H' in marker_data.keys():
+					self.calib_H = np.zeros(self.robot.H.shape)
+					for i in range(len(marker_data['H'])):
+						self.calib_H[0,i] = marker_data['H'][i]['x']
+						self.calib_H[1,i] = marker_data['H'][i]['y']
+						self.calib_H[2,i] = marker_data['H'][i]['z']
 		self.tool_marker_config_file=tool_marker_config_file
 		self.T_tool_toolmarker = None # T^tool_toolmarker
 		if len(tool_marker_config_file)>0:

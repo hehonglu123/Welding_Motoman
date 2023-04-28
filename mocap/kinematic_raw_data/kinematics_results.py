@@ -8,7 +8,7 @@ from robot_def import *
 config_dir='../../config/'
 robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path=config_dir+'weldgun.csv',d=15,\
 pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',\
-base_marker_config_file=config_dir+'MA2010_marker_config_rmsecalib.yaml',tool_marker_config_file=config_dir+'weldgun_marker_config.yaml')
+base_marker_config_file=config_dir+'MA2010_marker_config.yaml',tool_marker_config_file=config_dir+'weldgun_marker_config.yaml')
 
 data_dir='./'
 with open(data_dir+'robot_q.pickle', 'rb') as handle:
@@ -17,7 +17,8 @@ with open(data_dir+'robot_q.pickle', 'rb') as handle:
 total_N = len(robot_q.keys())
 total_pose = len(robot_q[0].keys())
 
-marker_id = robot_weld.tool_markers_id[0]
+marker_id = 'rigid3_marker1'
+
 for pose_N in range(total_pose):
     position_error=[]
     mocap_position=[]

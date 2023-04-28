@@ -38,7 +38,6 @@ all_ids=[]
 all_ids.extend(robot_weld.tool_markers_id)
 all_ids.extend(robot_weld.base_markers_id)
 all_ids.append(robot_weld.base_rigid_id)
-all_ids.append()
 mpl_obj = MocapFrameListener(mocap_cli,all_ids,'world')
 mpl_obj.run_pose_listener()
 time.sleep(5)
@@ -46,29 +45,24 @@ mpl_obj.stop_pose_listener()
 
 data_dir = 'kinematic_raw_data/'
 
-repeats_N = 1
+repeats_N = 20
 rob_speed = 15
-all_robot_ctrl_pose = []
-all_robot_mocap_pose = []
 robot_q = {}
 for N in range(repeats_N):
     print("N:",N)
     pose_N = 0
     for test_q in test_qs:
         # move robot
-        robot_client = MotionProgramExecClient(IP='192.168.1.31',ROBOT_CHOICE='RB1',pulse2deg=robot_weld.pulse2deg)
-        robot_client.MoveJ(test_q,rob_speed,0)
-        robot_client.setWaitTime(1)
-        robot_stamps,curve_exe, job_line,job_step = robot_client.execute_motion_program("AAA.JBI")
-        encoder_T = robot_weld.fwd(curve_exe[-1,:6])
-        all_robot_ctrl_pose.append(np.append(encoder_T.p,R2q(encoder_T.R)))
+        robot_client = MotionProgramExecClient()
+        mp=MotionProgram(ROBOT_CHOICE='RB1',pulse2deg=robot_weld.pulse2deg)
+        mp.MoveJ(test_q,rob_speed,0)
+        mp.setWaitTime(1)
+        robot_stamps,curve_exe, job_line,job_step = robot_client.execute_motion_program(mp)
 
         mpl_obj.run_pose_listener()
         time.sleep(0.5)
         mpl_obj.stop_pose_listener()
         curve_p,curve_R,timestamps = mpl_obj.get_frames_traj()
-        mocap_T = Transform(curve_R[robot_weld.robot_name][-1],curve_p[robot_weld.robot_name][-1])
-        all_robot_mocap_pose.append(np.append(mocap_T.p,R2q(mocap_T.R)))
         
         if N not in robot_q.keys():
             robot_q[N]={}
