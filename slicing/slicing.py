@@ -229,7 +229,7 @@ def slice(bottom_curve,stl_pc,direction,slice_height):
     direction=np.array([0,0,-1])
     bottom_curve_normal=get_curve_normal(bottom_curve,stl_pc,direction)
     slice_all=[[bottom_curve]]
-    for i in range(92*8):
+    for i in range(74):
         print(i, 'th layer')
         slice_ith_layer=[]
         for x in range(len(slice_all[-1])):
@@ -271,7 +271,7 @@ stl_pc *= 25.4      ##convert to mm
 bottom_edge = slicing_uniform(stl_pc,z = np.max(stl_pc[:,2]))
 curve_normal=get_curve_normal(bottom_edge,stl_pc,np.array([0,0,-1]))
 
-slice_all=slice(bottom_edge,stl_pc,np.array([0,0,-1]),slice_height=0.1)
+slice_all=slice(bottom_edge,stl_pc,np.array([0,0,-1]),slice_height=1.)
 
 # Plot the original points and the fitted curved plane
 fig = plt.figure()
@@ -285,6 +285,7 @@ vis_step=5
 for i in range(len(slice_all)):
     for x in range(len(slice_all[i])):
         ax.plot3D(slice_all[i][x][::vis_step,0],slice_all[i][x][::vis_step,1],slice_all[i][x][::vis_step,2],'r.-')
+        np.savetxt('slicing_result/slice_%i_%i.csv'%(i,x),slice_all[i][x])
 
 ax.set_xlabel('X')
 ax.set_ylabel('Y')

@@ -65,11 +65,15 @@ client=MotionProgramExecClient()
 
 ###########################################layer welding############################################
 mp=MotionProgram(ROBOT_CHOICE='RB1',ROBOT_CHOICE2='ST1',pulse2deg=robot.pulse2deg,pulse2deg_2=positioner.pulse2deg, tool_num = 12)
-num_layer_start=90
-num_layer_end=94
+num_layer_start=70
+num_layer_end=80
 for layer in range(num_layer_start,num_layer_end):
 	num_sections=len(glob.glob(data_dir+'curve_sliced_relative/slice'+str(layer)+'_*.csv'))
-	for x in range(num_sections):
+	if layer % 2==1:
+		sections=reversed(range(num_sections))
+	else:
+		sections=range(num_sections)
+	for x in sections:
 		curve_sliced_js=np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
 		positioner_js=np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
 		curve_sliced_relative=np.loadtxt(data_dir+'curve_sliced_relative/slice'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
@@ -91,18 +95,18 @@ for layer in range(num_layer_start,num_layer_end):
 		if num_sections>1:
 			target2=['MOVJ',np.degrees(positioner_js[breakpoints[0]]),30]
 			waypoint_pose=robot.fwd(curve_sliced_js[breakpoints[0]])
-			waypoint_pose.p[-1]+=80
+			waypoint_pose.p[-1]+=50
 			waypoint_q=robot.inv(waypoint_pose.p,waypoint_pose.R,curve_sliced_js[breakpoints[0]])[0]
 			mp.MoveL(np.degrees(waypoint_q), 25,target2=target2)
 
 		target2=['MOVJ',np.degrees(positioner_js[breakpoints[0]]),30]
 		mp.MoveL(np.degrees(curve_sliced_js[breakpoints[0]]), s1_all[0],target2=target2)
 
-		mp.setArc(True,cond_num=404)
+		# mp.setArc(True,cond_num=404)
 		for j in range(1,len(breakpoints)):
 		    target2=['MOVJ',np.degrees(positioner_js[breakpoints[j]]),10]
 		    mp.MoveL(np.degrees(curve_sliced_js[breakpoints[j]]), s1_all[j],target2=target2)
-		mp.setArc(False)
+		# mp.setArc(False)
 
     
 timestamp,joint_recording,job_line,_=client.execute_motion_program(mp) 
