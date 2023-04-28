@@ -15,12 +15,13 @@ q_seed=np.radians([-35.4291,56.6333,40.5194,4.5177,-52.2505,-11.6546])
 q_init=np.degrees(robot.inv(p_start,R,q_seed)[0])
 q_end=np.degrees(robot.inv(p_end,R,q_seed)[0])
 
-client=MotionProgramExecClient(IP='192.168.1.31',ROBOT_CHOICE='RB1',pulse2deg=robot.pulse2deg)
 
+mp=MotionProgram(ROBOT_CHOICE='RB1',pulse2deg=[1.341416193724337745e+03,1.907685083229250267e+03,1.592916090846681982e+03,1.022871664227330484e+03,9.802549195016306385e+02,4.547554799861444508e+02])
+client=MotionProgramExecClient()
 
-client.MoveJ(q_init,1,0)
-client.SetArc(True,cond_num=301)
-client.MoveL(q_end,5,0)
-client.SetArc(False)
+mp.MoveJ(q_init,1,0)
+# mp.SetArc(True,cond_num=410)
+mp.MoveL(q_end,5,0)
+# mp.SetArc(False)
 
-client.execute_motion_program()
+client.execute_motion_program(mp)
