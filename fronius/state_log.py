@@ -2,7 +2,7 @@ from RobotRaconteur.Client import *
 import time
 import numpy as np
 
-c = RRN.ConnectService('rr+tcp://localhost:60823?service=welder')
+c = RRN.ConnectService('rr+tcp://192.168.55.10:60823?service=welder')
 
 consts = RRN.GetConstants("experimental.fronius", c)
 flags_const = consts["WelderStateFlags"]
