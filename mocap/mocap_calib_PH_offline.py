@@ -43,58 +43,98 @@ H_nom = np.matmul(nominal_robot_base.R,robot_weld.robot.H)
 H_act = deepcopy(H_nom)
 axis_p = deepcopy(H_nom)
 
-for j in range(6):
-    # read raw data
-    raw_data_dir = 'PH_raw_data/train_data'
-    with open(raw_data_dir+'_'+str(j+1)+'.pickle', 'rb') as handle:
-        curve_p = pickle.load(handle)
-    # convert to a usual frame
-    R_zaxis_up = np.array([[0,0,1],
-                            [1,0,0],
-                            [0,1,0]])
-    for marker_id in curve_p.keys():
-        curve_p[marker_id] = np.array(curve_p[marker_id])
-        curve_p[marker_id] = np.matmul(R_zaxis_up,curve_p[marker_id].T).T
+all_datasets=['train_data','valid_data_1','valid_data_2']
+for dataset in all_datasets:
+    print(dataset)
+    for j in range(6):
+        # read raw data
+        raw_data_dir = 'PH_raw_data/'+dataset
+        with open(raw_data_dir+'_'+str(j+1)+'.pickle', 'rb') as handle:
+            curve_p = pickle.load(handle)
+        # convert to a usual frame
+        R_zaxis_up = np.array([[0,0,1],
+                                [1,0,0],
+                                [0,1,0]])
+        for marker_id in curve_p.keys():
+            curve_p[marker_id] = np.array(curve_p[marker_id])
+            curve_p[marker_id] = np.matmul(R_zaxis_up,curve_p[marker_id].T).T
 
-    # detect axis
-    this_axis_p,this_axis_normal = detect_axis(curve_p,H_nom[:,j],robot_weld.tool_markers_id)
-    H_act[:,j] = this_axis_normal
-    axis_p[:,j] = this_axis_p
+        # detect axis
+        this_axis_p,this_axis_normal = detect_axis(curve_p,H_nom[:,j],robot_weld.tool_markers_id)
+        H_act[:,j] = this_axis_normal
+        axis_p[:,j] = this_axis_p
 
-H = H_act
-H_point = axis_p
-for i in range(6):
-    H[:,i]=H[:,i]/np.linalg.norm(H[:,i])
+    H = H_act
+    H_point = axis_p
+    for i in range(6):
+        H[:,i]=H[:,i]/np.linalg.norm(H[:,i])
 
-print(np.round(H,5).T)
+    # print(np.round(H,5).T)
 
-# rotate R
-z_axis = H[:,0]
-y_axis = H[:,1]
-y_axis = y_axis-np.dot(z_axis,y_axis)*z_axis
-y_axis = y_axis/np.linalg.norm(y_axis)
-x_axis = np.cross(y_axis,z_axis)
-x_axis = x_axis/np.linalg.norm(x_axis)
-R = np.array([x_axis,y_axis,z_axis])
+    # rotate R
+    z_axis = H[:,0]
+    y_axis = H[:,1]
+    y_axis = y_axis-np.dot(z_axis,y_axis)*z_axis
+    y_axis = y_axis/np.linalg.norm(y_axis)
+    x_axis = np.cross(y_axis,z_axis)
+    x_axis = x_axis/np.linalg.norm(x_axis)
+    R = np.array([x_axis,y_axis,z_axis])
 
-H = np.matmul(R,H)
-print(H.T)
-print(np.round(H,5).T)
-H_point = (H_point.T-H_point[:,0]).T
-H_point = np.matmul(R,H_point)
-print(H_point.T)
+    H = np.matmul(R,H)
+    # print(H.T)
+    print(np.round(H,5).T)
+    H_point = (H_point.T-H_point[:,0]).T
+    H_point = np.matmul(R,H_point)
+    # print(H_point.T)
 
-diff_H = np.linalg.norm(robot_weld.robot.H-H,axis=0)
-print(diff_H)
+    diff_H = np.linalg.norm(robot_weld.robot.H-H,axis=0)
+    # print(diff_H)
 
-for i in range(6):
-    print(np.degrees(np.arccos(np.dot(H[:,i],robot_weld.robot.H[:,i])/(np.linalg.norm(H[:,i])*np.linalg.norm(robot_weld.robot.H[:,i])))))
+    # for i in range(6):
+    #     print(np.degrees(np.arccos(np.dot(H[:,i],robot_weld.robot.H[:,i])/(np.linalg.norm(H[:,i])*np.linalg.norm(robot_weld.robot.H[:,i])))))
 
-fig = plt.figure()
-ax = fig.add_subplot(projection='3d')
-for i in range(6):
-    start_p = H_point[:,i]-H[:,i]*1000
-    end_p = H_point[:,i]+H[:,i]*1000
-    ax.plot([start_p[0],end_p[0]], [start_p[1],end_p[1]], [start_p[2],end_p[2]], label='axis '+str(i+1))
-plt.legend()
-plt.show()
+    # fig = plt.figure()
+    # ax = fig.add_subplot(projection='3d')
+    # for i in range(6):
+    #     start_p = H_point[:,i]-H[:,i]*1000
+    #     end_p = H_point[:,i]+H[:,i]*1000
+    #     ax.plot([start_p[0],end_p[0]], [start_p[1],end_p[1]], [start_p[2],end_p[2]], label='axis '+str(i+1))
+    # plt.legend()
+    # plt.show()
+
+ 
+    # get P
+
+    # joint 1 is the closest point on H1 to H2
+    ab_coefficient = np.matmul(np.linalg.pinv(np.array([H[:,0],-H[:,1]]).T),
+                                        -(H_point[:,0]-H_point[:,1]))
+    j1_center = H_point[:,0]+ab_coefficient[0]*H[:,0]
+    j2_center = H_point[:,1]+ab_coefficient[1]*H[:,1]
+    print("P2:",j2_center-j1_center)
+
+    k=(j2_center[1]-H_point[1,2])/H[1,2]
+    j3_center = H_point[:,2]+k*H[:,2]
+    print("P3:",j3_center-j2_center)
+
+    # p456
+    # ab_coefficient = np.matmul(np.linalg.pinv(np.array([H[:,0],-H[:,1]]).T),
+    #                                     -(H_point[:,0]-H_point[:,1]))
+    # j1_center = H_point[:,0]+ab_coefficient[0]*H[:,0]
+    # j2_center = H_point[:,1]+ab_coefficient[1]*H[:,1]
+
+    # p5
+    k=(j3_center[1]-H_point[1,4])/H[1,4]
+    j5_center = H_point[:,4]+k*H[:,4]
+    # p4
+    k=(j5_center[0]-H_point[0,3])/H[0,3]
+    j4_center = H_point[:,3]+k*H[:,3]
+    # p6
+    k=(j5_center[0]-H_point[0,5])/H[0,5]
+    j6_center = H_point[:,5]+k*H[:,5]
+    print("P4:",j4_center-j3_center)
+    print("P5:",j5_center-j4_center)
+    print("P6:",j6_center-j5_center)
+    print(j1_center)
+    print(j6_center)
+    print(j6_center-j1_center)
+    print("====================")
