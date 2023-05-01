@@ -89,7 +89,10 @@ class CalibRobotPH:
         mp.MoveJ(start_p[-1],rob_speed,0)
         client.execute_motion_program(mp)
         self.mpl_obj.run_pose_listener()
-        time.sleep(5)
+        mp=MotionProgram(ROBOT_CHOICE=ROBOT_CHOICE,pulse2deg=rob_p2d)
+        mp.MoveJ(start_p[-1],rob_speed,0)
+        mp.setWaitTime(5)
+        client.execute_motion_program(mp)
         self.mpl_obj.stop_pose_listener()
         curve_p,curve_R,timestamps = self.mpl_obj.get_frames_traj()
         if save_raw_data:
