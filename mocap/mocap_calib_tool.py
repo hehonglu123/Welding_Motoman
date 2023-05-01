@@ -118,23 +118,28 @@ class CalibRobotTool:
     def run_calib(self,tool_marker_config_file,auto=False,rob_IP=None,ROBOT_CHOICE=None,rob_p2d=None,paths=[],rob_speed=3):
 
         input("Enter to start calibrate tool")
+
+        
+
+        client=MotionProgramExecClient()
+
         cp_thread = Thread( target = self.collect_point_thread,daemon=True)
         self.collect_thread_end = False
         cp_thread.start()
         if auto:
             print("Robot is collecting samples")
             # move robot to start
-            client=MotionProgramExecClient(IP=rob_IP,ROBOT_CHOICE=ROBOT_CHOICE,pulse2deg=rob_p2d)
-            client.MoveJ(paths[0],rob_speed,0)
-            client.execute_motion_program("AAA.JBI")
+            mp=MotionProgram(ROBOT_CHOICE=ROBOT_CHOICE,pulse2deg=rob_p2d)
+            mp.MoveJ(paths[0],rob_speed,0)
+            client.execute_motion_program(mp)
             # collect data
             self.collect_markers = True
             time.sleep(0.5)
-            client=MotionProgramExecClient(IP=rob_IP,ROBOT_CHOICE=ROBOT_CHOICE,pulse2deg=rob_p2d)
+            mp=MotionProgram(ROBOT_CHOICE=ROBOT_CHOICE,pulse2deg=rob_p2d)
             for i in range(1,len(paths)):
-                client.MoveJ(paths[i],rob_speed,0)
-            client.MoveJ(paths[0],rob_speed,0)
-            client.execute_motion_program("AAA.JBI")
+                mp.MoveJ(paths[i],rob_speed,0)
+            mp.MoveJ(paths[0],rob_speed,0)
+            client.execute_motion_program(mp)
         else:
             input("Please move the tool to be seen by as many camera as possible.")
             self.collect_markers = True
