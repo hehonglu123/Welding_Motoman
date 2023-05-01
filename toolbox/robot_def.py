@@ -138,6 +138,9 @@ class robot_obj(object):
 						marker_data['calib_tool_toolmarker_pose']['orientation']['y'],
 						marker_data['calib_tool_toolmarker_pose']['orientation']['z']]
 					self.T_tool_toolmarker = Transform(q2R(q),p)
+					# add d
+					T_d1_d2 = Transform(np.eye(3),p=[0,0,d-15])
+					self.T_tool_toolmarker = self.T_tool_toolmarker*T_d1_d2
 
 	def get_acc(self,q_all,direction=[]):
 		###get acceleration limit from q config, assume last 3 joints acc fixed direction is 3 length vector, 0 is -, 1 is +

@@ -125,6 +125,8 @@ class CalibRobotBase:
 
     def run_calib(self,base_marker_config_file,auto=False,rob_IP=None,ROBOT_CHOICE=None,rob_p2d=None,paths=[],rob_speed=3,repeat_N=1):
 
+        client=MotionProgramExecClient()
+
         # check where's joint axis 1
         self.clear_samples()
         cp_thread = Thread( target = self.collect_point_thread,daemon=True)
@@ -135,17 +137,17 @@ class CalibRobotBase:
         if auto:
             print("Robot is collecting samples")
             # move robot to start
-            client=MotionProgramExecClient(IP=rob_IP,ROBOT_CHOICE=ROBOT_CHOICE,pulse2deg=rob_p2d)
-            client.MoveJ(paths[0][0],rob_speed,0)
-            client.execute_motion_program("AAA.JBI")
+            mp=MotionProgram(ROBOT_CHOICE=ROBOT_CHOICE,pulse2deg=rob_p2d)
+            mp.MoveJ(paths[0][0],rob_speed,0)
+            client.execute_motion_program(mp)
             # collect data
             self.collect_markers = True
             time.sleep(0.5)
-            client=MotionProgramExecClient(IP=rob_IP,ROBOT_CHOICE=ROBOT_CHOICE,pulse2deg=rob_p2d)
+            mp=MotionProgram(ROBOT_CHOICE=ROBOT_CHOICE,pulse2deg=rob_p2d)
             for N in range(repeat_N):
-                client.MoveJ(paths[0][1],rob_speed,0)
-                client.MoveJ(paths[0][0],rob_speed,0)
-            client.execute_motion_program("AAA.JBI")
+                mp.MoveJ(paths[0][1],rob_speed,0)
+                mp.MoveJ(paths[0][0],rob_speed,0)
+            client.execute_motion_program(mp)
         else:
             self.collect_markers = True
             input("Press Enter if you collect enough samples")
@@ -166,17 +168,17 @@ class CalibRobotBase:
         if auto:
             print("Robot is collecting samples")
             # move robot to start
-            client=MotionProgramExecClient(IP=rob_IP,ROBOT_CHOICE=ROBOT_CHOICE,pulse2deg=rob_p2d)
-            client.MoveJ(paths[1][0],rob_speed,0)
-            client.execute_motion_program("AAA.JBI")
+            mp=MotionProgram(ROBOT_CHOICE=ROBOT_CHOICE,pulse2deg=rob_p2d)
+            mp.MoveJ(paths[1][0],rob_speed,0)
+            client.execute_motion_program(mp)
             # collect data
             self.collect_markers = True
             time.sleep(0.5)
-            client=MotionProgramExecClient(IP=rob_IP,ROBOT_CHOICE=ROBOT_CHOICE,pulse2deg=rob_p2d)
+            mp=MotionProgram(ROBOT_CHOICE=ROBOT_CHOICE,pulse2deg=rob_p2d)
             for N in range(repeat_N):
-                client.MoveJ(paths[1][1],rob_speed,0)
-                client.MoveJ(paths[1][0],rob_speed,0)
-            client.execute_motion_program("AAA.JBI")
+                mp.MoveJ(paths[1][1],rob_speed,0)
+                mp.MoveJ(paths[1][0],rob_speed,0)
+            client.execute_motion_program(mp)
         else:
             self.collect_markers = True
             input("Press Enter if you collect enough samples")

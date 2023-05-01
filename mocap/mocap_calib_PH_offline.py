@@ -75,20 +75,18 @@ for dataset in all_datasets:
     x_axis = np.cross(y_axis,z_axis)
     x_axis = x_axis/np.linalg.norm(x_axis)
     R = np.array([x_axis,y_axis,z_axis])
-
-    T_frame_mocap = Transform(R,np.matmul(R,-H_point[:,0]))
-    H = np.matmul(R,H)
-    for i in range(6):
-        H_point[:,i] = np.matmul(T_frame_mocap.R,H_point[:,i])+T_frame_mocap.p
     
-    P_marker_id = 'marker1_rigid3'
+    P_marker_id = 'marker4_rigid3'
     raw_data_dir = 'PH_raw_data/'+dataset
     with open(raw_data_dir+'_zero_config.pickle', 'rb') as handle:
         curve_p = pickle.load(handle)
-    tcp_frame = np.matmul(T_frame_mocap.R,np.mean(curve_p[P_marker_id],axis=0))+T_frame_mocap.p
-    print(T_frame_mocap)
-    print(np.mean(curve_p[P_marker_id],axis=0))
-    print(tcp_frame)
+    tcp = np.mean(curve_p[P_marker_id],axis=0)
+
+    # T_frame_mocap = Transform(R,np.matmul(R,-H_point[:,0]))
+    # H = np.matmul(R,H)
+    # for i in range(6):
+    #     H_point[:,i] = np.matmul(T_frame_mocap.R,H_point[:,i])+T_frame_mocap.p
+    # tcp_frame = np.matmul(T_frame_mocap.R,np.mean(curve_p[P_marker_id],axis=0))+T_frame_mocap.p
 
     # print(np.round(H,5).T)
     # H_point = (H_point.T-H_point[:,0]).T
@@ -117,6 +115,17 @@ for dataset in all_datasets:
     j1_center = H_point[:,0]+ab_coefficient[0]*H[:,0]
     j2_center = H_point[:,1]+ab_coefficient[1]*H[:,1]
 
+    ###### get robot base frame and convert
+    T_base_mocap = Transform(R.T,j1_center)
+    T_mocap_base = T_base_mocap.inv()
+    H = np.matmul(T_mocap_base.R,H)
+    for i in range(6):
+        H_point[:,i] = np.matmul(T_mocap_base.R,H_point[:,i])+T_mocap_base.p
+    tcp_base = np.matmul(T_mocap_base.R,tcp)+T_mocap_base.p
+    j1_center = np.matmul(T_mocap_base.R,j1_center)+T_mocap_base.p
+    j2_center = np.matmul(T_mocap_base.R,j2_center)+T_mocap_base.p
+    #######################################
+
     k=(j2_center[1]-H_point[1,2])/H[1,2]
     j3_center = H_point[:,2]+k*H[:,2]
 
@@ -137,19 +146,19 @@ for dataset in all_datasets:
     P[:,3]=j4_center-j3_center
     P[:,4]=j5_center-j4_center
     P[:,5]=j6_center-j5_center
-    P[:,6]=tcp_frame-j6_center
-    print("P2:",j2_center-j1_center)
-    print("P3:",j3_center-j2_center)
-    print("P4:",j4_center-j3_center)
-    print("P5:",j5_center-j4_center)
-    print("P6:",j6_center-j5_center)
-    print("P7:",tcp_frame-j6_center)
-    print("J1 Center:",j1_center)
-    print("J6 Center:",j6_center)
-    print("J6 in J1:",j6_center-j1_center)
-    print("====================")
+    P[:,6]=tcp_base-j6_center
 
-    T_base_mocap = Transform(R.T,j1_center)
+    print("P2:",P[:,1])
+    print("P3:",P[:,2])
+    print("P4:",P[:,3])
+    print("P5:",P[:,4])
+    print("P6:",P[:,5])
+    print("P7:",P[:,6])
+    print("H:",H.T)
+    # print("J1 Center:",j1_center)
+    # print("J6 Center:",j6_center)
+    # print("J6 in J1:",j6_center-j1_center)
+    print("====================")
 
 with open(base_marker_config_file,'r') as file:
     base_marker_data = yaml.safe_load(file)
