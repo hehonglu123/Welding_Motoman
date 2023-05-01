@@ -37,9 +37,9 @@ pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',\
 base_marker_config_file=base_marker_config_file,tool_marker_config_file=config_dir+'weldgun_marker_config.yaml')
 
 # only R matter
-nominal_robot_base = Transform(np.array([[1,0,0],
-                                        [0,1,0],
-                                        [0,0,1]]),[0,0,0]) 
+nominal_robot_base = Transform(np.array([[0,1,0],
+                                        [0,0,1],
+                                        [1,0,0]]),[0,0,0]) 
 H_nom = np.matmul(nominal_robot_base.R,robot_weld.robot.H)
 H_act = deepcopy(H_nom)
 axis_p = deepcopy(H_nom)
@@ -54,12 +54,12 @@ for dataset in all_datasets:
         with open(raw_data_dir+'_'+str(j+1)+'.pickle', 'rb') as handle:
             curve_p = pickle.load(handle)
         # convert to a usual frame
-        R_zaxis_up = np.array([[0,0,1],
-                                [1,0,0],
-                                [0,1,0]])
-        for marker_id in curve_p.keys():
-            curve_p[marker_id] = np.array(curve_p[marker_id])
-            curve_p[marker_id] = np.matmul(R_zaxis_up,curve_p[marker_id].T).T
+        # R_zaxis_up = np.array([[0,0,1],
+        #                         [1,0,0],
+        #                         [0,1,0]])
+        # for marker_id in curve_p.keys():
+        #     curve_p[marker_id] = np.array(curve_p[marker_id])
+        #     curve_p[marker_id] = np.matmul(R_zaxis_up,curve_p[marker_id].T).T
 
         # detect axis
         this_axis_p,this_axis_normal = detect_axis(curve_p,H_nom[:,j],robot_weld.tool_markers_id)
@@ -75,6 +75,7 @@ for dataset in all_datasets:
 
     # rotate R
     z_axis = H[:,0]
+    print(H[:,0])
     y_axis = H[:,1]
     y_axis = y_axis-np.dot(z_axis,y_axis)*z_axis
     y_axis = y_axis/np.linalg.norm(y_axis)
@@ -87,11 +88,15 @@ for dataset in all_datasets:
     for i in range(6):
         H_point[:,i] = np.matmul(T_frame_mocap.R,H_point[:,i])+T_frame_mocap.p
     
-    P_marker_id = 'rigid3_marker1'
+    P_marker_id = 'marker1_rigid3'
     raw_data_dir = 'PH_raw_data/'+dataset
     with open(raw_data_dir+'_zero_config.pickle', 'rb') as handle:
         curve_p = pickle.load(handle)
+    # curve_p[P_marker_id] = np.matmul(R_zaxis_up,np.array(curve_p[P_marker_id]).T).T
     tcp_frame = np.matmul(T_frame_mocap.R,np.mean(curve_p[P_marker_id],axis=0))+T_frame_mocap.p
+    print(T_frame_mocap)
+    print(np.mean(curve_p[P_marker_id],axis=0))
+    print(tcp_frame)
 
     # print(np.round(H,5).T)
     # H_point = (H_point.T-H_point[:,0]).T
@@ -113,25 +118,15 @@ for dataset in all_datasets:
     # plt.legend()
     # plt.show()
 
- 
     # get P
-
     # joint 1 is the closest point on H1 to H2
     ab_coefficient = np.matmul(np.linalg.pinv(np.array([H[:,0],-H[:,1]]).T),
                                         -(H_point[:,0]-H_point[:,1]))
     j1_center = H_point[:,0]+ab_coefficient[0]*H[:,0]
     j2_center = H_point[:,1]+ab_coefficient[1]*H[:,1]
-    print("P2:",j2_center-j1_center)
 
     k=(j2_center[1]-H_point[1,2])/H[1,2]
     j3_center = H_point[:,2]+k*H[:,2]
-    print("P3:",j3_center-j2_center)
-
-    # p456
-    # ab_coefficient = np.matmul(np.linalg.pinv(np.array([H[:,0],-H[:,1]]).T),
-    #                                     -(H_point[:,0]-H_point[:,1]))
-    # j1_center = H_point[:,0]+ab_coefficient[0]*H[:,0]
-    # j2_center = H_point[:,1]+ab_coefficient[1]*H[:,1]
 
     # p5
     k=(j3_center[1]-H_point[1,4])/H[1,4]
@@ -142,15 +137,8 @@ for dataset in all_datasets:
     # p6
     k=(j5_center[0]-H_point[0,5])/H[0,5]
     j6_center = H_point[:,5]+k*H[:,5]
-    print("P4:",j4_center-j3_center)
-    print("P5:",j5_center-j4_center)
-    print("P6:",j6_center-j5_center)
-    print(j1_center)
-    print(j6_center)
-    print(j6_center-j1_center)
-    print("====================")
 
-    P=deepcopy(H)
+    P=np.zeros((3,7))
     P[:,0]=np.array([0,0,0])
     P[:,1]=j2_center-j1_center
     P[:,2]=j3_center-j2_center
@@ -158,6 +146,16 @@ for dataset in all_datasets:
     P[:,4]=j5_center-j4_center
     P[:,5]=j6_center-j5_center
     P[:,6]=tcp_frame-j6_center
+    print("P2:",j2_center-j1_center)
+    print("P3:",j3_center-j2_center)
+    print("P4:",j4_center-j3_center)
+    print("P5:",j5_center-j4_center)
+    print("P6:",j6_center-j5_center)
+    print("P7:",tcp_frame-j6_center)
+    print("J1 Center:",j1_center)
+    print("J6 Center:",j6_center)
+    print("J6 in J1:",j6_center-j1_center)
+    print("====================")
 
 with open(base_marker_config_file,'r') as file:
     base_marker_data = yaml.safe_load(file)
