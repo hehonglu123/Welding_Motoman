@@ -53,13 +53,6 @@ for dataset in all_datasets:
         raw_data_dir = 'PH_raw_data/'+dataset
         with open(raw_data_dir+'_'+str(j+1)+'.pickle', 'rb') as handle:
             curve_p = pickle.load(handle)
-        # convert to a usual frame
-        # R_zaxis_up = np.array([[0,0,1],
-        #                         [1,0,0],
-        #                         [0,1,0]])
-        # for marker_id in curve_p.keys():
-        #     curve_p[marker_id] = np.array(curve_p[marker_id])
-        #     curve_p[marker_id] = np.matmul(R_zaxis_up,curve_p[marker_id].T).T
 
         # detect axis
         this_axis_p,this_axis_normal = detect_axis(curve_p,H_nom[:,j],robot_weld.tool_markers_id)
@@ -92,7 +85,6 @@ for dataset in all_datasets:
     raw_data_dir = 'PH_raw_data/'+dataset
     with open(raw_data_dir+'_zero_config.pickle', 'rb') as handle:
         curve_p = pickle.load(handle)
-    # curve_p[P_marker_id] = np.matmul(R_zaxis_up,np.array(curve_p[P_marker_id]).T).T
     tcp_frame = np.matmul(T_frame_mocap.R,np.mean(curve_p[P_marker_id],axis=0))+T_frame_mocap.p
     print(T_frame_mocap)
     print(np.mean(curve_p[P_marker_id],axis=0))
@@ -157,6 +149,8 @@ for dataset in all_datasets:
     print("J6 in J1:",j6_center-j1_center)
     print("====================")
 
+    T_base_mocap = Transform(R.T,j1_center)
+
 with open(base_marker_config_file,'r') as file:
     base_marker_data = yaml.safe_load(file)
 base_marker_data['H']=[]
@@ -173,5 +167,16 @@ for j in range(len(P[0])):
     this_P['y']=float(P[1,j])
     this_P['z']=float(P[2,j])
     base_marker_data['P'].append(this_P)
+base_marker_data['calib_base_mocap_pose'] = {}
+base_marker_data['calib_base_mocap_pose']['position'] = {}
+base_marker_data['calib_base_mocap_pose']['position']['x'] = float(T_base_mocap.p[0])
+base_marker_data['calib_base_mocap_pose']['position']['y'] = float(T_base_mocap.p[1])
+base_marker_data['calib_base_mocap_pose']['position']['z'] = float(T_base_mocap.p[2])
+quat = R2q(T_base_mocap.R)
+base_marker_data['calib_base_mocap_pose']['orientation'] = {}
+base_marker_data['calib_base_mocap_pose']['orientation']['w'] = float(quat[0])
+base_marker_data['calib_base_mocap_pose']['orientation']['x'] = float(quat[1])
+base_marker_data['calib_base_mocap_pose']['orientation']['y'] = float(quat[2])
+base_marker_data['calib_base_mocap_pose']['orientation']['z'] = float(quat[3])
 with open(base_marker_config_file,'w') as file:
     yaml.safe_dump(base_marker_data,file)
