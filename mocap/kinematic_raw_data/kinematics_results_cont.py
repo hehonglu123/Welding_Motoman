@@ -12,6 +12,19 @@ robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_co
 pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',\
 base_marker_config_file=config_dir+'MA2010_marker_config.yaml',tool_marker_config_file=config_dir+'weldgun_marker_config.yaml')
 
+raw_data_dir = 'test0502_noanchor/'
+for j in range(6):
+    with open(raw_data_dir+'mocap_p_cont.pickle', 'rb') as handle:
+        curve_p = pickle.load(handle)
+    with open(raw_data_dir+'mocap_R_cont.pickle', 'rb') as handle:
+        curve_R = pickle.load(handle)
+    with open(raw_data_dir+'mocap_p_timestamps_cont.pickle', 'rb') as handle:
+        mocap_stamps = pickle.load(handle)
+    print(curve_p[robot_weld.tool_rigid_id][0])
+    print(curve_R[robot_weld.tool_rigid_id][0])
+    print(mocap_stamps[robot_weld.tool_rigid_id][0])
+exit()
+
 data_dir='./'
 with open(data_dir+'robot_q_cont.pickle', 'rb') as handle:
     robot_q = pickle.load(handle)
