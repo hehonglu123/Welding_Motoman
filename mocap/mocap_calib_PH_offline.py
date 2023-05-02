@@ -77,6 +77,7 @@ for dataset in all_datasets:
     R = np.array([x_axis,y_axis,z_axis])
     
     P_marker_id = 'marker4_rigid3'
+    # P_marker_id = 'rigid3'
     raw_data_dir = 'PH_raw_data/'+dataset
     with open(raw_data_dir+'_zero_config.pickle', 'rb') as handle:
         curve_p = pickle.load(handle)

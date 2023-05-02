@@ -33,6 +33,7 @@ class CalibRobotPH:
         all_ids.extend(self.calib_marker_ids)
         all_ids.extend(self.base_markers_ids)
         all_ids.append(self.base_rigid_id)
+        all_ids.append(robot.tool_rigid_id)
         self.mpl_obj = MocapFrameListener(self.mocap_cli,all_ids,'world')
 
         # nominal H axis
