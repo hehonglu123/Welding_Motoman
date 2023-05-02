@@ -74,7 +74,7 @@ class CalibRobotPH:
             for N in range(repeat_N):
                 mp.MoveJ(paths[j][0],rob_speed,0)
                 mp.MoveJ(paths[j][1],rob_speed,0)
-            client.execute_motion_program(mp)
+            robot_stamps,curve_exe, job_line,job_step = client.execute_motion_program(mp)
             self.mpl_obj.stop_pose_listener()
             curve_p,curve_R,timestamps = self.mpl_obj.get_frames_traj()
             axis_p,axis_normal = self.detect_axis(curve_p,self.H_nom[:,j])
@@ -82,8 +82,16 @@ class CalibRobotPH:
             self.axis_p[:,j] = axis_p
 
             if save_raw_data:
-                with open(raw_data_dir+'_'+str(j+1)+'.pickle', 'wb') as handle:
+                with open(raw_data_dir+'_'+str(j+1)+'_mocap_p.pickle', 'wb') as handle:
                     pickle.dump(curve_p, handle, protocol=pickle.HIGHEST_PROTOCOL)
+                with open(raw_data_dir+'_'+str(j+1)+'_mocap_R.pickle', 'wb') as handle:
+                    pickle.dump(curve_R, handle, protocol=pickle.HIGHEST_PROTOCOL)
+                with open(raw_data_dir+'_'+str(j+1)+'_mocap_timestamps.pickle', 'wb') as handle:
+                    pickle.dump(timestamps, handle, protocol=pickle.HIGHEST_PROTOCOL)
+                with open(raw_data_dir+'_'+str(j+1)+'_robot_q.pickle', 'wb') as handle:
+                    pickle.dump(curve_exe, handle, protocol=pickle.HIGHEST_PROTOCOL)
+                with open(raw_data_dir+'_'+str(j+1)+'_robot_timestamps.pickle', 'wb') as handle:
+                    pickle.dump(robot_stamps, handle, protocol=pickle.HIGHEST_PROTOCOL)
         
         # save zero config
         mp=MotionProgram(ROBOT_CHOICE=ROBOT_CHOICE,pulse2deg=rob_p2d)
@@ -93,12 +101,20 @@ class CalibRobotPH:
         mp=MotionProgram(ROBOT_CHOICE=ROBOT_CHOICE,pulse2deg=rob_p2d)
         mp.MoveJ(start_p[-1],rob_speed,0)
         mp.setWaitTime(5)
-        client.execute_motion_program(mp)
+        robot_stamps,curve_exe, job_line,job_step = client.execute_motion_program(mp)
         self.mpl_obj.stop_pose_listener()
         curve_p,curve_R,timestamps = self.mpl_obj.get_frames_traj()
         if save_raw_data:
-            with open(raw_data_dir+'_zero_config.pickle', 'wb') as handle:
+            with open(raw_data_dir+'_zero_mocap_p.pickle', 'wb') as handle:
                 pickle.dump(curve_p, handle, protocol=pickle.HIGHEST_PROTOCOL)
+            with open(raw_data_dir+'_zero_mocap_R.pickle', 'wb') as handle:
+                pickle.dump(curve_R, handle, protocol=pickle.HIGHEST_PROTOCOL)
+            with open(raw_data_dir+'_zero_mocap_timestamps.pickle', 'wb') as handle:
+                pickle.dump(timestamps, handle, protocol=pickle.HIGHEST_PROTOCOL)
+            with open(raw_data_dir+'_zero_robot_q.pickle', 'wb') as handle:
+                pickle.dump(curve_exe, handle, protocol=pickle.HIGHEST_PROTOCOL)
+            with open(raw_data_dir+'_zero_robot_timestamps.pickle', 'wb') as handle:
+                pickle.dump(robot_stamps, handle, protocol=pickle.HIGHEST_PROTOCOL)
         
         with open(base_marker_config_file,'r') as file:
             base_marker_data = yaml.safe_load(file)

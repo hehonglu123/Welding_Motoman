@@ -37,6 +37,7 @@ all_ids=[]
 all_ids.extend(robot_weld.tool_markers_id)
 all_ids.extend(robot_weld.base_markers_id)
 all_ids.append(robot_weld.base_rigid_id)
+all_ids.append(robot_weld.tool_rigid_id)
 mpl_obj = MocapFrameListener(mocap_cli,all_ids,'world')
 
 data_dir = 'kinematic_raw_data/'
