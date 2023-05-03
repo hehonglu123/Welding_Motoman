@@ -14,6 +14,40 @@ from mpl_toolkits.mplot3d import Axes3D
 import pickle
 from fitting_3dcircle import *
 
+def read_and_convert_frame(filename,target_frame,markers_id):
+
+    base_filename = filename+'_'+target_frame
+    mocap_filename = filename+'_mocap'
+
+    try:
+        with open(base_filename+'_p.pickle', 'rb') as handle:
+            curve_p = pickle.load(handle)
+        with open(base_filename+'_R.pickle', 'rb') as handle:
+            curve_R = pickle.load(handle)
+        with open(base_filename+'_timestamps.pickle', 'rb') as handle:
+            mocap_stamps = pickle.load(handle)
+        for marker_id in markers_id:
+            curve_p[marker_id]
+    except:
+        with open(mocap_filename+'_p.pickle', 'rb') as handle:
+            curve_p = pickle.load(handle)
+        with open(mocap_filename+'_R.pickle', 'rb') as handle:
+            curve_R = pickle.load(handle)
+        with open(mocap_filename+'_timestamps.pickle', 'rb') as handle:
+            mocap_stamps = pickle.load(handle)
+
+        # convert everything in basemarker frame
+        curve_p,curve_R,mocap_stamps = to_frame(curve_p,curve_R,mocap_stamps,target_frame,markers_id)
+
+        with open(base_filename+'_p.pickle', 'wb') as handle:
+            pickle.dump(curve_p, handle, protocol=pickle.HIGHEST_PROTOCOL)
+        with open(base_filename+'_R.pickle', 'wb') as handle:
+            pickle.dump(curve_R, handle, protocol=pickle.HIGHEST_PROTOCOL)
+        with open(base_filename+'_timestamps.pickle', 'wb') as handle:
+            pickle.dump(mocap_stamps, handle, protocol=pickle.HIGHEST_PROTOCOL)
+    
+    return curve_p,curve_R,mocap_stamps
+
 def detect_axis(points,rough_axis_direction,calib_marker_ids):
 
     all_normals=[]
@@ -30,11 +64,35 @@ def detect_axis(points,rough_axis_direction,calib_marker_ids):
 
     return center_mean,normal_mean
 
+def to_frame(curve_p,curve_R,mocap_stamps,target_frame,markers_id):
+    curve_p_frame = {}
+    curve_R_frame = {}
+    mocap_stamps_frame = []
+    for sample_i in range(len(mocap_stamps[target_frame])):
+        basemarker_stamp = mocap_stamps[target_frame][sample_i]
+        basemarker_T = Transform(curve_R[target_frame][sample_i],
+                                curve_p[target_frame][sample_i]).inv()
+        for i in range(len(markers_id)):
+            this_k = np.argwhere(mocap_stamps[markers_id[i]]==basemarker_stamp)
+            if len(this_k)!=1 or len(this_k[0])!=1:
+                continue
+            this_k=this_k[0][0]
+            mocap_stamps_frame.append(basemarker_stamp)
+            if markers_id[i] not in curve_p_frame.keys():
+                curve_p_frame[markers_id[i]] = []
+                curve_R_frame[markers_id[i]] = []
+            curve_p_frame[markers_id[i]].append(np.matmul(basemarker_T.R,curve_p[markers_id[i]][this_k])\
+                                                            + basemarker_T.p)
+            curve_R_frame[markers_id[i]].append(np.matmul(basemarker_T.R,curve_R[markers_id[i]][this_k]))
+
+    return curve_p_frame,curve_R_frame,mocap_stamps_frame
+
 config_dir='../config/'
 base_marker_config_file=config_dir+'MA2010_marker_config.yaml'
+tool_marker_config_file=config_dir+'weldgun_marker_config.yaml'
 robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path=config_dir+'weldgun.csv',\
 pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',\
-base_marker_config_file=base_marker_config_file,tool_marker_config_file=config_dir+'weldgun_marker_config.yaml')
+base_marker_config_file=base_marker_config_file,tool_marker_config_file=tool_marker_config_file)
 
 # only R matter
 nominal_robot_base = Transform(np.array([[0,1,0],
@@ -46,34 +104,15 @@ axis_p = deepcopy(H_nom)
 
 # all_datasets=['train_data','valid_data_1','valid_data_2']
 all_datasets=['test0502_noanchor/train_data']
+# all_datasets=['test0502_anchor/train_data']
+# P_marker_id = 'marker4_rigid3'
+P_marker_id = robot_weld.tool_rigid_id
 for dataset in all_datasets:
     print(dataset)
+    raw_data_dir = 'PH_raw_data/'+dataset
     for j in range(6):
         # read raw data
-        raw_data_dir = 'PH_raw_data/'+dataset
-
-        try:
-            s
-        except:
-            with open(raw_data_dir+'_'+str(j+1)+'_mocap_p.pickle', 'rb') as handle:
-                curve_p = pickle.load(handle)
-            with open(raw_data_dir+'_'+str(j+1)+'_mocap_R.pickle', 'rb') as handle:
-                curve_R = pickle.load(handle)
-            with open(raw_data_dir+'_'+str(j+1)+'_mocap_timestamps.pickle', 'rb') as handle:
-                mocap_stamps = pickle.load(handle)
-
-            # convert everything in basemarker frame
-            for sample_i in range(len(mocap_stamps[robot_weld.tool_rigid_id])):
-                basemarker_stamp = mocap_stamps[robot_weld.tool_rigid_id][sample_i]
-                basemarker_T = Transform(curve_R[robot_weld.tool_rigid_id][sample_i],
-                                        curve_p[robot_weld.tool_rigid_id][sample_i]).inv()
-                for i in range(len(robot_weld.tool_markers_id)):
-                    this_k = np.argwhere(mocap_stamps[robot_weld.tool_markers_id[i]]==basemarker_stamp)
-                    if len(this_k)!=1 or len(this_k[0])!=1:
-                        continue
-                    this_k=this_k[0][0]
-                    curve_p[robot_weld.tool_markers_id[i]][this_k] = np.matmul(basemarker_T.R,curve_p[robot_weld.tool_markers_id[i]][this_k])\
-                                                                    + basemarker_T.p
+        curve_p,curve_R,mocap_stamps = read_and_convert_frame(raw_data_dir+'_'+str(j+1),robot_weld.base_rigid_id,robot_weld.tool_markers_id)
 
         # detect axis
         this_axis_p,this_axis_normal = detect_axis(curve_p,H_nom[:,j],robot_weld.tool_markers_id)
@@ -96,52 +135,11 @@ for dataset in all_datasets:
     x_axis = x_axis/np.linalg.norm(x_axis)
     R = np.array([x_axis,y_axis,z_axis])
     
-    P_marker_id = 'marker4_rigid3'
-    # P_marker_id = 'rigid3'
     # read raw data
-    raw_data_dir = 'PH_raw_data/'+dataset
-    with open(raw_data_dir+'_zero_mocap_p.pickle', 'rb') as handle:
-        curve_p = pickle.load(handle)
-    with open(raw_data_dir+'_zero_mocap_R.pickle', 'rb') as handle:
-        curve_R = pickle.load(handle)
-    with open(raw_data_dir+'_zero_mocap_timestamps.pickle', 'rb') as handle:
-        mocap_stamps = pickle.load(handle)
-    # convert everything in basemarker frame
-    for sample_i in range(len(mocap_stamps[robot_weld.tool_rigid_id])):
-        basemarker_stamp = mocap_stamps[robot_weld.tool_rigid_id][sample_i]
-        basemarker_T = Transform(curve_R[robot_weld.tool_rigid_id][sample_i],
-                                    curve_p[robot_weld.tool_rigid_id][sample_i]).inv()
-        for i in range(len(robot_weld.tool_markers_id)):
-            this_k = np.squeeze(np.argwhere(mocap_stamps[robot_weld.tool_markers_id[i]]==basemarker_stamp))
-            curve_p[robot_weld.tool_markers_id[i]][this_k] = np.matmul(basemarker_T.R,curve_p[robot_weld.tool_markers_id[i]][this_k])\
-                                                            + basemarker_T.p
+    curve_p,curve_R,mocap_stamps = read_and_convert_frame(raw_data_dir+'_zero',robot_weld.base_rigid_id,[P_marker_id])
+
     tcp = np.mean(curve_p[P_marker_id],axis=0)
-
-    # T_frame_mocap = Transform(R,np.matmul(R,-H_point[:,0]))
-    # H = np.matmul(R,H)
-    # for i in range(6):
-    #     H_point[:,i] = np.matmul(T_frame_mocap.R,H_point[:,i])+T_frame_mocap.p
-    # tcp_frame = np.matmul(T_frame_mocap.R,np.mean(curve_p[P_marker_id],axis=0))+T_frame_mocap.p
-
-    # print(np.round(H,5).T)
-    # H_point = (H_point.T-H_point[:,0]).T
-    # H_point = np.matmul(R,H_point)
-    # print(H_point.T)
-
-    diff_H = np.linalg.norm(robot_weld.robot.H-H,axis=0)
-    # print(diff_H)
-
-    # for i in range(6):
-    #     print(np.degrees(np.arccos(np.dot(H[:,i],robot_weld.robot.H[:,i])/(np.linalg.norm(H[:,i])*np.linalg.norm(robot_weld.robot.H[:,i])))))
-
-    # fig = plt.figure()
-    # ax = fig.add_subplot(projection='3d')
-    # for i in range(6):
-    #     start_p = H_point[:,i]-H[:,i]*1000
-    #     end_p = H_point[:,i]+H[:,i]*1000
-    #     ax.plot([start_p[0],end_p[0]], [start_p[1],end_p[1]], [start_p[2],end_p[2]], label='axis '+str(i+1))
-    # plt.legend()
-    # plt.show()
+    R_tool_basemarker = curve_R[P_marker_id] # need this later for tool calibration
 
     # get P
     # joint 1 is the closest point on H1 to H2
@@ -150,7 +148,7 @@ for dataset in all_datasets:
     j1_center = H_point[:,0]+ab_coefficient[0]*H[:,0]
     j2_center = H_point[:,1]+ab_coefficient[1]*H[:,1]
 
-    ###### get robot base frame and convert
+    ###### get robot base frame and convert to base frame from basemarker frame
     T_base_basemarker = Transform(R.T,j1_center)
     T_basemarker_base = T_base_basemarker.inv()
     H = np.matmul(T_basemarker_base.R,H)
@@ -195,6 +193,15 @@ for dataset in all_datasets:
     # print("J6 in J1:",j6_center-j1_center)
     print("====================")
 
+# Find R^toolmarker_base
+# similar to the idea of "flange frame"
+rpy_tool_basemarker = []
+for Rtool in R_tool_basemarker:
+    rpy_tool_basemarker.append(np.array(R2rpy(Rtool)))
+rpy_tool_basemarker = np.mean(rpy_tool_basemarker,axis=0)
+R_tool_basemarker = rpy2R(rpy_tool_basemarker)
+R_tool_base = np.matmul(T_basemarker_base.R,R_tool_basemarker)
+
 with open(base_marker_config_file,'r') as file:
     base_marker_data = yaml.safe_load(file)
 base_marker_data['H']=[]
@@ -222,5 +229,76 @@ base_marker_data['calib_base_basemarker_pose']['orientation']['w'] = float(quat[
 base_marker_data['calib_base_basemarker_pose']['orientation']['x'] = float(quat[1])
 base_marker_data['calib_base_basemarker_pose']['orientation']['y'] = float(quat[2])
 base_marker_data['calib_base_basemarker_pose']['orientation']['z'] = float(quat[3])
+
+base_marker_data['calib_tool_flange_pose'] = {}
+base_marker_data['calib_tool_flange_pose']['position'] = {}
+base_marker_data['calib_tool_flange_pose']['position']['x'] = 0
+base_marker_data['calib_tool_flange_pose']['position']['y'] = 0
+base_marker_data['calib_tool_flange_pose']['position']['z'] = 0
+quat = R2q(R_tool_base)
+base_marker_data['calib_tool_flange_pose']['orientation'] = {}
+base_marker_data['calib_tool_flange_pose']['orientation']['w'] = float(quat[0])
+base_marker_data['calib_tool_flange_pose']['orientation']['x'] = float(quat[1])
+base_marker_data['calib_tool_flange_pose']['orientation']['y'] = float(quat[2])
+base_marker_data['calib_tool_flange_pose']['orientation']['z'] = float(quat[3])
+
 with open(base_marker_config_file,'w') as file:
     yaml.safe_dump(base_marker_data,file)
+
+# calibrate tool
+# Find T^tool_toolmarker
+curve_p,curve_R,mocap_stamps = read_and_convert_frame(raw_data_dir+'_zero',robot_weld.tool_rigid_id,robot_weld.tool_markers_id)
+
+# A: known tool maker position in tool frame, p^marker_tool
+# B: capture tool marker position in rigid body frame (from motiv), p^marker_toolmarker
+marker_B = {}
+for marker_id in robot_weld.tool_markers_id: # average across the captured
+    marker_B[marker_id] = np.mean(curve_p[marker_id],axis=0)
+# find center of A B
+marker_A = deepcopy(robot_weld.tool_markers)
+center_A = []
+center_B = []
+A = []
+B = []
+for marker_id in robot_weld.tool_markers_id:
+    center_A.append(marker_A[marker_id])
+    A.append(marker_A[marker_id])
+    center_B.append(marker_B[marker_id])
+    B.append(marker_B[marker_id])
+center_A = np.mean(center_A,axis=0)
+A = np.array(A)
+center_B = np.mean(center_B,axis=0)
+B = np.array(B)
+
+A_centered = A-center_A
+B_centered = B-center_B
+H = np.matmul(A_centered.T,B_centered)
+u,s,vT = np.linalg.svd(H)
+R = np.matmul(vT.T,u.T)
+if np.linalg.det(R)<0:
+    u,s,v = np.linalg.svd(R)
+    v=v.T
+    v[:,2] = v[:,2]*-1
+    R = np.matmul(v,u.T)
+
+t = center_B-np.dot(R,center_A)
+T_tool_toolmarker = Transform(R,t)
+
+with open(tool_marker_config_file,'r') as file:
+    tool_marker_data = yaml.safe_load(file)
+tool_marker_data['calib_tool_toolmarker_pose'] = {}
+tool_marker_data['calib_tool_toolmarker_pose']['position'] = {}
+tool_marker_data['calib_tool_toolmarker_pose']['position']['x'] = float(T_tool_toolmarker.p[0])
+tool_marker_data['calib_tool_toolmarker_pose']['position']['y'] = float(T_tool_toolmarker.p[1])
+tool_marker_data['calib_tool_toolmarker_pose']['position']['z'] = float(T_tool_toolmarker.p[2])
+quat = R2q(T_tool_toolmarker.R)
+tool_marker_data['calib_tool_toolmarker_pose']['orientation'] = {}
+tool_marker_data['calib_tool_toolmarker_pose']['orientation']['w'] = float(quat[0])
+tool_marker_data['calib_tool_toolmarker_pose']['orientation']['x'] = float(quat[1])
+tool_marker_data['calib_tool_toolmarker_pose']['orientation']['y'] = float(quat[2])
+tool_marker_data['calib_tool_toolmarker_pose']['orientation']['z'] = float(quat[3])
+
+with open(tool_marker_config_file,'w') as file:
+    yaml.safe_dump(tool_marker_data,file)
+
+print("Done")

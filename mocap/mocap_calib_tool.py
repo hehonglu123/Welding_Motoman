@@ -119,8 +119,6 @@ class CalibRobotTool:
 
         input("Enter to start calibrate tool")
 
-        
-
         client=MotionProgramExecClient()
 
         cp_thread = Thread( target = self.collect_point_thread,daemon=True)

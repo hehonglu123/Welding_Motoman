@@ -17,7 +17,7 @@ from MocapPoseListener import *
 import pickle
 
 class CalibRobotPH:
-    def __init__(self,mocap_cli,robot,nominal_robot_base) -> None:
+    def __init__(self,mocap_cli,robot) -> None:
         
         self.mocap_cli = mocap_cli
 
@@ -36,32 +36,10 @@ class CalibRobotPH:
         all_ids.append(robot.tool_rigid_id)
         self.mpl_obj = MocapFrameListener(self.mocap_cli,all_ids,'world')
 
-        # nominal H axis
-        self.H_nom = np.matmul(nominal_robot_base.R,self.robot.robot.H)
-    
-    def detect_axis(self,points,rough_axis_direction):
-
-        all_normals=[]
-        all_centers=[]
-        for i in range(len(self.calib_marker_ids)):
-            center, normal = fitting_3dcircle(points[self.calib_marker_ids[i]])
-            if np.sum(np.multiply(normal,rough_axis_direction)) < 0:
-                normal = -1*normal
-            all_normals.append(normal)
-            all_centers.append(center)
-        normal_mean = np.mean(all_normals,axis=0)
-        normal_mean = normal_mean/np.linalg.norm(normal_mean)
-        center_mean = np.mean(all_centers,axis=0)
-
-        return center_mean,normal_mean
-
     def run_calib(self,base_marker_config_file,rob_IP=None,ROBOT_CHOICE=None,rob_p2d=None,start_p=None,paths=[],rob_speed=3,repeat_N=1,
-                  save_raw_data=False,raw_data_dir=''):
+                  raw_data_dir=''):
         
         client = MotionProgramExecClient()
-
-        self.H_act = deepcopy(self.H_nom)
-        self.axis_p = deepcopy(self.H_nom)
 
         input("Press Enter and the robot will start moving.")
         for j in range(len(self.H_nom[0])-1,-1,-1): # from axis 6 to axis 1
@@ -77,65 +55,41 @@ class CalibRobotPH:
             robot_stamps,curve_exe, job_line,job_step = client.execute_motion_program(mp)
             self.mpl_obj.stop_pose_listener()
             curve_p,curve_R,timestamps = self.mpl_obj.get_frames_traj()
-            axis_p,axis_normal = self.detect_axis(curve_p,self.H_nom[:,j])
-            self.H_act[:,j] = axis_normal
-            self.axis_p[:,j] = axis_p
 
-            if save_raw_data:
-                with open(raw_data_dir+'_'+str(j+1)+'_mocap_p.pickle', 'wb') as handle:
-                    pickle.dump(curve_p, handle, protocol=pickle.HIGHEST_PROTOCOL)
-                with open(raw_data_dir+'_'+str(j+1)+'_mocap_R.pickle', 'wb') as handle:
-                    pickle.dump(curve_R, handle, protocol=pickle.HIGHEST_PROTOCOL)
-                with open(raw_data_dir+'_'+str(j+1)+'_mocap_timestamps.pickle', 'wb') as handle:
-                    pickle.dump(timestamps, handle, protocol=pickle.HIGHEST_PROTOCOL)
-                with open(raw_data_dir+'_'+str(j+1)+'_robot_q.pickle', 'wb') as handle:
-                    pickle.dump(curve_exe, handle, protocol=pickle.HIGHEST_PROTOCOL)
-                with open(raw_data_dir+'_'+str(j+1)+'_robot_timestamps.pickle', 'wb') as handle:
-                    pickle.dump(robot_stamps, handle, protocol=pickle.HIGHEST_PROTOCOL)
+            with open(raw_data_dir+'_'+str(j+1)+'_mocap_p.pickle', 'wb') as handle:
+                pickle.dump(curve_p, handle, protocol=pickle.HIGHEST_PROTOCOL)
+            with open(raw_data_dir+'_'+str(j+1)+'_mocap_R.pickle', 'wb') as handle:
+                pickle.dump(curve_R, handle, protocol=pickle.HIGHEST_PROTOCOL)
+            with open(raw_data_dir+'_'+str(j+1)+'_mocap_timestamps.pickle', 'wb') as handle:
+                pickle.dump(timestamps, handle, protocol=pickle.HIGHEST_PROTOCOL)
+            with open(raw_data_dir+'_'+str(j+1)+'_robot_q.pickle', 'wb') as handle:
+                pickle.dump(curve_exe, handle, protocol=pickle.HIGHEST_PROTOCOL)
+            with open(raw_data_dir+'_'+str(j+1)+'_robot_timestamps.pickle', 'wb') as handle:
+                pickle.dump(robot_stamps, handle, protocol=pickle.HIGHEST_PROTOCOL)
         
         # save zero config
         mp=MotionProgram(ROBOT_CHOICE=ROBOT_CHOICE,pulse2deg=rob_p2d)
         mp.MoveJ(start_p[-1],rob_speed,0)
         client.execute_motion_program(mp)
-        self.mpl_obj.run_pose_listener()
+        
         mp=MotionProgram(ROBOT_CHOICE=ROBOT_CHOICE,pulse2deg=rob_p2d)
         mp.MoveJ(start_p[-1],rob_speed,0)
         mp.setWaitTime(5)
+        self.mpl_obj.run_pose_listener()
         robot_stamps,curve_exe, job_line,job_step = client.execute_motion_program(mp)
         self.mpl_obj.stop_pose_listener()
         curve_p,curve_R,timestamps = self.mpl_obj.get_frames_traj()
-        if save_raw_data:
-            with open(raw_data_dir+'_zero_mocap_p.pickle', 'wb') as handle:
-                pickle.dump(curve_p, handle, protocol=pickle.HIGHEST_PROTOCOL)
-            with open(raw_data_dir+'_zero_mocap_R.pickle', 'wb') as handle:
-                pickle.dump(curve_R, handle, protocol=pickle.HIGHEST_PROTOCOL)
-            with open(raw_data_dir+'_zero_mocap_timestamps.pickle', 'wb') as handle:
-                pickle.dump(timestamps, handle, protocol=pickle.HIGHEST_PROTOCOL)
-            with open(raw_data_dir+'_zero_robot_q.pickle', 'wb') as handle:
-                pickle.dump(curve_exe, handle, protocol=pickle.HIGHEST_PROTOCOL)
-            with open(raw_data_dir+'_zero_robot_timestamps.pickle', 'wb') as handle:
-                pickle.dump(robot_stamps, handle, protocol=pickle.HIGHEST_PROTOCOL)
         
-        with open(base_marker_config_file,'r') as file:
-            base_marker_data = yaml.safe_load(file)
-        base_marker_data['H']=[]
-        base_marker_data['H_point']=[]
-        for j in range(len(self.H_act[0])):
-            this_H = {}
-            this_H['x']=float(self.H_act[0,j])
-            this_H['y']=float(self.H_act[1,j])
-            this_H['z']=float(self.H_act[2,j])
-            base_marker_data['H'].append(this_H)
-            this_Hp = {}
-            this_Hp['x']=float(self.axis_p[0,j])
-            this_Hp['y']=float(self.axis_p[1,j])
-            this_Hp['z']=float(self.axis_p[2,j])
-            base_marker_data['H_point'].append(this_Hp)
-        with open(base_marker_config_file,'w') as file:
-            yaml.safe_dump(base_marker_data,file)
-        print("Result Calibrated H:")
-        print(self.H_act)
-        print("Done. Please check file:",base_marker_config_file)
+        with open(raw_data_dir+'_zero_mocap_p.pickle', 'wb') as handle:
+            pickle.dump(curve_p, handle, protocol=pickle.HIGHEST_PROTOCOL)
+        with open(raw_data_dir+'_zero_mocap_R.pickle', 'wb') as handle:
+            pickle.dump(curve_R, handle, protocol=pickle.HIGHEST_PROTOCOL)
+        with open(raw_data_dir+'_zero_mocap_timestamps.pickle', 'wb') as handle:
+            pickle.dump(timestamps, handle, protocol=pickle.HIGHEST_PROTOCOL)
+        with open(raw_data_dir+'_zero_robot_q.pickle', 'wb') as handle:
+            pickle.dump(curve_exe, handle, protocol=pickle.HIGHEST_PROTOCOL)
+        with open(raw_data_dir+'_zero_robot_timestamps.pickle', 'wb') as handle:
+            pickle.dump(robot_stamps, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
 def calib_R1():
 
@@ -147,11 +101,7 @@ def calib_R1():
     mocap_url = 'rr+tcp://localhost:59823?service=optitrack_mocap'
     mocap_cli = RRN.ConnectService(mocap_url)
 
-    # only R matter
-    nominal_robot_base = Transform(np.array([[0,1,0],
-                                             [0,0,1],
-                                             [1,0,0]]),[0,0,0]) 
-    calib_obj = CalibRobotPH(mocap_cli,robot_weld,nominal_robot_base)
+    calib_obj = CalibRobotPH(mocap_cli,robot_weld)
 
     # calibration
     # start_p = np.array([[0,-30,-40,0,0,0],
@@ -189,8 +139,9 @@ def calib_R1():
     # raw_data_dir='PH_raw_data/valid_data_2'
     #####################
 
-    calib_obj.run_calib(config_dir+'MA2010_marker_config.yaml','192.168.1.31','RB1',robot_weld.pulse2deg,start_p,q_paths,rob_speed=3,repeat_N=1,
-                        save_raw_data=True,raw_data_dir=raw_data_dir) # save calib config to file
+    calib_obj.run_calib(config_dir+'MA2010_marker_config.yaml','192.168.1.31','RB1',robot_weld.pulse2deg,start_p,q_paths,rob_speed=3,repeat_N=1\
+                        ,raw_data_dir=raw_data_dir) # save calib config to file
+    print("Collect PH data done")
 
 
 if __name__=='__main__':

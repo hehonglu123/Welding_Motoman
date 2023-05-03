@@ -109,6 +109,15 @@ class robot_obj(object):
 						marker_data['calib_base_mocap_pose']['orientation']['y'],
 						marker_data['calib_base_mocap_pose']['orientation']['z']]
 					self.T_base_mocap = Transform(q2R(q),p)
+				if 'calib_tool_flange_pose' in marker_data.keys():
+					p = [marker_data['calib_tool_flange_pose']['position']['x'],
+						marker_data['calib_tool_flange_pose']['position']['y'],
+						marker_data['calib_tool_flange_pose']['position']['z']]
+					q = [marker_data['calib_tool_flange_pose']['orientation']['w'],
+						marker_data['calib_tool_flange_pose']['orientation']['x'],
+						marker_data['calib_tool_flange_pose']['orientation']['y'],
+						marker_data['calib_tool_flange_pose']['orientation']['z']]
+					self.T_tool_flange = Transform(q2R(q),p)
 				if 'P' in marker_data.keys():
 					self.calib_P = np.zeros(self.robot.P.shape)
 					for i in range(len(marker_data['P'])):
