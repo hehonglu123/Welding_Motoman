@@ -363,3 +363,6 @@ data/wall_weld_test/**/points*
 scan/jw_example/deferred_captured_mesh/
 
 *.JBI
+
+mocap/**/*.pickle
+data/**/*.pcd
