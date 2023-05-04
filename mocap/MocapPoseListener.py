@@ -10,7 +10,7 @@ from utils import *
 from robot_def import * 
 
 class MocapPoseListener():
-    def __init__(self,rr_mocap,robots,collect_base_stop=1e4,use_static_base=False,use_toolmarker_rigid=False):
+    def __init__(self,rr_mocap,robots,collect_base_window=240,use_static_base=False,use_toolmarker_rigid=False):
 
         self.rr_mocap = rr_mocap
 
@@ -34,7 +34,7 @@ class MocapPoseListener():
         self.collect_marker = False
 
         # determined base pose
-        self.collect_base_stop = collect_base_stop
+        self.collect_base_window = collect_base_window
         self.use_static_base = use_static_base
         self.use_toolmarker_rigid = use_toolmarker_rigid
         if use_static_base:
@@ -72,7 +72,7 @@ class MocapPoseListener():
                 for i in range(len(data.fiducials.recognized_fiducials)):
                     this_marker_id = data.fiducials.recognized_fiducials[i].fiducial_marker
                     for robot_name in self.robots.keys():
-                        if this_marker_id == self.robots[robot_name].base_rigid_id and len(self.robots_base_p[robot_name])<self.collect_base_stop and not self.use_static_base:
+                        if this_marker_id == self.robots[robot_name].base_rigid_id and not self.use_static_base:
                             this_position = np.array(list(data.fiducials.recognized_fiducials[i].pose.pose.pose[0]['position']))
                             if np.all(this_position == np.array([0.,0.,0.])):
                                 continue
@@ -80,6 +80,10 @@ class MocapPoseListener():
                             this_orientation_rpy = R2rpy(this_orientation_R)
                             self.robots_base_p[robot_name].append(this_position)
                             self.robots_base_rpy[robot_name].append(this_orientation_rpy)
+
+                            if len(self.robots_base_p[robot_name])>self.collect_base_window:
+                                self.robots_base_p[robot_name].pop[0]
+                                self.robots_base_rpy[robot_name].pop[0]
 
                             # (T^basemarker_world * T^base_basemarker).inv()
                             # T^world_base
@@ -245,8 +249,9 @@ def robotposelistener():
     mocap_url = mocap_url
     mocap_cli = RRN.ConnectService(mocap_url)
 
-    # mpl_obj = MocapPoseListener(mocap_cli,[robot_weld],collect_base_stop=1000)
-    mpl_obj = MocapPoseListener(mocap_cli,[robot_weld],collect_base_stop=1,use_static_base=True)
+    # collect base window windown length of moving average
+    mpl_obj = MocapPoseListener(mocap_cli,[robot_weld],collect_base_window=240)
+    # mpl_obj = MocapPoseListener(mocap_cli,[robot_weld],collect_base_window=1,use_static_base=True)
     mpl_obj.run_pose_listener()
     time.sleep(1)
     mpl_obj.stop_pose_listener()
