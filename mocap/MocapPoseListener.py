@@ -82,8 +82,8 @@ class MocapPoseListener():
                             self.robots_base_rpy[robot_name].append(this_orientation_rpy)
 
                             if len(self.robots_base_p[robot_name])>self.collect_base_window:
-                                self.robots_base_p[robot_name].pop[0]
-                                self.robots_base_rpy[robot_name].pop[0]
+                                self.robots_base_p[robot_name].pop(0)
+                                self.robots_base_rpy[robot_name].pop(0)
 
                             # (T^basemarker_world * T^base_basemarker).inv()
                             # T^world_base
