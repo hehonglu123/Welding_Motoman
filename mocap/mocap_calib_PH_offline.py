@@ -103,8 +103,9 @@ H_act = deepcopy(H_nom)
 axis_p = deepcopy(H_nom)
 
 # all_datasets=['train_data','valid_data_1','valid_data_2']
-all_datasets=['test0502_noanchor/train_data']
+# all_datasets=['test0502_noanchor/train_data']
 # all_datasets=['test0502_anchor/train_data']
+all_datasets=['test0504_high_zero/train_data']
 # P_marker_id = 'marker4_rigid3'
 P_marker_id = robot_weld.tool_rigid_id
 for dataset in all_datasets:

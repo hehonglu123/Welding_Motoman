@@ -42,7 +42,7 @@ class CalibRobotPH:
         client = MotionProgramExecClient()
 
         input("Press Enter and the robot will start moving.")
-        for j in range(len(self.H_nom[0])-1,-1,-1): # from axis 6 to axis 1
+        for j in range(len(paths)-1,-1,-1): # from axis 6 to axis 1
             mp=MotionProgram(ROBOT_CHOICE=ROBOT_CHOICE,pulse2deg=rob_p2d)
             mp.MoveJ(start_p[j],rob_speed,0)
             client.execute_motion_program(mp)
@@ -52,6 +52,7 @@ class CalibRobotPH:
             for N in range(repeat_N):
                 mp.MoveJ(paths[j][0],rob_speed,0)
                 mp.MoveJ(paths[j][1],rob_speed,0)
+            mp.MoveJ(start_p[j],rob_speed,0)
             robot_stamps,curve_exe, job_line,job_step = client.execute_motion_program(mp)
             self.mpl_obj.stop_pose_listener()
             curve_p,curve_R,timestamps = self.mpl_obj.get_frames_traj()
@@ -104,12 +105,7 @@ def calib_R1():
     calib_obj = CalibRobotPH(mocap_cli,robot_weld)
 
     # calibration
-    # start_p = np.array([[0,-30,-40,0,0,0],
-    #                     [0,0,-34,0,0,0],
-    #                     [0,0,0,0,0,0],
-    #                     [0,0,0,0,-80,0],
-    #                     [0,0,0,0,0,0],
-    #                     [0,0,0,0,0,0]])
+    ## zero config
     start_p = np.array([[0,0,0,0,0,0],
                         [0,0,0,0,0,0],
                         [0,0,0,0,0,0],
@@ -118,8 +114,6 @@ def calib_R1():
                         [0,0,0,0,0,0]])
     q1_1=start_p[0] + np.array([-80,0,0,0,0,0])
     q1_2=start_p[0] + np.array([56,0,0,0,0,0])
-    # q2_1=start_p[1] + np.array([0,-60,0,0,0,0])
-    # q2_2=start_p[1] + np.array([0,30,0,0,0,0])
     q2_1=start_p[1] + np.array([0,50,0,0,0,0])
     q2_2=start_p[1] + np.array([0,-10,0,0,0,0])
     q3_1=start_p[2] + np.array([0,0,-60,0,0,0])
@@ -130,6 +124,47 @@ def calib_R1():
     q5_2=start_p[4] + np.array([0,0,0,0,-80,0])
     q6_1=start_p[5] + np.array([0,0,0,0,0,-180])
     q6_2=start_p[5] + np.array([0,0,0,0,0,180])
+    ## out stretch
+    # start_p = np.array([[0,50,31,0,0,0],
+    #                     [0,50,31,0,0,0],
+    #                     [0,50,31,0,0,0],
+    #                     [0,50,31,0,0,0],
+    #                     [0,50,31,0,0,0],
+    #                     [0,50,31,0,0,0]])
+    # q1_1=start_p[0] + np.array([-53,0,0,0,0,0])
+    # q1_2=start_p[0] + np.array([44,0,0,0,0,0])
+    # q2_1=start_p[1] + np.array([0,30,0,0,0,0])
+    # q2_2=start_p[1] + np.array([0,-10,0,0,0,0])
+    # q3_1=start_p[2] + np.array([0,0,-50,0,0,0])
+    # q3_2=start_p[2] + np.array([0,0,50,0,0,0])
+    # q4_1=start_p[3] + np.array([0,0,0,-120,0,0])
+    # q4_2=start_p[3] + np.array([0,0,0,120,0,0])
+    # q5_1=start_p[4] + np.array([0,0,0,0,80,0])
+    # q5_2=start_p[4] + np.array([0,0,0,0,-80,0])
+    # q6_1=start_p[5] + np.array([0,0,0,0,0,-180])
+    # q6_2=start_p[5] + np.array([0,0,0,0,0,180])
+    ## inward
+    # start_p = np.array([[0,-66,-66,0,0,0],
+    #                     [0,-66,-66,0,0,0],
+    #                     [0,-66,-66,0,0,0],
+    #                     [0,-66,-66,0,0,0],
+    #                     [0,-66,-66,0,0,0],
+    #                     [0,-66,-66,0,0,0]])
+    # q1_1=start_p[0] + np.array([-80,0,0,0,0,0])
+    # q1_2=start_p[0] + np.array([60,0,0,0,0,0])
+    # q2_1=start_p[1] + np.array([0,70,0,0,0,0])
+    # q2_2=start_p[1] + np.array([0,0,0,0,0,0])
+    # q3_1=start_p[2] + np.array([0,0,-8,0,0,0])
+    # q3_2=start_p[2] + np.array([0,0,30,0,0,0])
+    # q4_1=start_p[3] + np.array([0,0,0,-120,0,0])
+    # q4_2=start_p[3] + np.array([0,0,0,120,0,0])
+    # q5_1=start_p[4] + np.array([0,0,0,0,80,0])
+    # q5_2=start_p[4] + np.array([0,0,0,0,-80,0])
+    # q6_1=start_p[5] + np.array([0,0,0,0,0,-180])
+    # q6_2=start_p[5] + np.array([0,0,0,0,0,180])
+
+
+
     q_paths = [[q1_1,q1_2],[q2_1,q2_2],[q3_1,q3_2],[q4_1,q4_2],[q5_1,q5_2],[q6_1,q6_2]]
 
 
