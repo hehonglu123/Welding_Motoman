@@ -30,7 +30,7 @@ robot_qdot_norm = np.linalg.norm(robot_qdot,axis=1)
 marker_id = robot_weld.tool_rigid_id
 with open(data_dir+'mocap_p_cont.pickle', 'rb') as handle:
     mocap_p = pickle.load(handle)
-    # static_mocap_marker = mocap_p[robot_weld.base_markers_id[0]]
+    static_mocap_marker = mocap_p[robot_weld.base_rigid_id]
     base_rigid_p = mocap_p[robot_weld.base_rigid_id]
     mocap_p = np.array(mocap_p[marker_id])
 with open(data_dir+'mocap_R_cont.pickle', 'rb') as handle:
@@ -151,6 +151,7 @@ robot_weld.robot.H = robot_weld.calib_H
 # change to calibrated flange (tool rigidbody orientation)
 robot_weld.robot.T_flange = robot_weld.T_tool_flange
 # from tool rigid to tool tip
+robot_weld.T_tool_toolmarker = Transform(np.eye(3),[0,0,0])
 robot_weld.robot.R_tool=robot_weld.T_tool_toolmarker.R
 robot_weld.robot.p_tool=robot_weld.T_tool_toolmarker.p
 robot_weld.p_tool=robot_weld.T_tool_toolmarker.p
@@ -210,6 +211,7 @@ for pose_N in range(total_pose):
         std_pos_N.append(np.std(this_mocap_p,axis=0))
         std_pos_norm_N.append(np.std(np.linalg.norm(this_mocap_p,2,axis=1)))
         
+        mocap_orientation.append(np.mean(this_mocap_R,axis=0))
         orientation_error.append(np.mean(this_orientation_error,axis=0))
         std_ori_N.append(np.std(this_mocap_R,axis=0))
         std_ori_norm_N.append(np.std(np.linalg.norm(this_mocap_R,2,axis=1)))
@@ -229,6 +231,7 @@ for pose_N in range(total_pose):
     print("Mean N Std Position:",np.mean(std_pos_N,axis=0))
     print("Mean N Std Position Norm:",np.mean(std_pos_norm_N,axis=0))
     print("===")
+    print("Mean Orientation:",np.mean(mocap_orientation,axis=0))
     print("Mean Orientation Error Vec:",np.mean(orientation_error,axis=0))
     print("Mean Orientation Error:",np.mean(np.linalg.norm(orientation_error,2,axis=1)))
     print("Std Orientation Error:",np.std(orientation_error,axis=0))
@@ -237,9 +240,15 @@ for pose_N in range(total_pose):
     print("Mean N Std Orientation Norm:",np.mean(std_ori_norm_N,axis=0))
     print("===========================")
 
-    plt.plot(np.fabs(position_error)[:,0],'-o',label='error x')
-    plt.plot(np.fabs(position_error)[:,1],'-o',label='error y')
-    plt.plot(np.fabs(position_error)[:,2],'-o',label='error z')
+    # plt.plot(np.fabs(position_error)[:,0],'-o',label='error x')
+    # plt.plot(np.fabs(position_error)[:,1],'-o',label='error y')
+    # plt.plot(np.fabs(position_error)[:,2],'-o',label='error z')
+    # plt.legend()
+    # plt.show()
+
+    plt.plot(np.array(position_error)[:,0],'-o',label='error x')
+    plt.plot(np.array(position_error)[:,1],'-o',label='error y')
+    plt.plot(np.array(position_error)[:,2],'-o',label='error z')
     plt.legend()
     plt.show()
 

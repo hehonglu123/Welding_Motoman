@@ -112,6 +112,7 @@ T_basemarker_base = T_base_basemarker.inv()
 robot_weld.T_tool_toolmarker=Transform(np.eye(3),[0,0,0])
 
 #### Gradient
+print("Training Set:",train_N)
 testing_pose=1
 total_iteration = 100
 total_grad_sample = 40
@@ -121,14 +122,14 @@ Ry=np.array([0,1,0])
 Rz=np.array([0,0,1])
 dH_range = np.radians(0.001)
 dH_rotate_axis = [[Rx,Ry],[Rz,Rx],[Rz,Rx],[Ry,Rz],[Rz,Rx],[Ry,Rz]]
-alpha=0.000001
+alpha=0.1
 pos_error_progress = []
 for iter_N in range(total_iteration):
     print(iter_N)
     G_ave = []
     position_error=[]
     orientation_error=[]
-    for N in [train_N[0]]:
+    for N in train_N:
         d_T_all = [] # difference in robot T
         d_pH_all = [] # difference in PH
         # initial robot_T
@@ -185,6 +186,11 @@ for iter_N in range(total_iteration):
         orientation_error.append(np.mean(this_orientation_error,axis=0))
 
     G_ave=np.mean(G_ave,axis=0)
+    if iter_N==0 or iter_N==total_iteration-1:
+        print(G_ave)
+        plt.matshow(G_ave)
+        plt.colorbar()
+        plt.show()
     position_error = np.mean(position_error,axis=0)
     orientation_error = np.mean(orientation_error,axis=0)
     
@@ -197,7 +203,7 @@ for iter_N in range(total_iteration):
         new_H = deepcopy(robot_weld.calib_H[:,i])
         for j in range(2):
             d_angle = dH[i,j]
-            new_H = np.matmul(rot(dH_rotate_axis[i][j],d_angle),new_H)
+            new_H = np.matmul(rot(dH_rotate_axis[i][j],np.radians(d_angle)),new_H)
         robot_weld.calib_H[:,i] = new_H
 
     pos_error_progress.append(position_error)
