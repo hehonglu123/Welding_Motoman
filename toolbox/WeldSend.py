@@ -7,11 +7,42 @@ from dx200_motion_program_exec_client import *
 
 # from lambda_calc import *
 
-class MotionSend(object):
+class WeldSend(object):
 	def __init__(self,IP='192.168.1.31') -> None:
-		self.IP=IP
+		self.client=MotionProgramExecClient(IP=IP)
 		self.ROBOT_CHOICE_MAP={'MA_2010_A0':'RB1','MA_1440_A0':'RB2','D500B':'ST1'}
 
+	def wire_cut(self,robot):
+		###cut wire, length given in robot standoff d
+		mp=MotionProgram(ROBOT_CHOICE='RB1',pulse2deg=robot.pulse2deg)
+		p=[]
+		R=np.array([[]])
+		q_cut1=robot.inv(p+np.array([0,0,50]),R,np.zeros(6))[0]
+		q_cut2=robot.inv(p,R,np.zeros(6))[0]
+		mp.MoveJ(np.zeros(6),2)
+		mp.MoveJ(np.degrees(q_cut1),2)
+		mp.MoveL(np.degrees(q_cut2),50)
+		mp.setDOPulse(11,2)
+		mp.MoveL(np.degrees(q_cut1),50)
+		mp.MoveJ(np.zeros(6),2)
+
+		self.client.execute_motion_program(mp)
+
+	def touchsense(self,robot,p1,p2,R):
+		###p1: list of poitns as starting points
+		###p2: list of points as touchsense direction
+		###R: tool direction
+		q_all=[]
+		for i in range(len(p1)):
+			mp=MotionProgram(ROBOT_CHOICE='RB1',pulse2deg=robot.pulse2deg)
+			q1=robot.inv(p1[i],R,np.zeros(6))[0]
+			mp.MoveJ(np.degrees(q1),1)
+			q2=robot.inv(p2[i],R,np.zeros(6))[0]
+			mp.touchsense(np.degrees(q2), 10 ,20)
+			_,joint_recording,_,_=self.client.execute_motion_program(mp)
+			q_all.append(joint_recording[-1])
+
+		return q_all
 
 	def extract_data_from_cmd(self,filename):
 		data = read_csv(filename)
