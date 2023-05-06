@@ -8,23 +8,38 @@ from dx200_motion_program_exec_client import *
 # from lambda_calc import *
 
 class WeldSend(object):
-	def __init__(self,IP='192.168.1.31') -> None:
-		self.client=MotionProgramExecClient(IP=IP)
+	def __init__(self,client) -> None:
+		self.client=client
 		self.ROBOT_CHOICE_MAP={'MA_2010_A0':'RB1','MA_1440_A0':'RB2','D500B':'ST1'}
 
-	def wire_cut(self,robot):
+	def weld_segment(self,robot,q1,q2,speed,cond_num,arc=False):
+		mp=MotionProgram(ROBOT_CHOICE='RB1',pulse2deg=robot.pulse2deg)
+		mp.MoveJ(q1,1,0)
+		mp.setArc(arc,cond_num=200)
+		mp.MoveL(q2,speed,0)
+		mp.setArc(False)
+		self.client.execute_motion_program(mp)
+
+	def wire_cut(self,robot,speed=5):
 		###cut wire, length given in robot standoff d
 		mp=MotionProgram(ROBOT_CHOICE='RB1',pulse2deg=robot.pulse2deg)
-		p=[]
-		R=np.array([[]])
+		p=[463.1378, 1347, -293]
+		R=np.array([[ 0.2081,  0.9781, 0],
+					[ 0.9781, -0.2081,  0],
+					[ 0, 	 	0, 		-1]])
 		q_cut1=robot.inv(p+np.array([0,0,50]),R,np.zeros(6))[0]
 		q_cut2=robot.inv(p,R,np.zeros(6))[0]
-		mp.MoveJ(np.zeros(6),2)
-		mp.MoveJ(np.degrees(q_cut1),2)
+		mp.MoveJ(np.array([-23.88,37.9,40.66,7.42,-72,-20]),speed/2)
+		mp.MoveJ(np.zeros(6),speed)
+		mp.MoveJ(np.degrees(q_cut1),speed)
 		mp.MoveL(np.degrees(q_cut2),50)
+		mp.setDO(4095,1)
+		mp.setWaitTime(1)
+		mp.setDO(4095,0)
 		mp.setDOPulse(11,2)
 		mp.MoveL(np.degrees(q_cut1),50)
-		mp.MoveJ(np.zeros(6),2)
+		mp.MoveJ(np.zeros(6),speed)
+		mp.MoveJ(np.array([-23.88,37.9,40.66,7.42,-72,-20]),speed)
 
 		self.client.execute_motion_program(mp)
 
@@ -36,13 +51,13 @@ class WeldSend(object):
 		for i in range(len(p1)):
 			mp=MotionProgram(ROBOT_CHOICE='RB1',pulse2deg=robot.pulse2deg)
 			q1=robot.inv(p1[i],R,np.zeros(6))[0]
-			mp.MoveJ(np.degrees(q1),1)
+			mp.MoveJ(np.degrees(q1),4)
 			q2=robot.inv(p2[i],R,np.zeros(6))[0]
-			mp.touchsense(np.degrees(q2), 10 ,20)
+			mp.touchsense(np.degrees(q2), 30 ,20)
 			_,joint_recording,_,_=self.client.execute_motion_program(mp)
-			q_all.append(joint_recording[-1])
+			q_all.append(joint_recording[-1][:6])
 
-		return q_all
+		return np.array(q_all)
 
 	def extract_data_from_cmd(self,filename):
 		data = read_csv(filename)
