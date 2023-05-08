@@ -1,36 +1,40 @@
 from stl import mesh
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.path import Path
 from mpl_toolkits.mplot3d import Axes3D
 import sys, copy
+from scipy.spatial import ConvexHull
 sys.path.append('../toolbox')
-from path_calc import *
+from lambda_calc import *
 from error_check import *
-
+from toolbox_circular_fit import *
 
 def check_boundary(p,stl_pc):
-    ###find closest 10 points
-    num_points=10
+    ###find closest 50 points
+    num_points=50
     indices=np.argsort(np.linalg.norm(stl_pc-p,axis=1))[:num_points]
-    p_avg=np.average(stl_pc[indices],axis=0)
-
     distance=np.linalg.norm(stl_pc[indices]-p,axis=1)
-    threshold = 1e-1
-
-    ###if all neighbors are in 1 direction, this will return true, meaning point is likely outside the stl boundary
-    # direction_check=np.all((stl_pc[indices]-np.tile([p],(num_points,1)))@(p_avg-p)>0)
-
-    # vectors=stl_pc[indices]-np.tile([p],(num_points,1))
-    # vectors=vectors / np.linalg.norm(vectors, axis=1, keepdims=True)
-    # avg_vector=(p_avg-p)/np.linalg.norm(p_avg-p)
-    # direction_check=np.all(vectors@avg_vector>0.2)
-
-    # if np.min(distance)>threshold and direction_check:
-    #     return False
 
     threshold=1
     if np.min(distance)>threshold:
-        return False
+        ###find a plane
+        normal, centroid=fit_plane(stl_pc[indices])
+
+        ###find projected 2d points
+        projection = np.append(stl_pc[indices],[p],axis=0) - centroid
+        projection = projection - np.outer(np.dot(projection, normal), normal)
+
+        projection_xy = rodrigues_rot(projection, normal, [0,0,1])[:,:-1]
+        ###convexhull checking
+        hull = ConvexHull(projection_xy[:-1])
+        hull_path = Path( projection_xy[:-1][hull.vertices] )
+
+        # Check if the point is inside the convex hull
+        if hull_path.contains_point(projection_xy[-1]):
+            return True
+        else:
+            return False
     
     return True
 
@@ -125,9 +129,22 @@ def get_curve_normal(curve,stl_pc,direction):
     
     return np.array(curve_normal)
 
-def slice_next_layer(curve,stl_pc,direction,slice_height):
+def get_curve_normal_from_curves(curve,curve_prev):
+    curve_normal=[]
+    for i in range(len(curve)):
+        indices=np.argsort(np.linalg.norm(curve_prev-curve[i],axis=1))[:2]
+        u = curve_prev[indices[0]] - curve[i]
+        v = curve_prev[indices[1]] - curve_prev[indices[0]]
+        proj_v_u = np.dot(u, v) / np.dot(v, v) * v
+        w = u - proj_v_u
+        curve_normal.append(- w / np.linalg.norm(w))
 
-    curve_normal=get_curve_normal(curve,stl_pc,direction)
+    return np.array(curve_normal)
+
+
+def slice_next_layer(curve,stl_pc,curve_normal,slice_height):
+
+    
     slice_next=[]
     for i in range(len(curve)):
         p_plus=project_point_on_stl(curve[i]+slice_height*curve_normal[i],stl_pc)
@@ -169,7 +186,7 @@ def fit_to_length(curve,stl_pc,threshold=1):
         while not check_boundary(curve[i],stl_pc): 
             i+=1
             if i>len(curve)-1:
-                break
+                return []
         start_idx=i
 
     # print('end point check')
@@ -187,10 +204,11 @@ def fit_to_length(curve,stl_pc,threshold=1):
         while not check_boundary(curve[i],stl_pc): 
             i-=1
             if i<1:
-                break
+                return []
         end_idx=i
     
-    # print(start_idx,end_idx)
+    if start_idx>=end_idx:
+        return []
     return curve[start_idx:end_idx+1]
 
 def split_slices(curve,stl_pc):
@@ -209,7 +227,7 @@ def split_slices(curve,stl_pc):
             ###filter small gaps
             if continuous_count<continuous_threshold and i-1 in indices:
                 indices=indices[:-(continuous_count+1)]
-    
+
     ###point distance thresholding
     distances = np.sqrt(np.sum(np.diff(curve, axis=0) ** 2, axis=1))
     threshold=10*np.average(distances)
@@ -221,25 +239,34 @@ def split_slices(curve,stl_pc):
 
 
     sub_curves=[sub_curve for sub_curve in sub_curves if len(sub_curve) > continuous_threshold2]
-    for sub_curve in sub_curves:
-        print(len(sub_curve))
+    # for sub_curve in sub_curves:
+    #     print(len(sub_curve))
     return sub_curves
 
-def slice(bottom_curve,stl_pc,direction,slice_height):
+def slice(bottom_curve,stl_pc,direction,slice_height,num_slices):
     direction=np.array([0,0,-1])
-    bottom_curve_normal=get_curve_normal(bottom_curve,stl_pc,direction)
     slice_all=[[bottom_curve]]
-    for i in range(74):
+    for i in range(num_slices):
         print(i, 'th layer')
         slice_ith_layer=[]
         for x in range(len(slice_all[-1])):
             ###push curve 1 layer up
-            curve_next=slice_next_layer(slice_all[-1][x],stl_pc,direction,slice_height)
+            try:
+                ###Fix curve normal from unaligned section
+                curve_normal=get_curve_normal_from_curves(slice_all[-1][x],slice_all[-2][x])
+            except:
+                print('USING SURF NORM @ %ith layer'%i)
+                curve_normal=get_curve_normal(slice_all[-1][x],stl_pc,direction)
+
+            curve_next=slice_next_layer(slice_all[-1][x],stl_pc,curve_normal,slice_height)
 
             if x==0 or x==len(slice_all[-1])-1: ###only extend or shrink if first or last segment for now, need to address later
                 curve_next=fit_to_length(curve_next,stl_pc)
 
-            
+            if len(curve_next)==0:      
+                if len(slice_all[-1])==1:   ###end condition
+                    return slice_all
+                continue
 
             ###split the curve based on projection error
             sub_curves_next=split_slices(curve_next,stl_pc)
@@ -254,41 +281,45 @@ def slice(bottom_curve,stl_pc,direction,slice_height):
 
     return slice_all
 
-# Load the STL file
-filename = '../data/blade0.1/surface.stl'
-your_mesh = mesh.Mesh.from_file(filename)
-# Get the number of facets in the STL file
-num_facets = len(your_mesh)
+def main():
+    # Load the STL file
+    filename = '../data/blade0.1/surface.stl'
+    your_mesh = mesh.Mesh.from_file(filename)
+    # Get the number of facets in the STL file
+    num_facets = len(your_mesh)
 
-# Extract all vertices
-vertices = np.zeros((num_facets, 3, 3))
-for i, facet in enumerate(your_mesh.vectors):
-    vertices[i] = facet
-# Flatten the vertices array and remove duplicates
-stl_pc = np.unique(vertices.reshape(-1, 3), axis=0)
-stl_pc *= 25.4      ##convert to mm
+    # Extract all vertices
+    vertices = np.zeros((num_facets, 3, 3))
+    for i, facet in enumerate(your_mesh.vectors):
+        vertices[i] = facet
+    # Flatten the vertices array and remove duplicates
+    stl_pc = np.unique(vertices.reshape(-1, 3), axis=0)
+    stl_pc *= 25.4      ##convert to mm
 
-bottom_edge = slicing_uniform(stl_pc,z = np.max(stl_pc[:,2]))
-curve_normal=get_curve_normal(bottom_edge,stl_pc,np.array([0,0,-1]))
+    bottom_edge = slicing_uniform(stl_pc,z = np.max(stl_pc[:,2]))
+    curve_normal=get_curve_normal(bottom_edge,stl_pc,np.array([0,0,-1]))
 
-slice_all=slice(bottom_edge,stl_pc,np.array([0,0,-1]),slice_height=1.)
+    slice_all=slice(bottom_edge,stl_pc,np.array([0,0,-1]),slice_height=0.1,num_slices=800)
 
-# Plot the original points and the fitted curved plane
-fig = plt.figure()
-ax = fig.add_subplot(111, projection='3d')
-vis_step=5
+    # Plot the original points and the fitted curved plane
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    vis_step=5
 
-# ax.plot3D(bottom_edge[::vis_step,0],bottom_edge[::vis_step,1],bottom_edge[::vis_step,2],'r.-')
-# ax.quiver(bottom_edge[::vis_step,0],bottom_edge[::vis_step,1],bottom_edge[::vis_step,2],curve_normal[::vis_step,0],curve_normal[::vis_step,1],curve_normal[::vis_step,2],length=0.1, normalize=True)
-# ax.scatter(stl_pc[:,0], stl_pc[:,1], stl_pc[:,2], c='b', marker='o', label='Original points')
+    # ax.plot3D(bottom_edge[::vis_step,0],bottom_edge[::vis_step,1],bottom_edge[::vis_step,2],'r.-')
+    # ax.quiver(bottom_edge[::vis_step,0],bottom_edge[::vis_step,1],bottom_edge[::vis_step,2],curve_normal[::vis_step,0],curve_normal[::vis_step,1],curve_normal[::vis_step,2],length=0.1, normalize=True)
+    # ax.scatter(stl_pc[:,0], stl_pc[:,1], stl_pc[:,2], c='b', marker='o', label='Original points')
 
-for i in range(len(slice_all)):
-    for x in range(len(slice_all[i])):
-        ax.plot3D(slice_all[i][x][::vis_step,0],slice_all[i][x][::vis_step,1],slice_all[i][x][::vis_step,2],'r.-')
-        np.savetxt('slicing_result/slice_%i_%i.csv'%(i,x),slice_all[i][x])
+    for i in range(len(slice_all)):
+        for x in range(len(slice_all[i])):
+            ax.plot3D(slice_all[i][x][::vis_step,0],slice_all[i][x][::vis_step,1],slice_all[i][x][::vis_step,2],'r.-')
+            np.savetxt('slicing_result/slice_%i_%i.csv'%(i,x),slice_all[i][x],delimiter=',')
 
-ax.set_xlabel('X')
-ax.set_ylabel('Y')
-ax.set_zlabel('Z')
-plt.title('STL first X Layer Slicing')
-plt.show()
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
+    plt.title('STL first X Layer Slicing')
+    plt.show()
+
+if __name__ == "__main__":
+    main()
