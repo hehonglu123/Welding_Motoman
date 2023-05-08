@@ -24,9 +24,10 @@ class WeldSend(object):
 		###cut wire, length given in robot standoff d
 		mp=MotionProgram(ROBOT_CHOICE='RB1',pulse2deg=robot.pulse2deg)
 		p=[463.1378, 1347, -293]
-		R=np.array([[ 0.2081,  0.9781, 0],
-					[ 0.9781, -0.2081,  0],
+		R=np.array([[ -0.2081, -0.9781, 0],
+					[ -0.9781, 0.2081,  0],
 					[ 0, 	 	0, 		-1]])
+
 		q_cut1=robot.inv(p+np.array([0,0,50]),R,np.zeros(6))[0]
 		q_cut2=robot.inv(p,R,np.zeros(6))[0]
 		mp.MoveJ(np.array([-23.88,37.9,40.66,7.42,-72,-20]),speed/2)
