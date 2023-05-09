@@ -12,15 +12,23 @@ robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_co
 pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',\
 base_marker_config_file=config_dir+'MA2010_marker_config.yaml',tool_marker_config_file=config_dir+'weldgun_marker_config.yaml')
 
-data_dir='test0502_noanchor/'
+# data_dir='test0502_noanchor/'
 # data_dir='test0502_anchor/'
-with open(data_dir+'robot_q_cont.pickle', 'rb') as handle:
-    robot_q = pickle.load(handle)
-    robot_q = robot_q[:,:6]
-with open(data_dir+'robot_q_timestamps_cont.pickle', 'rb') as handle:
-    robot_q_stamps = pickle.load(handle)
-robot_qdot = np.divide(np.gradient(robot_q,axis=0),np.tile(np.gradient(robot_q_stamps),(6,1)).T)
-robot_qdot_norm = np.linalg.norm(robot_qdot,axis=1)
+# data_dir='test0504_nomove/nomove_concalib_'
+# data_dir='test0504_withrecord/'
+data_dir='test0504/'
+
+try:
+    with open(data_dir+'robot_q_cont.pickle', 'rb') as handle:
+        robot_q = pickle.load(handle)
+        robot_q = robot_q[:,:6]
+    with open(data_dir+'robot_q_timestamps_cont.pickle', 'rb') as handle:
+        robot_q_stamps = pickle.load(handle)
+    robot_qdot = np.divide(np.gradient(robot_q,axis=0),np.tile(np.gradient(robot_q_stamps),(6,1)).T)
+    robot_qdot_norm = np.linalg.norm(robot_qdot,axis=1)
+except:
+    pass
+
 
 # plt.plot(robot_qdot_norm)
 # plt.plot(np.diff(robot_q_stamps))
@@ -30,7 +38,7 @@ robot_qdot_norm = np.linalg.norm(robot_qdot,axis=1)
 marker_id = robot_weld.tool_rigid_id
 with open(data_dir+'mocap_p_cont.pickle', 'rb') as handle:
     mocap_p = pickle.load(handle)
-    static_mocap_marker = mocap_p[robot_weld.base_rigid_id]
+    static_mocap_marker = mocap_p[robot_weld.base_markers_id[0]]
     base_rigid_p = mocap_p[robot_weld.base_rigid_id]
     mocap_p = np.array(mocap_p[marker_id])
 with open(data_dir+'mocap_R_cont.pickle', 'rb') as handle:
@@ -43,6 +51,24 @@ with open(data_dir+'mocap_p_timestamps_cont.pickle', 'rb') as handle:
     mocap_p_stamps = np.array(mocap_p_stamps[marker_id])
 mocap_pdot = np.divide(np.gradient(mocap_p,axis=0),np.tile(np.gradient(mocap_p_stamps),(3,1)).T)
 mocap_pdot_norm = np.linalg.norm(mocap_pdot,axis=1)
+
+# static_mocap_marker = np.array(static_mocap_marker)
+# print(np.std(static_mocap_marker,axis=0))
+# plt.plot(static_mocap_marker[:,0]-np.mean(static_mocap_marker[:,0]),label='Marker x')
+# plt.plot(static_mocap_marker[:,1]-np.mean(static_mocap_marker[:,1]),label='Marker y')
+# plt.plot(static_mocap_marker[:,2]-np.mean(static_mocap_marker[:,2]),label='Marker z')
+# plt.title('Stationary Marker Position')
+# plt.legend()
+# plt.show()
+# base_rigid_p = np.array(base_rigid_p)
+# print(np.std(base_rigid_p,axis=0))
+# plt.plot(base_rigid_p[:,0]-np.mean(base_rigid_p[:,0]),label='Rigid x')
+# plt.plot(base_rigid_p[:,1]-np.mean(base_rigid_p[:,1]),label='Rigid y')
+# plt.plot(base_rigid_p[:,2]-np.mean(base_rigid_p[:,2]),label='Rigid z')
+# plt.title('Stationary Rigid Body Position')
+# plt.legend()
+# plt.show()
+# exit()
 
 print(len(mocap_p))
 print(len(mocap_p_stamps))
@@ -84,12 +110,12 @@ for i in range(0,len(robot_q)-dK_robot):
 robot_v_dev=np.array(robot_v_dev)
 robot_stop_k.append(np.argmin(robot_v_dev[robot_stop_k[-1]+dK_robot:])+robot_stop_k[-1]+dK_robot)
 
-# plt.plot(robot_v_dev)
-# plt.scatter(robot_stop_k,robot_v_dev[robot_stop_k])
-# plt.plot(robot_qdot_norm,'blue')
-# for k in robot_stop_k:
-#     plt.plot(np.arange(k,k+dK_robot),robot_qdot_norm[k:k+dK_robot])
-# plt.show()
+plt.plot(robot_v_dev)
+plt.scatter(robot_stop_k,robot_v_dev[robot_stop_k])
+plt.plot(robot_qdot_norm,'blue')
+for k in robot_stop_k:
+    plt.plot(np.arange(k,k+dK_robot),robot_qdot_norm[k:k+dK_robot])
+plt.show()
 
 
 mocap_dev_thres = 5
@@ -128,19 +154,12 @@ mocap_stop_k.append(np.argmin(mocap_v_dev[mocap_stop_k[-1]+dK_mocap:])+mocap_sto
 # plt.plot(mocap_pdot_norm)
 # plt.show()
 
-# plt.plot(mocap_v_dev)
-# plt.plot(mocap_pdot_norm,'blue')
-# for k in mocap_stop_k:
-#     plt.plot(np.arange(k,k+dK_mocap),mocap_pdot_norm[k:k+dK_mocap])
-# plt.show()
-
-# static_mocap_marker = np.array(static_mocap_marker)
-# print(np.std(static_mocap_marker,axis=0))
-# # print(static_mocap_marker)
-# for i in range(3):
-#     plt.plot(static_mocap_marker[:,i]-np.mean(static_mocap_marker[:,i]))
-# plt.show()
-# exit()
+# check 
+plt.plot(mocap_v_dev)
+plt.plot(mocap_pdot_norm,'blue')
+for k in mocap_stop_k:
+    plt.plot(np.arange(k,k+dK_mocap),mocap_pdot_norm[k:k+dK_mocap])
+plt.show()
 
 total_pose = 5
 total_N = int(len(mocap_stop_k)/total_pose)

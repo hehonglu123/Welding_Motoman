@@ -105,15 +105,29 @@ axis_p = deepcopy(H_nom)
 # all_datasets=['train_data','valid_data_1','valid_data_2']
 # all_datasets=['test0502_noanchor/train_data']
 # all_datasets=['test0502_anchor/train_data']
-all_datasets=['test0504_high_zero/train_data']
+# all_datasets=['test0504_high_zero/train_data']
+# all_datasets=['test0504_zero/train_data']
+# all_datasets=['test0504_stretch/train_data']
+all_datasets=['test0504_inward/train_data']
+
+jN=6
 # P_marker_id = 'marker4_rigid3'
 P_marker_id = robot_weld.tool_rigid_id
+zero_config_q = [[],[],[],[],[],[]]
 for dataset in all_datasets:
     print(dataset)
     raw_data_dir = 'PH_raw_data/'+dataset
-    for j in range(6):
+    for j in range(jN):
         # read raw data
         curve_p,curve_R,mocap_stamps = read_and_convert_frame(raw_data_dir+'_'+str(j+1),robot_weld.base_rigid_id,robot_weld.tool_markers_id)
+
+        # read q
+        with open(raw_data_dir+'_'+str(j+1)+'_robot_q.pickle', 'rb') as handle:
+            robot_q = pickle.load(handle)
+            robot_q = robot_q[:,:jN]
+        for i in range(jN):
+            if i!=j:
+                zero_config_q[i].extend(robot_q[:,i])
 
         # detect axis
         this_axis_p,this_axis_normal = detect_axis(curve_p,H_nom[:,j],robot_weld.tool_markers_id)
@@ -122,7 +136,7 @@ for dataset in all_datasets:
 
     H = H_act
     H_point = axis_p
-    for i in range(6):
+    for i in range(jN):
         H[:,i]=H[:,i]/np.linalg.norm(H[:,i])
 
     # print(np.round(H,5).T)
@@ -153,7 +167,7 @@ for dataset in all_datasets:
     T_base_basemarker = Transform(R.T,j1_center)
     T_basemarker_base = T_base_basemarker.inv()
     H = np.matmul(T_basemarker_base.R,H)
-    for i in range(6):
+    for i in range(jN):
         H_point[:,i] = np.matmul(T_basemarker_base.R,H_point[:,i])+T_basemarker_base.p
     tcp_base = np.matmul(T_basemarker_base.R,tcp)+T_basemarker_base.p
     j1_center = np.matmul(T_basemarker_base.R,j1_center)+T_basemarker_base.p
@@ -219,6 +233,11 @@ for j in range(len(P[0])):
     this_P['y']=float(P[1,j])
     this_P['z']=float(P[2,j])
     base_marker_data['P'].append(this_P)
+# save zero config q
+for i in range(jN):
+    zero_config_q[i] = float(np.mean(zero_config_q[i]))
+base_marker_data['zero_config'] = zero_config_q
+
 base_marker_data['calib_base_basemarker_pose'] = {}
 base_marker_data['calib_base_basemarker_pose']['position'] = {}
 base_marker_data['calib_base_basemarker_pose']['position']['x'] = float(T_base_basemarker.p[0])
