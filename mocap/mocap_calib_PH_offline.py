@@ -193,7 +193,7 @@ for dataset in all_datasets:
     j2_center = np.matmul(T_basemarker_base.R,j2_center)+T_basemarker_base.p
     #######################################
 
-    
+    if robot_type!='S1':
         k=(j2_center[1]-H_point[1,2])/H[1,2]
         j3_center = H_point[:,2]+k*H[:,2]
 
