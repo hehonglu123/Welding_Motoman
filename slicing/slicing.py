@@ -90,19 +90,11 @@ def project_point_onto_plane(point, normal, centroid):
 
     return projected_point
 
-def project_point_onto_triangle(point, a,b,c):
-    normal = np.cross(b - a, c - a)
-    normal /= np.linalg.norm(normal)
-    projected_point = point - np.dot(point - a, normal) * normal
-    return projected_point
-
 def project_point_on_stl(point,stl_pc):     ###project a point on stl surface
     indices=np.argsort(np.linalg.norm(stl_pc-point,axis=1))[:50]
     normal,centroid=fit_plane(stl_pc[indices])
     return project_point_onto_plane(point,normal,centroid)
 
-    # indices=np.argsort(np.linalg.norm(stl_pc-point,axis=1))[:3]
-    # return project_point_onto_triangle(point,stl_pc[indices[0]],stl_pc[indices[1]],stl_pc[indices[2]])
 
 def slicing_uniform(stl_pc,z,threshold = 1e-6):
     bottom_edge_vertices = stl_pc[np.where(np.abs(stl_pc[:,2] - z) <threshold)[0]]
@@ -167,9 +159,9 @@ def split_slice1(curve):
     else:
         return [curve]
 
-
+def find_point_on_boundary(p,vec,stl_pc):
+    return
 def fit_to_length(curve,stl_pc,threshold=1): 
-    # print('start point check')   
     
     if check_boundary(curve[0],stl_pc):
         ###extend to fit on boundary
@@ -243,19 +235,25 @@ def split_slices(curve,stl_pc):
     #     print(len(sub_curve))
     return sub_curves
 
-def slice(bottom_curve,stl_pc,direction,slice_height,num_slices):
+def slice(bottom_curve,stl_pc,direction,slice_height):
     direction=np.array([0,0,-1])
     slice_all=[[bottom_curve]]
-    for i in range(num_slices):
-        print(i, 'th layer')
+    layer_num=0
+    while True:
+        print(layer_num, 'th layer')
+        if len(slice_all[-1])==0:
+            break
         slice_ith_layer=[]
         for x in range(len(slice_all[-1])):
             ###push curve 1 layer up
             try:
                 ###Fix curve normal from unaligned section
-                curve_normal=get_curve_normal_from_curves(slice_all[-1][x],slice_all[-2][x])
+                if len(slice_all[-2])!=len(slice_all[-1]):
+                    curve_normal=get_curve_normal(slice_all[-1][x],stl_pc,direction)
+                else:
+                    curve_normal=get_curve_normal_from_curves(slice_all[-1][x],slice_all[-2][x])
             except:
-                print('USING SURF NORM @ %ith layer'%i)
+                print('USING SURF NORM @ %ith layer'%layer_num)
                 curve_normal=get_curve_normal(slice_all[-1][x],stl_pc,direction)
 
             curve_next=slice_next_layer(slice_all[-1][x],stl_pc,curve_normal,slice_height)
@@ -263,8 +261,9 @@ def slice(bottom_curve,stl_pc,direction,slice_height,num_slices):
             if x==0 or x==len(slice_all[-1])-1: ###only extend or shrink if first or last segment for now, need to address later
                 curve_next=fit_to_length(curve_next,stl_pc)
 
-            if len(curve_next)==0:      
-                if len(slice_all[-1])==1:   ###end condition
+            if len(curve_next)==0:   
+                print('here',len(slice_all[-1]))   
+                if len(slice_all[-1])<=1:   ###end condition
                     return slice_all
                 continue
 
@@ -276,7 +275,7 @@ def slice(bottom_curve,stl_pc,direction,slice_height,num_slices):
             
             slice_ith_layer.extend(sub_curves_next)
 
-
+        layer_num+=1
         slice_all.append(slice_ith_layer)
 
     return slice_all
@@ -299,7 +298,7 @@ def main():
     bottom_edge = slicing_uniform(stl_pc,z = np.max(stl_pc[:,2]))
     curve_normal=get_curve_normal(bottom_edge,stl_pc,np.array([0,0,-1]))
 
-    slice_all=slice(bottom_edge,stl_pc,np.array([0,0,-1]),slice_height=0.1,num_slices=800)
+    slice_all=slice(bottom_edge,stl_pc,np.array([0,0,-1]),slice_height=0.1)
 
     # Plot the original points and the fitted curved plane
     fig = plt.figure()
