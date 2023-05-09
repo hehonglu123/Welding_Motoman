@@ -158,42 +158,40 @@ for dataset in all_datasets:
     for i in range(jN):
         H[:,i]=H[:,i]/np.linalg.norm(H[:,i])
 
-    # print(np.round(H,5).T)
-
-    # rotate R
-    z_axis = H[:,0]
-    y_axis = H[:,1]
-    y_axis = y_axis-np.dot(z_axis,y_axis)*z_axis
-    y_axis = y_axis/np.linalg.norm(y_axis)
-    x_axis = np.cross(y_axis,z_axis)
-    x_axis = x_axis/np.linalg.norm(x_axis)
-    R = np.array([x_axis,y_axis,z_axis])
-    
-    # read raw data
-    curve_p,curve_R,mocap_stamps = read_and_convert_frame(raw_data_dir+'_zero',robot.base_rigid_id,[P_marker_id])
-
-    tcp = np.mean(curve_p[P_marker_id],axis=0)
-    R_tool_basemarker = curve_R[P_marker_id] # need this later for tool calibration
-
-    # get P
-    # joint 1 is the closest point on H1 to H2
-    ab_coefficient = np.matmul(np.linalg.pinv(np.array([H[:,0],-H[:,1]]).T),
-                                        -(H_point[:,0]-H_point[:,1]))
-    j1_center = H_point[:,0]+ab_coefficient[0]*H[:,0]
-    j2_center = H_point[:,1]+ab_coefficient[1]*H[:,1]
-
-    ###### get robot base frame and convert to base frame from basemarker frame
-    T_base_basemarker = Transform(R.T,j1_center)
-    T_basemarker_base = T_base_basemarker.inv()
-    H = np.matmul(T_basemarker_base.R,H)
-    for i in range(jN):
-        H_point[:,i] = np.matmul(T_basemarker_base.R,H_point[:,i])+T_basemarker_base.p
-    tcp_base = np.matmul(T_basemarker_base.R,tcp)+T_basemarker_base.p
-    j1_center = np.matmul(T_basemarker_base.R,j1_center)+T_basemarker_base.p
-    j2_center = np.matmul(T_basemarker_base.R,j2_center)+T_basemarker_base.p
-    #######################################
-
     if robot_type!='S1':
+        # rotate R
+        z_axis = H[:,0]
+        y_axis = H[:,1]
+        y_axis = y_axis-np.dot(z_axis,y_axis)*z_axis
+        y_axis = y_axis/np.linalg.norm(y_axis)
+        x_axis = np.cross(y_axis,z_axis)
+        x_axis = x_axis/np.linalg.norm(x_axis)
+        R = np.array([x_axis,y_axis,z_axis])
+
+        # read raw data
+        curve_p,curve_R,mocap_stamps = read_and_convert_frame(raw_data_dir+'_zero',robot.base_rigid_id,[P_marker_id])
+
+        tcp = np.mean(curve_p[P_marker_id],axis=0)
+        R_tool_basemarker = curve_R[P_marker_id] # need this later for tool calibration
+
+        # get P
+        # joint 1 is the closest point on H1 to H2
+        ab_coefficient = np.matmul(np.linalg.pinv(np.array([H[:,0],-H[:,1]]).T),
+                                            -(H_point[:,0]-H_point[:,1]))
+        j1_center = H_point[:,0]+ab_coefficient[0]*H[:,0]
+        j2_center = H_point[:,1]+ab_coefficient[1]*H[:,1]
+
+        ###### get robot base frame and convert to base frame from basemarker frame
+        T_base_basemarker = Transform(R.T,j1_center)
+        T_basemarker_base = T_base_basemarker.inv()
+        H = np.matmul(T_basemarker_base.R,H)
+        for i in range(jN):
+            H_point[:,i] = np.matmul(T_basemarker_base.R,H_point[:,i])+T_basemarker_base.p
+        tcp_base = np.matmul(T_basemarker_base.R,tcp)+T_basemarker_base.p
+        j1_center = np.matmul(T_basemarker_base.R,j1_center)+T_basemarker_base.p
+        j2_center = np.matmul(T_basemarker_base.R,j2_center)+T_basemarker_base.p
+        #######################################
+    
         k=(j2_center[1]-H_point[1,2])/H[1,2]
         j3_center = H_point[:,2]+k*H[:,2]
 
@@ -207,27 +205,57 @@ for dataset in all_datasets:
         k=(j5_center[0]-H_point[0,5])/H[0,5]
         j6_center = H_point[:,5]+k*H[:,5]
 
-    P=np.zeros((3,7))
-    P[:,0]=np.array([0,0,0])
-    P[:,1]=j2_center-j1_center
-    if robot_type!='S1':
+        P=np.zeros((3,7))
+        P[:,0]=np.array([0,0,0])
+        P[:,1]=j2_center-j1_center
         P[:,2]=j3_center-j2_center
         P[:,3]=j4_center-j3_center
         P[:,4]=j5_center-j4_center
         P[:,5]=j6_center-j5_center
         P[:,6]=tcp_base-j6_center
 
-    print("P2:",P[:,1])
-    if robot_type!='S1':
-        print("P3:",P[:,2])
-        print("P4:",P[:,3])
-        print("P5:",P[:,4])
-        print("P6:",P[:,5])
-        print("P7:",P[:,6])
+    else:
+        # rotate R
+        y_axis = -H[:,0]
+        z_axis = -H[:,1]
+        z_axis = z_axis-np.dot(z_axis,y_axis)*y_axis
+        z_axis = z_axis/np.linalg.norm(z_axis)
+
+        x_axis = np.cross(y_axis,z_axis)
+        x_axis = x_axis/np.linalg.norm(x_axis)
+        R = np.array([x_axis,y_axis,z_axis])
+
+        # read raw data
+        curve_p,curve_R,mocap_stamps = read_and_convert_frame(raw_data_dir+'_zero',robot.base_rigid_id,[P_marker_id])
+
+        tcp = np.mean(curve_p[P_marker_id],axis=0)
+        R_tool_basemarker = curve_R[P_marker_id] # need this later for tool calibration
+
+        # get P
+        # joint 1 is the closest point on H1 to H2
+        ab_coefficient = np.matmul(np.linalg.pinv(np.array([H[:,0],-H[:,1]]).T),
+                                            -(H_point[:,0]-H_point[:,1]))
+        j1_center = H_point[:,0]+ab_coefficient[0]*H[:,0]
+        j2_center = H_point[:,1]+ab_coefficient[1]*H[:,1]
+
+        ###### get robot base frame and convert to base frame from basemarker frame
+        T_base_basemarker = Transform(R.T,j1_center)
+        T_basemarker_base = T_base_basemarker.inv()
+        H = np.matmul(T_basemarker_base.R,H)
+        for i in range(jN):
+            H_point[:,i] = np.matmul(T_basemarker_base.R,H_point[:,i])+T_basemarker_base.p
+        tcp_base = np.matmul(T_basemarker_base.R,tcp)+T_basemarker_base.p
+        j1_center = np.matmul(T_basemarker_base.R,j1_center)+T_basemarker_base.p
+        j2_center = np.matmul(T_basemarker_base.R,j2_center)+T_basemarker_base.p
+        #######################################
+
+        P=np.zeros((3,3))
+        P[:,0]=np.array([0,0,0])
+        P[:,1]=j2_center-j1_center
+        P[:,2]=tcp_base-j2_center
+        
+    print("P:",P.T)
     print("H:",H.T)
-    # print("J1 Center:",j1_center)
-    # print("J6 Center:",j6_center)
-    # print("J6 in J1:",j6_center-j1_center)
     print("====================")
 
 # Find R^toolmarker_base
@@ -328,7 +356,16 @@ if robot_type!='S1':
     T_tool_toolmarker = Transform(R,t)
     
 else:
-    pass
+    # Find T^tool_toolmarker
+    curve_p,curve_R,mocap_stamps = read_and_convert_frame(raw_data_dir+'_zero',robot.base_rigid_id,[robot.tool_rigid_id])
+
+    # T^tool_base
+    tool_p = j2_center+180*-1*H[:,1] # 180 mm above j2_center
+    T_tool_base = Transform(np.eye(3),tool_p)
+
+    #T^tool_toolmarker
+    T_toolmarker_base = Transform(R_tool_base,tcp_base)
+    T_tool_toolmarker = T_toolmarker_base.inv()*T_tool_base
 
 with open(tool_marker_config_file,'r') as file:
     tool_marker_data = yaml.safe_load(file)
