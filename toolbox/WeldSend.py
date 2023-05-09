@@ -60,6 +60,24 @@ class WeldSend(object):
 
 		return np.array(q_all)
 
+
+	def logged_data_analysis_mocap(self,robot,curve_exe_dict,curve_exe_R_dict,timestamp_dict):
+		curve_exe = np.array(curve_exe_dict[robot.robot_name])
+		curve_exe_R = np.array(curve_exe_R_dict[robot.robot_name])
+		timestamp = np.array(timestamp_dict[robot.robot_name])
+		len_min=min(len(timestamp),len(curve_exe),len(curve_exe_R))
+		curve_exe=curve_exe[:len_min]
+		timestamp=timestamp[:len_min]
+		curve_exe_R=curve_exe_R[:len_min]
+
+		curve_exe_w=smooth_w(R2w(curve_exe_R,np.eye(3)))
+		###filter noise
+		timestamp, curve_exe_pw=lfilter(timestamp, np.hstack((curve_exe,curve_exe_w)))
+
+
+		return  curve_exe_pw[:,:3], curve_exe_pw[:,3:], timestamp
+
+		
 	def extract_data_from_cmd(self,filename):
 		data = read_csv(filename)
 		breakpoints=np.array(data['breakpoints'].tolist())
