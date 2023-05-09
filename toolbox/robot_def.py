@@ -292,6 +292,32 @@ class positioner_obj(object):
 						marker_data['calib_base_mocap_pose']['orientation']['y'],
 						marker_data['calib_base_mocap_pose']['orientation']['z']]
 					self.T_base_mocap = Transform(q2R(q),p)
+				if 'calib_tool_flange_pose' in marker_data.keys():
+					p = [marker_data['calib_tool_flange_pose']['position']['x'],
+						marker_data['calib_tool_flange_pose']['position']['y'],
+						marker_data['calib_tool_flange_pose']['position']['z']]
+					q = [marker_data['calib_tool_flange_pose']['orientation']['w'],
+						marker_data['calib_tool_flange_pose']['orientation']['x'],
+						marker_data['calib_tool_flange_pose']['orientation']['y'],
+						marker_data['calib_tool_flange_pose']['orientation']['z']]
+					self.T_tool_flange = Transform(q2R(q),p)
+				if 'P' in marker_data.keys():
+					self.calib_P = np.zeros(self.robot.P.shape)
+					for i in range(len(marker_data['P'])):
+						self.calib_P[0,i] = marker_data['P'][i]['x']
+						self.calib_P[1,i] = marker_data['P'][i]['y']
+						self.calib_P[2,i] = marker_data['P'][i]['z']
+				if 'H' in marker_data.keys():
+					self.calib_H = np.zeros(self.robot.H.shape)
+					for i in range(len(marker_data['H'])):
+						self.calib_H[0,i] = marker_data['H'][i]['x']
+						self.calib_H[1,i] = marker_data['H'][i]['y']
+						self.calib_H[2,i] = marker_data['H'][i]['z']
+				self.calib_zero_config=np.zeros(self.robot.H.shape[1])
+				if 'zero_config' in marker_data.keys():
+					self.calib_zero_config = np.array(marker_data['zero_config'])
+					self.robot.joint_upper_limit = self.robot.joint_upper_limit-self.calib_zero_config
+					self.robot.joint_lower_limit = self.robot.joint_lower_limit-self.calib_zero_config
 		self.tool_marker_config_file=tool_marker_config_file
 		self.T_tool_toolmarker = None # T^tool_toolmarker
 		if len(tool_marker_config_file)>0:
@@ -309,6 +335,9 @@ class positioner_obj(object):
 						marker_data['calib_tool_toolmarker_pose']['orientation']['y'],
 						marker_data['calib_tool_toolmarker_pose']['orientation']['z']]
 					self.T_tool_toolmarker = Transform(q2R(q),p)
+					# add d
+					T_d1_d2 = Transform(np.eye(3),p=[0,0,d-15])
+					self.T_tool_toolmarker = self.T_tool_toolmarker*T_d1_d2
 
 	def fwd(self,q_all,world=False,qlim_override=False):
 		###robot forworld kinematics

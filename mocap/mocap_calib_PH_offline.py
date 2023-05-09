@@ -88,17 +88,38 @@ def to_frame(curve_p,curve_R,mocap_stamps,target_frame,markers_id):
     return curve_p_frame,curve_R_frame,mocap_stamps_frame
 
 config_dir='../config/'
-base_marker_config_file=config_dir+'MA2010_marker_config.yaml'
-tool_marker_config_file=config_dir+'weldgun_marker_config.yaml'
-robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path=config_dir+'weldgun.csv',\
-pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',\
-base_marker_config_file=base_marker_config_file,tool_marker_config_file=tool_marker_config_file)
 
-# only R matter
-nominal_robot_base = Transform(np.array([[0,1,0],
-                                        [0,0,1],
-                                        [1,0,0]]),[0,0,0]) 
-H_nom = np.matmul(nominal_robot_base.R,robot_weld.robot.H)
+robot_type='R1'
+
+if robot_type=='R1':
+    base_marker_config_file=config_dir+'MA2010_marker_config.yaml'
+    tool_marker_config_file=config_dir+'weldgun_marker_config.yaml'
+    robot=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path=config_dir+'torch.csv',\
+    pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',\
+    base_marker_config_file=base_marker_config_file,tool_marker_config_file=tool_marker_config_file)
+
+    # only R matter
+    nominal_robot_base = Transform(np.array([[0,1,0],
+                                            [0,0,1],
+                                            [1,0,0]]),[0,0,0]) 
+    H_nom = np.matmul(nominal_robot_base.R,robot.robot.H)
+
+    jN=6
+
+elif robot_type=='S1':
+    base_marker_config_file=config_dir+'D500B_marker_config.yaml'
+    tool_marker_config_file=config_dir+'positioner_tcp_marker_config.yaml'
+    robot=positioner_obj('D500B',def_path=config_dir+'D500B_robot_default_config.yml',tool_file_path=config_dir+'positioner_tcp.csv',\
+    pulse2deg_file_path=config_dir+'D500B_pulse2deg_real.csv',\
+    base_marker_config_file=base_marker_config_file,tool_marker_config_file=tool_marker_config_file)
+    # only R matter
+    nominal_robot_base = Transform(np.array([[-1,0,0],
+                                            [0,0,1],
+                                            [0,1,0]]),[0,0,0]) 
+    H_nom = np.matmul(nominal_robot_base.R,robot.robot.H)
+
+    jN=6
+
 H_act = deepcopy(H_nom)
 axis_p = deepcopy(H_nom)
 
@@ -106,20 +127,18 @@ axis_p = deepcopy(H_nom)
 # all_datasets=['test0502_noanchor/train_data']
 # all_datasets=['test0502_anchor/train_data']
 # all_datasets=['test0504_high_zero/train_data']
-# all_datasets=['test0504_zero/train_data']
+all_datasets=['test0504_zero/train_data']
 # all_datasets=['test0504_stretch/train_data']
-all_datasets=['test0504_inward/train_data']
+# all_datasets=['test0504_inward/train_data']
 
-jN=6
-# P_marker_id = 'marker4_rigid3'
-P_marker_id = robot_weld.tool_rigid_id
+P_marker_id = robot.tool_rigid_id
 zero_config_q = [[],[],[],[],[],[]]
 for dataset in all_datasets:
     print(dataset)
     raw_data_dir = 'PH_raw_data/'+dataset
     for j in range(jN):
         # read raw data
-        curve_p,curve_R,mocap_stamps = read_and_convert_frame(raw_data_dir+'_'+str(j+1),robot_weld.base_rigid_id,robot_weld.tool_markers_id)
+        curve_p,curve_R,mocap_stamps = read_and_convert_frame(raw_data_dir+'_'+str(j+1),robot.base_rigid_id,robot.tool_markers_id)
 
         # read q
         with open(raw_data_dir+'_'+str(j+1)+'_robot_q.pickle', 'rb') as handle:
@@ -130,7 +149,7 @@ for dataset in all_datasets:
                 zero_config_q[i].extend(robot_q[:,i])
 
         # detect axis
-        this_axis_p,this_axis_normal = detect_axis(curve_p,H_nom[:,j],robot_weld.tool_markers_id)
+        this_axis_p,this_axis_normal = detect_axis(curve_p,H_nom[:,j],robot.tool_markers_id)
         H_act[:,j] = this_axis_normal
         axis_p[:,j] = this_axis_p
 
@@ -151,7 +170,7 @@ for dataset in all_datasets:
     R = np.array([x_axis,y_axis,z_axis])
     
     # read raw data
-    curve_p,curve_R,mocap_stamps = read_and_convert_frame(raw_data_dir+'_zero',robot_weld.base_rigid_id,[P_marker_id])
+    curve_p,curve_R,mocap_stamps = read_and_convert_frame(raw_data_dir+'_zero',robot.base_rigid_id,[P_marker_id])
 
     tcp = np.mean(curve_p[P_marker_id],axis=0)
     R_tool_basemarker = curve_R[P_marker_id] # need this later for tool calibration
@@ -174,34 +193,37 @@ for dataset in all_datasets:
     j2_center = np.matmul(T_basemarker_base.R,j2_center)+T_basemarker_base.p
     #######################################
 
-    k=(j2_center[1]-H_point[1,2])/H[1,2]
-    j3_center = H_point[:,2]+k*H[:,2]
+    
+        k=(j2_center[1]-H_point[1,2])/H[1,2]
+        j3_center = H_point[:,2]+k*H[:,2]
 
-    # p5
-    k=(j3_center[1]-H_point[1,4])/H[1,4]
-    j5_center = H_point[:,4]+k*H[:,4]
-    # p4
-    k=(j5_center[0]-H_point[0,3])/H[0,3]
-    j4_center = H_point[:,3]+k*H[:,3]
-    # p6
-    k=(j5_center[0]-H_point[0,5])/H[0,5]
-    j6_center = H_point[:,5]+k*H[:,5]
+        # p5
+        k=(j3_center[1]-H_point[1,4])/H[1,4]
+        j5_center = H_point[:,4]+k*H[:,4]
+        # p4
+        k=(j5_center[0]-H_point[0,3])/H[0,3]
+        j4_center = H_point[:,3]+k*H[:,3]
+        # p6
+        k=(j5_center[0]-H_point[0,5])/H[0,5]
+        j6_center = H_point[:,5]+k*H[:,5]
 
     P=np.zeros((3,7))
     P[:,0]=np.array([0,0,0])
     P[:,1]=j2_center-j1_center
-    P[:,2]=j3_center-j2_center
-    P[:,3]=j4_center-j3_center
-    P[:,4]=j5_center-j4_center
-    P[:,5]=j6_center-j5_center
-    P[:,6]=tcp_base-j6_center
+    if robot_type!='S1':
+        P[:,2]=j3_center-j2_center
+        P[:,3]=j4_center-j3_center
+        P[:,4]=j5_center-j4_center
+        P[:,5]=j6_center-j5_center
+        P[:,6]=tcp_base-j6_center
 
     print("P2:",P[:,1])
-    print("P3:",P[:,2])
-    print("P4:",P[:,3])
-    print("P5:",P[:,4])
-    print("P6:",P[:,5])
-    print("P7:",P[:,6])
+    if robot_type!='S1':
+        print("P3:",P[:,2])
+        print("P4:",P[:,3])
+        print("P5:",P[:,4])
+        print("P6:",P[:,5])
+        print("P7:",P[:,6])
     print("H:",H.T)
     # print("J1 Center:",j1_center)
     # print("J6 Center:",j6_center)
@@ -266,43 +288,47 @@ with open(base_marker_config_file,'w') as file:
     yaml.safe_dump(base_marker_data,file)
 
 # calibrate tool
-# Find T^tool_toolmarker
-curve_p,curve_R,mocap_stamps = read_and_convert_frame(raw_data_dir+'_zero',robot_weld.tool_rigid_id,robot_weld.tool_markers_id)
+if robot_type!='S1':
+    # Find T^tool_toolmarker
+    curve_p,curve_R,mocap_stamps = read_and_convert_frame(raw_data_dir+'_zero',robot.tool_rigid_id,robot.tool_markers_id)
 
-# A: known tool maker position in tool frame, p^marker_tool
-# B: capture tool marker position in rigid body frame (from motiv), p^marker_toolmarker
-marker_B = {}
-for marker_id in robot_weld.tool_markers_id: # average across the captured
-    marker_B[marker_id] = np.mean(curve_p[marker_id],axis=0)
-# find center of A B
-marker_A = deepcopy(robot_weld.tool_markers)
-center_A = []
-center_B = []
-A = []
-B = []
-for marker_id in robot_weld.tool_markers_id:
-    center_A.append(marker_A[marker_id])
-    A.append(marker_A[marker_id])
-    center_B.append(marker_B[marker_id])
-    B.append(marker_B[marker_id])
-center_A = np.mean(center_A,axis=0)
-A = np.array(A)
-center_B = np.mean(center_B,axis=0)
-B = np.array(B)
+    # A: known tool maker position in tool frame, p^marker_tool
+    # B: capture tool marker position in rigid body frame (from motiv), p^marker_toolmarker
+    marker_B = {}
+    for marker_id in robot.tool_markers_id: # average across the captured
+        marker_B[marker_id] = np.mean(curve_p[marker_id],axis=0)
+    # find center of A B
+    marker_A = deepcopy(robot.tool_markers)
+    center_A = []
+    center_B = []
+    A = []
+    B = []
+    for marker_id in robot.tool_markers_id:
+        center_A.append(marker_A[marker_id])
+        A.append(marker_A[marker_id])
+        center_B.append(marker_B[marker_id])
+        B.append(marker_B[marker_id])
+    center_A = np.mean(center_A,axis=0)
+    A = np.array(A)
+    center_B = np.mean(center_B,axis=0)
+    B = np.array(B)
 
-A_centered = A-center_A
-B_centered = B-center_B
-H = np.matmul(A_centered.T,B_centered)
-u,s,vT = np.linalg.svd(H)
-R = np.matmul(vT.T,u.T)
-if np.linalg.det(R)<0:
-    u,s,v = np.linalg.svd(R)
-    v=v.T
-    v[:,2] = v[:,2]*-1
-    R = np.matmul(v,u.T)
+    A_centered = A-center_A
+    B_centered = B-center_B
+    H = np.matmul(A_centered.T,B_centered)
+    u,s,vT = np.linalg.svd(H)
+    R = np.matmul(vT.T,u.T)
+    if np.linalg.det(R)<0:
+        u,s,v = np.linalg.svd(R)
+        v=v.T
+        v[:,2] = v[:,2]*-1
+        R = np.matmul(v,u.T)
 
-t = center_B-np.dot(R,center_A)
-T_tool_toolmarker = Transform(R,t)
+    t = center_B-np.dot(R,center_A)
+    T_tool_toolmarker = Transform(R,t)
+    
+else:
+    pass
 
 with open(tool_marker_config_file,'r') as file:
     tool_marker_data = yaml.safe_load(file)
@@ -320,5 +346,4 @@ tool_marker_data['calib_tool_toolmarker_pose']['orientation']['z'] = float(quat[
 
 with open(tool_marker_config_file,'w') as file:
     yaml.safe_dump(tool_marker_data,file)
-
 print("Done")

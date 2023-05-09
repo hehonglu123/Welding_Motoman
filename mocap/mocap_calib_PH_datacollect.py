@@ -92,6 +92,43 @@ class CalibRobotPH:
         with open(raw_data_dir+'_zero_robot_timestamps.pickle', 'wb') as handle:
             pickle.dump(robot_stamps, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
+def calib_S1():
+
+    config_dir='../config/'
+    turn_table=positioner_obj('D500B',def_path=config_dir+'D500B_robot_default_config.yml',tool_file_path=config_dir+'positioner_tcp.csv'\
+        ,pulse2deg_file_path=config_dir+'D500B_pulse2deg_real.csv',\
+        base_marker_config_file=config_dir+'D500B_marker_config.yaml',tool_marker_config_file=config_dir+'positioner_tcp_marker_config.yaml')
+
+    mocap_url = 'rr+tcp://localhost:59823?service=optitrack_mocap'
+    mocap_cli = RRN.ConnectService(mocap_url)
+
+    calib_obj = CalibRobotPH(mocap_cli,turn_table)
+
+    # calibration
+    ## zero config
+    start_p = np.array([[0,0],
+                        [0,0],
+                        [0,0],
+                        [0,0],
+                        [0,0],
+                        [0,0]])
+    q1_1=start_p[0] + np.array([-80,0])
+    q1_2=start_p[0] + np.array([56,0])
+    q2_1=start_p[1] + np.array([0,50])
+    q2_2=start_p[1] + np.array([0,-10])
+
+    q_paths = [[q1_1,q1_2],[q2_1,q2_2]]
+    
+    # collecting raw data
+    raw_data_dir='PH_raw_data/train_data'
+    # raw_data_dir='PH_raw_data/valid_data_1'
+    # raw_data_dir='PH_raw_data/valid_data_2'
+    #####################
+
+    calib_obj.run_calib(config_dir+'D500B_robot_default_config.yaml','192.168.1.31','RB1',turn_table.pulse2deg,start_p,q_paths,rob_speed=3,repeat_N=1\
+                        ,raw_data_dir=raw_data_dir) # save calib config to file
+    print("Collect PH data done")
+
 def calib_R1():
 
     config_dir='../config/'
@@ -163,10 +200,7 @@ def calib_R1():
     # q6_1=start_p[5] + np.array([0,0,0,0,0,-180])
     # q6_2=start_p[5] + np.array([0,0,0,0,0,180])
 
-
-
     q_paths = [[q1_1,q1_2],[q2_1,q2_2],[q3_1,q3_2],[q4_1,q4_2],[q5_1,q5_2],[q6_1,q6_2]]
-
 
     # collecting raw data
     raw_data_dir='PH_raw_data/train_data'
