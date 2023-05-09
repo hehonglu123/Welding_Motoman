@@ -2,12 +2,11 @@ import sys
 sys.path.append('toolbox/')
 from robot_def import *
 from dx200_motion_program_exec_client import *
-from MotionSendMotoman import *
 
-robot1=robot_obj('MA2010_A0',def_path='config/MA2010_A0_robot_default_config.yml',tool_file_path='config/weldgun.csv',\
+robot1=robot_obj('MA2010_A0',def_path='config/MA2010_A0_robot_default_config.yml',tool_file_path='config/torch.csv',\
 	pulse2deg_file_path='config/MA2010_A0_pulse2deg_real.csv')
 
-robot2=robot_obj('MA2010_A0',def_path='config/MA2010_A0_robot_default_config.yml',tool_file_path='config/weldgun.csv',\
+robot2=robot_obj('MA2010_A0',def_path='config/MA2010_A0_robot_default_config.yml',tool_file_path='config/scanner_tcp.csv',\
 	pulse2deg_file_path='config/MA1440_A0_pulse2deg_real.csv')
 
 station_pulse2deg=np.abs(np.loadtxt('config/D500B_pulse2deg_real.csv'))

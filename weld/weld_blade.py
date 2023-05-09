@@ -28,9 +28,8 @@ client=MotionProgramExecClient()
 ###move to starting position
 # curve_sliced_js=np.loadtxt(data_dir+'curve_sliced_js/MA2010_base_js0_0.csv',delimiter=',')
 # positioner_js=np.loadtxt(data_dir+'curve_sliced_js/D500B_base_js0_0.csv',delimiter=',')
-# target2=['MOVJ',np.degrees(positioner_js[breakpoints[0]]),10]
-# mp.MoveJ(np.degrees(curve_sliced_js[breakpoints[0]]), 5,target2=target2)
-# client.execute_motion_program(mp)
+# target2=['MOVJ',np.degrees(positioner_js[0]),10]
+# mp.MoveJ(np.degrees(curve_sliced_js[0]), 3,target2=target2)
 
 ###baselayer
 # num_baselayer=2
@@ -57,7 +56,7 @@ client=MotionProgramExecClient()
 
 # 		target2=['MOVJ',np.degrees(positioner_js[breakpoints[0]]),10]
 # 		mp.MoveL(np.degrees(curve_sliced_js[breakpoints[0]]), s1_all[0],target2=target2)
-# 		mp.setArc(True,cond_num=410)
+# 		mp.setArc(True,cond_num=250)
 # 		for j in range(1,len(breakpoints)):
 # 		    target2=['MOVJ',np.degrees(positioner_js[breakpoints[j]]),10]
 # 		    mp.MoveL(np.degrees(curve_sliced_js[breakpoints[j]]), s1_all[j],target2=target2)
@@ -65,8 +64,8 @@ client=MotionProgramExecClient()
 
 ###########################################layer welding############################################
 mp=MotionProgram(ROBOT_CHOICE='RB1',ROBOT_CHOICE2='ST1',pulse2deg=robot.pulse2deg,pulse2deg_2=positioner.pulse2deg, tool_num = 12)
-num_layer_start=70
-num_layer_end=80
+num_layer_start=89
+num_layer_end=94
 for layer in range(num_layer_start,num_layer_end):
 	num_sections=len(glob.glob(data_dir+'curve_sliced_relative/slice'+str(layer)+'_*.csv'))
 	if layer % 2==1:
@@ -78,7 +77,7 @@ for layer in range(num_layer_start,num_layer_end):
 		positioner_js=np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
 		curve_sliced_relative=np.loadtxt(data_dir+'curve_sliced_relative/slice'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
 
-		vd_relative=10
+		vd_relative=16
 		lam1=calc_lam_js(curve_sliced_js,robot)
 		lam2=calc_lam_js(positioner_js,positioner)
 		lam_relative=calc_lam_cs(curve_sliced_relative)
@@ -102,11 +101,11 @@ for layer in range(num_layer_start,num_layer_end):
 		target2=['MOVJ',np.degrees(positioner_js[breakpoints[0]]),30]
 		mp.MoveL(np.degrees(curve_sliced_js[breakpoints[0]]), s1_all[0],target2=target2)
 
-		# mp.setArc(True,cond_num=404)
+		mp.setArc(True,cond_num=110)
 		for j in range(1,len(breakpoints)):
 		    target2=['MOVJ',np.degrees(positioner_js[breakpoints[j]]),10]
 		    mp.MoveL(np.degrees(curve_sliced_js[breakpoints[j]]), s1_all[j],target2=target2)
-		# mp.setArc(False)
+		mp.setArc(False)
 
     
 timestamp,joint_recording,job_line,_=client.execute_motion_program(mp) 
