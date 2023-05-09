@@ -16,7 +16,9 @@ base_marker_config_file=config_dir+'MA2010_marker_config.yaml',tool_marker_confi
 # data_dir='test0502_anchor/'
 # data_dir='test0504_nomove/nomove_concalib_'
 # data_dir='test0504_withrecord/'
-data_dir='test0504/'
+# data_dir='test0504/'
+# data_dir='test0509_beforecalib/'
+data_dir='test0509_aftercalib/'
 
 try:
     with open(data_dir+'robot_q_cont.pickle', 'rb') as handle:
