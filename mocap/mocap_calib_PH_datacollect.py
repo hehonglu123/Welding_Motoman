@@ -106,16 +106,12 @@ def calib_S1():
 
     # calibration
     ## zero config
-    start_p = np.array([[0,0],
-                        [0,0],
-                        [0,0],
-                        [0,0],
-                        [0,0],
-                        [0,0]])
-    q1_1=start_p[0] + np.array([-80,0])
-    q1_2=start_p[0] + np.array([56,0])
-    q2_1=start_p[1] + np.array([0,50])
-    q2_2=start_p[1] + np.array([0,-10])
+    start_p = np.array([[0,180],
+                        [0,180]])
+    q1_1=start_p[0] + np.array([-60,0])
+    q1_2=start_p[0] + np.array([45,0])
+    q2_1=start_p[1] + np.array([0,-120])
+    q2_2=start_p[1] + np.array([0,120])
 
     q_paths = [[q1_1,q1_2],[q2_1,q2_2]]
     
@@ -125,7 +121,7 @@ def calib_S1():
     # raw_data_dir='PH_raw_data/valid_data_2'
     #####################
 
-    calib_obj.run_calib(config_dir+'D500B_robot_default_config.yaml','192.168.1.31','RB1',turn_table.pulse2deg,start_p,q_paths,rob_speed=3,repeat_N=1\
+    calib_obj.run_calib(config_dir+'D500B_robot_default_config.yaml','192.168.1.31','ST1',turn_table.pulse2deg,start_p,q_paths,rob_speed=3,repeat_N=1\
                         ,raw_data_dir=raw_data_dir) # save calib config to file
     print("Collect PH data done")
 
@@ -215,4 +211,5 @@ def calib_R1():
 
 if __name__=='__main__':
 
-    calib_R1()
+    # calib_R1()
+    calib_S1()

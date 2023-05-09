@@ -89,7 +89,7 @@ def to_frame(curve_p,curve_R,mocap_stamps,target_frame,markers_id):
 
 config_dir='../config/'
 
-robot_type='R1'
+robot_type='S1'
 
 if robot_type=='R1':
     base_marker_config_file=config_dir+'MA2010_marker_config.yaml'
@@ -118,7 +118,7 @@ elif robot_type=='S1':
                                             [0,1,0]]),[0,0,0]) 
     H_nom = np.matmul(nominal_robot_base.R,robot.robot.H)
 
-    jN=6
+    jN=2
 
 H_act = deepcopy(H_nom)
 axis_p = deepcopy(H_nom)
@@ -127,9 +127,11 @@ axis_p = deepcopy(H_nom)
 # all_datasets=['test0502_noanchor/train_data']
 # all_datasets=['test0502_anchor/train_data']
 # all_datasets=['test0504_high_zero/train_data']
-all_datasets=['test0504_zero/train_data']
+# all_datasets=['test0504_zero/train_data']
 # all_datasets=['test0504_stretch/train_data']
 # all_datasets=['test0504_inward/train_data']
+# all_datasets=['test0509_aftercalib/train_data']
+all_datasets=['test0509_S1_aftercalib/train_data']
 
 P_marker_id = robot.tool_rigid_id
 zero_config_q = [[],[],[],[],[],[]]
@@ -152,6 +154,7 @@ for dataset in all_datasets:
         this_axis_p,this_axis_normal = detect_axis(curve_p,H_nom[:,j],robot.tool_markers_id)
         H_act[:,j] = this_axis_normal
         axis_p[:,j] = this_axis_p
+        print("one axis")
 
     H = H_act
     H_point = axis_p
@@ -283,10 +286,12 @@ for j in range(len(P[0])):
     this_P['y']=float(P[1,j])
     this_P['z']=float(P[2,j])
     base_marker_data['P'].append(this_P)
-# save zero config q
-for i in range(jN):
-    zero_config_q[i] = float(np.mean(zero_config_q[i]))
-base_marker_data['zero_config'] = zero_config_q
+
+if robot_type!='S1':
+    # save zero config q
+    for i in range(jN):
+        zero_config_q[i] = float(np.mean(zero_config_q[i]))
+    base_marker_data['zero_config'] = zero_config_q
 
 base_marker_data['calib_base_basemarker_pose'] = {}
 base_marker_data['calib_base_basemarker_pose']['position'] = {}
