@@ -12,9 +12,10 @@ image_consts = None
 
 def main():
     now=time.time()
-    url='rr+tcp://127.0.0.1:60827/?service=camera'
+    url='rr+tcp://192.168.55.10:60827/?service=camera'
 
     c1=RRN.ConnectService(url)
+    c1.setf_param("ir_format", RR.VarValue("temperature_linear_10mK","string"))
 
     global image_consts
     image_consts = RRN.GetConstants('com.robotraconteur.image', c1)
