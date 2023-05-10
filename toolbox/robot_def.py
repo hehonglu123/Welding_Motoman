@@ -335,9 +335,6 @@ class positioner_obj(object):
 						marker_data['calib_tool_toolmarker_pose']['orientation']['y'],
 						marker_data['calib_tool_toolmarker_pose']['orientation']['z']]
 					self.T_tool_toolmarker = Transform(q2R(q),p)
-					# add d
-					T_d1_d2 = Transform(np.eye(3),p=[0,0,d-15])
-					self.T_tool_toolmarker = self.T_tool_toolmarker*T_d1_d2
 
 	def fwd(self,q_all,world=False,qlim_override=False):
 		###robot forworld kinematics

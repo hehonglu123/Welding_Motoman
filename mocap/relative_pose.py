@@ -8,6 +8,7 @@ from general_robotics_toolbox import *
 # from RobotRaconteur.Client import *
 import numpy as np
 # from MocapPoseListener import *
+import pickle
 
 config_dir='../config/'
 base_marker_config_file=config_dir+'MA2010_marker_config.yaml'
@@ -32,3 +33,16 @@ T_posbase_robbase = robot.T_base_basemarker.inv()*pos_T_bottombase_basemarker
 print(T_posbase_robbase)
 print(R2rpy(T_posbase_robbase.R))
 print(T_posbase_robbase.p)
+
+mocap_filename='PH_raw_data/test0509_S1_aftercalib/train_data_zero_mocap'
+with open(mocap_filename+'_p.pickle', 'rb') as handle:
+    curve_p = pickle.load(handle)
+with open(mocap_filename+'_R.pickle', 'rb') as handle:
+    curve_R = pickle.load(handle)
+with open(mocap_filename+'_timestamps.pickle', 'rb') as handle:
+    mocap_stamps = pickle.load(handle)
+
+T_basemarker = Transform(curve_R[positioner.base_rigid_id][0],curve_p[positioner.base_rigid_id][0])
+T_toolmarker = Transform(curve_R[positioner.tool_rigid_id][0],curve_p[positioner.tool_rigid_id][0])
+
+print(positioner.T_base_basemarker.inv()*T_basemarker.inv()*T_toolmarker*positioner.T_tool_toolmarker)

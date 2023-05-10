@@ -89,7 +89,7 @@ def to_frame(curve_p,curve_R,mocap_stamps,target_frame,markers_id):
 
 config_dir='../config/'
 
-robot_type='R1'
+robot_type='S1'
 
 if robot_type=='R1':
     base_marker_config_file=config_dir+'MA2010_marker_config.yaml'
@@ -131,8 +131,8 @@ axis_p = deepcopy(H_nom)
 # all_datasets=['test0504_stretch/train_data']
 # all_datasets=['test0504_inward/train_data']
 # all_datasets=['test0509_beforecalib/train_data']
-all_datasets=['test0509_aftercalib/train_data']
-# all_datasets=['test0509_S1_aftercalib/train_data']
+# all_datasets=['test0509_aftercalib/train_data']
+all_datasets=['test0509_S1_aftercalib/train_data']
 
 P_marker_id = robot.tool_rigid_id
 zero_config_q = [[],[],[],[],[],[]]
@@ -367,6 +367,7 @@ else:
 
     # T^tool_base
     tool_p = j2_center+180*-1*H[:,1] # 180 mm above j2_center
+    print(j2_center)
     T_tool_base = Transform(np.eye(3),tool_p)
 
     #T^tool_toolmarker
