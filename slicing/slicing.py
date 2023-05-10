@@ -5,6 +5,8 @@ from matplotlib.path import Path
 from mpl_toolkits.mplot3d import Axes3D
 import sys, copy
 from scipy.spatial import ConvexHull
+# from sympy.geometry import Point, Line
+
 sys.path.append('../toolbox')
 from lambda_calc import *
 from error_check import *
@@ -37,6 +39,36 @@ def check_boundary(p,stl_pc):
             return False
     
     return True
+
+def find_point_on_boundary(p1,p2,stl_pc):
+    ###find a point between p1 (inside) and p2 (outside) on the stl boundary
+    num_points=50
+    indices1=np.argsort(np.linalg.norm(stl_pc-p1,axis=1))[:num_points]
+    indices2=np.argsort(np.linalg.norm(stl_pc-p2,axis=1))[:num_points]
+    indices=np.unique(np.concatenate((indices1,indices2),0))
+
+    ###find a plane
+    normal, centroid=fit_plane(stl_pc[indices])
+
+    ###find projected 2d points
+    projection = np.append(stl_pc[indices],[p1,p2],axis=0) - centroid
+    projection = projection - np.outer(np.dot(projection, normal), normal)
+
+    projection_xy = rodrigues_rot(projection, normal, [0,0,1])[:,:-1]
+    ###convexhull checking
+    line = Line(projection_xy[-1], projection_xy[-2])
+    hull = ConvexHull(projection_xy[:-2])
+    for simplex in hull.simplices:
+        p1_hull = Point(projection_xy[simplex[0], 0], projection_xy[simplex[0], 1])
+        p2_hull = Point(projection_xy[simplex[1], 0], projection_xy[simplex[1], 1])
+        hull_edge = Line(p1_hull, p2_hull)
+        intersection_point = line.intersection(hull_edge)
+        if intersection_point:
+            intersection_points.append(intersection_point)
+    print(len(intersection_points))
+    distance=np.linalg.norm(intersection_points[0]-projection_xy[-1])
+    return p1+distance*(p2-p1)/np.linalg.norm(p2-p1)
+
 
 def extract_bottom_edge(stl_file):
     # Load the STL mesh
@@ -103,7 +135,7 @@ def slicing_uniform(stl_pc,z,threshold = 1e-6):
 
 def smooth_curve(curve):
     lam=np.insert(np.cumsum(np.linalg.norm(np.diff(curve,axis=0),axis=1)),0,0)
-    polyfit=np.polyfit(lam,curve,deg=47)
+    polyfit=np.polyfit(lam,curve,deg=20)
 
     return np.vstack((np.poly1d(polyfit[:,0])(lam), np.poly1d(polyfit[:,1])(lam), np.poly1d(polyfit[:,2])(lam))).T
 
@@ -161,47 +193,107 @@ def split_slice1(curve):
 
 def find_point_on_boundary(p,vec,stl_pc):
     return
-def fit_to_length(curve,stl_pc,threshold=1): 
+
+# def fit_to_length(curve,stl_pc,threshold=1): 
     
-    if check_boundary(curve[0],stl_pc):
-        ###extend to fit on boundary
-        next_p=project_point_on_stl(2*curve[0]-curve[1],stl_pc)        
+#     if check_boundary(curve[0],stl_pc):
+#         ###extend to fit on boundary
+#         next_p=project_point_on_stl(2*curve[0]-curve[1],stl_pc)        
 
-        while check_boundary(next_p,stl_pc) and np.linalg.norm(next_p-curve[0])<threshold:
-            curve=np.insert(curve,0,copy.deepcopy(next_p),axis=0)
-            next_p=project_point_on_stl(2*curve[0]-curve[1],stl_pc)
-        start_idx=0
+#         while check_boundary(next_p,stl_pc) and np.linalg.norm(next_p-curve[0])<threshold:
+#             curve=np.insert(curve,0,copy.deepcopy(next_p),axis=0)
+#             next_p=project_point_on_stl(2*curve[0]-curve[1],stl_pc)
+#         start_idx=0
 
-    else:
-        ###shrink to fit on boundary
-        i=1
-        while not check_boundary(curve[i],stl_pc): 
-            i+=1
-            if i>len(curve)-1:
-                return []
-        start_idx=i
+#     else:
+#         ###shrink to fit on boundary
+#         i=1
+#         while not check_boundary(curve[i],stl_pc): 
+#             i+=1
+#             if i>len(curve)-1:
+#                 return []
+#         start_idx=i
 
-    # print('end point check')
-    if check_boundary(curve[-1],stl_pc):
-        ###extend to fit on boundary
-        next_p=project_point_on_stl(2*curve[-1]-curve[-2],stl_pc)
-        while check_boundary(next_p,stl_pc) and np.linalg.norm(next_p-curve[-1])<threshold:
-            curve=np.append(curve,[copy.deepcopy(next_p)],axis=0)
-            next_p=project_point_on_stl(2*curve[-1]-curve[-2],stl_pc)
+#     # print('end point check')
+#     if check_boundary(curve[-1],stl_pc):
+#         ###extend to fit on boundary
+#         next_p=project_point_on_stl(2*curve[-1]-curve[-2],stl_pc)
+#         while check_boundary(next_p,stl_pc) and np.linalg.norm(next_p-curve[-1])<threshold:
+#             curve=np.append(curve,[copy.deepcopy(next_p)],axis=0)
+#             next_p=project_point_on_stl(2*curve[-1]-curve[-2],stl_pc)
 
-        end_idx=len(curve)-1
-    else:
-        ###shrink to fit on boundary
-        i=len(curve)-1
-        while not check_boundary(curve[i],stl_pc): 
-            i-=1
-            if i<1:
-                return []
-        end_idx=i
+#         end_idx=len(curve)-1
+#     else:
+#         ###shrink to fit on boundary
+#         i=len(curve)-1
+#         while not check_boundary(curve[i],stl_pc): 
+#             i-=1
+#             if i<1:
+#                 return []
+#         end_idx=i
     
-    if start_idx>=end_idx:
-        return []
-    return curve[start_idx:end_idx+1]
+#     if start_idx>=end_idx:
+#         return []
+#     return curve[start_idx:end_idx+1]
+
+def fit_to_length(curve,stl_pc,resolution=0.5):
+
+    ###shrink start first
+    start_idx=0
+    start_shrinked=False
+    while not check_boundary(curve[start_idx],stl_pc):
+        start_shrinked=True
+        start_idx+=1
+        if start_idx>len(curve)-1:
+            return []
+        
+    if start_shrinked:
+        boundary_distance=np.linalg.norm(curve[start_idx-1]-curve[start_idx])
+    else:
+        boundary_distance=5
+    curve=curve[start_idx:]
+
+    if len(curve)<2:
+        return curve
+    
+    ###extend start second
+    vec=(curve[0]-curve[1])/np.linalg.norm(curve[0]-curve[1])
+    distance_added=0
+    while check_boundary(curve[0],stl_pc) and distance_added < boundary_distance:
+        next_p=project_point_on_stl(curve[0]+resolution*vec,stl_pc)
+        curve=np.insert(curve,0,copy.deepcopy(next_p),axis=0)
+        distance_added+=resolution
+    curve=curve[1:]
+    
+
+    ###shrink end first
+    end_idx=len(curve)-1
+    end_shrinked=False
+    while not check_boundary(curve[end_idx],stl_pc):
+        end_shrinked=True
+        end_idx-=1
+        if end_idx<1:
+            return []
+        
+    if end_shrinked:
+        boundary_distance=np.linalg.norm(curve[end_idx+1]-curve[end_idx])
+    else:
+        boundary_distance=5
+    curve=curve[:end_idx+1]
+
+    if len(curve)<2:
+        return curve
+
+    ###extend end second
+    vec=(curve[-1]-curve[-2])/np.linalg.norm(curve[-1]-curve[-2])
+    distance_added=0
+    while check_boundary(curve[-1],stl_pc) and distance_added < boundary_distance:
+        next_p=project_point_on_stl(curve[-1]+resolution*vec,stl_pc)
+        curve=np.append(curve,[copy.deepcopy(next_p)],axis=0)
+        distance_added+=resolution
+    curve=curve[:-1]
+
+    return curve
 
 def split_slices(curve,stl_pc):
     indices=[]
@@ -262,7 +354,6 @@ def slice(bottom_curve,stl_pc,direction,slice_height):
                 curve_next=fit_to_length(curve_next,stl_pc)
 
             if len(curve_next)==0:   
-                print('here',len(slice_all[-1]))   
                 if len(slice_all[-1])<=1:   ###end condition
                     return slice_all
                 continue
@@ -287,6 +378,8 @@ def main():
     # Get the number of facets in the STL file
     num_facets = len(your_mesh)
 
+    slice_height=0.1
+
     # Extract all vertices
     vertices = np.zeros((num_facets, 3, 3))
     for i, facet in enumerate(your_mesh.vectors):
@@ -298,12 +391,12 @@ def main():
     bottom_edge = slicing_uniform(stl_pc,z = np.max(stl_pc[:,2]))
     curve_normal=get_curve_normal(bottom_edge,stl_pc,np.array([0,0,-1]))
 
-    slice_all=slice(bottom_edge,stl_pc,np.array([0,0,-1]),slice_height=0.1)
+    slice_all=slice(bottom_edge,stl_pc,np.array([0,0,-1]),slice_height=slice_height)
 
     # Plot the original points and the fitted curved plane
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
-    vis_step=5
+    vis_step=1
 
     # ax.plot3D(bottom_edge[::vis_step,0],bottom_edge[::vis_step,1],bottom_edge[::vis_step,2],'r.-')
     # ax.quiver(bottom_edge[::vis_step,0],bottom_edge[::vis_step,1],bottom_edge[::vis_step,2],curve_normal[::vis_step,0],curve_normal[::vis_step,1],curve_normal[::vis_step,2],length=0.1, normalize=True)
@@ -317,7 +410,7 @@ def main():
     ax.set_xlabel('X')
     ax.set_ylabel('Y')
     ax.set_zlabel('Z')
-    plt.title('STL first X Layer Slicing')
+    plt.title('STL %fmm Slicing'%slice_height)
     plt.show()
 
 if __name__ == "__main__":

@@ -21,8 +21,8 @@ robot=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.
 		pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',d=15,  base_marker_config_file=config_dir+'MA2010_marker_config.yaml',\
 		tool_marker_config_file=config_dir+'weldgun_marker_config.yaml')
 
-positioner=positioner_obj('D500B',def_path='../config/D500B_robot_default_config.yml',tool_file_path='../config/positioner_tcp.csv',\
-	pulse2deg_file_path='../config/D500B_pulse2deg_real.csv',base_transformation_file='../config/D500B_pose.csv',\
+positioner=positioner_obj('D500B',def_path=config_dir+'D500B_robot_default_config.yml',tool_file_path=config_dir+'positioner_tcp.csv',\
+	pulse2deg_file_path=config_dir+'D500B_pulse2deg_real.csv',base_transformation_file=config_dir+'D500B_pose.csv',\
 	base_marker_config_file=config_dir+'D500B_marker_config.yaml',\
 	tool_marker_config_file=config_dir+'positioner_tcp_marker_config.yaml')
 
