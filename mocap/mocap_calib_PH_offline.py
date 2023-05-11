@@ -89,7 +89,7 @@ def to_frame(curve_p,curve_R,mocap_stamps,target_frame,markers_id):
 
 config_dir='../config/'
 
-robot_type='S1'
+robot_type='R1'
 
 if robot_type=='R1':
     base_marker_config_file=config_dir+'MA2010_marker_config.yaml'
@@ -105,6 +105,11 @@ if robot_type=='R1':
     H_nom = np.matmul(nominal_robot_base.R,robot.robot.H)
 
     jN=6
+
+    output_base_marker_config_file = config_dir+'MA2010_marker_config.yaml'
+    # output_base_marker_config_file = config_dir+'MA2010_0504_marker_config.yaml'
+    # output_base_marker_config_file = config_dir+'MA2010_0504stretch_marker_config.yaml'
+    # output_base_marker_config_file = config_dir+'MA2010_0504inward_marker_config.yaml'
 
 elif robot_type=='S1':
     base_marker_config_file=config_dir+'D500B_marker_config.yaml'
@@ -127,12 +132,12 @@ axis_p = deepcopy(H_nom)
 # all_datasets=['test0502_noanchor/train_data']
 # all_datasets=['test0502_anchor/train_data']
 # all_datasets=['test0504_high_zero/train_data']
-# all_datasets=['test0504_zero/train_data']
+all_datasets=['test0504_zero/train_data']
 # all_datasets=['test0504_stretch/train_data']
 # all_datasets=['test0504_inward/train_data']
 # all_datasets=['test0509_beforecalib/train_data']
 # all_datasets=['test0509_aftercalib/train_data']
-all_datasets=['test0509_S1_aftercalib/train_data']
+# all_datasets=['test0509_S1_aftercalib/train_data']
 
 P_marker_id = robot.tool_rigid_id
 zero_config_q = [[],[],[],[],[],[]]
@@ -318,7 +323,7 @@ base_marker_data['calib_tool_flange_pose']['orientation']['x'] = float(quat[1])
 base_marker_data['calib_tool_flange_pose']['orientation']['y'] = float(quat[2])
 base_marker_data['calib_tool_flange_pose']['orientation']['z'] = float(quat[3])
 
-with open(base_marker_config_file,'w') as file:
+with open(output_base_marker_config_file,'w') as file:
     yaml.safe_dump(base_marker_data,file)
 
 # calibrate tool
