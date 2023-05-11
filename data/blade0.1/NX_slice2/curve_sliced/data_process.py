@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 from matplotlib import cm
 import sys, glob
 sys.path.append('../../../../toolbox')
-from path_calc import *
+from lambda_calc import *
 
 def find_norm(p1,p2,p3):
 	#find normal vector from p1 pointing to line of p2p3

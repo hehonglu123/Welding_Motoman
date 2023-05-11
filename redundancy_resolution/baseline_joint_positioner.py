@@ -8,9 +8,9 @@ from robot_def import *
 
 def main():
 	dataset='blade0.1/'
-	sliced_alg='NX_slice2/'
+	sliced_alg='auto_slice/'
 	data_dir='../data/'+dataset+sliced_alg
-	num_layers=94
+	num_layers=759
 	num_baselayers=2
 	curve_sliced_relative_base=[]
 	curve_sliced_relative=[]
@@ -33,9 +33,9 @@ def main():
 		curve_sliced.append(curve_sliced_ith_layer)
 
 	robot=robot_obj('MA2010_A0',def_path='../config/MA2010_A0_robot_default_config.yml',tool_file_path='../config/torch.csv',\
-		pulse2deg_file_path='../config/MA2010_A0_pulse2deg.csv',d=15)
+		pulse2deg_file_path='../config/MA2010_A0_pulse2deg_real.csv',d=15)
 	positioner=positioner_obj('D500B',def_path='../config/D500B_robot_default_config.yml',tool_file_path='../config/positioner_tcp.csv',\
-		pulse2deg_file_path='../config/D500B_pulse2deg.csv',base_transformation_file='../config/D500B_pose.csv')
+		pulse2deg_file_path='../config/D500B_pulse2deg_real.csv',base_transformation_file='../config/D500B_pose.csv')
 
 
 	R_torch=np.array([[-0.7071, 0.7071, -0.    ],

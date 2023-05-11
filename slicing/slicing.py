@@ -330,12 +330,14 @@ def split_slices(curve,stl_pc):
 def slice(bottom_curve,stl_pc,direction,slice_height):
     direction=np.array([0,0,-1])
     slice_all=[[bottom_curve]]
+    curve_normal_all=[]
     layer_num=0
     while True:
         print(layer_num, 'th layer')
         if len(slice_all[-1])==0:
             break
         slice_ith_layer=[]
+        normal_i_1th_layer=[]
         for x in range(len(slice_all[-1])):
             ###push curve 1 layer up
             try:
@@ -348,6 +350,7 @@ def slice(bottom_curve,stl_pc,direction,slice_height):
                 print('USING SURF NORM @ %ith layer'%layer_num)
                 curve_normal=get_curve_normal(slice_all[-1][x],stl_pc,direction)
 
+            normal_i_1th_layer.append(-curve_normal)
             curve_next=slice_next_layer(slice_all[-1][x],stl_pc,curve_normal,slice_height)
 
             if x==0 or x==len(slice_all[-1])-1: ###only extend or shrink if first or last segment for now, need to address later
@@ -355,7 +358,8 @@ def slice(bottom_curve,stl_pc,direction,slice_height):
 
             if len(curve_next)==0:   
                 if len(slice_all[-1])<=1:   ###end condition
-                    return slice_all
+                    curve_normal_all.append(get_curve_normal_from_curves(slice_all[-1][0],slice_all[-2][0]))
+                    return slice_all, curve_normal_all
                 continue
 
             ###split the curve based on projection error
@@ -368,8 +372,10 @@ def slice(bottom_curve,stl_pc,direction,slice_height):
 
         layer_num+=1
         slice_all.append(slice_ith_layer)
+        curve_normal_all.append(normal_i_1th_layer)
 
-    return slice_all
+    
+    return slice_all, curve_normal_all
 
 def main():
     # Load the STL file
@@ -389,9 +395,11 @@ def main():
     stl_pc *= 25.4      ##convert to mm
 
     bottom_edge = slicing_uniform(stl_pc,z = np.max(stl_pc[:,2]))
-    curve_normal=get_curve_normal(bottom_edge,stl_pc,np.array([0,0,-1]))
 
-    slice_all=slice(bottom_edge,stl_pc,np.array([0,0,-1]),slice_height=slice_height)
+    slice_all,curve_normal_all=slice(bottom_edge,stl_pc,np.array([0,0,-1]),slice_height=slice_height)
+
+    ###override first layer normal to [0,0,1]
+    curve_normal_all[0][0]=np.array([[0,0,1]]*len(curve_normal_all[0][0]))
 
     # Plot the original points and the fitted curved plane
     fig = plt.figure()
@@ -404,8 +412,11 @@ def main():
 
     for i in range(len(slice_all)):
         for x in range(len(slice_all[i])):
+            if len(slice_all[i][x])==0:
+                break
+
             ax.plot3D(slice_all[i][x][::vis_step,0],slice_all[i][x][::vis_step,1],slice_all[i][x][::vis_step,2],'r.-')
-            np.savetxt('slicing_result/slice_%i_%i.csv'%(i,x),slice_all[i][x],delimiter=',')
+            np.savetxt('slicing_result/slice%i_%i.csv'%(i,x),np.hstack((slice_all[i][x],curve_normal_all[i][x])),delimiter=',')
 
     ax.set_xlabel('X')
     ax.set_ylabel('Y')

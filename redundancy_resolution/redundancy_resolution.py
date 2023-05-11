@@ -6,7 +6,7 @@ from qpsolvers import solve_qp
 
 sys.path.append('../toolbox')
 from robot_def import *
-from path_calc import *
+from lambda_calc import *
 # from utils import *
 
 def linear_fit(data,p_constraint=[]):
