@@ -1,22 +1,22 @@
 import sys, glob
 sys.path.append('../toolbox/')
 from robot_def import *
-from path_calc import *
+from lambda_calc import *
 from multi_robot import *
 from dx200_motion_program_exec_client import *
-from MotionSendMotoman import *
+from WeldSend import *
 
 
 dataset='blade0.1/'
-sliced_alg='NX_slice2/'
+sliced_alg='auto_slice/'
 data_dir='../data/'+dataset+sliced_alg
-cmd_dir=data_dir+'cmd/50J/'
 
 waypoint_distance=5 	###waypoint separation
+layer_height=int(0.5/0.1)
 curve_sliced_js=[]
 positioner_js=[]
 
-robot=robot_obj('MA2010_A0',def_path='../config/MA2010_A0_robot_default_config.yml',tool_file_path='../config/weldgun.csv',\
+robot=robot_obj('MA2010_A0',def_path='../config/MA2010_A0_robot_default_config.yml',tool_file_path='../config/torch.csv',\
 	pulse2deg_file_path='../config/MA2010_A0_pulse2deg_real.csv',d=15)
 positioner=positioner_obj('D500B',def_path='../config/D500B_robot_default_config.yml',tool_file_path='../config/positioner_tcp.csv',\
 	pulse2deg_file_path='../config/D500B_pulse2deg_real.csv',base_transformation_file='../config/D500B_pose.csv')
@@ -56,16 +56,16 @@ client=MotionProgramExecClient()
 
 # 		target2=['MOVJ',np.degrees(positioner_js[breakpoints[0]]),10]
 # 		mp.MoveL(np.degrees(curve_sliced_js[breakpoints[0]]), s1_all[0],target2=target2)
-# 		mp.setArc(True,cond_num=250)
+# 		# mp.setArc(True,cond_num=250)
 # 		for j in range(1,len(breakpoints)):
 # 		    target2=['MOVJ',np.degrees(positioner_js[breakpoints[j]]),10]
 # 		    mp.MoveL(np.degrees(curve_sliced_js[breakpoints[j]]), s1_all[j],target2=target2)
-# 		mp.setArc(False)
+# 		# mp.setArc(False)
 
 ###########################################layer welding############################################
 mp=MotionProgram(ROBOT_CHOICE='RB1',ROBOT_CHOICE2='ST1',pulse2deg=robot.pulse2deg,pulse2deg_2=positioner.pulse2deg, tool_num = 12)
-num_layer_start=89
-num_layer_end=94
+num_layer_start=0
+num_layer_end=3
 for layer in range(num_layer_start,num_layer_end):
 	num_sections=len(glob.glob(data_dir+'curve_sliced_relative/slice'+str(layer)+'_*.csv'))
 	if layer % 2==1:
@@ -77,7 +77,7 @@ for layer in range(num_layer_start,num_layer_end):
 		positioner_js=np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
 		curve_sliced_relative=np.loadtxt(data_dir+'curve_sliced_relative/slice'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
 
-		vd_relative=16
+		vd_relative=10
 		lam1=calc_lam_js(curve_sliced_js,robot)
 		lam2=calc_lam_js(positioner_js,positioner)
 		lam_relative=calc_lam_cs(curve_sliced_relative)
@@ -101,11 +101,11 @@ for layer in range(num_layer_start,num_layer_end):
 		target2=['MOVJ',np.degrees(positioner_js[breakpoints[0]]),30]
 		mp.MoveL(np.degrees(curve_sliced_js[breakpoints[0]]), s1_all[0],target2=target2)
 
-		mp.setArc(True,cond_num=110)
+		# mp.setArc(True,cond_num=110)
 		for j in range(1,len(breakpoints)):
 		    target2=['MOVJ',np.degrees(positioner_js[breakpoints[j]]),10]
 		    mp.MoveL(np.degrees(curve_sliced_js[breakpoints[j]]), s1_all[j],target2=target2)
-		mp.setArc(False)
+		# mp.setArc(False)
 
     
 timestamp,joint_recording,job_line,_=client.execute_motion_program(mp) 

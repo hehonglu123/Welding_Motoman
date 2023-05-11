@@ -327,7 +327,7 @@ def split_slices(curve,stl_pc):
     #     print(len(sub_curve))
     return sub_curves
 
-def slice(bottom_curve,stl_pc,direction,slice_height):
+def slice_stl(bottom_curve,stl_pc,direction,slice_height):
     direction=np.array([0,0,-1])
     slice_all=[[bottom_curve]]
     curve_normal_all=[]
@@ -377,6 +377,43 @@ def slice(bottom_curve,stl_pc,direction,slice_height):
     
     return slice_all, curve_normal_all
 
+def smooth_normal(curve_normal,n=15):
+    curve_normal_new=copy.deepcopy(curve_normal)
+    for i in range(len(curve_normal)):
+        curve_normal_new[i]=np.average(curve_normal[max(0,i-n):min(len(curve_normal),i+n)],axis=0)
+        curve_normal_new[i]=curve_normal_new[i]/np.linalg.norm(curve_normal_new[i])
+    return curve_normal_new
+
+def post_process(slice_all,point_distance=1):
+    slice_all_new=[]
+    curve_normal_all=[]
+
+    lam=calc_lam_cs(slice_all[0][0])
+    lam=np.linspace(0,lam[-1],num_points=int(lam[-1]/point_distance))
+    polyfit=np.polyfit(lam,slice_all[0][0],deg=47)
+    slice_all_new.append([np.vstack((np.poly1d(polyfit[:,0])(lam), np.poly1d(polyfit[:,1])(lam), np.poly1d(polyfit[:,2])(lam))).T])
+    curve_normal_all.append([np.array([[0,0,1]]*len(slice_all_new[0][0]))])
+
+    slice_prev=slice_all_new[0][0]
+    for i in range(1,len(slice_all)):
+        slice_ith_layer=[]
+        normal_ith_layer=[]
+        for x in range(slice_all[i]):
+            lam=calc_lam_cs(slice_all[i][x])
+            lam=np.linspace(0,lam[-1],num_points=int(lam[-1]/point_distance))
+            polyfit=np.polyfit(lam,slice_all[i][x],deg=47)
+            curve=np.vstack((np.poly1d(polyfit[:,0])(lam), np.poly1d(polyfit[:,1])(lam), np.poly1d(polyfit[:,2])(lam))).T
+            slice_ith_layer.append(curve)
+            normal=-get_curve_normal_from_curves(curve,slice_prev)
+            normal_ith_layer.append(smooth_normal(normal))
+        
+        slice_prev=np.concatenate(slice_ith_layer,axis=0)
+        slice_all_new.append(slice_ith_layer)
+        curve_normal_all.append(normal_ith_layer)
+
+    return slice_all_new, curve_normal_all
+
+
 def main():
     # Load the STL file
     filename = '../data/blade0.1/surface.stl'
@@ -396,7 +433,9 @@ def main():
 
     bottom_edge = slicing_uniform(stl_pc,z = np.max(stl_pc[:,2]))
 
-    slice_all,curve_normal_all=slice(bottom_edge,stl_pc,np.array([0,0,-1]),slice_height=slice_height)
+    slice_all,curve_normal_all=slice_stl(bottom_edge,stl_pc,np.array([0,0,-1]),slice_height=slice_height)
+
+    slice_all,curve_normal_all=post_process(slice_all,point_distance=1)
 
     ###override first layer normal to [0,0,1]
     curve_normal_all[0][0]=np.array([[0,0,1]]*len(curve_normal_all[0][0]))
