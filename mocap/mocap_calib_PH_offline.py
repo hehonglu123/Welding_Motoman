@@ -54,6 +54,11 @@ def detect_axis(points,rough_axis_direction,calib_marker_ids):
     all_centers=[]
     for i in range(len(calib_marker_ids)):
         center, normal = fitting_3dcircle(points[calib_marker_ids[i]])
+
+        if calib_marker_ids[i]=='marker8_rigid4':
+            print("Radius:",np.mean(np.linalg.norm(points[calib_marker_ids[i]]-center,axis=1)))
+            print("Radius std:",np.std(np.linalg.norm(points[calib_marker_ids[i]]-center,axis=1)))
+
         if np.sum(np.multiply(normal,rough_axis_direction)) < 0:
             normal = -1*normal
         all_normals.append(normal)
@@ -89,7 +94,7 @@ def to_frame(curve_p,curve_R,mocap_stamps,target_frame,markers_id):
 
 config_dir='../config/'
 
-robot_type='R1'
+robot_type='S1'
 
 if robot_type=='R1':
     base_marker_config_file=config_dir+'MA2010_marker_config.yaml'
@@ -125,6 +130,8 @@ elif robot_type=='S1':
 
     jN=2
 
+    output_base_marker_config_file = config_dir+'D500B_marker_config.yaml'
+
 H_act = deepcopy(H_nom)
 axis_p = deepcopy(H_nom)
 
@@ -132,12 +139,13 @@ axis_p = deepcopy(H_nom)
 # all_datasets=['test0502_noanchor/train_data']
 # all_datasets=['test0502_anchor/train_data']
 # all_datasets=['test0504_high_zero/train_data']
-all_datasets=['test0504_zero/train_data']
+# all_datasets=['test0504_zero/train_data']
 # all_datasets=['test0504_stretch/train_data']
 # all_datasets=['test0504_inward/train_data']
 # all_datasets=['test0509_beforecalib/train_data']
 # all_datasets=['test0509_aftercalib/train_data']
 # all_datasets=['test0509_S1_aftercalib/train_data']
+all_datasets=['test0511_S1_newmarker/train_data']
 
 P_marker_id = robot.tool_rigid_id
 zero_config_q = [[],[],[],[],[],[]]
@@ -367,8 +375,6 @@ if robot_type!='S1':
     T_tool_toolmarker = Transform(R,t)
     
 else:
-    # Find T^tool_toolmarker
-    curve_p,curve_R,mocap_stamps = read_and_convert_frame(raw_data_dir+'_zero',robot.base_rigid_id,[robot.tool_rigid_id])
 
     # T^tool_base
     tool_p = j2_center+180*-1*H[:,1] # 180 mm above j2_center
@@ -378,6 +384,8 @@ else:
     #T^tool_toolmarker
     T_toolmarker_base = Transform(R_tool_base,tcp_base)
     T_tool_toolmarker = T_toolmarker_base.inv()*T_tool_base
+    # beacuse our positoiner always at 180 the second axis
+    T_tool_toolmarker = T_tool_toolmarker*Transform(rot([0,0,1],np.pi),[0,0,0])
 
 with open(tool_marker_config_file,'r') as file:
     tool_marker_data = yaml.safe_load(file)
