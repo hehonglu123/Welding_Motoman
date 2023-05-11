@@ -54,6 +54,14 @@ def main():
 					[-0.9664,  0.0053,  0.2569,-910.7085],
 					[ 0.2569,  0.0008,  0.9664,-800.2703],
 					[0,0,0,1]])
+
+	# positioner.base_H=robot.T_base_basemarker.inv()*positioner.T_base_basemarker
+	# positioner.base_H=np.array([[ 0.005,   1.,     -0.0021,1651.7603 ],
+	# 							[-0.9664,  0.0053,  0.2569,-813.0717],
+	# 							[ 0.2569,  0.0008,  0.9664,-433.0287],
+	# 							[0,0,0,1]])
+
+
 	# relative_path_exe=[]
 	# for i in range(len(curve_exe_data)):
 	# 	if curve_exe_data[i][0]==curve_exe_positioner_data[i][0]:	#if timestamp aligns
