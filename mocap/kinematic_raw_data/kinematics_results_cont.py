@@ -10,15 +10,29 @@ from matplotlib import pyplot as plt
 config_dir='../../config/'
 robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path='',d=0,\
 pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',\
-base_marker_config_file=config_dir+'MA2010_marker_config.yaml',tool_marker_config_file=config_dir+'weldgun_marker_config.yaml')
+base_marker_config_file=config_dir+'MA2010_0504inward_marker_config.yaml',tool_marker_config_file=config_dir+'weldgun_marker_config.yaml')
 
+print("P",robot_weld.calib_P[:,1:6].T)
+print("H",robot_weld.calib_H.T)
+
+nom_P = np.zeros(robot_weld.calib_P.shape)
+nom_H = np.zeros(robot_weld.calib_H.shape)
+T = Transform(np.eye(3),[0,0,0])
+for j in range(6):
+    T_next = T*Transform(rot(robot_weld.robot.H[:,j],robot_weld.calib_zero_config[j]),robot_weld.robot.P[:,j])
+    nom_P[:,j] = T_next.p-T.p
+    nom_H[:,j] = np.matmul(T_next.R,robot_weld.robot.H[:,j])
+    T = T_next
+print('P',nom_P[:,1:6].T)
+print('H',nom_H.T)
+exit()
 # data_dir='test0502_noanchor/'
 # data_dir='test0502_anchor/'
 # data_dir='test0504_nomove/nomove_concalib_'
 # data_dir='test0504_withrecord/'
-# data_dir='test0504/'
+data_dir='test0504/'
 # data_dir='test0509_beforecalib/'
-data_dir='test0509_aftercalib/'
+# data_dir='test0509_aftercalib/'
 
 try:
     with open(data_dir+'robot_q_cont.pickle', 'rb') as handle:
