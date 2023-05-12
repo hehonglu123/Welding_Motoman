@@ -3,9 +3,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.path import Path
 from mpl_toolkits.mplot3d import Axes3D
-import sys, copy
+import sys, copy, traceback
 from scipy.spatial import ConvexHull
-# from sympy.geometry import Point, Line
 
 sys.path.append('../toolbox')
 from lambda_calc import *
@@ -134,7 +133,7 @@ def slicing_uniform(stl_pc,z,threshold = 1e-6):
     return bottom_edge_vertices
 
 def smooth_curve(curve):
-    lam=np.insert(np.cumsum(np.linalg.norm(np.diff(curve,axis=0),axis=1)),0,0)
+    lam=calc_lam_cs(curve)
     polyfit=np.polyfit(lam,curve,deg=20)
 
     return np.vstack((np.poly1d(polyfit[:,0])(lam), np.poly1d(polyfit[:,1])(lam), np.poly1d(polyfit[:,2])(lam))).T
@@ -168,7 +167,6 @@ def get_curve_normal_from_curves(curve,curve_prev):
 
 def slice_next_layer(curve,stl_pc,curve_normal,slice_height):
 
-    
     slice_next=[]
     for i in range(len(curve)):
         p_plus=project_point_on_stl(curve[i]+slice_height*curve_normal[i],stl_pc)
@@ -176,65 +174,8 @@ def slice_next_layer(curve,stl_pc,curve_normal,slice_height):
 
     return np.array(slice_next)
 
-def split_slice1(curve):    
-    # Calculate distances between consecutive points
-    distances = np.sqrt(np.sum(np.diff(curve, axis=0) ** 2, axis=1))
-    threshold=5*np.average(distances)
-
-    # Find outlier indices
-    outlier_indices = np.where(distances > threshold)[0]
-    print('num outlier indices: ',len(outlier_indices))
-    if len(outlier_indices)>0:
-
-        return [curve[:outlier_indices[0]], curve[outlier_indices[-1]+1:]]
-
-    else:
-        return [curve]
-
 def find_point_on_boundary(p,vec,stl_pc):
     return
-
-# def fit_to_length(curve,stl_pc,threshold=1): 
-    
-#     if check_boundary(curve[0],stl_pc):
-#         ###extend to fit on boundary
-#         next_p=project_point_on_stl(2*curve[0]-curve[1],stl_pc)        
-
-#         while check_boundary(next_p,stl_pc) and np.linalg.norm(next_p-curve[0])<threshold:
-#             curve=np.insert(curve,0,copy.deepcopy(next_p),axis=0)
-#             next_p=project_point_on_stl(2*curve[0]-curve[1],stl_pc)
-#         start_idx=0
-
-#     else:
-#         ###shrink to fit on boundary
-#         i=1
-#         while not check_boundary(curve[i],stl_pc): 
-#             i+=1
-#             if i>len(curve)-1:
-#                 return []
-#         start_idx=i
-
-#     # print('end point check')
-#     if check_boundary(curve[-1],stl_pc):
-#         ###extend to fit on boundary
-#         next_p=project_point_on_stl(2*curve[-1]-curve[-2],stl_pc)
-#         while check_boundary(next_p,stl_pc) and np.linalg.norm(next_p-curve[-1])<threshold:
-#             curve=np.append(curve,[copy.deepcopy(next_p)],axis=0)
-#             next_p=project_point_on_stl(2*curve[-1]-curve[-2],stl_pc)
-
-#         end_idx=len(curve)-1
-#     else:
-#         ###shrink to fit on boundary
-#         i=len(curve)-1
-#         while not check_boundary(curve[i],stl_pc): 
-#             i-=1
-#             if i<1:
-#                 return []
-#         end_idx=i
-    
-#     if start_idx>=end_idx:
-#         return []
-#     return curve[start_idx:end_idx+1]
 
 def fit_to_length(curve,stl_pc,resolution=0.5):
 
@@ -330,36 +271,29 @@ def split_slices(curve,stl_pc):
 def slice_stl(bottom_curve,stl_pc,direction,slice_height):
     direction=np.array([0,0,-1])
     slice_all=[[bottom_curve]]
-    curve_normal_all=[]
     layer_num=0
     while True:
         print(layer_num, 'th layer')
         if len(slice_all[-1])==0:
+            slice_all=slice_all[:-1]
             break
         slice_ith_layer=[]
-        normal_i_1th_layer=[]
         for x in range(len(slice_all[-1])):
             ###push curve 1 layer up
             try:
-                ###Fix curve normal from unaligned section
-                if len(slice_all[-2])!=len(slice_all[-1]):
-                    curve_normal=get_curve_normal(slice_all[-1][x],stl_pc,direction)
-                else:
-                    curve_normal=get_curve_normal_from_curves(slice_all[-1][x],slice_all[-2][x])
+                curve_normal=get_curve_normal_from_curves(slice_all[-1][x],np.concatenate(slice_all[-2],axis=0))
             except:
                 print('USING SURF NORM @ %ith layer'%layer_num)
                 curve_normal=get_curve_normal(slice_all[-1][x],stl_pc,direction)
 
-            normal_i_1th_layer.append(-curve_normal)
             curve_next=slice_next_layer(slice_all[-1][x],stl_pc,curve_normal,slice_height)
 
-            if x==0 or x==len(slice_all[-1])-1: ###only extend or shrink if first or last segment for now, need to address later
+            if x==0 or x==len(slice_all[-1])-1: ###only extend or shrink if first or last segment for now
                 curve_next=fit_to_length(curve_next,stl_pc)
 
             if len(curve_next)==0:   
                 if len(slice_all[-1])<=1:   ###end condition
-                    curve_normal_all.append(get_curve_normal_from_curves(slice_all[-1][0],slice_all[-2][0]))
-                    return slice_all, curve_normal_all
+                    return slice_all
                 continue
 
             ###split the curve based on projection error
@@ -372,10 +306,9 @@ def slice_stl(bottom_curve,stl_pc,direction,slice_height):
 
         layer_num+=1
         slice_all.append(slice_ith_layer)
-        curve_normal_all.append(normal_i_1th_layer)
 
     
-    return slice_all, curve_normal_all
+    return slice_all
 
 def smooth_normal(curve_normal,n=15):
     curve_normal_new=copy.deepcopy(curve_normal)
@@ -384,13 +317,13 @@ def smooth_normal(curve_normal,n=15):
         curve_normal_new[i]=curve_normal_new[i]/np.linalg.norm(curve_normal_new[i])
     return curve_normal_new
 
-def post_process(slice_all,point_distance=1):
+def post_process(slice_all,point_distance=0.5):       ###postprocess the sliced layers into equally spaced points and attach curve normal
     slice_all_new=[]
     curve_normal_all=[]
 
     lam=calc_lam_cs(slice_all[0][0])
-    lam=np.linspace(0,lam[-1],num_points=int(lam[-1]/point_distance))
     polyfit=np.polyfit(lam,slice_all[0][0],deg=47)
+    lam=np.linspace(0,lam[-1],num=int(lam[-1]/point_distance))
     slice_all_new.append([np.vstack((np.poly1d(polyfit[:,0])(lam), np.poly1d(polyfit[:,1])(lam), np.poly1d(polyfit[:,2])(lam))).T])
     curve_normal_all.append([np.array([[0,0,1]]*len(slice_all_new[0][0]))])
 
@@ -398,18 +331,21 @@ def post_process(slice_all,point_distance=1):
     for i in range(1,len(slice_all)):
         slice_ith_layer=[]
         normal_ith_layer=[]
-        for x in range(slice_all[i]):
+        for x in range(len(slice_all[i])):
             lam=calc_lam_cs(slice_all[i][x])
-            lam=np.linspace(0,lam[-1],num_points=int(lam[-1]/point_distance))
             polyfit=np.polyfit(lam,slice_all[i][x],deg=47)
+            lam=np.linspace(0,lam[-1],num=int(np.ceil(lam[-1]/point_distance)))
             curve=np.vstack((np.poly1d(polyfit[:,0])(lam), np.poly1d(polyfit[:,1])(lam), np.poly1d(polyfit[:,2])(lam))).T
             slice_ith_layer.append(curve)
             normal=-get_curve_normal_from_curves(curve,slice_prev)
+
             normal_ith_layer.append(smooth_normal(normal))
-        
+
         slice_prev=np.concatenate(slice_ith_layer,axis=0)
         slice_all_new.append(slice_ith_layer)
         curve_normal_all.append(normal_ith_layer)
+        if len(slice_prev)==1:
+            break       ###if previous layer only contains 1 point given point_distance, then quit
 
     return slice_all_new, curve_normal_all
 
@@ -433,21 +369,14 @@ def main():
 
     bottom_edge = slicing_uniform(stl_pc,z = np.max(stl_pc[:,2]))
 
-    slice_all,curve_normal_all=slice_stl(bottom_edge,stl_pc,np.array([0,0,-1]),slice_height=slice_height)
-
+    slice_all=slice_stl(bottom_edge,stl_pc,np.array([0,0,-1]),slice_height=slice_height)
     slice_all,curve_normal_all=post_process(slice_all,point_distance=1)
-
-    ###override first layer normal to [0,0,1]
-    curve_normal_all[0][0]=np.array([[0,0,1]]*len(curve_normal_all[0][0]))
+   
 
     # Plot the original points and the fitted curved plane
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
     vis_step=1
-
-    # ax.plot3D(bottom_edge[::vis_step,0],bottom_edge[::vis_step,1],bottom_edge[::vis_step,2],'r.-')
-    # ax.quiver(bottom_edge[::vis_step,0],bottom_edge[::vis_step,1],bottom_edge[::vis_step,2],curve_normal[::vis_step,0],curve_normal[::vis_step,1],curve_normal[::vis_step,2],length=0.1, normalize=True)
-    # ax.scatter(stl_pc[:,0], stl_pc[:,1], stl_pc[:,2], c='b', marker='o', label='Original points')
 
     for i in range(len(slice_all)):
         for x in range(len(slice_all[i])):
@@ -455,6 +384,7 @@ def main():
                 break
 
             ax.plot3D(slice_all[i][x][::vis_step,0],slice_all[i][x][::vis_step,1],slice_all[i][x][::vis_step,2],'r.-')
+            # np.savetxt('slicing_result/slice%i_%i.csv'%(i,x),slice_all[i][x],delimiter=',')
             np.savetxt('slicing_result/slice%i_%i.csv'%(i,x),np.hstack((slice_all[i][x],curve_normal_all[i][x])),delimiter=',')
 
     ax.set_xlabel('X')
