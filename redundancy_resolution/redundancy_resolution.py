@@ -127,9 +127,9 @@ class redundancy_resolution(object):
 
 
 
-	def baseline_joint(self,R_torch,curve_sliced_relative,curve_sliced_relative_base,q_init=np.zeros(6)):
+	def baseline_joint(self,R_torch,curve_sliced_relative,curve_sliced_relative_base,q_init=np.zeros(6),positioner_q_init=[0,-2]):
 		####baseline redundancy resolution, with fixed orientation
-		positioner_js=self.positioner_resolution(curve_sliced_relative)		#solve for positioner first
+		positioner_js=self.positioner_resolution(curve_sliced_relative,q_seed=positioner_q_init)		#solve for positioner first
 		###TO FIX: override first layer positioner q2
 		for x in range(len(positioner_js[0])):
 			positioner_js[0][x][:,1]=positioner_js[1][x][0,-1]
@@ -185,10 +185,12 @@ class redundancy_resolution(object):
 
 		return positioner_js,curve_sliced_js,positioner_js_base,curve_sliced_js_base
 
-	def baseline_pose(self):
+	def baseline_pose(self,vec=np.array([1,0])):
 		###where to place the welded part on positioner
 		###assume first layer normal z always vertical
 		###baseline, only look at first layer
+		###place largest variance along unit vector (x,y)
+
 		first_layer=np.concatenate(self.curve_sliced[0],axis=0)
 		COM=np.average(first_layer[:,:3],axis=0)
 
@@ -198,13 +200,19 @@ class redundancy_resolution(object):
 		idx = eigenValues.argsort()[::-1]   
 		eigenValues = eigenValues[idx]
 		eigenVectors = eigenVectors[:,idx]
-		Vx=eigenVectors[0]
+		V=eigenVectors[0]
 
 		###put normal along G direction
 		N=-np.sum(first_layer[:,3:],axis=0)
 		N=N/np.linalg.norm(N)
 
-		Vx=VectorPlaneProjection(Vx,N)
+		V=VectorPlaneProjection(V,N)
+
+		###find the angle btw given vector to its local x
+		angle2x= np.arctan2(np.cross(vec, np.array([1,0])), np.dot(vec, np.array([1,0])))
+		###rotate the same angle from v to X to identify first column in rotation matrix
+		Vx=Rz(-angle2x)@V
+
 
 		###form transformation
 		R=np.vstack((Vx,np.cross(N,Vx),N))
@@ -213,10 +221,10 @@ class redundancy_resolution(object):
 		return H_from_RT(R,T)
 
 
-	def positioner_resolution(self,curve_sliced_relative):
+	def positioner_resolution(self,curve_sliced_relative,q_seed=[0,-1.]):
 		###resolve 2DOF positioner joint angle 
 		positioner_js=[]
-		q_prev=[0,-0.5]
+		q_prev=q_seed
 		for i in range(len(curve_sliced_relative)):
 			positioner_js_ith_layer=[]
 			for x in range(len(curve_sliced_relative[i])):

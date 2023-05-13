@@ -18,6 +18,9 @@ def check_boundary(p,stl_pc):
     distance=np.linalg.norm(stl_pc[indices]-p,axis=1)
 
     threshold=1
+    if np.min(distance)>10*threshold:
+        return False
+    
     if np.min(distance)>threshold:
         ###find a plane
         normal, centroid=fit_plane(stl_pc[indices])
@@ -240,7 +243,7 @@ def split_slices(curve,stl_pc):
     indices=[]
     continuous_count=0
     continuous_threshold=1      ###more than x continuous points not on stl means a gap 
-    continuous_threshold2=2     ###curve must contain more than x points
+    continuous_threshold2=2     ###splited curve must contain more than x points
     for i in range(len(curve)):
         if not check_boundary(curve[i],stl_pc):
             if i-1 in indices:

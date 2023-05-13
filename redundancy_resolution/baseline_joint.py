@@ -10,7 +10,7 @@ def main():
 	dataset='blade0.1/'
 	sliced_alg='auto_slice/'
 	data_dir='../data/'+dataset+sliced_alg
-	num_layers=759
+	num_layers=757
 	num_baselayers=2
 	curve_sliced_relative_base=[]
 	curve_sliced_relative=[]
@@ -46,7 +46,7 @@ def main():
 	rr=redundancy_resolution(robot,positioner,curve_sliced)
 	H=np.loadtxt(data_dir+'curve_pose.csv',delimiter=',')
 
-	positioner_js,curve_sliced_js,positioner_js_base,curve_sliced_js_base=rr.baseline_joint(R_torch,curve_sliced_relative,curve_sliced_relative_base)
+	positioner_js,curve_sliced_js,positioner_js_base,curve_sliced_js_base=rr.baseline_joint(R_torch,curve_sliced_relative,curve_sliced_relative_base,q_seed,positioner_q_init=[0,-2])
 
 	for i in range(num_layers):
 		for x in range(len(positioner_js[i])):

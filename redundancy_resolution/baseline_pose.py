@@ -10,7 +10,7 @@ def main():
 	dataset='blade0.1/'
 	sliced_alg='auto_slice/'
 	data_dir='../data/'+dataset+sliced_alg
-	num_layers=759
+	num_layers=757
 	base_thickness=3
 	num_baselayers=2
 	curve_sliced=[]
@@ -23,8 +23,6 @@ def main():
 
 		curve_sliced.append(curve_sliced_ith_layer)
 
-	print(curve_sliced)
-
 	robot=robot_obj('MA2010_A0',def_path='../config/MA2010_A0_robot_default_config.yml',tool_file_path='../config/torch.csv',\
 		pulse2deg_file_path='../config/MA2010_A0_pulse2deg_real.csv',d=15)
 	positioner=positioner_obj('D500B',def_path='../config/D500B_robot_default_config.yml',tool_file_path='../config/positioner_tcp.csv',\
@@ -36,7 +34,7 @@ def main():
 	q_seed=np.radians([-35.4291,56.6333,40.5194,4.5177,-52.2505,-11.6546])
 
 	rr=redundancy_resolution(robot,positioner,curve_sliced)
-	H=rr.baseline_pose()
+	H=rr.baseline_pose(vec=np.array([-0.95,0.31224989992]))
 	H[2,-1]+=num_baselayers*base_thickness
 
 	np.savetxt(data_dir+'curve_pose.csv',H,delimiter=',')
@@ -51,9 +49,11 @@ def main():
 	for i in range(len(rr.curve_sliced)):
 		for x in range(len(rr.curve_sliced[i])):
 			for j in range(len(rr.curve_sliced[i][x])):
+				
 				curve_sliced_relative[i][x][j,:3]=np.dot(H,np.hstack((rr.curve_sliced[i][x][j,:3],[1])).T)[:-1]
 				#convert curve direction to base frame
 				curve_sliced_relative[i][x][j,3:]=np.dot(H[:3,:3],rr.curve_sliced[i][x][j,3:]).T
+
 
 			if i==0:
 				ax.plot3D(curve_sliced_relative[i][x][::vis_step,0],curve_sliced_relative[i][x][::vis_step,1],curve_sliced_relative[i][x][::vis_step,2],'r.-')

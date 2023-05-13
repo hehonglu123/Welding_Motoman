@@ -10,7 +10,7 @@ def main():
 	dataset='blade0.1/'
 	sliced_alg='auto_slice/'
 	data_dir='../data/'+dataset+sliced_alg
-	num_layers=759
+	num_layers=758
 	num_baselayers=2
 	curve_sliced_relative_base=[]
 	curve_sliced_relative=[]
@@ -46,7 +46,7 @@ def main():
 	rr=redundancy_resolution(robot,positioner,curve_sliced)
 	H=np.loadtxt(data_dir+'curve_pose.csv',delimiter=',')
 
-	positioner_js=rr.positioner_resolution(curve_sliced_relative)		#solve for positioner first
+	positioner_js=rr.positioner_resolution(curve_sliced_relative,q_seed=[0,-2])		#solve for positioner first
 	###TO FIX: override first layer positioner q2
 	for x in range(len(positioner_js[0])):
 		positioner_js[0][x][:,1]=positioner_js[1][x][0,1]

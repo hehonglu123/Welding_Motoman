@@ -7,9 +7,9 @@ import matplotlib.pyplot as plt
 
 def main():
 	dataset='blade0.1/'
-	sliced_alg='NX_slice2/'
+	sliced_alg='auto_slice/'
 	data_dir='../data/'+dataset+sliced_alg
-	num_layers=94
+	num_layers=757
 	num_baselayers=2
 	curve_sliced_js=[]
 	positioner_js=[]
