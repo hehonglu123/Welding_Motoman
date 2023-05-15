@@ -32,73 +32,22 @@ client=MotionProgramExecClient()
 # mp.MoveJ(np.degrees(curve_sliced_js[0]), 3,target2=target2)
 
 ###baselayer
-num_baselayer=2
-mp=MotionProgram(ROBOT_CHOICE='RB1',ROBOT_CHOICE2='ST1',pulse2deg=robot.pulse2deg,pulse2deg_2=positioner.pulse2deg, tool_num = 12)
-for base_layer in range(num_baselayer):
-	num_sections=len(glob.glob(data_dir+'curve_sliced_relative/baselayer'+str(base_layer)+'_*.csv'))
-	for x in range(num_sections):
-		curve_sliced_js=np.loadtxt(data_dir+'curve_sliced_js/MA2010_base_js'+str(base_layer)+'_'+str(x)+'.csv',delimiter=',')
-		positioner_js=np.loadtxt(data_dir+'curve_sliced_js/D500B_base_js'+str(base_layer)+'_'+str(x)+'.csv',delimiter=',')
-		curve_sliced_relative=np.loadtxt(data_dir+'curve_sliced_relative/baselayer'+str(base_layer)+'_'+str(x)+'.csv',delimiter=',')
-
-		vd_relative=5
-		lam1=calc_lam_js(curve_sliced_js,robot)
-		lam2=calc_lam_js(positioner_js,positioner)
-		lam_relative=calc_lam_cs(curve_sliced_relative)
-
-		num_points_layer=max(2,int(lam_relative[-1]/waypoint_distance))
-		if base_layer % 2==1:
-		    breakpoints=np.linspace(0,len(curve_sliced_js)-1,num=num_points_layer).astype(int)
-		else:
-		    breakpoints=np.linspace(len(curve_sliced_js)-1,0,num=num_points_layer).astype(int)
-
-		s1_all,_=calc_individual_speed(vd_relative,lam1,lam2,lam_relative,breakpoints)
-
-		target2=['MOVJ',np.degrees(positioner_js[breakpoints[0]]),10]
-		mp.MoveL(np.degrees(curve_sliced_js[breakpoints[0]]), s1_all[0],target2=target2)
-		# mp.setArc(True,cond_num=250)
-		for j in range(1,len(breakpoints)):
-		    target2=['MOVJ',np.degrees(positioner_js[breakpoints[j]]),10]
-		    mp.MoveL(np.degrees(curve_sliced_js[breakpoints[j]]), s1_all[j],target2=target2)
-		# mp.setArc(False)
-
-###########################################layer welding############################################
+# num_baselayer=2
+# q_prev=np.array([-3.791547245558870571e-01,7.167996965635117235e-01,2.745092098742105691e-01,2.111291009755724701e-01,-7.843516348888318612e-01,-5.300740197588397207e-01])
 # mp=MotionProgram(ROBOT_CHOICE='RB1',ROBOT_CHOICE2='ST1',pulse2deg=robot.pulse2deg,pulse2deg_2=positioner.pulse2deg, tool_num = 12)
-# q_prev=np.array([-4.648632327355830540e-01,6.145417429141453169e-01,1.297227761555772574e-01,1.783769119574359630e-01,-7.277620428963936794e-01,-4.324206397400618407e-01])
-# num_layer_start=0*layer_height_num
-# num_layer_end=75*layer_height_num
-# num_sections=1
-# for layer in range(num_layer_start,num_layer_end,layer_height_num):
-# 	num_sections_prev=num_sections
-# 	num_sections=len(glob.glob(data_dir+'curve_sliced_relative/slice'+str(layer)+'_*.csv'))
+# for base_layer in range(num_baselayer):
+# 	num_sections=len(glob.glob(data_dir+'curve_sliced_relative/baselayer'+str(base_layer)+'_*.csv'))
+# 	for x in range(num_sections):
+# 		curve_sliced_js=np.loadtxt(data_dir+'curve_sliced_js/MA2010_base_js'+str(base_layer)+'_'+str(x)+'.csv',delimiter=',')
+# 		positioner_js=np.loadtxt(data_dir+'curve_sliced_js/D500B_base_js'+str(base_layer)+'_'+str(x)+'.csv',delimiter=',')
+# 		curve_sliced_relative=np.loadtxt(data_dir+'curve_sliced_relative/baselayer'+str(base_layer)+'_'+str(x)+'.csv',delimiter=',')
 
-# 	###############DETERMINE SECTION ORDER###########################
-# 	if num_sections==1:
-# 		sections=[0]
-# 	else:
-# 		endpoints=[]
-# 		curve_sliced_js_first=np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(layer)+'_0.csv',delimiter=',')
-# 		curve_sliced_js_last=np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(layer)+'_'+str(num_sections-1)+'.csv',delimiter=',')
-# 		endpoints=np.array([curve_sliced_js_first[0],curve_sliced_js_first[-1],curve_sliced_js_last[0],curve_sliced_js_last[-1]])
-# 		clost_idx=np.argmin(np.linalg.norm(endpoints-q_prev,axis=1))
-# 		if clost_idx>1:
-# 			sections=reversed(range(num_sections))
-# 		else:
-# 			sections=range(num_sections)
-
-# 	####################DETERMINE CURVE ORDER##############################################
-# 	for x in sections:
-# 		curve_sliced_js=np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
-# 		positioner_js=np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
-# 		curve_sliced_relative=np.loadtxt(data_dir+'curve_sliced_relative/slice'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
-
-# 		vd_relative=100
+# 		vd_relative=5
 # 		lam1=calc_lam_js(curve_sliced_js,robot)
 # 		lam2=calc_lam_js(positioner_js,positioner)
 # 		lam_relative=calc_lam_cs(curve_sliced_relative)
 
 # 		num_points_layer=max(2,int(lam_relative[-1]/waypoint_distance))
-
 # 		###find which end to start
 # 		if np.linalg.norm(q_prev-curve_sliced_js[0])<np.linalg.norm(q_prev-curve_sliced_js[-1]):
 # 			breakpoints=np.linspace(0,len(curve_sliced_js)-1,num=num_points_layer).astype(int)
@@ -106,26 +55,82 @@ for base_layer in range(num_baselayer):
 # 			breakpoints=np.linspace(len(curve_sliced_js)-1,0,num=num_points_layer).astype(int)
 
 # 		s1_all,_=calc_individual_speed(vd_relative,lam1,lam2,lam_relative,breakpoints)
-		
-# 		###move to intermidieate waypoint for collision avoidance if multiple section
-# 		if num_sections>1 or num_sections<num_sections_prev:
-# 			target2=['MOVJ',np.degrees(positioner_js[breakpoints[0]]),30]
-# 			waypoint_pose=robot.fwd(curve_sliced_js[breakpoints[0]])
-# 			waypoint_pose.p[-1]+=30
-# 			waypoint_q=robot.inv(waypoint_pose.p,waypoint_pose.R,curve_sliced_js[breakpoints[0]])[0]
-# 			mp.MoveL(np.degrees(waypoint_q), 25,target2=target2)
 
-# 		target2=['MOVJ',np.degrees(positioner_js[breakpoints[0]]),30]
+# 		target2=['MOVJ',np.degrees(positioner_js[breakpoints[0]]),10]
 # 		mp.MoveL(np.degrees(curve_sliced_js[breakpoints[0]]), s1_all[0],target2=target2)
-
-# 		# mp.setArc(True,cond_num=110)
+# 		# mp.setArc(True,cond_num=250)
 # 		for j in range(1,len(breakpoints)):
-# 			target2=['MOVJ',np.degrees(positioner_js[breakpoints[j]]),10]
-# 			mp.MoveL(np.degrees(curve_sliced_js[breakpoints[j]]), s1_all[j],target2=target2)
+# 		    target2=['MOVJ',np.degrees(positioner_js[breakpoints[j]]),10]
+# 		    mp.MoveL(np.degrees(curve_sliced_js[breakpoints[j]]), s1_all[j],target2=target2)
 # 		# mp.setArc(False)
 
 # 		q_prev=curve_sliced_js[breakpoints[-1]]
 
+###########################################layer welding############################################
+mp=MotionProgram(ROBOT_CHOICE='RB1',ROBOT_CHOICE2='ST1',pulse2deg=robot.pulse2deg,pulse2deg_2=positioner.pulse2deg, tool_num = 12)
+# q_prev=np.array([-3.791544713877046391e-01,7.156749523014762637e-01,2.756772964158371586e-01,2.106493295914119712e-01,-7.865937103692784982e-01,-5.293956242391706368e-01])
+q_prev=client.getJointAnglesMH()
+
+num_layer_start=0*layer_height_num
+num_layer_end=75*layer_height_num
+num_sections=1
+for layer in range(num_layer_start,num_layer_end,layer_height_num):
+	num_sections_prev=num_sections
+	num_sections=len(glob.glob(data_dir+'curve_sliced_relative/slice'+str(layer)+'_*.csv'))
+
+	###############DETERMINE SECTION ORDER###########################
+	if num_sections==1:
+		sections=[0]
+	else:
+		endpoints=[]
+		curve_sliced_js_first=np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(layer)+'_0.csv',delimiter=',')
+		curve_sliced_js_last=np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(layer)+'_'+str(num_sections-1)+'.csv',delimiter=',')
+		endpoints=np.array([curve_sliced_js_first[0],curve_sliced_js_first[-1],curve_sliced_js_last[0],curve_sliced_js_last[-1]])
+		clost_idx=np.argmin(np.linalg.norm(endpoints-q_prev,axis=1))
+		if clost_idx>1:
+			sections=reversed(range(num_sections))
+		else:
+			sections=range(num_sections)
+
+	####################DETERMINE CURVE ORDER##############################################
+	for x in sections:
+		curve_sliced_js=np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
+		positioner_js=np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
+		curve_sliced_relative=np.loadtxt(data_dir+'curve_sliced_relative/slice'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
+
+		vd_relative=10
+		lam1=calc_lam_js(curve_sliced_js,robot)
+		lam2=calc_lam_js(positioner_js,positioner)
+		lam_relative=calc_lam_cs(curve_sliced_relative)
+
+		num_points_layer=max(2,int(lam_relative[-1]/waypoint_distance))
+
+		###find which end to start
+		if np.linalg.norm(q_prev-curve_sliced_js[0])<np.linalg.norm(q_prev-curve_sliced_js[-1]):
+			breakpoints=np.linspace(0,len(curve_sliced_js)-1,num=num_points_layer).astype(int)
+		else:
+			breakpoints=np.linspace(len(curve_sliced_js)-1,0,num=num_points_layer).astype(int)
+
+		s1_all,_=calc_individual_speed(vd_relative,lam1,lam2,lam_relative,breakpoints)
+		
+		###move to intermidieate waypoint for collision avoidance if multiple section
+		if num_sections>1 or num_sections<num_sections_prev:
+			target2=['MOVJ',np.degrees(positioner_js[breakpoints[0]]),30]
+			waypoint_pose=robot.fwd(curve_sliced_js[breakpoints[0]])
+			waypoint_pose.p[-1]+=30
+			waypoint_q=robot.inv(waypoint_pose.p,waypoint_pose.R,curve_sliced_js[breakpoints[0]])[0]
+			mp.MoveL(np.degrees(waypoint_q), 25,target2=target2)
+
+		target2=['MOVJ',np.degrees(positioner_js[breakpoints[0]]),30]
+		mp.MoveL(np.degrees(curve_sliced_js[breakpoints[0]]), s1_all[0],target2=target2)
+
+		# mp.setArc(True,cond_num=110)
+		for j in range(1,len(breakpoints)):
+			target2=['MOVJ',np.degrees(positioner_js[breakpoints[j]]),10]
+			mp.MoveL(np.degrees(curve_sliced_js[breakpoints[j]]), s1_all[j],target2=target2)
+		# mp.setArc(False)
+
+		q_prev=curve_sliced_js[breakpoints[-1]]
 	
 
 
