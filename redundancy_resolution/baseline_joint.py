@@ -50,6 +50,8 @@ def main():
 
 	for i in range(num_layers):
 		for x in range(len(positioner_js[i])):
+			###final smoothing
+			# positioner_js[i][x][:,1]=moving_average(positioner_js[i][x][:,1],padding=True)
 			np.savetxt(data_dir+'curve_sliced_js/D500B_js'+str(i)+'_'+str(x)+'.csv',positioner_js[i][x],delimiter=',')
 			np.savetxt(data_dir+'curve_sliced_js/MA2010_js'+str(i)+'_'+str(x)+'.csv',curve_sliced_js[i][x],delimiter=',')
 

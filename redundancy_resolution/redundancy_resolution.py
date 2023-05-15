@@ -80,6 +80,12 @@ class redundancy_resolution(object):
 
 		return positioner_js_new2
 
+	def rolling_average(self,positioner_js):
+		for i in range(len(positioner_js)):
+			for x in range(len(positioner_js[i])):
+				positioner_js[i][x][:,1]=moving_average(positioner_js[i][x][:,1],padding=True)
+		return positioner_js
+
 	def introducing_tolerance(self,positioner_js):
 		### introduce tolerance to positioner inverse kinematics by linear fit
 		tolerance=np.radians(3)
@@ -138,6 +144,7 @@ class redundancy_resolution(object):
 		# positioner_js=self.conditional_rolling_average(positioner_js)
 		positioner_js=self.introducing_tolerance2(positioner_js)
 		positioner_js=self.conditional_rolling_average(positioner_js)
+		positioner_js=self.rolling_average(positioner_js)
 		for x in range(len(positioner_js[0])):
 			positioner_js[0][x][:,1]=positioner_js[1][x][0,-1]
 
@@ -241,7 +248,7 @@ class redundancy_resolution(object):
 
 				###filter noise
 				positioner_js_ith_layer_xth_section[:,0]=moving_average(positioner_js_ith_layer_xth_section[:,0],padding=True)
-				positioner_js_ith_layer_xth_section[:,1]=moving_average(positioner_js_ith_layer_xth_section[:,1],padding=True)
+				positioner_js_ith_layer_xth_section[:,1]=moving_average(positioner_js_ith_layer_xth_section[:,1],n=15,padding=True)
 
 				positioner_js_ith_layer.append(np.array(positioner_js_ith_layer_xth_section))
 

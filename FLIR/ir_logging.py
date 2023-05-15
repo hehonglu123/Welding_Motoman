@@ -18,8 +18,15 @@ def main():
     url='rr+tcp://192.168.55.10:60827/?service=camera'
 
     c1=RRN.ConnectService(url)
-    c1.setf_param("ir_format", RR.VarValue("temperature_linear_100mK","string"))
+    c1.setf_param("ir_format", RR.VarValue("radiometric","string"))
+    c1.setf_param("focus_pos", RR.VarValue(int(2800),"int32"))
+    c1.setf_param("object_emissivity", RR.VarValue(0.9,"double"))
+    # c1.setf_param("relative_humidity", RR.VarValue(0.5,"double"))
+    # c1.setf_param("reflected_temperature", RR.VarValue(293.15,"double"))
 
+
+
+    # print(print(c1.getf_param('atmospheric_temperature').data[0]))
     global image_consts
     image_consts = RRN.GetConstants('com.robotraconteur.image', c1)
 
@@ -37,14 +44,7 @@ def main():
     
     try:
         while True:
-            if current_mat is not None:
-                # print(c1.getf_param('focus_pos').data[0])
-                print(1/(time.time()-now))
-                now=time.time()
-                plt.imshow(current_mat, cmap='inferno', aspect='auto')
-                plt.colorbar(format='%.2f')
-            plt.pause(0.001)
-            plt.clf()
+            time.sleep(0.001)
     
     finally:
         try:
@@ -55,7 +55,8 @@ def main():
             c1.stop_streaming()
         except: pass
 
-        pickle.dump(logging, 'ir_logging.pickle')
+        with open('ir_recording_raw.pickle', 'wb') as file:
+            pickle.dump(logging, file)
 
 
 
