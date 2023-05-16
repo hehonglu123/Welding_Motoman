@@ -5,6 +5,28 @@ from scipy.interpolate import interp1d
 from scipy import signal
 import scipy, math
 
+
+def pose_regression(A,B):
+	###find transformation between ordered point lists A and B with regression
+    center_A = np.mean(A,axis=0)
+    center_B = np.mean(B,axis=0)
+
+    A_centered = A-center_A
+    B_centered = B-center_B
+    H = np.matmul(A_centered.T,B_centered)
+    u,s,vT = np.linalg.svd(H)
+    R = np.matmul(vT.T,u.T)
+    if np.linalg.det(R)<0:
+        u,s,v = np.linalg.svd(R)
+        v=v.T
+        v[:,2] = v[:,2]*-1
+        R = np.matmul(v,u.T)
+
+    t = center_B-np.dot(R,center_A)
+
+    return R,t
+
+
 def find_norm(p1,p2,p3):
 	#find normal vector from p1 pointing to line of p2p3
 	p2p1=p2-p1

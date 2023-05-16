@@ -85,6 +85,8 @@ class robot_obj(object):
 		self.base_marker_config_file=base_marker_config_file
 		self.T_base_basemarker = None # T^base_basemaker
 		self.T_base_mocap = None # T^base_mocap
+		self.T_tool_flange = None
+		self.calib_zero_config=np.zeros(self.robot.H.shape[1])
 		if len(base_marker_config_file)>0:
 			with open(base_marker_config_file,'r') as file:
 				marker_data = yaml.safe_load(file)
@@ -130,7 +132,6 @@ class robot_obj(object):
 						self.calib_H[0,i] = marker_data['H'][i]['x']
 						self.calib_H[1,i] = marker_data['H'][i]['y']
 						self.calib_H[2,i] = marker_data['H'][i]['z']
-				self.calib_zero_config=np.zeros(self.robot.H.shape[1])
 				if 'zero_config' in marker_data.keys():
 					self.calib_zero_config = np.array(marker_data['zero_config'])
 					self.robot.joint_upper_limit = self.robot.joint_upper_limit-self.calib_zero_config
@@ -193,7 +194,7 @@ class robot_obj(object):
 
 		if q_all.ndim==1:
 			q=q_all
-			# q = np.array(q)-self.calib_zero_config
+			q = np.array(q)-self.calib_zero_config
 			pose_temp=fwdkin(self.robot,q)
 
 			if world:
@@ -336,7 +337,7 @@ class positioner_obj(object):
 						marker_data['calib_tool_toolmarker_pose']['orientation']['z']]
 					self.T_tool_toolmarker = Transform(q2R(q),p)
 					# add d
-					T_d1_d2 = Transform(np.eye(3),p=[0,0,d-15])
+					T_d1_d2 = Transform(np.eye(3),p=[0,0,d])
 					self.T_tool_toolmarker = self.T_tool_toolmarker*T_d1_d2
 
 	def fwd(self,q_all,world=False,qlim_override=False):
