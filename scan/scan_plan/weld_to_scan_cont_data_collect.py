@@ -12,7 +12,7 @@ from scan_continuous import *
 from redundancy_resolution_scanner import *
 from tesseract_env import *
 from dx200_motion_program_exec_client import *
-from MotionSendMotoman import *
+# from MotionSendMotoman import *
 
 from general_robotics_toolbox import *
 from RobotRaconteur.Client import *
@@ -145,9 +145,9 @@ def get_connect_circle(start_p,start_R,end_p,end_R,pc):
 
 config_dir='../../config/'
 
-robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',d=15,tool_file_path=config_dir+'weldgun.csv',\
+robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',d=15,tool_file_path=config_dir+'weldgun_old.csv',\
 	pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv')
-# robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path=config_dir+'weldgun.csv',d=15,\
+# robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path=config_dir+'weldgun_old.csv',d=15,\
 # 	pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg.csv')
 robot_scan=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.yml',tool_file_path=config_dir+'scanner_tcp2.csv',\
 	base_transformation_file=config_dir+'MA1440_pose.csv',pulse2deg_file_path=config_dir+'MA1440_A0_pulse2deg_real.csv')
@@ -234,11 +234,11 @@ all_scan_angle = np.radians([-45,45]) ## scanning angles
 #############################################
 #############################################
 ######### enter your wanted z height ########
-all_layer_z=[0, 25, 50] ## all layer z height
+all_layer_z=[0,25,40] ## all layer z height
 #############################################
 #############################################
 #############################################
-#############################################S
+#############################################
 #############################################
 #############################################
 
@@ -530,11 +530,12 @@ if not use_artec_studio:
 
 ### execute motion ###
 ## move to start
+client = MotionProgramExecClient()
 to_start_speed=10
-robot_client=MotionProgramExecClient(ROBOT_CHOICE='RB2',ROBOT_CHOICE2='ST1',pulse2deg=robot_scan.pulse2deg,pulse2deg_2=turn_table.pulse2deg)
+robot_client=MotionProgram(ROBOT_CHOICE='RB2',ROBOT_CHOICE2='ST1',pulse2deg=robot_scan.pulse2deg,pulse2deg_2=turn_table.pulse2deg)
 target2=['MOVJ',np.degrees(q_bp2[0][0]),to_start_speed]
 robot_client.MoveJ(np.degrees(q_bp1[0][0]), to_start_speed, 0, target2=target2)
-robot_client.execute_motion_program("AAA.JBI")
+client.execute_motion_program(robot_client)
 
 input("Open Artec Studio or Scanner and Press Enter to start moving")
 
@@ -543,7 +544,7 @@ if not use_artec_studio:
     cscanner.start_capture()
 
 ## motion start
-robot_client=MotionProgramExecClient(ROBOT_CHOICE='RB2',ROBOT_CHOICE2='ST1',pulse2deg=robot_scan.pulse2deg,pulse2deg_2=turn_table.pulse2deg)
+robot_client=MotionProgram(ROBOT_CHOICE='RB2',ROBOT_CHOICE2='ST1',pulse2deg=robot_scan.pulse2deg,pulse2deg_2=turn_table.pulse2deg)
 
 # calibration motion
 target2=['MOVJ',np.degrees(q_bp2[1][0]),10]
@@ -554,7 +555,7 @@ for path_i in range(2,len(q_bp1)-1):
     robot_client.MoveL(np.degrees(q_bp1[path_i][0]), s1_all[path_i], target2=target2)
 target2=['MOVJ',np.degrees(q_bp2[-1][0]),10]
 robot_client.MoveL(np.degrees(q_bp1[-1][0]), s1_all[-1], 0, target2=target2)
-robot_stamps,curve_pulse_exe = robot_client.execute_motion_program("AAA.JBI")
+robot_stamps,curve_pulse_exe,_,_ = client.execute_motion_program(robot_client)
 # q_out_exe=np.divide(curve_pulse_exe[:,6:],robot_scan.pulse2deg)
 q_out_exe=curve_pulse_exe[:,6:]
 
@@ -568,18 +569,18 @@ if not use_artec_studio:
     # print("Robot last joint:",q_out1_exe[-1])
 
 input("Press Stop on Artec Studio and Move Home")
-robot_client=MotionProgramExecClient(ROBOT_CHOICE='RB2',ROBOT_CHOICE2='ST1',pulse2deg=robot_scan.pulse2deg,pulse2deg_2=turn_table.pulse2deg)
+robot_client=MotionProgram(ROBOT_CHOICE='RB2',ROBOT_CHOICE2='ST1',pulse2deg=robot_scan.pulse2deg,pulse2deg_2=turn_table.pulse2deg)
 # move robot to home
 q2=np.zeros(6)
 q2[0]=90
 q3=[-15,180]
-robot_client=MotionProgramExecClient(ROBOT_CHOICE='RB2',pulse2deg=robot_scan.pulse2deg)
+robot_client=MotionProgram(ROBOT_CHOICE='RB2',pulse2deg=robot_scan.pulse2deg)
 robot_client.MoveJ(q2,to_start_speed,0)
-robot_stamps,curve_pulse_exe = robot_client.execute_motion_program("AAA.JBI")
+robot_stamps,curve_pulse_exe,_,_ = client.execute_motion_program(robot_client)
 
-robot_client=MotionProgramExecClient(IP='192.168.1.31',ROBOT_CHOICE='ST1',pulse2deg=turn_table.pulse2deg)
+robot_client=MotionProgram(ROBOT_CHOICE='ST1',pulse2deg=turn_table.pulse2deg)
 robot_client.MoveJ(q3,to_start_speed,0)
-robot_stamps,curve_pulse_exe = robot_client.execute_motion_program("AAA.JBI")
+robot_stamps,curve_pulse_exe,_,_ = client.execute_motion_program(robot_client)
 #####################
 # exit()
 
