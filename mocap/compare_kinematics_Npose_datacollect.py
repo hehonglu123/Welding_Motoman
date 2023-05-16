@@ -26,6 +26,21 @@ test_qs = np.array([[0.,0.,0.,0.,0.,0.],[0,69,57,0,0,0],[0,-68,-68,0,0,0],[-36.6
                 [21.0753,-1.8803,-27.3509,13.1122,-25.1173,-25.2466]])
 # test_qs = np.array([[0,69,57,0,0,0],[0,-68,-68,0,0,0]])
 # print(robot_weld.fwd(np.radians([-0.5,-68,-68,0,0,0])))
+
+test_qs = []
+sample_q = []
+sample_N = [] # len(sample_q)-1
+for i in range(sample_N):
+    start_T = robot_weld.fwd(sample_q[i])
+    end_T = robot_weld.fwd(sample_q[i+1])
+    k,dtheta = np.matmul(start_T.R.T,end_T.R)
+    dp_vector = end_T.p-start_T.p
+    for n in range(sample_N[i]):
+        this_R=np.matmul(start_T.R,rot(k,dtheta/sample_N[i]*n))
+        this_p=start_T.p+dp_vector/sample_N[i]*n
+        this_q=robot_weld.inv(this_p,this_R,last_joints=sample_q[i])[0]
+        test_qs.append(this_q)
+
 # exit()
 
 # mocap pose listener
@@ -41,8 +56,9 @@ mpl_obj = MocapFrameListener(mocap_cli,all_ids,'world')
 
 data_dir = 'kinematic_raw_data/'
 
-repeats_N = 20
+repeats_N = 1
 rob_speed = 15
+waitTime = 1
 
 robot_client = MotionProgramExecClient()
 mp=MotionProgram(ROBOT_CHOICE='RB1',pulse2deg=robot_weld.pulse2deg)
@@ -50,7 +66,7 @@ for N in range(repeats_N):
     for test_q in test_qs:
         # move robot
         mp.MoveJ(test_q,rob_speed,0)
-        mp.setWaitTime(3)
+        mp.setWaitTime(waitTime)
 
 # Run
 mpl_obj.run_pose_listener()
