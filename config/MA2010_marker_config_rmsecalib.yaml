@@ -23,8 +23,8 @@ calib_base_mocap_pose:
     y: 1268.5445556739683
     z: -1567.790043744993
 calibration_markers:
-- marker1_rigid1
-- marker2_rigid1
-- marker3_rigid1
-- marker4_rigid1
-- marker5_rigid1
+- marker1_rigid3
+- marker2_rigid3
+- marker3_rigid3
+- marker4_rigid3
+- marker5_rigid3
