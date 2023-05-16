@@ -34,12 +34,10 @@ class CalibRobotPH:
         all_ids.extend(self.base_markers_ids)
         all_ids.append(self.base_rigid_id)
         all_ids.append(robot.tool_rigid_id)
-        self.mpl_obj = MocapFrameListener(self.mocap_cli,all_ids,'world')
+        self.mpl_obj = MocapFrameListener(self.mocap_cli,all_ids,'world',use_quat=True)
 
-    def run_calib(self,base_marker_config_file,rob_IP=None,ROBOT_CHOICE=None,rob_p2d=None,start_p=None,paths=[],rob_speed=3,waittime=1,repeat_N=1,
+    def run_calib(self,base_marker_config_file,rob_IP=None,ROBOT_CHOICE=None,rob_p2d=None,paths=[],rob_speed=3,waittime=1,
                   raw_data_dir=''):
-        
-        client = MotionProgramExecClient()
 
         input("Press Enter and the robot will start moving.")
         robot_client = MotionProgramExecClient()
@@ -55,16 +53,22 @@ class CalibRobotPH:
         self.mpl_obj.stop_pose_listener()
         curve_p,curve_R,timestamps = self.mpl_obj.get_frames_traj()
 
-        with open(raw_data_dir+'mocap_p_cont.pickle', 'wb') as handle:
+        save_curve_R = {}
+        save_curve_R[self.robot.base_rigid_id]=curve_R[self.robot.base_rigid_id]
+        save_curve_R[self.robot.tool_rigid_id]=curve_R[self.robot.tool_rigid_id]
+        print(save_curve_R[self.robot.base_rigid_id][0])
+        print(save_curve_R[self.robot.tool_rigid_id][0])
+
+        with open(raw_data_dir+'_mocap_p_cont.pickle', 'wb') as handle:
             pickle.dump(curve_p, handle, protocol=pickle.HIGHEST_PROTOCOL)
-        with open(raw_data_dir+'mocap_R_cont.pickle', 'wb') as handle:
+        with open(raw_data_dir+'_mocap_R_cont.pickle', 'wb') as handle:
             pickle.dump(curve_R, handle, protocol=pickle.HIGHEST_PROTOCOL)
-        with open(raw_data_dir+'robot_q_cont.pickle', 'wb') as handle:
+        with open(raw_data_dir+'_robot_q_cont.pickle', 'wb') as handle:
             pickle.dump(curve_exe, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
-        with open(raw_data_dir+'mocap_p_timestamps_cont.pickle', 'wb') as handle:
+        with open(raw_data_dir+'_mocap_p_timestamps_cont.pickle', 'wb') as handle:
             pickle.dump(timestamps, handle, protocol=pickle.HIGHEST_PROTOCOL)
-        with open(raw_data_dir+'robot_q_timestamps_cont.pickle', 'wb') as handle:
+        with open(raw_data_dir+'_robot_q_timestamps_cont.pickle', 'wb') as handle:
             pickle.dump(robot_stamps, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
 def calib_S1():
@@ -96,7 +100,7 @@ def calib_S1():
     # raw_data_dir='PH_raw_data/valid_data_2'
     #####################
 
-    calib_obj.run_calib(config_dir+'D500B_robot_default_config.yaml','192.168.1.31','ST1',turn_table.pulse2deg,start_p,q_paths,rob_speed=3,repeat_N=1\
+    calib_obj.run_calib(config_dir+'D500B_robot_default_config.yaml','192.168.1.31','ST1',turn_table.pulse2deg,q_paths,rob_speed=3,waittime=0.5,repeat_N=1\
                         ,raw_data_dir=raw_data_dir) # save calib config to file
     print("Collect PH data done")
 
@@ -107,18 +111,17 @@ def calib_R1():
 	pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',\
     base_marker_config_file=config_dir+'MA2010_marker_config.yaml',tool_marker_config_file=config_dir+'weldgun_marker_config.yaml')
 
-    # mocap_url = 'rr+tcp://localhost:59823?service=optitrack_mocap'
-    # mocap_cli = RRN.ConnectService(mocap_url)
+    mocap_url = 'rr+tcp://localhost:59823?service=optitrack_mocap'
+    mocap_cli = RRN.ConnectService(mocap_url)
 
-    # calib_obj = CalibRobotPH(mocap_cli,robot_weld)
+    calib_obj = CalibRobotPH(mocap_cli,robot_weld)
 
     # calibration
-    q2_up=45
-    q2_low=-45
-    q3_up_sample = np.array([[-45,0],[0,10],[45,60]]) #[[q2 q3]]
-    q3_low_sample = np.array([[-45,-60],[0,-30],[45,30]]) #[[q2 q3]]
+    q2_up=50
+    q2_low=-55
+    q3_up_sample = np.array([[-55,-40],[0,10],[50,50]]) #[[q2 q3]]
+    q3_low_sample = np.array([[-55,-70],[0,-50],[50,0]]) #[[q2 q3]]
     d_angle = 5 # 5 degree
-
     # add 7 points (at least 6 is needed)
     dq_sample = [[0,0,0,0,0,0],\
           [-1,0,0,0,0,0],[1,0,0,0,0,0],\
@@ -126,6 +129,10 @@ def calib_R1():
           [0,1,1,0,0,0],[0,1,-1,0,0,0]]
     scale=1
     dq_sample = np.array(dq_sample)*scale
+
+    # speed
+    rob_speed=5
+    waittime=0.5
 
     q_paths = []
     for q2 in np.append(np.arange(q2_low,q2_up,d_angle),q2_up):
@@ -137,14 +144,13 @@ def calib_R1():
             target_q[2]=q3
             for dq in dq_sample:
                 q_paths.append(target_q+dq)
-    print(len(q_paths))
-    exit()
+    print("total pose:",len(q_paths))
 
     # collecting raw data
-    raw_data_dir='PH_raw_data/train_data'
+    raw_data_dir='PH_grad_data/train_data'
     #####################
 
-    calib_obj.run_calib(config_dir+'MA2010_marker_config.yaml','192.168.1.31','RB1',robot_weld.pulse2deg,start_p,q_paths,rob_speed=3,repeat_N=1\
+    calib_obj.run_calib(config_dir+'MA2010_marker_config.yaml','192.168.1.31','RB1',robot_weld.pulse2deg,q_paths,rob_speed=rob_speed,waittime=waittime\
                         ,raw_data_dir=raw_data_dir) # save calib config to file
     print("Collect PH data done")
 

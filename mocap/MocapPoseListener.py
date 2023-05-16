@@ -149,13 +149,16 @@ class MocapPoseListener():
         return self.robots_base_mocap_p,self.robots_base_mocap_R,self.robots_tool_mocap_p,self.robots_tool_mocap_R,self.robots_traj_stamps
 
 class MocapFrameListener():
-    def __init__(self,rr_mocap,target_frames,source_frame='world'):
+    def __init__(self,rr_mocap,target_frames,source_frame='world',use_quat=False):
 
         self.rr_mocap = rr_mocap
         
         self.source_frame = source_frame
         self.target_frames = target_frames
         self.clear_traj()
+
+        # use quaternion
+        self.use_quat = use_quat
 
         # threading
         self.cp_thread = None
@@ -207,7 +210,10 @@ class MocapFrameListener():
                         T_target_world = Transform(this_orientation_R,this_position)
                         T_target_source = T_world_source*T_target_world
                         self.target_frames_traj_p[this_marker_id].append(T_target_source.p)
-                        self.target_frames_traj_R[this_marker_id].append(T_target_source.R)
+                        if self.use_quat:
+                            self.target_frames_traj_R[this_marker_id].append(R2q(T_target_source.R))
+                        else:
+                            self.target_frames_traj_R[this_marker_id].append(T_target_source.R)
                         self.traj_stamps[this_marker_id].append(float(data.sensor_data.ts[0]['seconds'])+data.sensor_data.ts[0]['nanoseconds']*1e-9)
 
         sensor_data_srv.Close()

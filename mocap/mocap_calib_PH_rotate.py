@@ -94,7 +94,21 @@ def to_frame(curve_p,curve_R,mocap_stamps,target_frame,markers_id):
 
 config_dir='../config/'
 
+# robot_type='R1'
 robot_type='S1'
+
+# all_datasets=['train_data','valid_data_1','valid_data_2']
+# all_datasets=['test0502_noanchor/train_data']
+# all_datasets=['test0502_anchor/train_data']
+# all_datasets=['test0504_high_zero/train_data']
+# all_datasets=['test0504_zero/train_data']
+# all_datasets=['test0504_stretch/train_data']
+# all_datasets=['test0504_inward/train_data']
+# all_datasets=['test0509_beforecalib/train_data']
+# all_datasets=['test0509_aftercalib/train_data']
+# all_datasets=['test0509_S1_aftercalib/train_data']
+# all_datasets=['test0516_R1_aftercalib/train_data']
+all_datasets=['test0516_S1_aftercalib/train_data']
 
 if robot_type=='R1':
     base_marker_config_file=config_dir+'MA2010_marker_config.yaml'
@@ -135,23 +149,11 @@ elif robot_type=='S1':
 H_act = deepcopy(H_nom)
 axis_p = deepcopy(H_nom)
 
-# all_datasets=['train_data','valid_data_1','valid_data_2']
-# all_datasets=['test0502_noanchor/train_data']
-# all_datasets=['test0502_anchor/train_data']
-# all_datasets=['test0504_high_zero/train_data']
-# all_datasets=['test0504_zero/train_data']
-# all_datasets=['test0504_stretch/train_data']
-# all_datasets=['test0504_inward/train_data']
-# all_datasets=['test0509_beforecalib/train_data']
-# all_datasets=['test0509_aftercalib/train_data']
-# all_datasets=['test0509_S1_aftercalib/train_data']
-all_datasets=['test0511_S1_newmarker/train_data']
-
 P_marker_id = robot.tool_rigid_id
 zero_config_q = [[],[],[],[],[],[]]
 for dataset in all_datasets:
     print(dataset)
-    raw_data_dir = 'PH_raw_data/'+dataset
+    raw_data_dir = 'PH_rotate_data/'+dataset
     for j in range(jN):
         # read raw data
         curve_p,curve_R,mocap_stamps = read_and_convert_frame(raw_data_dir+'_'+str(j+1),robot.base_rigid_id,robot.tool_markers_id)

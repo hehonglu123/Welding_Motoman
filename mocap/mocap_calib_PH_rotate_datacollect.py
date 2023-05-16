@@ -116,7 +116,7 @@ def calib_S1():
     q_paths = [[q1_1,q1_2],[q2_1,q2_2]]
     
     # collecting raw data
-    raw_data_dir='PH_raw_data/train_data'
+    raw_data_dir='PH_rotate_data/train_data'
     # raw_data_dir='PH_raw_data/valid_data_1'
     # raw_data_dir='PH_raw_data/valid_data_2'
     #####################
@@ -199,7 +199,7 @@ def calib_R1():
     q_paths = [[q1_1,q1_2],[q2_1,q2_2],[q3_1,q3_2],[q4_1,q4_2],[q5_1,q5_2],[q6_1,q6_2]]
 
     # collecting raw data
-    raw_data_dir='PH_raw_data/train_data'
+    raw_data_dir='PH_rotate_data/train_data'
     # raw_data_dir='PH_raw_data/valid_data_1'
     # raw_data_dir='PH_raw_data/valid_data_2'
     #####################
