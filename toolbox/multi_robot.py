@@ -5,6 +5,19 @@ from general_robotics_toolbox import *
 # from lambda_calc import *
 from pandas import read_csv
 
+def form_relative_path_mocap(curve_exe1,curve_exe1_R,curve_exe2,curve_exe2_R,robot1,robot2):
+	relative_path_exe=[]
+	relative_path_exe_R=[]
+	for i in range(len(curve_exe1)):
+
+		curve_exe2_world_now=robot2.base_H[:3,:3]@curve_exe2[i]+robot2.base_H[:3,-1]
+		curve_exe2_R_world_now=robot2.base_H[:3,:3]@curve_exe2_R[i]
+
+		relative_path_exe.append(curve_exe2_R_world_now.T@(curve_exe1[i]-curve_exe2_world_now))
+		relative_path_exe_R.append(curve_exe2_R_world_now.T@curve_exe1_R[i])
+
+	return np.array(relative_path_exe),np.array(relative_path_exe_R)
+
 def form_relative_path(curve_js1,curve_js2,robot1,robot2):
 	relative_path_exe=[]
 	relative_path_exe_R=[]

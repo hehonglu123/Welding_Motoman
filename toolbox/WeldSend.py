@@ -20,7 +20,7 @@ class WeldSend(object):
 		mp.setArc(False)
 		self.client.execute_motion_program(mp)
 
-	def wire_cut(self,robot,speed=5):
+	def wire_cut(self,robot,speed=5,q_safe=np.radians([-23.88,37.9,40.66,7.42,-72,-20])):
 		###cut wire, length given in robot standoff d
 		mp=MotionProgram(ROBOT_CHOICE='RB1',pulse2deg=robot.pulse2deg)
 		p=[463.1378, 1347, -293]
@@ -30,7 +30,7 @@ class WeldSend(object):
 
 		q_cut1=robot.inv(p+np.array([0,0,50]),R,np.zeros(6))[0]
 		q_cut2=robot.inv(p,R,np.zeros(6))[0]
-		mp.MoveJ(np.array([-23.88,37.9,40.66,7.42,-72,-20]),speed/2)
+		mp.MoveJ(np.degrees(q_safe),speed/2)
 		mp.MoveJ(np.zeros(6),speed)
 		mp.MoveJ(np.degrees(q_cut1),speed)
 		mp.MoveL(np.degrees(q_cut2),50)
@@ -40,25 +40,50 @@ class WeldSend(object):
 		mp.setDOPulse(11,2)
 		mp.MoveL(np.degrees(q_cut1),50)
 		mp.MoveJ(np.zeros(6),speed)
-		mp.MoveJ(np.array([-23.88,37.9,40.66,7.42,-72,-20]),speed)
+		mp.MoveJ(np.degrees(q_safe),speed)
 
 		self.client.execute_motion_program(mp)
 
-	def touchsense(self,robot,p1,p2,R):
+	def touchsense(self,robot,p1,p2,R,q_safe=np.radians([-23.88,37.9,40.66,7.42,-72,-20])):
 		###p1: list of poitns as starting points
 		###p2: list of points as touchsense direction
 		###R: tool direction
+		mp=MotionProgram(ROBOT_CHOICE='RB1',pulse2deg=robot.pulse2deg)
+		mp.MoveJ(np.degrees(q_safe),2)
+		self.client.execute_motion_program(mp)
 		q_all=[]
 		for i in range(len(p1)):
 			mp=MotionProgram(ROBOT_CHOICE='RB1',pulse2deg=robot.pulse2deg)
 			q1=robot.inv(p1[i],R,np.zeros(6))[0]
 			mp.MoveJ(np.degrees(q1),4)
 			q2=robot.inv(p2[i],R,np.zeros(6))[0]
-			mp.touchsense(np.degrees(q2), 30 ,20)
+			mp.touchsense(np.degrees(q2), 10 ,20)
 			_,joint_recording,_,_=self.client.execute_motion_program(mp)
 			q_all.append(joint_recording[-1][:6])
 
+		mp=MotionProgram(ROBOT_CHOICE='RB1',pulse2deg=robot.pulse2deg)
+		mp.MoveJ(np.degrees(q_safe),2)
+		self.client.execute_motion_program(mp)
+
 		return np.array(q_all)
+
+
+	def logged_data_analysis_mocap(self,robot,curve_exe_dict,curve_exe_R_dict,timestamp_dict):
+		curve_exe = np.array(curve_exe_dict[robot.robot_name])
+		curve_exe_R = np.array(curve_exe_R_dict[robot.robot_name])
+		timestamp = np.array(timestamp_dict[robot.robot_name])
+		len_min=min(len(timestamp),len(curve_exe),len(curve_exe_R))
+		curve_exe=curve_exe[:len_min]
+		timestamp=timestamp[:len_min]
+		curve_exe_R=curve_exe_R[:len_min]
+
+		curve_exe_w=smooth_w(R2w(curve_exe_R,np.eye(3)))
+		###filter noise
+		timestamp, curve_exe_pw=lfilter(timestamp, np.hstack((curve_exe,curve_exe_w)))
+
+
+		return  curve_exe_pw[:,:3], curve_exe_pw[:,3:], timestamp
+
 
 	def extract_data_from_cmd(self,filename):
 		data = read_csv(filename)
