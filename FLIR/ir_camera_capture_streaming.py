@@ -15,7 +15,16 @@ def main():
     url='rr+tcp://192.168.55.10:60827/?service=camera'
 
     c1=RRN.ConnectService(url)
+
+    c1.setf_param("focus_pos", RR.VarValue(int(1400),"int32"))
     c1.setf_param("ir_format", RR.VarValue("temperature_linear_100mK","string"))
+    c1.setf_param("object_emissivity", RR.VarValue(0.13,"double"))
+    c1.setf_param("relative_humidity", RR.VarValue(50,"double"))
+    c1.setf_param("atmospheric_temperature", RR.VarValue(293.15,"double"))
+    c1.setf_param("ext_optics_temperature", RR.VarValue(293.15,"double"))
+    c1.setf_param("ext_optics_transmission", RR.VarValue(1.0,"double"))
+    c1.setf_param("scale_limit_low", RR.VarValue(293.15,"double"))
+    c1.setf_param("scale_limit_upper", RR.VarValue(5000,"double"))
 
     global image_consts
     image_consts = RRN.GetConstants('com.robotraconteur.image', c1)
