@@ -94,8 +94,8 @@ def to_frame(curve_p,curve_R,mocap_stamps,target_frame,markers_id):
 
 config_dir='../config/'
 
-# robot_type='R1'
-robot_type='S1'
+robot_type='R1'
+# robot_type='S1'
 
 # all_datasets=['train_data','valid_data_1','valid_data_2']
 # all_datasets=['test0502_noanchor/train_data']
@@ -107,8 +107,8 @@ robot_type='S1'
 # all_datasets=['test0509_beforecalib/train_data']
 # all_datasets=['test0509_aftercalib/train_data']
 # all_datasets=['test0509_S1_aftercalib/train_data']
-# all_datasets=['test0516_R1_aftercalib/train_data']
-all_datasets=['test0516_S1_aftercalib/train_data']
+all_datasets=['test0516_R1_aftercalib/train_data']
+# all_datasets=['test0516_S1_aftercalib/train_data']
 
 if robot_type=='R1':
     base_marker_config_file=config_dir+'MA2010_marker_config.yaml'
