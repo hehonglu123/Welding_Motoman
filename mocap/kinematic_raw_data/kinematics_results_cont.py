@@ -25,7 +25,7 @@ for j in range(6):
     T = T_next
 print('P',nom_P[:,1:6].T)
 print('H',nom_H.T)
-exit()
+# exit()
 # data_dir='test0502_noanchor/'
 # data_dir='test0502_anchor/'
 # data_dir='test0504_nomove/nomove_concalib_'

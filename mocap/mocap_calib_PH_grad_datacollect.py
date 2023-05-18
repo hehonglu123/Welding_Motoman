@@ -111,10 +111,10 @@ def calib_R1():
 	pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',\
     base_marker_config_file=config_dir+'MA2010_marker_config.yaml',tool_marker_config_file=config_dir+'weldgun_marker_config.yaml')
 
-    mocap_url = 'rr+tcp://localhost:59823?service=optitrack_mocap'
-    mocap_cli = RRN.ConnectService(mocap_url)
+    # mocap_url = 'rr+tcp://localhost:59823?service=optitrack_mocap'
+    # mocap_cli = RRN.ConnectService(mocap_url)
 
-    calib_obj = CalibRobotPH(mocap_cli,robot_weld)
+    # calib_obj = CalibRobotPH(mocap_cli,robot_weld)
 
     # calibration
     q2_up=50
@@ -145,6 +145,8 @@ def calib_R1():
             for dq in dq_sample:
                 q_paths.append(target_q+dq)
     print("total pose:",len(q_paths))
+
+    exit()
 
     # collecting raw data
     raw_data_dir='PH_grad_data/train_data'
