@@ -117,8 +117,8 @@ robot_weld.T_tool_toolmarker=Transform(np.eye(3),[0,0,0])
 #### Gradient
 print("Training Set:",train_N)
 plot_grad=True
-# all_testing_pose=[1]
-all_testing_pose=[0,1,2,3,4]
+all_testing_pose=[1]
+# all_testing_pose=[0,1,2,3,4]
 total_iteration = 100
 total_grad_sample = 40
 dP_range = 0.05
