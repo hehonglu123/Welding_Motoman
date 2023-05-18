@@ -10,7 +10,7 @@ from matplotlib import pyplot as plt
 config_dir='../../config/'
 robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path='',d=0,\
 pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',\
-base_marker_config_file=config_dir+'MA2010_0504inward_marker_config.yaml',tool_marker_config_file=config_dir+'weldgun_marker_config.yaml')
+base_marker_config_file=config_dir+'MA2010_0504stretch_marker_config.yaml',tool_marker_config_file=config_dir+'weldgun_marker_config.yaml')
 
 print("P",robot_weld.calib_P[:,1:6].T)
 print("H",robot_weld.calib_H.T)
@@ -18,6 +18,8 @@ print("H",robot_weld.calib_H.T)
 nom_P = np.zeros(robot_weld.calib_P.shape)
 nom_H = np.zeros(robot_weld.calib_H.shape)
 T = Transform(np.eye(3),[0,0,0])
+robot_weld.robot.P = robot_weld.calib_P
+robot_weld.robot.H = robot_weld.calib_H
 for j in range(6):
     T_next = T*Transform(rot(robot_weld.robot.H[:,j],robot_weld.calib_zero_config[j]),robot_weld.robot.P[:,j])
     nom_P[:,j] = T_next.p-T.p
@@ -25,7 +27,20 @@ for j in range(6):
     T = T_next
 print('P',nom_P[:,1:6].T)
 print('H',nom_H.T)
-# exit()
+
+np.set_printoptions(suppress=True)
+zero_P = deepcopy(robot_weld.calib_P)
+zero_H = deepcopy(robot_weld.calib_H)
+R = np.eye(3)
+for j in range(6,0,-1):
+    R = rot(zero_H[:,j-1],-robot_weld.calib_zero_config[j-1])
+    for i in range(j,7):
+        if i!=6:
+            zero_H[:,i] = R@zero_H[:,i]
+        zero_P[:,i] = R@zero_P[:,i]
+print('P',np.round(zero_P[:,1:7],3).T)
+print('H',np.round(zero_H,3).T)
+exit()
 # data_dir='test0502_noanchor/'
 # data_dir='test0502_anchor/'
 # data_dir='test0504_nomove/nomove_concalib_'
