@@ -25,8 +25,8 @@ dtype = o3d.core.float32
 
 # data_dir='../../data/wall_weld_test/scan_cont_6_backup/scans/'
 # data_dir='../../data/wall_weld_test/wall_param_1/scans/'
-data_dir='../../data/wall_weld_test/scan_cont_newdx_1/scans/'
-# data_dir='../../data/wall_weld_test/wall_param_data_collection/path_Rz-45_Ry0_stand_off_d243_b_theta45_scan_angle-45_45_z0_35_/scans/'
+# data_dir='../../data/wall_weld_test/scan_cont_newdx_1/scans/'
+data_dir='../../data/wall_weld_test/wall_param_data_collection/path_Rz-45_Ry0_stand_off_d243_b_theta45_scan_angle-45_45_z0_35_/scans/'
 config_dir='../../config/'
 
 robot_scan=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.yml',tool_file_path=config_dir+'scanner_tcp2.csv',\
@@ -90,19 +90,14 @@ sca_stamps_sync_robt = sca_stamps-robot_scanner_t_diff
 # print(sca_stamps_sync_robt[:30])
 # exit()
 
-T_origin_R=rot([0,0,1],np.radians(87.5))
-T_origin=Transform(T_origin_R,np.array([200,-800,300]))
-T_origin_inv=T_origin.inv()
-
 ### using tensor or legacy ###
 use_tensor=False
 ##############################
 
 ### process parameters
-use_icp=False
+use_icp=True
 timestep_search=False
 timestep_search_2=False
-search_start_i=50
 
 threshold = 5
 rmse_search_step=100
@@ -158,24 +153,32 @@ for search_i in range(0,rmse_search_step):
 # print(rmse_i)
 # exit()
 # rmse_i+=2
-sca_stamps_sync_robt=sca_stamps_sync_robt+(rob_stamps[robt_move_t1_i+rmse_i]-sca_stamps_sync_robt[scan_move_stamp_i])
+test_offset = 0
+sca_stamps_sync_robt=sca_stamps_sync_robt+(rob_stamps[robt_move_t1_i+rmse_i+test_offset]-sca_stamps_sync_robt[scan_move_stamp_i])
 # robt_move_t1_i=np.argsort(np.abs(rob_stamps-sca_stamps_sync_robt[scan_move_stamp_i]))[0]
 # print(robt_move_t1_i)
 # exit()
 
+# precrop
+crop_flag=False
+min_bound = (-50,-50,30)
+max_bound = (50,55,150)
 
 pcd_combined = None
 scan_js_exe_cor = []
 scan_i_start=None
+search_start_i=50+scan_move_stamp_i
 # scan_N=70
 for scan_i in range(scan_N):
-    # print("Scan:",scan_i)
+    print("Scan:",scan_i)
     # discard scanner timestamp <0 (robot motion haven't start)
     if sca_stamps_sync_robt[scan_i]<0:
         scan_js_exe_cor.append(scan_js_exe[0])
         continue
     if scan_i_start is None:
         scan_i_start=scan_i
+    if scan_i%5!=0:
+        continue
     scan_points_origin = np.load(data_dir + 'points_'+str(scan_i)+'.npy')
     ## get corresponding js
     closest_i_sort=np.argsort(np.abs(rob_stamps-sca_stamps_sync_robt[scan_i]))
@@ -202,6 +205,11 @@ for scan_i in range(scan_N):
     
     ## voxel down sample
     pcd = pcd.voxel_down_sample(voxel_size=voxel_size)
+
+    ## crop point clouds
+    if crop_flag:
+        bbox = o3d.geometry.AxisAlignedBoundingBox(min_bound=min_bound,max_bound=max_bound)
+        pcd=pcd.crop(bbox)
 
     ## paint pcd for visualization
     color_dist = plt.get_cmap("rainbow")((scan_i-scan_i_start)/(scan_N-scan_i_start))
@@ -301,7 +309,7 @@ for scan_i in range(scan_N):
             pcd_combined=pcd_combined.append(pcd)
         else:
             pcd_combined+=pcd
-        # pcd_combined = pcd_combined.voxel_down_sample(voxel_size=voxel_size)
+        pcd_combined = pcd_combined.voxel_down_sample(voxel_size=voxel_size)
     pcd_last=deepcopy(pcd)
 
 pcd_combined_down = pcd_combined.voxel_down_sample(voxel_size=0.5)
@@ -311,15 +319,15 @@ visualize_pcd([pcd_combined_down])
 o3d.io.write_point_cloud(data_dir+'processed_pcd_raw.pcd',pcd_combined)
 
 voxel_down_flag=True
-crop_flag=False
+crop_flag=True
 outlier_remove=True
 cluster_based_outlier_remove=True
 
 ####### processing parameters
 voxel_size=0.1
 ## crop focused region
-min_bound = (-1,-1,-1)
-max_bound = (143.1+5,15.8+1,30.6+1)
+min_bound = (-50,-50,30)
+max_bound = (50,55,150)
 ## outlier removal
 nb_neighbors=40
 std_ratio=0.5
@@ -328,16 +336,17 @@ cluster_neighbor=0.75
 min_points=50
 ######################
 
+## crop point clouds
+if crop_flag:
+    bbox = o3d.geometry.AxisAlignedBoundingBox(min_bound=min_bound,max_bound=max_bound)
+    pcd_combined=pcd_combined.crop(bbox)
+visualize_pcd([pcd_combined])
+
 #### processing
 ## voxel down sample
 if voxel_down_flag:
     pcd_combined = pcd_combined.voxel_down_sample(voxel_size=voxel_size)
     print("Voxel Down done.")
-
-## crop point clouds
-if crop_flag:
-    bbox = o3d.geometry.AxisAlignedBoundingBox(min_bound=min_bound,max_bound=max_bound)
-    pcd_combined=pcd_combined.crop(bbox)
 
 if outlier_remove:
     cl,ind=pcd_combined.remove_statistical_outlier(nb_neighbors=nb_neighbors,std_ratio=std_ratio)
