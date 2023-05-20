@@ -14,7 +14,6 @@ def main():
 	sliced_alg='auto_slice/'
 	data_dir='../../data/'+dataset+sliced_alg
 	curve_sliced_relative=[]
-	num_layers=5
 	
 	layer_height_num=int(1.0/0.1)
 
@@ -34,7 +33,7 @@ def main():
 	positioner_js=[]
 	robot_js=[]
 	num_layer_start=int(0*layer_height_num)
-	num_layer_end=int(5*layer_height_num)
+	num_layer_end=int(9*layer_height_num)
 	for layer in range(num_layer_start,num_layer_end,layer_height_num):
 		positioner_js.extend(np.loadtxt(data_dir+'curve_sliced_js/D500B_js%i_0.csv'%layer,delimiter=','))
 		robot_js.extend(np.loadtxt(data_dir+'curve_sliced_js/MA2010_js%i_0.csv'%layer,delimiter=','))

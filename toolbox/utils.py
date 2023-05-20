@@ -5,6 +5,26 @@ from scipy.interpolate import interp1d
 from scipy import signal
 import scipy, math
 
+def vector_to_plane(point, centroid, normal):		###vector from point to plane
+    return  np.dot(centroid - point,normal)*normal
+
+def point2plane_distance(p,centroid,normal):
+	return np.abs(np.dot(p - centroid, normal) / np.linalg.norm(normal))
+
+def fit_plane(points):
+    # Calculate the centroid of the points
+    centroid = np.mean(points, axis=0)
+
+    # Center the points by subtracting the centroid
+    centered_points = points - centroid
+
+    # Calculate the SVD of the centered points
+    u, s, vh = np.linalg.svd(centered_points)
+
+    # The normal vector of the plane is the last column of vh
+    normal = vh[-1]
+
+    return normal, centroid
 
 def pose_regression(A,B):
 	###find transformation between ordered point lists A and B with regression
