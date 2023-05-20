@@ -4,6 +4,18 @@ import open3d as o3d
 sys.path.append('../toolbox/')
 from utils import *
 
+
+def calc_error(target_points,collapsed_points):
+    error_off=[]
+    error_miss=[]
+    for p in collapsed_points:
+        error_off.append(np.linalg.norm(target_points-p,axis=1).min())
+    
+    for p in target_points:
+        error_miss.append(np.linalg.norm(collapsed_points-p,axis=1).min())
+    
+    return np.array(error_off), np.array(error_miss)
+
 def separate(scanned_points,target_points):
     num_points=10
     left_indices=[]
@@ -34,7 +46,7 @@ def collapse(left_pc,right_pc,target_points):
         width.append([np.linalg.norm(v1),np.linalg.norm(v2)])
         collapsed_surface.append(left_pc[i]-v1+(v1+v2)/2)
     
-    return width, collapsed_surface
+    return np.sum(width,axis=1), collapsed_surface
 
 def visualize_pcd(show_pcd_list,point_show_normal=False):
 
@@ -86,10 +98,16 @@ right_pc.points = o3d.utility.Vector3dVector(scanned_points_tranform[right_indic
 right_pc.paint_uniform_color([0.7, 0.7, 0.0])
 
 # Visualize the point cloud
-# o3d.visualization.draw_geometries([target_points,left_pc,right_pc])
+o3d.visualization.draw_geometries([target_points,left_pc,right_pc])
 
 width,collapsed_surface=collapse(np.array(left_pc.points),np.array(right_pc.points),target_points_transform)
 collapsed_surface_pc=o3d.geometry.PointCloud()
 collapsed_surface_pc.points=o3d.utility.Vector3dVector(collapsed_surface)
 collapsed_surface_pc.paint_uniform_color([0.7, 0.7, 0.0])
 o3d.visualization.draw_geometries([target_points,collapsed_surface_pc])
+
+print(np.std(width),np.average(width))
+
+error_off,error_miss=calc_error(target_points_transform,collapsed_surface)
+print(error_off.max(),np.mean(error_off))
+print(error_miss.max(),np.mean(error_miss))
