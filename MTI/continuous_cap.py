@@ -8,18 +8,13 @@ c = RRN.ConnectService("rr+tcp://192.168.55.10:60830/?service=MTI2D")
 
 c.setExposureTime("25")
 time.sleep(0.5)
+fig = plt.figure(1)
+
 
 now=time.time()
 while True:
-    frame = c.Capture()
-    print(1/(time.time()-now))
-    now=time/time()
+    frame = c.lineProfile
+    plt.plot(frame.X_data, frame.Z_data, "x")
 
-plt.figure()
-plt.plot(frame.X_data, frame.Z_data, "x")
-plt.title("XY Scatter Plot")
-plt.figure()
-plt.plot(frame.X_data, frame.I_data, "x")
-plt.title("XI Scatter Plot")
-
-plt.show()
+    plt.pause(0.1)
+    plt.clf()
