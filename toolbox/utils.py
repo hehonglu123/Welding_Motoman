@@ -5,7 +5,22 @@ from scipy.interpolate import interp1d
 from scipy import signal
 import scipy, math
 
-def vector_to_plane(point, centroid, normal):		###vector from point to plane
+def H_inv(H):
+	R=H[:3,:3].T
+	p=-R@H[:3,-1]
+	return H_from_RT(R,p)
+def transform_curve(curve,H):
+	###trasform spatial curve with transformation H
+	R=H[:3,:3]
+	T=H[:-1,-1]
+	curve_new=np.dot(R,curve[:,:3].T).T+np.tile(T,(len(curve),1))
+	if len(curve[0])>3:
+		curve_normal_new=np.dot(R,curve[:,3:].T).T
+		return np.hstack((curve_new,curve_normal_new))
+	else:
+		return curve_new
+
+def vector_to_plane(point, centroid, normal):		###find the vector from point to plane
     return  np.dot(centroid - point,normal)*normal
 
 def point2plane_distance(p,centroid,normal):
@@ -108,11 +123,7 @@ def quadrant(q,robot):
 
 
 	return np.hstack((cf146,[4*REAR+2*LOWERARM+FLIP])).astype(int)
-	
-def cross(v):
-	return np.array([[0,-v[-1],v[1]],
-					[v[-1],0,-v[0]],
-					[-v[1],v[0],0]])
+
 
 def direction2R(v_norm,v_tang):
 	v_norm=v_norm/np.linalg.norm(v_norm)

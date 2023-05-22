@@ -8,6 +8,7 @@ from robot_def import *
 from multi_robot import *
 from error_check import *
 from lambda_calc import *
+from pointcloud_toolbox import *
 
 def main():
 	dataset='blade0.1/'
@@ -41,8 +42,9 @@ def main():
 	robot_js=np.array(robot_js)
 	positioner_pose=positioner.fwd(positioner_js)
 	robot_pose=robot.fwd(robot_js)
-	relative_path_exe,relative_path_exe_R=form_relative_path_mocap(robot_pose.p_all,robot_pose.R_all,positioner_pose.p_all,positioner_pose.R_all,robot,positioner)
-	ax.plot3D(relative_path_exe[::vis_step,0],relative_path_exe[::vis_step,1],relative_path_exe[::vis_step,2],'g.-')
+	relative_path_exe_gt,_=form_relative_path_mocap(robot_pose.p_all,robot_pose.R_all,positioner_pose.p_all,positioner_pose.R_all,robot,positioner)
+
+	
 
 	################mocap recorded path###########
 	curve_exe_data=np.loadtxt('mocap_robot.csv',delimiter=',')
@@ -71,14 +73,14 @@ def main():
 	
 	relative_path_exe, relative_path_exe_R=form_relative_path_mocap(curve_exe_data[:,1:4],w2R(curve_exe_data[:,4:],np.eye(3)),curve_exe_positioner_data[:,1:4],w2R(curve_exe_positioner_data[:,4:],np.eye(3)),robot,positioner)
 
-	
+	H=np.eye(4)
+	# H[:3,-1]=np.average(relative_path_exe_gt,axis=0)-np.average(relative_path_exe,axis=0)
+	# H=icp_align2(relative_path_exe,relative_path_exe_gt,H=H,icp_turns = 10,threshold=0.0001,max_iteration=100000)
+	# print(H)
+	relative_path_exe_transformed=transform_curve(relative_path_exe,H)
 
-	ax.plot3D(relative_path_exe[::vis_step,0],relative_path_exe[::vis_step,1],relative_path_exe[::vis_step,2],'r.-')
-
-
-	
-
-
+	ax.plot3D(relative_path_exe_gt[::vis_step,0],relative_path_exe_gt[::vis_step,1],relative_path_exe_gt[::vis_step,2],'g.-')
+	ax.plot3D(relative_path_exe_transformed[::vis_step,0],relative_path_exe_transformed[::vis_step,1],relative_path_exe_transformed[::vis_step,2],'r.-')
 	plt.show()
 if __name__ == '__main__':
 	main()

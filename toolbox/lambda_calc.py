@@ -8,7 +8,9 @@ from utils import *
 from scipy.optimize import fminbound
 from scipy.signal import find_peaks
 
-
+def curve_segmentation(curve_all):
+	
+	return
 def equalize_curve_spacing(curve,num_points):
 	###linearly interpolate a given curve with equally spaced num_points points
 	lam=calc_lam_cs(curve)
