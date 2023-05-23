@@ -51,7 +51,6 @@ def get_connect_circle(start_p,start_R,end_p,end_R,pc,scan_stand_off_d):
     k = k/np.linalg.norm(k)
 
     theta = -2*np.arcsin(np.linalg.norm(end_p-start_p)/2/scan_stand_off_d)
-    print(np.degrees(theta))
 
     dR = np.matmul(start_R.T,end_R)
     dRk,dRtheta = R2rot(dR)
@@ -85,25 +84,21 @@ class ScanPathGen():
         self.Ry_angle=Ry_angle
         self.bounds_theta=bounds_theta
 
-    def _gen_scan_path(self,curve_sliced_relative,all_layer_z,all_scan_angle):
-
-        curve_sliced_relative_origin=deepcopy(curve_sliced_relative)
+    def _gen_scan_path(self,all_curve_sliced_relative,all_layer,all_scan_angle):
 
         ### path gen ###
         scan_p=[]
         scan_R=[]
         reverse_path_flag=False
-        reverse_scan_angle_flag=True
-        for layer_z in all_layer_z:
-            
-            curve_sliced_relative[:,2] = curve_sliced_relative_origin[:,2]+layer_z
+        all_scan_angle=all_scan_angle[::-1]
+        for layer in all_layer:
             all_scan_angle=all_scan_angle[::-1]
-            if layer_z==all_layer_z[-1]: # last layer scan
+            if layer==all_layer[-1]: # last layer scan
                 if all_scan_angle[-1]!=0:
                     all_scan_angle = np.append(all_scan_angle,0)
             scan_angle_i=0
+            curve_sliced_relative=deepcopy(all_curve_sliced_relative[layer])
             for scan_angle in all_scan_angle:
-                
                 sub_scan_p=[]
                 sub_scan_R=[]
                 for pT_i in range(len(curve_sliced_relative)):
@@ -166,7 +161,7 @@ class ScanPathGen():
                     if reverse_path_flag:
                         curve_slice_start_p = deepcopy(curve_sliced_relative[-1][:3])
 
-                    p_bound_path,R_bound_path=get_connect_circle(last_end_p,last_end_R,this_start_p,this_start_R,curve_slice_start_p)
+                    p_bound_path,R_bound_path=get_connect_circle(last_end_p,last_end_R,this_start_p,this_start_R,curve_slice_start_p,self.scan_stand_off_d)
                     p_bound_path.extend(sub_scan_p)
                     sub_scan_p=deepcopy(p_bound_path)
                     R_bound_path.extend(sub_scan_R)
@@ -256,10 +251,21 @@ class ScanPathGen():
         elif solve_js_method==1:
             ### Method 2: stepwise qp, turntable involved
             rrs = redundancy_resolution_scanner(self.robot,self.positioner,scan_p,scan_R)
-            q_init_table=np.radians([-70,150])
             
+            # for ddeg in np.arange(-180,180,10):
+            #     try:
+            #         pose_R2_table=T_S1Base_R2Base*self.positioner.fwd(q_init_table+np.radians([0,ddeg]))
+            #         print(ddeg)
+            #         q_init_robot = self.robot.inv(np.matmul(pose_R2_table.R,scan_p[0])+pose_R2_table.p,np.matmul(pose_R2_table.R,scan_R[0]),zero_config)[0]
+            #         print(np.degrees(q_init_robot))
+            #     except:
+            #         continue
+            # exit()
+
             pose_R2_table=T_S1Base_R2Base*self.positioner.fwd(q_init_table)
             q_init_robot = self.robot.inv(np.matmul(pose_R2_table.R,scan_p[0])+pose_R2_table.p,np.matmul(pose_R2_table.R,scan_R[0]),zero_config)[0]
+            print(np.degrees(q_init_robot))
+            
             # q_out1, q_out2, j_out1, j_out2=rrs.arm_table_stepwise_opt(q_init_robot,q_init_table,w2=0.03)
             q_out1, q_out2, j_out1, j_out2=rrs.arm_table_stepwise_opt_Rz(q_init_robot,q_init_table,w2=0.03)
             # q_out1, q_out2, j_out1, j_out2=rrs.arm_table_stepwise_opt_Rz(q_init_robot,q_init_table,w2=5)
@@ -289,7 +295,7 @@ class ScanPathGen():
         
         return q_out1,q_out2
     
-    def gen_scan_path(self,curve_sliced_relative,all_layer_z,all_scan_angle,solve_js_method=1,q_init_table=np.radians([-15,180]),scan_path_dir=None):
+    def gen_scan_path(self,all_curve_sliced_relative,all_layer,all_scan_angle,solve_js_method=1,q_init_table=np.radians([-15,180]),scan_path_dir=None):
         
         try:
             scan_T=np.loadtxt(scan_path_dir + 'scan_T.csv',delimiter=',')
@@ -303,7 +309,7 @@ class ScanPathGen():
             q_out2=np.loadtxt(scan_path_dir + 'scan_js2.csv',delimiter=',')
         except:
             # generate cartesian path
-            scan_p,scan_R = self._gen_scan_path(curve_sliced_relative,all_layer_z,all_scan_angle)
+            scan_p,scan_R = self._gen_scan_path(all_curve_sliced_relative,all_layer,all_scan_angle)
             # generate joint space path
             q_out1,q_out2 = self._gen_js_path(scan_p,scan_R,solve_js_method,q_init_table)
             if scan_path_dir:
