@@ -16,33 +16,6 @@ import matplotlib.pyplot as plt
 import time
 import numpy as np
 
-def robot_weld_path_gen():
-    R=np.array([[ 0.7071, -0.7071, -0.    ],
-			[-0.7071, -0.7071,  0.    ],
-			[-0.,      0.,     -1.    ]])
-    # x0 =  1684	# Origin x coordinate
-    # y0 = -753.5	# Origin y coordinate
-    # z0 = -245   # 10 mm distance to base
-
-    # base layer
-    # weld_p = np.array([[1651, -771, -245],[1651, -856, -245]])
-    # wall layer
-    weld_p = np.array([[1651, -781, -245],[1651, -846, -245]])
-
-    ## tune
-    dx = 0
-    dy = 0
-    dz = 0
-    dp = np.array([dx,dy,dz])
-
-    path_T=[]
-    for p in weld_p:
-        path_T.append(Transform(R,p+dp))
-
-    all_path_T = [path_T]
-    
-    return all_path_T
-
 config_dir='../../config/'
 
 # robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',d=15,tool_file_path=config_dir+'torch.csv',\
@@ -56,23 +29,29 @@ turn_table=positioner_obj('D500B',def_path=config_dir+'D500B_robot_default_confi
 
 
 ## wall test path
-Table_home_T = turn_table.fwd(np.radians([-15,180]))
-T_S1TCP_R1Base = np.linalg.inv(np.matmul(turn_table.base_H,H_from_RT(Table_home_T.R,Table_home_T.p)))
-
-data_dir='../../data/wall_weld_test/top_layer_test/'
-all_path_T = robot_weld_path_gen()
-curve_sliced_R1=np.array(all_path_T[0])
-curve_sliced_relative=[]
-for path_p in curve_sliced_R1:
-    this_p = np.matmul(T_S1TCP_R1Base[:3,:3],path_p.p)+T_S1TCP_R1Base[:3,-1]
-    this_n = np.matmul(T_S1TCP_R1Base[:3,:3],path_p.R[:,-1])
-    curve_sliced_relative.append(np.append(this_p,this_n))
-curve_sliced_relative=np.array(curve_sliced_relative)
+dataset='blade0.1/'
+sliced_alg='auto_slice/'
+data_dir='../../data/'+dataset+sliced_alg
+all_curve_sliced_relative=[]
+# import base layer
+all_curve_sliced_relative.append(np.loadtxt(data_dir+'curve_sliced_relative/baselayer0_0.csv',delimiter=','))
+all_curve_sliced_relative.append(np.loadtxt(data_dir+'curve_sliced_relative/baselayer1_0.csv',delimiter=','))
+total_layer=500
+for layer in range(total_layer):
+    part_num=0
+    all_curve_sliced_relative.append([])
+    while True:
+        try:
+            all_curve_sliced_relative[-1].extend(np.loadtxt(data_dir+'curve_sliced_relative/slice'+str(layer)+'_'+str(part_num)+'.csv',delimiter=','))
+        except:
+            break
+        part_num+=1
+print("Total Layer",len(all_curve_sliced_relative))
 
 ### scan parameters
 scan_speed=30 # scanning speed (mm/sec)
 scan_stand_off_d = 243 ## mm
-Rz_angle = np.radians(-45) # point direction w.r.t welds
+Rz_angle = np.radians(0) # point direction w.r.t welds
 Ry_angle = np.radians(0) # rotate in y a bit, z-axis not pointing down, to have ik solution
 # Rz_angle = np.radians(0) # point direction w.r.t welds
 # Ry_angle = np.radians(0) # rotate in y a bit, z-axis not pointing down, to have ik solution
@@ -80,24 +59,27 @@ Ry_angle = np.radians(0) # rotate in y a bit, z-axis not pointing down, to have 
 bounds_theta = np.radians(5) ## circular motion at start and end
 
 ## scan angle
-all_scan_angle = np.radians([0]) ## scanning angless
+all_scan_angle = np.radians([-45,45]) ## scanning angless
 
-######### enter your wanted z height ########
-all_layer_z=[0] ## all layer z height
+######### enter your wanted layers ########
+all_layer=np.arange(0,len(all_curve_sliced_relative),251) ## all layer
+if all_layer[-1]!=len(all_curve_sliced_relative)-1:
+    all_layer = np.append(all_layer,len(all_curve_sliced_relative)-1)
 
 # param set 1
 out_dir = data_dir+''
 
 # path gen
 spg = ScanPathGen(robot_scan,turn_table,scan_stand_off_d,Rz_angle,Ry_angle,bounds_theta)
-q_init_table=np.radians([-40,170])
+q_init_table=np.radians([15,70])
 # q_init_table=np.radians([-15,180])
+# q_init_table=np.radians([-70,150])
 
-scan_p,scan_R,q_out1,q_out2=spg.gen_scan_path(curve_sliced_relative,all_layer_z,all_scan_angle,\
-                  solve_js_method=0,q_init_table=q_init_table,scan_path_dir=out_dir)
+scan_p,scan_R,q_out1,q_out2=spg.gen_scan_path(all_curve_sliced_relative,all_layer,all_scan_angle,\
+                  solve_js_method=1,q_init_table=q_init_table,scan_path_dir=None)
 
-# print(np.degrees(q_out1[:10]))
-# print(np.degrees(q_out1[10:]))
+print(np.degrees(q_out1[:10]))
+print(np.degrees(q_out1[10:]))
 
 # motion program gen
 q_bp1,q_bp2,s1_all,s2_all=spg.gen_motion_program(q_out1,q_out2,scan_p,scan_speed)
