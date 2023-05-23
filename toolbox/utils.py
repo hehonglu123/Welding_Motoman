@@ -5,6 +5,63 @@ from scipy.interpolate import interp1d
 from scipy import signal
 import scipy, math
 
+def H_inv(H):
+	R=H[:3,:3].T
+	p=-R@H[:3,-1]
+	return H_from_RT(R,p)
+def transform_curve(curve,H):
+	###trasform spatial curve with transformation H
+	R=H[:3,:3]
+	T=H[:-1,-1]
+	curve_new=np.dot(R,curve[:,:3].T).T+np.tile(T,(len(curve),1))
+	if len(curve[0])>3:
+		curve_normal_new=np.dot(R,curve[:,3:].T).T
+		return np.hstack((curve_new,curve_normal_new))
+	else:
+		return curve_new
+
+def vector_to_plane(point, centroid, normal):		###find the vector from point to plane
+    return  np.dot(centroid - point,normal)*normal
+
+def point2plane_distance(p,centroid,normal):
+	return np.abs(np.dot(p - centroid, normal) / np.linalg.norm(normal))
+
+def fit_plane(points):
+    # Calculate the centroid of the points
+    centroid = np.mean(points, axis=0)
+
+    # Center the points by subtracting the centroid
+    centered_points = points - centroid
+
+    # Calculate the SVD of the centered points
+    u, s, vh = np.linalg.svd(centered_points)
+
+    # The normal vector of the plane is the last column of vh
+    normal = vh[-1]
+
+    return normal, centroid
+
+def pose_regression(A,B):
+	###find transformation between ordered point lists A and B with regression
+    center_A = np.mean(A,axis=0)
+    center_B = np.mean(B,axis=0)
+
+    A_centered = A-center_A
+    B_centered = B-center_B
+    H = np.matmul(A_centered.T,B_centered)
+    u,s,vT = np.linalg.svd(H)
+    R = np.matmul(vT.T,u.T)
+    if np.linalg.det(R)<0:
+        u,s,v = np.linalg.svd(R)
+        v=v.T
+        v[:,2] = v[:,2]*-1
+        R = np.matmul(v,u.T)
+
+    t = center_B-np.dot(R,center_A)
+
+    return R,t
+
+
 def find_norm(p1,p2,p3):
 	#find normal vector from p1 pointing to line of p2p3
 	p2p1=p2-p1
@@ -66,11 +123,7 @@ def quadrant(q,robot):
 
 
 	return np.hstack((cf146,[4*REAR+2*LOWERARM+FLIP])).astype(int)
-	
-def cross(v):
-	return np.array([[0,-v[-1],v[1]],
-					[v[-1],0,-v[0]],
-					[-v[1],v[0],0]])
+
 
 def direction2R(v_norm,v_tang):
 	v_norm=v_norm/np.linalg.norm(v_norm)

@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pickle, sys
 
-with open('IR_92023_05_12_11_43_51_ir_recording.pickle', 'rb') as file:
+with open('ir_recording_raw.pickle', 'rb') as file:
     ir_recording=pickle.load(file)
 freq=13
 
