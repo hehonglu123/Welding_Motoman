@@ -2,7 +2,7 @@ import sys, glob
 sys.path.append('../toolbox/')
 from robot_def import *
 
-data_dir='../data/cylinder/'
+data_dir='../data/spiral_cylinder/'
 solution_dir='baseline/'
 robot=robot_obj('MA2010_A0',def_path='../config/MA2010_A0_robot_default_config.yml',tool_file_path='../config/torch.csv',\
 	pulse2deg_file_path='../config/MA2010_A0_pulse2deg_real.csv',d=15)

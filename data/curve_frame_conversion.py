@@ -2,7 +2,7 @@ import numpy as np
 import sys, glob
 from general_robotics_toolbox import *
  
-data_dir='cylinder/'
+data_dir='spiral_cylinder/'
 solution_dir='baseline/'
 
 ###reference frame transformation

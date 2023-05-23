@@ -29,4 +29,5 @@ ax.plot3D(curve_dense[::vis_step,0],curve_dense[::vis_step,1],curve_dense[::vis_
 ax.quiver(curve_dense[::vis_step,0],curve_dense[::vis_step,1],curve_dense[::vis_step,2],curve_dense[::vis_step,3],curve_dense[::vis_step,4],curve_dense[::vis_step,5],length=1, normalize=True)
 plt.show()
 
-np.savetxt('curve_dense.csv',curve_dense,delimiter=',')
+for layer in range(num_layers):
+	np.savetxt('curve_sliced/'+str(layer)+'.csv',curve_dense[layer*points_per_layer:(layer+1)*points_per_layer],delimiter=',')
