@@ -8,20 +8,20 @@ from robot_def import *
 from multi_robot import *
 from error_check import *
 from lambda_calc import *
+from pointcloud_toolbox import *
 
 def main():
 	dataset='blade0.1/'
-	sliced_alg='NX_slice2/'
+	sliced_alg='auto_slice/'
 	data_dir='../../data/'+dataset+sliced_alg
 	curve_sliced_relative=[]
-	num_layers=5
 	
+	layer_height_num=int(1.0/0.1)
 
 	config_dir='../../config/'
-	robot=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path=config_dir+'weldgun_old.csv',\
-		pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',d=15,  base_marker_config_file=config_dir+'MA2010_marker_config.yaml',\
-		tool_marker_config_file=config_dir+'weldgun_marker_config.yaml')
-
+	robot=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path=config_dir+'torch.csv',\
+	pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',d=15,  base_marker_config_file=config_dir+'MA2010_marker_config.yaml',\
+			tool_marker_config_file=config_dir+'weldgun_marker_config.yaml')
 	positioner=positioner_obj('D500B',def_path=config_dir+'D500B_robot_default_config.yml',tool_file_path=config_dir+'positioner_tcp.csv',\
 		pulse2deg_file_path=config_dir+'D500B_pulse2deg_real.csv',base_transformation_file=config_dir+'D500B_pose.csv',\
 		base_marker_config_file=config_dir+'D500B_marker_config.yaml',\
@@ -33,15 +33,18 @@ def main():
 	##########nominal relative path#######################
 	positioner_js=[]
 	robot_js=[]
-	for i in range(num_layers):
-		positioner_js.extend(np.loadtxt(data_dir+'curve_sliced_js/D500B_js%i_0.csv'%i,delimiter=','))
-		robot_js.extend(np.loadtxt(data_dir+'curve_sliced_js/MA2010_js%i_0.csv'%i,delimiter=','))
+	num_layer_start=int(0*layer_height_num)
+	num_layer_end=int(9*layer_height_num)
+	for layer in range(num_layer_start,num_layer_end,layer_height_num):
+		positioner_js.extend(np.loadtxt(data_dir+'curve_sliced_js/D500B_js%i_0.csv'%layer,delimiter=','))
+		robot_js.extend(np.loadtxt(data_dir+'curve_sliced_js/MA2010_js%i_0.csv'%layer,delimiter=','))
 	positioner_js=np.array(positioner_js)
 	robot_js=np.array(robot_js)
 	positioner_pose=positioner.fwd(positioner_js)
 	robot_pose=robot.fwd(robot_js)
-	relative_path_exe,relative_path_exe_R=form_relative_path_mocap(robot_pose.p_all,robot_pose.R_all,positioner_pose.p_all,positioner_pose.R_all,robot,positioner)
-	ax.plot3D(relative_path_exe[::vis_step,0],relative_path_exe[::vis_step,1],relative_path_exe[::vis_step,2],'g.-')
+	relative_path_exe_gt,_=form_relative_path_mocap(robot_pose.p_all,robot_pose.R_all,positioner_pose.p_all,positioner_pose.R_all,robot,positioner)
+
+	
 
 	################mocap recorded path###########
 	curve_exe_data=np.loadtxt('mocap_robot.csv',delimiter=',')
@@ -70,14 +73,14 @@ def main():
 	
 	relative_path_exe, relative_path_exe_R=form_relative_path_mocap(curve_exe_data[:,1:4],w2R(curve_exe_data[:,4:],np.eye(3)),curve_exe_positioner_data[:,1:4],w2R(curve_exe_positioner_data[:,4:],np.eye(3)),robot,positioner)
 
-	
+	H=np.eye(4)
+	# H[:3,-1]=np.average(relative_path_exe_gt,axis=0)-np.average(relative_path_exe,axis=0)
+	# H=icp_align2(relative_path_exe,relative_path_exe_gt,H=H,icp_turns = 10,threshold=0.0001,max_iteration=100000)
+	# print(H)
+	relative_path_exe_transformed=transform_curve(relative_path_exe,H)
 
-	ax.plot3D(relative_path_exe[::vis_step,0],relative_path_exe[::vis_step,1],relative_path_exe[::vis_step,2],'r.-')
-
-
-	
-
-
+	ax.plot3D(relative_path_exe_gt[::vis_step,0],relative_path_exe_gt[::vis_step,1],relative_path_exe_gt[::vis_step,2],'g.-')
+	ax.plot3D(relative_path_exe_transformed[::vis_step,0],relative_path_exe_transformed[::vis_step,1],relative_path_exe_transformed[::vis_step,2],'r.-')
 	plt.show()
 if __name__ == '__main__':
 	main()

@@ -7,6 +7,7 @@ import sys, copy, traceback
 from scipy.spatial import ConvexHull
 
 sys.path.append('../toolbox')
+from utils import *
 from lambda_calc import *
 from error_check import *
 from toolbox_circular_fit import *
@@ -97,20 +98,6 @@ def calculate_surface_normal(p1,p2,p3):
     surface_normal /= np.linalg.norm(surface_normal)  # Normalize the normal vector
     return surface_normal
 
-def fit_plane(points):
-    # Calculate the centroid of the points
-    centroid = np.mean(points, axis=0)
-
-    # Center the points by subtracting the centroid
-    centered_points = points - centroid
-
-    # Calculate the SVD of the centered points
-    u, s, vh = np.linalg.svd(centered_points)
-
-    # The normal vector of the plane is the last column of vh
-    normal = vh[-1]
-
-    return normal, centroid
 
 def project_point_onto_plane(point, normal, centroid):
     # Compute the vector from the centroid to the point

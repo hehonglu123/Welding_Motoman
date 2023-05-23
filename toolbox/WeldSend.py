@@ -117,16 +117,16 @@ class WeldSend(object):
 		return breakpoints,primitives, p_bp,q_bp
 
 	def exec_motion_from_dir(self,robot,directory,arc=False):
-		client = MotionProgramExecClient(IP=self.IP,ROBOT_CHOICE=self.ROBOT_CHOICE_MAP[robot.robot_name],pulse2deg=robot.pulse2deg)
+		mp=MotionProgram(ROBOT_CHOICE='RB1',pulse2deg=robot.pulse2deg)
 		
 		# num_command=len(fnmatch.filter(os.listdir(directory), '*.csv'))
 		num_command=50
 		for i in range(num_command):
 			breakpoints,primitives, p_bp,q_bp=self.extract_data_from_cmd(directory+'command'+str(i)+'.csv')
 			if i<3:
-				client=self.form_motion_cmd(client,primitives,q_bp,p_bp,[1,5],0.1,arc)
+				mp=self.form_motion_cmd(primitives,q_bp,p_bp,[1,5],0.1,arc)
 			else:
-				client=self.form_motion_cmd(client,primitives,q_bp,p_bp,[1,50],0.5,arc)
+				mp=self.form_motion_cmd(primitives,q_bp,p_bp,[1,50],0.5,arc)
 
 		# num_layers=20
 		# breakpoints,primitives, p_bp,q_bp=self.extract_data_from_cmd(directory+'command0.csv')
