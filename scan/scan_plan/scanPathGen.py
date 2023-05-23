@@ -291,14 +291,28 @@ class ScanPathGen():
     
     def gen_scan_path(self,curve_sliced_relative,all_layer_z,all_scan_angle,solve_js_method=1,q_init_table=np.radians([-15,180]),scan_path_dir=None):
         
-        # generate cartesian path
-        scan_p,scan_R = self._gen_scan_path(curve_sliced_relative,all_layer_z,all_scan_angle)
-        # generate joint space path
-        if scan_path_dir is not None:
+        try:
+            scan_T=np.loadtxt(scan_path_dir + 'scan_T.csv',delimiter=',')
+            scan_p=[]
+            scan_R=[]
+            for this_scan_T in scan_T:
+                scan_p.append(this_scan_T[:3])
+                scan_R.append(q2R(this_scan_T[3:]))
+
             q_out1=np.loadtxt(scan_path_dir + 'scan_js1.csv',delimiter=',')
             q_out2=np.loadtxt(scan_path_dir + 'scan_js2.csv',delimiter=',')
-        else:
+        except:
+            # generate cartesian path
+            scan_p,scan_R = self._gen_scan_path(curve_sliced_relative,all_layer_z,all_scan_angle)
+            # generate joint space path
             q_out1,q_out2 = self._gen_js_path(scan_p,scan_R,solve_js_method,q_init_table)
+            if scan_path_dir:
+                scan_T=[]
+                for i in range(len(scan_p)):
+                    scan_T.append(np.append(scan_p[i],R2q(scan_R[i])))
+                np.savetxt(scan_path_dir + 'scan_T.csv',scan_T,delimiter=',')
+                np.savetxt(scan_path_dir + 'scan_js1.csv',q_out1,delimiter=',')
+                np.savetxt(scan_path_dir + 'scan_js2.csv',q_out2,delimiter=',')
 
         return scan_p,scan_R,q_out1,q_out2
 
