@@ -10,9 +10,7 @@ from multi_robot import *
 from scan_utils import *
 from scan_continuous import *
 from redundancy_resolution_scanner import *
-from tesseract_env import *
 from dx200_motion_program_exec_client import *
-from MotionSendMotoman import *
 
 from general_robotics_toolbox import *
 from RobotRaconteur.Client import *
@@ -145,10 +143,8 @@ def get_connect_circle(start_p,start_R,end_p,end_R,pc):
 
 config_dir='../../config/'
 
-robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',d=15,tool_file_path=config_dir+'weldgun.csv',\
-	pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg.csv')
-# robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path=config_dir+'weldgun.csv',d=15,\
-# 	pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg.csv')
+robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',d=15,tool_file_path=config_dir+'weldgun_old.csv',\
+	pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv')
 robot_scan=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.yml',tool_file_path=config_dir+'scanner_tcp2.csv',\
 	base_transformation_file=config_dir+'MA1440_pose.csv',pulse2deg_file_path=config_dir+'MA1440_A0_pulse2deg.csv')
 turn_table=positioner_obj('D500B',def_path=config_dir+'D500B_robot_default_config.yml',tool_file_path=config_dir+'positioner_tcp.csv',\
@@ -472,7 +468,6 @@ if sim:
 #############################
 
 ### motion program generation ###
-
 primitives=[]
 q_bp1=[]
 q_bp2=[]
