@@ -23,9 +23,18 @@ config_dir='../../config/'
 # print(robot_weld.fwd(zero_config))
 # exit()
 robot_scan=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.yml',tool_file_path=config_dir+'scanner_tcp2.csv',\
-	base_transformation_file=config_dir+'MA1440_pose.csv',pulse2deg_file_path=config_dir+'MA1440_A0_pulse2deg_real.csv')
+	base_transformation_file=config_dir+'MA1440_pose.csv',pulse2deg_file_path=config_dir+'MA1440_A0_pulse2deg_real.csv',\
+    base_marker_config_file=config_dir+'MA1440_marker_config.yaml',tool_marker_config_file=config_dir+'scanner_marker_config.yaml')
+
 turn_table=positioner_obj('D500B',def_path=config_dir+'D500B_robot_default_config.yml',tool_file_path=config_dir+'positioner_tcp.csv',\
-    base_transformation_file=config_dir+'D500B_pose.csv',pulse2deg_file_path=config_dir+'D500B_pulse2deg_real.csv')
+    base_transformation_file=config_dir+'D500B_pose.csv',pulse2deg_file_path=config_dir+'D500B_pulse2deg_real.csv',\
+    base_marker_config_file=config_dir+'D500B_marker_config.yaml',tool_marker_config_file=config_dir+'positioner_tcp_marker_config.yaml')
+
+#### change base H to calibrated ones ####
+robot_scan.base_H = H_from_RT(robot_scan.T_base_basemarker.R,robot_scan.T_base_basemarker.p)
+turn_table.base_H = H_from_RT(turn_table.T_base_basemarker.R,turn_table.T_base_basemarker.p)
+T_to_base = Transform(np.eye(3),[0,0,-380])
+turn_table.base_H = np.matmul(turn_table.base_H,H_from_RT(T_to_base.R,T_to_base.p))
 
 
 ## wall test path
@@ -47,10 +56,11 @@ for layer in range(total_layer):
             break
         part_num+=1
 print("Total Layer",len(all_curve_sliced_relative))
+print(all_curve_sliced_relative[0][0])
 
 ### scan parameters
 scan_speed=30 # scanning speed (mm/sec)
-scan_stand_off_d = 235 ## mm
+scan_stand_off_d = 245 ## mm
 Rz_angle = np.radians(0) # point direction w.r.t welds
 Ry_angle = np.radians(0) # rotate in y a bit, z-axis not pointing down, to have ik solution
 # Rz_angle = np.radians(0) # point direction w.r.t welds
@@ -59,7 +69,7 @@ Ry_angle = np.radians(0) # rotate in y a bit, z-axis not pointing down, to have 
 bounds_theta = np.radians(5) ## circular motion at start and end
 
 ## scan angle
-all_scan_angle = np.radians([-45,45]) ## scanning angless
+all_scan_angle = np.radians([-30,30]) ## scanning angless
 
 ######### enter your wanted layers ########
 all_layer=np.arange(0,len(all_curve_sliced_relative),251) ## all layer
@@ -82,7 +92,7 @@ print(np.degrees(q_out1[:10]))
 print(np.degrees(q_out1[10:]))
 
 # motion program gen
-q_bp1,q_bp2,s1_all,s2_all=spg.gen_motion_program(q_out1,q_out2,scan_p,scan_speed)
+q_bp1,q_bp2,s1_all,s2_all=spg.gen_motion_program(q_out1,q_out2,scan_p,scan_speed,init_sync_move=0)
 
 # exit()
 

@@ -94,21 +94,12 @@ def to_frame(curve_p,curve_R,mocap_stamps,target_frame,markers_id):
 
 config_dir='../config/'
 
-robot_type='R1'
+# robot_type='R1'
+robot_type='R2'
 # robot_type='S1'
 
 # all_datasets=['train_data','valid_data_1','valid_data_2']
-# all_datasets=['test0502_noanchor/train_data']
-# all_datasets=['test0502_anchor/train_data']
-# all_datasets=['test0504_high_zero/train_data']
-# all_datasets=['test0504_zero/train_data']
-# all_datasets=['test0504_stretch/train_data']
-# all_datasets=['test0504_inward/train_data']
-# all_datasets=['test0509_beforecalib/train_data']
-# all_datasets=['test0509_aftercalib/train_data']
-# all_datasets=['test0509_S1_aftercalib/train_data']
-all_datasets=['test0516_R1_aftercalib/train_data']
-# all_datasets=['test0516_S1_aftercalib/train_data']
+all_datasets=['test0524_R2/train_data']
 
 if robot_type=='R1':
     base_marker_config_file=config_dir+'MA2010_marker_config.yaml'
@@ -129,6 +120,23 @@ if robot_type=='R1':
     # output_base_marker_config_file = config_dir+'MA2010_0504_marker_config.yaml'
     # output_base_marker_config_file = config_dir+'MA2010_0504stretch_marker_config.yaml'
     # output_base_marker_config_file = config_dir+'MA2010_0504inward_marker_config.yaml'
+
+elif robot_type=='R2':
+    base_marker_config_file=config_dir+'MA1440_marker_config.yaml'
+    tool_marker_config_file=config_dir+'scanner_marker_config.yaml'
+    robot=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.yml',tool_file_path=config_dir+'scanner_tcp2.csv',\
+    pulse2deg_file_path=config_dir+'MA1440_A0_pulse2deg_real.csv',\
+    base_marker_config_file=base_marker_config_file,tool_marker_config_file=tool_marker_config_file)
+
+    # only R matter
+    nominal_robot_base = Transform(np.array([[0,-1,0],
+                                            [0,0,1],
+                                            [-1,0,0]]),[0,0,0]) 
+    H_nom = np.matmul(nominal_robot_base.R,robot.robot.H)
+
+    jN=6
+
+    output_base_marker_config_file = config_dir+'MA1440_marker_config.yaml'
 
 elif robot_type=='S1':
     base_marker_config_file=config_dir+'D500B_marker_config.yaml'
@@ -170,7 +178,7 @@ for dataset in all_datasets:
         this_axis_p,this_axis_normal = detect_axis(curve_p,H_nom[:,j],robot.tool_markers_id)
         H_act[:,j] = this_axis_normal
         axis_p[:,j] = this_axis_p
-        print("one axis")
+        print("Axis",j+1,"done.")
 
     H = H_act
     H_point = axis_p
