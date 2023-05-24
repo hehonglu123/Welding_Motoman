@@ -37,39 +37,63 @@ class CalibRobotPH:
         self.mpl_obj = MocapFrameListener(self.mocap_cli,all_ids,'world',use_quat=True)
 
     def run_calib(self,base_marker_config_file,rob_IP=None,ROBOT_CHOICE=None,rob_p2d=None,paths=[],rob_speed=3,waittime=1,
-                  raw_data_dir=''):
+                  raw_data_dir='',split_motion=3):
 
         input("Press Enter and the robot will start moving.")
         robot_client = MotionProgramExecClient()
-        mp=MotionProgram(ROBOT_CHOICE='RB1',pulse2deg=self.robot.pulse2deg)
-        for test_q in paths:
-            # move robot
-            mp.MoveJ(test_q,rob_speed,0)
-            mp.setWaitTime(waittime)
 
-        # Run
-        self.mpl_obj.run_pose_listener()
-        robot_stamps,curve_exe, job_line,job_step = robot_client.execute_motion_program(mp)
-        self.mpl_obj.stop_pose_listener()
-        curve_p,curve_R,timestamps = self.mpl_obj.get_frames_traj()
+        split_bp = np.arange(0,len(paths),len(paths)/split_motion).astype(int)
+        split_bp = np.append(split_bp,len(paths))
+
+        all_mocap_p = {}
+        all_mocap_R = {}
+        all_mocap_stamp = {}
+        all_robot_q = []
+        all_robot_stamp = []
+        for i in range(split_motion):
+            mp=MotionProgram(ROBOT_CHOICE='RB1',pulse2deg=self.robot.pulse2deg)
+            for test_q in paths[split_bp[i]:split_bp[i+1]]:
+                # move robot
+                mp.MoveJ(test_q,rob_speed,0)
+                mp.setWaitTime(waittime)
+
+            # Run
+            self.mpl_obj.run_pose_listener()
+            robot_stamps,curve_exe, job_line,job_step = robot_client.execute_motion_program(mp)
+            self.mpl_obj.stop_pose_listener()
+            curve_p,curve_R,timestamps = self.mpl_obj.get_frames_traj()
+
+            if len(all_robot_q) ==0:
+                all_mocap_p = deepcopy(curve_p)
+                all_mocap_R = deepcopy(curve_R)
+                all_mocap_stamp = deepcopy(timestamps)
+                all_robot_q = deepcopy(curve_exe)
+                all_robot_stamp = deepcopy(robot_stamps)
+            else:
+                for key in curve_p.keys():
+                    all_mocap_p[key] = np.vstack((all_mocap_p[key],curve_p[key]))
+                    all_mocap_R[key] = np.vstack((all_mocap_R[key],curve_R[key]))
+                    all_mocap_stamp[key] = np.vstack((all_mocap_stamp[key],timestamps[key]))
+                    all_robot_q = np.vstack(all_robot_q,curve_exe)
+                    all_robot_stamp = np.vstack(all_robot_stamp,robot_stamps)
 
         save_curve_R = {}
-        save_curve_R[self.robot.base_rigid_id]=curve_R[self.robot.base_rigid_id]
-        save_curve_R[self.robot.tool_rigid_id]=curve_R[self.robot.tool_rigid_id]
+        save_curve_R[self.robot.base_rigid_id]=all_mocap_R[self.robot.base_rigid_id]
+        save_curve_R[self.robot.tool_rigid_id]=all_mocap_R[self.robot.tool_rigid_id]
         print(save_curve_R[self.robot.base_rigid_id][0])
         print(save_curve_R[self.robot.tool_rigid_id][0])
 
         with open(raw_data_dir+'_mocap_p_cont.pickle', 'wb') as handle:
-            pickle.dump(curve_p, handle, protocol=pickle.HIGHEST_PROTOCOL)
+            pickle.dump(all_mocap_p, handle, protocol=pickle.HIGHEST_PROTOCOL)
         with open(raw_data_dir+'_mocap_R_cont.pickle', 'wb') as handle:
-            pickle.dump(curve_R, handle, protocol=pickle.HIGHEST_PROTOCOL)
+            pickle.dump(save_curve_R, handle, protocol=pickle.HIGHEST_PROTOCOL)
         with open(raw_data_dir+'_robot_q_cont.pickle', 'wb') as handle:
-            pickle.dump(curve_exe, handle, protocol=pickle.HIGHEST_PROTOCOL)
+            pickle.dump(all_robot_q, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
-        with open(raw_data_dir+'_mocap_p_timestamps_cont.pickle', 'wb') as handle:
-            pickle.dump(timestamps, handle, protocol=pickle.HIGHEST_PROTOCOL)
-        with open(raw_data_dir+'_robot_q_timestamps_cont.pickle', 'wb') as handle:
-            pickle.dump(robot_stamps, handle, protocol=pickle.HIGHEST_PROTOCOL)
+        with open(raw_data_dir+'_mocap_timestamps_cont.pickle', 'wb') as handle:
+            pickle.dump(all_mocap_stamp, handle, protocol=pickle.HIGHEST_PROTOCOL)
+        with open(raw_data_dir+'_robot_timestamps_cont.pickle', 'wb') as handle:
+            pickle.dump(all_robot_stamp, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
 def calib_S1():
 
@@ -123,10 +147,14 @@ def calib_R1():
     q3_low_sample = np.array([[-55,-70],[0,-50],[50,0]]) #[[q2 q3]]
     d_angle = 5 # 5 degree
     # add 7 points (at least 6 is needed)
+    # dq_sample = [[0,0,0,0,0,0],\
+    #       [-9,0,0,-9,-9,9],[-6,0,0,-6,-6,6],\
+    #       [-3,0,0,-3,-3,3],[4,0,0,4,4,-4],\
+    #       [8,0,0,8,8,-8],[12,0,0,12,12,-12]]
     dq_sample = [[0,0,0,0,0,0],\
-          [-1,0,0,0,0,0],[1,0,0,0,0,0],\
-          [0,-1,-1,0,0,0],[0,-1,1,0,0,0],\
-          [0,1,1,0,0,0],[0,1,-1,0,0,0]]
+          [-3,0,0,-3,-3,3],[-2,0,0,-2,-2,2],\
+          [-1,0,0,-1,-1,1],[1,0,0,1,1,-1],\
+          [2,0,0,2,2,-2],[3,0,0,3,3,-3]]
     scale=1
     dq_sample = np.array(dq_sample)*scale
 

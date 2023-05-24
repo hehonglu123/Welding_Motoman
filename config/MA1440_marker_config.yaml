@@ -1,7 +1,9 @@
 base_markers:
-- marker1_rigid5
-- marker2_rigid5
-- marker3_rigid5
+- marker1_rigid2
+- marker2_rigid2
+- marker3_rigid2
+- marker4_rigid2
+- marker5_rigid2
 calib_base_basemarker_pose:
   orientation:
     w: 0.11226409345734638
