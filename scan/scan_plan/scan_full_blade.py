@@ -50,7 +50,7 @@ print("Total Layer",len(all_curve_sliced_relative))
 
 ### scan parameters
 scan_speed=30 # scanning speed (mm/sec)
-scan_stand_off_d = 243 ## mm
+scan_stand_off_d = 235 ## mm
 Rz_angle = np.radians(0) # point direction w.r.t welds
 Ry_angle = np.radians(0) # rotate in y a bit, z-axis not pointing down, to have ik solution
 # Rz_angle = np.radians(0) # point direction w.r.t welds
@@ -84,15 +84,15 @@ print(np.degrees(q_out1[10:]))
 # motion program gen
 q_bp1,q_bp2,s1_all,s2_all=spg.gen_motion_program(q_out1,q_out2,scan_p,scan_speed)
 
-exit()
+# exit()
 
 ### execute motion ###
-robot_client=MotionProgramExecClient(ROBOT_CHOICE='RB2',ROBOT_CHOICE2='ST1',pulse2deg=robot_scan.pulse2deg,pulse2deg_2=turn_table.pulse2deg)
-use_artec_studio=False
+robot_client=MotionProgramExecClient()
+use_artec_studio=True
 input("Press Enter to start moving")
 
 ## move to start
-to_start_speed=10
+to_start_speed=3
 mp = MotionProgram(ROBOT_CHOICE='RB2',ROBOT_CHOICE2='ST1',pulse2deg=robot_scan.pulse2deg,pulse2deg_2=turn_table.pulse2deg)
 target2=['MOVJ',np.degrees(q_bp2[0][0]),to_start_speed]
 mp.MoveJ(np.degrees(q_bp1[0][0]), to_start_speed, 0, target2=target2)

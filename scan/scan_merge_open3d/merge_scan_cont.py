@@ -26,7 +26,8 @@ dtype = o3d.core.float32
 # data_dir='../../data/wall_weld_test/scan_cont_6_backup/scans/'
 # data_dir='../../data/wall_weld_test/wall_param_1/scans/'
 # data_dir='../../data/wall_weld_test/scan_cont_newdx_1/scans/'
-data_dir='../../data/wall_weld_test/wall_param_data_collection/path_Rz-45_Ry0_stand_off_d243_b_theta45_scan_angle-45_45_z0_35_/scans/'
+# data_dir='../../data/wall_weld_test/wall_param_data_collection/path_Rz-45_Ry0_stand_off_d243_b_theta45_scan_angle-45_45_z0_35_/scans/'
+data_dir='../../data/wall_weld_test/top_layer_test/scans/'
 config_dir='../../config/'
 
 robot_scan=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.yml',tool_file_path=config_dir+'scanner_tcp2.csv',\
@@ -43,7 +44,8 @@ sca_stamps=sca_stamps-sca_stamps[0]
 scan_N = len(sca_stamps) ## total scans
 
 ## TODO:auto get timestamp where scans/robot start moving
-scan_start_rmse=1
+# scan_start_rmse=1
+scan_start_rmse=0.4
 scan_move_stamp_i=None
 pcd_combined = None
 for scan_i in range(1,50):
@@ -62,7 +64,7 @@ for scan_i in range(1,50):
         evaluation = o3d.pipelines.registration.evaluate_registration(
                     pcd_combined, pcd, 5, np.eye(4))
 
-        # print(evaluation.inlier_rmse)
+        print(evaluation.inlier_rmse)
         if evaluation.inlier_rmse >= scan_start_rmse:
             scan_move_stamp_i=scan_i
             break
@@ -95,7 +97,7 @@ use_tensor=False
 ##############################
 
 ### process parameters
-use_icp=True
+use_icp=False
 timestep_search=False
 timestep_search_2=False
 
@@ -177,8 +179,8 @@ for scan_i in range(scan_N):
         continue
     if scan_i_start is None:
         scan_i_start=scan_i
-    if scan_i%5!=0:
-        continue
+    # if scan_i%5!=0:
+    #     continue
     scan_points_origin = np.load(data_dir + 'points_'+str(scan_i)+'.npy')
     ## get corresponding js
     closest_i_sort=np.argsort(np.abs(rob_stamps-sca_stamps_sync_robt[scan_i]))
@@ -190,7 +192,8 @@ for scan_i in range(scan_N):
         T_origin = turn_table.fwd(np.radians([-15,180]),world=True).inv() # T_tabletool^world
     else:
         robt_T = robot_scan.fwd(scan_js_exe[closest_i][:6],world=True) # T_world^r2tool
-        T_origin = turn_table.fwd(scan_js_exe[closest_i][6:],world=True).inv() # T_tabletool^world
+        # T_origin = turn_table.fwd(scan_js_exe[closest_i][6:],world=True).inv() # T_tabletool^world
+        T_origin = turn_table.fwd(np.radians([-40,170]),world=True).inv()
     T_rob_positioner_top = T_origin*robt_T
     ## get the points closed to origin
     scan_points = np.transpose(np.matmul(T_rob_positioner_top.R,np.transpose(scan_points_origin)))+T_rob_positioner_top.p
@@ -309,7 +312,7 @@ for scan_i in range(scan_N):
             pcd_combined=pcd_combined.append(pcd)
         else:
             pcd_combined+=pcd
-        pcd_combined = pcd_combined.voxel_down_sample(voxel_size=voxel_size)
+        # pcd_combined = pcd_combined.voxel_down_sample(voxel_size=voxel_size)
     pcd_last=deepcopy(pcd)
 
 pcd_combined_down = pcd_combined.voxel_down_sample(voxel_size=0.5)

@@ -63,7 +63,7 @@ T_S1TCP_R1Base = np.linalg.inv(np.matmul(turn_table.base_H,H_from_RT(Table_home_
 
 data_dir='../../data/wall_weld_test/top_layer_test/'
 ######### enter your wanted z height #######
-all_layer_z = [35]
+all_layer_z = [22.5,45]
 ###########################################
 all_path_T = robot_weld_path_gen(all_layer_z)
 all_curve_sliced_relative=[]
@@ -76,21 +76,21 @@ for path_T in all_path_T:
     all_curve_sliced_relative.append(np.array(curve_sliced_relative))
 
 ### scan parameters
-scan_speed=30 # scanning speed (mm/sec)
-scan_stand_off_d = 243 ## mm
-Rz_angle = np.radians(-45) # point direction w.r.t welds
+scan_speed=10 # scanning speed (mm/sec)
+scan_stand_off_d = 235 ## mm
+Rz_angle = np.radians(0) # point direction w.r.t welds
 Ry_angle = np.radians(0) # rotate in y a bit, z-axis not pointing down, to have ik solution
 # Rz_angle = np.radians(0) # point direction w.r.t welds
 # Ry_angle = np.radians(0) # rotate in y a bit, z-axis not pointing down, to have ik solution
 
-bounds_theta = np.radians(5) ## circular motion at start and end
+bounds_theta = np.radians(0) ## circular motion at start and end
 
 ## scan angle
-all_scan_angle = np.radians([0]) ## scanning angless
+all_scan_angle = np.radians([-10,10]) ## scanning angless
 
 ######### enter your wanted layers #######
-all_layer=[-1] ## all layer
-
+all_layer=np.arange(len(all_curve_sliced_relative)) ## all layer
+print(all_layer)
 # param set 1
 out_dir = data_dir+''
 
@@ -108,15 +108,15 @@ scan_p,scan_R,q_out1,q_out2=spg.gen_scan_path(all_curve_sliced_relative,all_laye
 # motion program gen
 q_bp1,q_bp2,s1_all,s2_all=spg.gen_motion_program(q_out1,q_out2,scan_p,scan_speed)
 
-exit()
+# exit()
 
 ### execute motion ###
-robot_client=MotionProgramExecClient(ROBOT_CHOICE='RB2',ROBOT_CHOICE2='ST1',pulse2deg=robot_scan.pulse2deg,pulse2deg_2=turn_table.pulse2deg)
+robot_client=MotionProgramExecClient()
 use_artec_studio=False
 input("Press Enter to start moving")
 
 ## move to start
-to_start_speed=10
+to_start_speed=3
 mp = MotionProgram(ROBOT_CHOICE='RB2',ROBOT_CHOICE2='ST1',pulse2deg=robot_scan.pulse2deg,pulse2deg_2=turn_table.pulse2deg)
 target2=['MOVJ',np.degrees(q_bp2[0][0]),to_start_speed]
 mp.MoveJ(np.degrees(q_bp1[0][0]), to_start_speed, 0, target2=target2)
@@ -144,6 +144,8 @@ target2=['MOVJ',np.degrees(q_bp2[-1][0]),10]
 mp.MoveL(np.degrees(q_bp1[-1][0]), s1_all[-1], 0, target2=target2)
 robot_stamps,curve_pulse_exe,_,_ = robot_client.execute_motion_program(mp)
 q_out_exe=curve_pulse_exe[:,6:]
+
+print(np.degrees(curve_pulse_exe[-10:]))
 
 if not use_artec_studio:
     ## scanner end

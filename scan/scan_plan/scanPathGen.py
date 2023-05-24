@@ -219,6 +219,8 @@ class ScanPathGen():
         scan_p=deepcopy(scan_p_detail)
         scan_R=deepcopy(scan_R_detail)
 
+        # visualize_frames(scan_R,scan_p,size=3)
+
         return scan_p,scan_R
     
     def _gen_js_path(self,scan_p,scan_R,solve_js_method,q_init_table=np.radians([-15,180])):
