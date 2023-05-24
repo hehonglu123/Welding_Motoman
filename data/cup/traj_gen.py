@@ -35,7 +35,7 @@ for r in radii:
 curve_dense.append(slice0)
 layer_prev=section
 
-###BOWL LAYERS
+###CUP LAYERS
 z=0
 layer=1
 while z<total_height:
