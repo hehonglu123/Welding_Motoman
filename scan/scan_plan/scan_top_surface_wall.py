@@ -30,9 +30,9 @@ def robot_weld_path_gen(all_layer_z):
     weld_p = np.array([[1651, -781, -245],[1651, -846, -245]])
 
     ## tune
-    dx = 0
+    dx = -1.727
     dy = 0
-    dz = 0
+    dz = -14 # observe z height different (posibiliy from calib error)
     dp = np.array([dx,dy,dz])
 
     all_path_T=[]
@@ -52,10 +52,12 @@ config_dir='../../config/'
 # print(robot_weld.fwd(zero_config))
 # exit()
 robot_scan=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.yml',tool_file_path=config_dir+'scanner_tcp2.csv',\
-	base_transformation_file=config_dir+'MA1440_pose.csv',pulse2deg_file_path=config_dir+'MA1440_A0_pulse2deg_real.csv')
-turn_table=positioner_obj('D500B',def_path=config_dir+'D500B_robot_default_config.yml',tool_file_path=config_dir+'positioner_tcp.csv',\
-    base_transformation_file=config_dir+'D500B_pose.csv',pulse2deg_file_path=config_dir+'D500B_pulse2deg_real.csv')
+	base_transformation_file=config_dir+'MA1440_pose.csv',pulse2deg_file_path=config_dir+'MA1440_A0_pulse2deg_real.csv',\
+    base_marker_config_file=config_dir+'MA1440_marker_config.yaml',tool_marker_config_file=config_dir+'scanner_marker_config.yaml')
 
+turn_table=positioner_obj('D500B',def_path=config_dir+'D500B_robot_default_config.yml',tool_file_path=config_dir+'positioner_tcp.csv',\
+    base_transformation_file=config_dir+'D500B_pose.csv',pulse2deg_file_path=config_dir+'D500B_pulse2deg_real.csv',\
+    base_marker_config_file=config_dir+'D500B_marker_config.yaml',tool_marker_config_file=config_dir+'positioner_tcp_marker_config.yaml')
 
 ## wall test path
 Table_home_T = turn_table.fwd(np.radians([-15,180]))
@@ -63,7 +65,7 @@ T_S1TCP_R1Base = np.linalg.inv(np.matmul(turn_table.base_H,H_from_RT(Table_home_
 
 data_dir='../../data/wall_weld_test/top_layer_test/'
 ######### enter your wanted z height #######
-all_layer_z = [22.5,45]
+all_layer_z = [30]
 ###########################################
 all_path_T = robot_weld_path_gen(all_layer_z)
 all_curve_sliced_relative=[]
@@ -75,18 +77,29 @@ for path_T in all_path_T:
         curve_sliced_relative.append(np.append(this_p,this_n))
     all_curve_sliced_relative.append(np.array(curve_sliced_relative))
 
+print(all_curve_sliced_relative)
+
+#### change base H to calibrated ones ####
+robot_scan.base_H = H_from_RT(robot_scan.T_base_basemarker.R,robot_scan.T_base_basemarker.p)
+turn_table.base_H = H_from_RT(turn_table.T_base_basemarker.R,turn_table.T_base_basemarker.p)
+T_to_base = Transform(np.eye(3),[0,0,-380])
+turn_table.base_H = np.matmul(turn_table.base_H,H_from_RT(T_to_base.R,T_to_base.p))
+
+# exit()
+
 ### scan parameters
 scan_speed=10 # scanning speed (mm/sec)
-scan_stand_off_d = 235 ## mm
-Rz_angle = np.radians(0) # point direction w.r.t welds
+scan_stand_off_d = 245 ## mm
+Rz_angle = np.radians(-45) # point direction w.r.t welds
 Ry_angle = np.radians(0) # rotate in y a bit, z-axis not pointing down, to have ik solution
 # Rz_angle = np.radians(0) # point direction w.r.t welds
 # Ry_angle = np.radians(0) # rotate in y a bit, z-axis not pointing down, to have ik solution
 
-bounds_theta = np.radians(0) ## circular motion at start and end
+bounds_theta = np.radians(30) ## circular motion at start and end
 
 ## scan angle
-all_scan_angle = np.radians([-10,10]) ## scanning angless
+# all_scan_angle = np.radians([-10,10]) ## scanning angless
+all_scan_angle = np.radians([0]) ## scanning angless
 
 ######### enter your wanted layers #######
 all_layer=np.arange(len(all_curve_sliced_relative)) ## all layer
@@ -96,7 +109,7 @@ out_dir = data_dir+''
 
 # path gen
 spg = ScanPathGen(robot_scan,turn_table,scan_stand_off_d,Rz_angle,Ry_angle,bounds_theta)
-q_init_table=np.radians([-40,170])
+q_init_table=np.radians([-60,180])
 # q_init_table=np.radians([-15,180])
 
 scan_p,scan_R,q_out1,q_out2=spg.gen_scan_path(all_curve_sliced_relative,all_layer,all_scan_angle,\
@@ -106,7 +119,9 @@ scan_p,scan_R,q_out1,q_out2=spg.gen_scan_path(all_curve_sliced_relative,all_laye
 # print(np.degrees(q_out1[10:]))
 
 # motion program gen
-q_bp1,q_bp2,s1_all,s2_all=spg.gen_motion_program(q_out1,q_out2,scan_p,scan_speed)
+q_bp1,q_bp2,s1_all,s2_all=spg.gen_motion_program(q_out1,q_out2,scan_p,scan_speed,init_sync_move=0)
+
+print(np.degrees(q_bp1))
 
 # exit()
 

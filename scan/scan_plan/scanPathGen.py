@@ -324,7 +324,7 @@ class ScanPathGen():
 
         return scan_p,scan_R,q_out1,q_out2
 
-    def gen_motion_program(self,q_out1,q_out2,scan_p,scan_speed):
+    def gen_motion_program(self,q_out1,q_out2,scan_p,scan_speed,init_sync_move = 50):
         
         primitives=[]
         q_bp1=[]
@@ -343,12 +343,12 @@ class ScanPathGen():
         #################################
 
         ####### add extension for time sync ####
-        init_sync_move = 50 # move 50 mm
+        # move 50 mm
         init_T = self.robot.fwd(q_bp1[0][0])
         init_x_dir = -init_T.R[:,0]
         init_T_align = deepcopy(init_T)
         init_T_align.p = init_T_align.p+init_x_dir*init_sync_move 
-        init_q_align = self.robot.inv(init_T_align.p,init_T_align.R,q_bp1[0][0])[0]
+        init_q_align = self.robot.inv(init_T_align.p,init_T_align.R,zero_config)[0]
         q_bp1.insert(0,[init_q_align])
         q_bp2.insert(0,[q_out2[0]])
         p_bp1.insert(0,init_T_align.p)

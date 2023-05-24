@@ -71,29 +71,39 @@ class CalibRobotPH:
                 all_robot_stamp = deepcopy(robot_stamps)
             else:
                 for key in curve_p.keys():
-                    all_mocap_p[key] = np.vstack((all_mocap_p[key],curve_p[key]))
-                    all_mocap_R[key] = np.vstack((all_mocap_R[key],curve_R[key]))
-                    all_mocap_stamp[key] = np.vstack((all_mocap_stamp[key],timestamps[key]))
-                    all_robot_q = np.vstack(all_robot_q,curve_exe)
-                    all_robot_stamp = np.vstack(all_robot_stamp,robot_stamps)
+                    all_mocap_p[key] = np.vstack((all_mocap_p[key],deepcopy(curve_p[key])))
+                    all_mocap_R[key] = np.vstack((all_mocap_R[key],deepcopy(curve_R[key])))
+                    all_mocap_stamp[key] = np.append(all_mocap_stamp[key],deepcopy(timestamps[key]))
+                all_robot_q = np.vstack((all_robot_q,deepcopy(curve_exe)))
+                all_robot_stamp = np.append(all_robot_stamp,deepcopy(robot_stamps))    
+            
+            for key in curve_p.keys():
+                print("key:",key)
+                print("mp p:",len(all_mocap_p[key]))
+                print("mp R:",len(all_mocap_R[key]))
+                print("mp t:",len(all_mocap_stamp[key]))
+            print("rob q:",len(all_robot_q))
+            print("rob t:",len(all_robot_stamp))
 
-        save_curve_R = {}
-        save_curve_R[self.robot.base_rigid_id]=all_mocap_R[self.robot.base_rigid_id]
-        save_curve_R[self.robot.tool_rigid_id]=all_mocap_R[self.robot.tool_rigid_id]
-        print(save_curve_R[self.robot.base_rigid_id][0])
-        print(save_curve_R[self.robot.tool_rigid_id][0])
+            save_curve_R = {}
+            save_curve_R[self.robot.base_rigid_id]=deepcopy(all_mocap_R[self.robot.base_rigid_id])
+            save_curve_R[self.robot.tool_rigid_id]=deepcopy(all_mocap_R[self.robot.tool_rigid_id])
+            print(save_curve_R[self.robot.base_rigid_id][0])
+            print(save_curve_R[self.robot.tool_rigid_id][0])
 
-        with open(raw_data_dir+'_mocap_p_cont.pickle', 'wb') as handle:
-            pickle.dump(all_mocap_p, handle, protocol=pickle.HIGHEST_PROTOCOL)
-        with open(raw_data_dir+'_mocap_R_cont.pickle', 'wb') as handle:
-            pickle.dump(save_curve_R, handle, protocol=pickle.HIGHEST_PROTOCOL)
-        with open(raw_data_dir+'_robot_q_cont.pickle', 'wb') as handle:
-            pickle.dump(all_robot_q, handle, protocol=pickle.HIGHEST_PROTOCOL)
+            # exit()
 
-        with open(raw_data_dir+'_mocap_timestamps_cont.pickle', 'wb') as handle:
-            pickle.dump(all_mocap_stamp, handle, protocol=pickle.HIGHEST_PROTOCOL)
-        with open(raw_data_dir+'_robot_timestamps_cont.pickle', 'wb') as handle:
-            pickle.dump(all_robot_stamp, handle, protocol=pickle.HIGHEST_PROTOCOL)
+            with open(raw_data_dir+'_mocap_p_cont.pickle', 'wb') as handle:
+                pickle.dump(all_mocap_p, handle, protocol=pickle.HIGHEST_PROTOCOL)
+            with open(raw_data_dir+'_mocap_R_cont.pickle', 'wb') as handle:
+                pickle.dump(save_curve_R, handle, protocol=pickle.HIGHEST_PROTOCOL)
+            with open(raw_data_dir+'_robot_q_cont.pickle', 'wb') as handle:
+                pickle.dump(all_robot_q, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+            with open(raw_data_dir+'_mocap_timestamps_cont.pickle', 'wb') as handle:
+                pickle.dump(all_mocap_stamp, handle, protocol=pickle.HIGHEST_PROTOCOL)
+            with open(raw_data_dir+'_robot_timestamps_cont.pickle', 'wb') as handle:
+                pickle.dump(all_robot_stamp, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
 def calib_S1():
 
@@ -135,10 +145,10 @@ def calib_R1():
 	pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',\
     base_marker_config_file=config_dir+'MA2010_marker_config.yaml',tool_marker_config_file=config_dir+'weldgun_marker_config.yaml')
 
-    # mocap_url = 'rr+tcp://localhost:59823?service=optitrack_mocap'
-    # mocap_cli = RRN.ConnectService(mocap_url)
+    mocap_url = 'rr+tcp://localhost:59823?service=optitrack_mocap'
+    mocap_cli = RRN.ConnectService(mocap_url)
 
-    # calib_obj = CalibRobotPH(mocap_cli,robot_weld)
+    calib_obj = CalibRobotPH(mocap_cli,robot_weld)
 
     # calibration
     q2_up=50
@@ -155,12 +165,12 @@ def calib_R1():
           [-3,0,0,-3,-3,3],[-2,0,0,-2,-2,2],\
           [-1,0,0,-1,-1,1],[1,0,0,1,1,-1],\
           [2,0,0,2,2,-2],[3,0,0,3,3,-3]]
-    scale=1
+    scale=2
     dq_sample = np.array(dq_sample)*scale
 
     # speed
     rob_speed=5
-    waittime=0.5
+    waittime=0.5 # stop 0.5 sec for sync
 
     q_paths = []
     for q2 in np.append(np.arange(q2_low,q2_up,d_angle),q2_up):
@@ -174,7 +184,7 @@ def calib_R1():
                 q_paths.append(target_q+dq)
     print("total pose:",len(q_paths))
 
-    exit()
+    # exit()
 
     # collecting raw data
     raw_data_dir='PH_grad_data/train_data'

@@ -31,9 +31,16 @@ data_dir='../../data/wall_weld_test/top_layer_test/scans/'
 config_dir='../../config/'
 
 robot_scan=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.yml',tool_file_path=config_dir+'scanner_tcp2.csv',\
-    base_transformation_file=config_dir+'MA1440_pose.csv',pulse2deg_file_path=config_dir+'MA1440_A0_pulse2deg_real.csv')
+	base_transformation_file=config_dir+'MA1440_pose.csv',pulse2deg_file_path=config_dir+'MA1440_A0_pulse2deg_real.csv',\
+    base_marker_config_file=config_dir+'MA1440_marker_config.yaml',tool_marker_config_file=config_dir+'scanner_marker_config.yaml')
 turn_table=positioner_obj('D500B',def_path=config_dir+'D500B_robot_default_config.yml',tool_file_path=config_dir+'positioner_tcp.csv',\
-    base_transformation_file=config_dir+'D500B_pose.csv',pulse2deg_file_path=config_dir+'D500B_pulse2deg_real.csv')
+    base_transformation_file=config_dir+'D500B_pose.csv',pulse2deg_file_path=config_dir+'D500B_pulse2deg_real.csv',\
+    base_marker_config_file=config_dir+'D500B_marker_config.yaml',tool_marker_config_file=config_dir+'positioner_tcp_marker_config.yaml')
+#### change base H to calibrated ones ####
+robot_scan.base_H = H_from_RT(robot_scan.T_base_basemarker.R,robot_scan.T_base_basemarker.p)
+turn_table.base_H = H_from_RT(turn_table.T_base_basemarker.R,turn_table.T_base_basemarker.p)
+T_to_base = Transform(np.eye(3),[0,0,-380])
+turn_table.base_H = np.matmul(turn_table.base_H,H_from_RT(T_to_base.R,T_to_base.p))
 
 scan_js_exe = np.loadtxt(data_dir+'scan_js_exe.csv',delimiter=",", dtype=np.float64)
 rob_stamps = np.loadtxt(data_dir+'robot_stamps.csv',delimiter=",", dtype=np.float64)
@@ -45,7 +52,7 @@ scan_N = len(sca_stamps) ## total scans
 
 ## TODO:auto get timestamp where scans/robot start moving
 # scan_start_rmse=1
-scan_start_rmse=0.4
+scan_start_rmse=0.8
 scan_move_stamp_i=None
 pcd_combined = None
 for scan_i in range(1,50):
@@ -193,7 +200,7 @@ for scan_i in range(scan_N):
     else:
         robt_T = robot_scan.fwd(scan_js_exe[closest_i][:6],world=True) # T_world^r2tool
         # T_origin = turn_table.fwd(scan_js_exe[closest_i][6:],world=True).inv() # T_tabletool^world
-        T_origin = turn_table.fwd(np.radians([-40,170]),world=True).inv()
+        T_origin = turn_table.fwd(np.radians([-60,180]),world=True).inv()
     T_rob_positioner_top = T_origin*robt_T
     ## get the points closed to origin
     scan_points = np.transpose(np.matmul(T_rob_positioner_top.R,np.transpose(scan_points_origin)))+T_rob_positioner_top.p
@@ -329,8 +336,8 @@ cluster_based_outlier_remove=True
 ####### processing parameters
 voxel_size=0.1
 ## crop focused region
-min_bound = (-50,-50,30)
-max_bound = (50,55,150)
+min_bound = (-50,-30,-10)
+max_bound = (50,30,50)
 ## outlier removal
 nb_neighbors=40
 std_ratio=0.5

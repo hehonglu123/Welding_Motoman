@@ -4,6 +4,7 @@ sys.path.append('../../toolbox/')
 sys.path.append('../scan_tools/')
 from robot_def import *
 from scan_utils import *
+from scan_continuous import *
 from general_robotics_toolbox import *
 import open3d as o3d
 from RobotRaconteur.Client import *
@@ -29,7 +30,7 @@ for scan in scans:
 pcd = o3d.geometry.PointCloud()
 pcd.points=o3d.utility.Vector3dVector(scan_points)
 
-d=243
+d=245
 width=0.5
 height=0.5
 bbox_mesh = o3d.geometry.TriangleMesh.create_box(width=width, height=height, depth=d)
