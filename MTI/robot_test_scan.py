@@ -2,7 +2,9 @@
 
 from RobotRaconteur.Client import *
 import matplotlib.pyplot as plt
-import time, sys
+import time, sys, pickle
+import open3d as o3d
+
 sys.path.append('../toolbox/')
 from robot_def import *
 from dx200_motion_program_exec_client import *
@@ -17,8 +19,8 @@ robot2=robot_obj('MA1440_A0',def_path='../config/MA1440_A0_robot_default_config.
 R=np.array([[0., -1,  0.    ],
             [-1, 0.,  0.    ],
             [0., 0., -1.    ]])
-p_start=np.array([1000,500,-260])
-p_end=np.array([1000,400,-260])
+p_start=np.array([1000,430,-230])
+p_end=np.array([1000,330,-230])
 q_seed=np.zeros(6)
 q_init=np.degrees(robot2.inv(p_start,R,q_seed)[0])
 q_end=np.degrees(robot2.inv(p_end,R,q_seed)[0])
@@ -31,6 +33,8 @@ layer_height=0.8
 
 
 for i in range(0,1):
+    mp=MotionProgram(ROBOT_CHOICE='RB2',pulse2deg=robot2.pulse2deg,tool_num=10)
+
     if i%2==0:
         p1=p_start+np.array([0,0,2*base_layer_height+i*layer_height])
         p2=p_end+np.array([0,0,2*base_layer_height+i*layer_height])
@@ -41,6 +45,8 @@ for i in range(0,1):
     q_init=np.degrees(robot2.inv(p1,R,q_seed)[0])
     q_end=np.degrees(robot2.inv(p2,R,q_seed)[0])
     mp.MoveJ(q_init,1,0)
+    client.execute_motion_program(mp)
+    mp=MotionProgram(ROBOT_CHOICE='RB2',pulse2deg=robot2.pulse2deg,tool_num=10)
     mp.MoveL(q_end,12,0)
     client.execute_motion_program_nonblocking(mp)
     ###streaming
@@ -58,9 +64,28 @@ for i in range(0,1):
             state_flag=data[16]
             joint_recording.append(joint_angle)
             ###MTI scans YZ point from tool frame
-            mti_recording.append([-c.lineProfile.X_data,c.lineProfile.Z_data])
+            mti_recording.append(np.array([-c.lineProfile.X_data,c.lineProfile.Z_data]))
 
     client.servoMH(False)
 
+mti_recording=np.array(mti_recording)
+
+pc=[]
+for i in range(len(mti_recording)):
+    line_scan=np.vstack((np.zeros(len(mti_recording[i][0])),mti_recording[i])).T
+    pose=robot2.fwd(joint_recording[i])
+    pc.extend(transform_curve(line_scan,H_from_RT(pose.R,pose.p)))
+
+pc=np.array(pc)
+pointcloud=o3d.geometry.PointCloud()
+pointcloud.points = o3d.utility.Vector3dVector(pc)
+o3d.visualization.draw_geometries([pointcloud])
+
+# ax = plt.figure().add_subplot(projection='3d')
+# ax.scatter(pc[:,0],pc[:,1],pc[:,2])
+# plt.show()
+
+
+with open('mti_recording.pickle', 'wb') as file:
+    pickle.dump(mti_recording, file)
 np.savetxt('joint_recording.csv',joint_recording,delimiter=',')
-np.savetxt('mti_recording.csv',mti_recording,delimiter=',')
