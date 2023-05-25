@@ -7,6 +7,8 @@ sys.path.append('../toolbox/')
 from robot_def import *
 from matplotlib import pyplot as plt
 
+from qpsolvers import solve_qp
+
 from numpy.random import default_rng
 rng = default_rng()
 
@@ -24,7 +26,7 @@ T_basemarker_base = T_base_basemarker.inv()
 robot_weld.T_tool_toolmarker=Transform(np.eye(3),[0,0,0])
 robot_weld.robot.T_flange = robot_weld.T_tool_flange
 
-data_dir='PH_grad_data/test0516_R1/train_data_'
+data_dir='PH_grad_data/test0524_R1/train_data_'
 
 try:
     robot_q = np.loadtxt(data_dir+'robot_q_align.csv',delimiter=',')
@@ -35,7 +37,7 @@ except:
     with open(data_dir+'robot_q_cont.pickle', 'rb') as handle:
         robot_q = pickle.load(handle)
         robot_q = robot_q[:,:6]
-    with open(data_dir+'robot_q_timestamps_cont.pickle', 'rb') as handle:
+    with open(data_dir+'robot_timestamps_cont.pickle', 'rb') as handle:
         robot_q_stamps = pickle.load(handle)
     robot_qdot = np.divide(np.gradient(robot_q,axis=0),np.tile(np.gradient(robot_q_stamps),(6,1)).T)
     robot_qdot_norm = np.linalg.norm(robot_qdot,axis=1)
@@ -51,7 +53,7 @@ except:
         # static_mocap_marker = mocap_p[robot_weld.base_markers_id[0]]
         base_rigid_R = mocap_R[robot_weld.base_rigid_id]
         mocap_R = np.array(mocap_R[marker_id])
-    with open(data_dir+'mocap_p_timestamps_cont.pickle', 'rb') as handle:
+    with open(data_dir+'mocap_timestamps_cont.pickle', 'rb') as handle:
         mocap_stamps = pickle.load(handle)
         base_rigid_stamps = np.array(mocap_stamps[marker_id])
         mocap_stamps = np.array(mocap_stamps[marker_id])
@@ -62,7 +64,7 @@ except:
     print(len(mocap_stamps))
     print(len(base_rigid_p))
 
-    mocap_start_k = 850
+    mocap_start_k = 1200
     mocap_R = mocap_R[mocap_start_k:]
     mocap_p = mocap_p[mocap_start_k:]
     mocap_stamps = mocap_stamps[mocap_start_k:]
@@ -72,10 +74,10 @@ except:
     base_rigid_R=base_rigid_R[mocap_start_k:]
     base_rigid_stamps=base_rigid_stamps[mocap_start_k:]
 
-    # plt.plot(mocap_pdot_norm)
-    # plt.show()
-    # plt.plot(robot_qdot_norm)
-    # plt.show()
+    plt.plot(mocap_pdot_norm)
+    plt.show()
+    plt.plot(robot_qdot_norm)
+    plt.show()
 
     timewindow = 0.3
 
@@ -108,7 +110,7 @@ except:
     robot_stop_k.append(np.argmin(robot_v_dev[robot_stop_k[-1]+dK_robot:])+robot_stop_k[-1]+dK_robot)
     all_dkrobot.append(dK_robot)
 
-    mocap_vdev_thres = 5
+    mocap_vdev_thres = 10
     mocap_v_thres = 50
     dt_ave_mocap = np.mean(np.gradient(mocap_stamps))
     dK_mocap = int(timewindow/dt_ave_mocap)
@@ -131,14 +133,14 @@ except:
     mocap_stop_k.append(np.argmin(mocap_v_dev[mocap_stop_k[-1]+dK_mocap:])+mocap_stop_k[-1]+dK_mocap)
 
     # check 
-    # plt.plot(robot_v_dev)
-    # plt.scatter(robot_stop_k,robot_v_dev[robot_stop_k])
-    # plt.plot(robot_qdot_norm,'blue')
-    # for ki in range(len(robot_stop_k)):
-    #     k=robot_stop_k[ki]
-    #     dK_robot=all_dkrobot[ki]
-    #     plt.plot(np.arange(k,k+dK_robot),robot_qdot_norm[k:k+dK_robot])
-    # plt.show()
+    plt.plot(robot_v_dev)
+    plt.scatter(robot_stop_k,robot_v_dev[robot_stop_k])
+    plt.plot(robot_qdot_norm,'blue')
+    for ki in range(len(robot_stop_k)):
+        k=robot_stop_k[ki]
+        dK_robot=all_dkrobot[ki]
+        plt.plot(np.arange(k,k+dK_robot),robot_qdot_norm[k:k+dK_robot])
+    plt.show()
     plt.plot(mocap_v_dev)
     plt.plot(mocap_pdot_norm,'blue')
     for k in mocap_stop_k:
@@ -149,7 +151,54 @@ except:
     print("Total robot stop:",len(robot_stop_k))
     print("Total mocap stop:",len(mocap_stop_k))
 
-    assert len(robot_stop_k)==len(mocap_stop_k), f"Mocap Stop and Robot Stop should be the same."
+    # assert len(robot_stop_k)==len(mocap_stop_k), f"Mocap Stop and Robot Stop should be the same."
+
+    if len(robot_stop_k)!=len(mocap_stop_k):
+        # change robot PH to calib PH
+        robot_weld.robot.P = robot_weld.calib_P
+        robot_weld.robot.H = robot_weld.calib_H
+        # change to calibrated flange (tool rigidbody orientation)
+        robot_weld.robot.T_flange = robot_weld.T_tool_flange
+
+        threshold = 3
+        erase_robot_stop = []
+        mocap_start_offset = 0
+        for i in range(len(robot_stop_k)):
+            this_robot_q = np.mean(robot_q[robot_stop_k[i]:robot_stop_k[i]+all_dkrobot[i]],axis=0)
+            rob_T = robot_weld.fwd(this_robot_q)
+
+            find_flag = False
+            for j in range(i-mocap_start_offset,i-mocap_start_offset+5):
+                T_mocap_basemarker = Transform(q2R(base_rigid_R[mocap_stop_k[j]]),base_rigid_p[mocap_stop_k[j]]).inv()
+                T_marker_mocap = Transform(q2R(mocap_R[mocap_stop_k[j]]),mocap_p[mocap_stop_k[j]])
+                T_marker_base = T_basemarker_base*T_mocap_basemarker*T_marker_mocap
+                if np.round(np.linalg.norm(rob_T.p-T_marker_base.p))<threshold:
+                    find_flag=True
+                    break
+            if not find_flag:
+                erase_robot_stop.append(i)
+                mocap_start_offset+=1
+                print(erase_robot_stop)
+        robot_stop_k = np.delete(robot_stop_k,erase_robot_stop)
+        all_dkrobot = np.delete(all_dkrobot,erase_robot_stop)
+        
+        erase_both_stop=[]
+        threshold = 1
+        for i in range(0,len(robot_stop_k),7):
+            this_robot_q = np.mean(robot_q[robot_stop_k[i]:robot_stop_k[i]+all_dkrobot[i]],axis=0)
+            find_flag = False
+            for j in range(i+1,i+7):
+                compare_q = np.mean(robot_q[robot_stop_k[j]:robot_stop_k[j]+all_dkrobot[j]],axis=0)
+                if np.linalg.norm(np.degrees(this_robot_q[1:3]-compare_q[1:3]))>threshold:
+                    find_flag=True
+                    break
+            if find_flag:
+                erase_both_stop = np.arange(i,i+7-len(erase_robot_stop))
+                print(erase_both_stop)
+                break
+        robot_stop_k = np.delete(robot_stop_k,erase_both_stop)
+        all_dkrobot = np.delete(all_dkrobot,erase_both_stop)
+        mocap_stop_k = np.delete(mocap_stop_k,erase_both_stop)
 
     robot_stop_q = []
     mocap_stop_T = []
@@ -192,18 +241,18 @@ for desired_q in setdesired:
 
 #### Gradient
 plot_grad=True
-all_testing_pose=np.arange(N_per_pose-5)
-total_iteration = 200
-total_grad_sample = 40
+all_testing_pose=np.arange(N_per_pose)
+total_iteration = 100
+total_grad_sample = 80
 # total_grad_sample = 7
 dP_up_range = 0.05
 dP_low_range = 0.01
 P_size = 6
 dH_up_range = np.radians(0.1)
 dH_low_range = np.radians(0.03)
-H_size = 3
+H_size = 6
 dH_rotate_axis = [[Rx,Ry],[Rz,Rx],[Rz,Rx],[Ry,Rz],[Rz,Rx],[Ry,Rz]]
-alpha=0.01
+alpha=0.1
 weight_ori = 0.01
 weight_pos = 1
 for N in train_set:
@@ -297,7 +346,15 @@ for N in train_set:
             plt.show()
         
         # update PH
-        d_pH_update = alpha*np.matmul(np.linalg.pinv(G),error_pos_ori)
+        Kq = np.diag(np.append(np.ones(P_size*3),np.ones(H_size*2))*10)
+        H=np.matmul(G.T,G)+Kq
+        H=(H+np.transpose(H))/2
+        f=-np.matmul(G.T,error_pos_ori)
+        dph=solve_qp(H,f,solver='quadprog')
+
+        # d_pH_update = alpha*np.matmul(np.linalg.pinv(G),error_pos_ori)
+        d_pH_update = alpha*dph
+
         robot_opt_P[:,:P_size] = robot_opt_P[:,:P_size]+np.reshape(d_pH_update[:robot_opt_P[:,:P_size].size],robot_opt_P[:,:P_size].T.shape).T
         dH = np.reshape(d_pH_update[robot_opt_P[:,:P_size].size:],(H_size,2))
         for i in range(len(dH)):
