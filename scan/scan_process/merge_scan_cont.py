@@ -23,7 +23,7 @@ else:
 dtype = o3d.core.float32
 #####################
 
-# data_dir='../../data/wall_weld_test/scan_cont_6_backup/scans/'
+# data_dir='../../data/wall_weld_test/scan_cont_6/scans/'
 # data_dir='../../data/wall_weld_test/wall_param_1/scans/'
 # data_dir='../../data/wall_weld_test/scan_cont_newdx_1/scans/'
 # data_dir='../../data/wall_weld_test/wall_param_data_collection/path_Rz-45_Ry0_stand_off_d243_b_theta45_scan_angle-45_45_z0_35_/scans/'
@@ -50,9 +50,10 @@ sca_stamps=sca_stamps-sca_stamps[0]
 
 scan_N = len(sca_stamps) ## total scans
 
-## TODO:auto get timestamp where scans/robot start moving
+## auto get timestamp where scans/robot start moving
 # scan_start_rmse=1
-scan_start_rmse=0.8
+scan_start_rmse=0.7
+# scan_start_rmse=50 # for testing
 scan_move_stamp_i=None
 pcd_combined = None
 for scan_i in range(1,50):
@@ -77,6 +78,7 @@ for scan_i in range(1,50):
             break
     # visualize_pcd([pcd_combined])
     pcd_combined=deepcopy(pcd)
+
 rob_start_norm=1e-3*2
 rob_move_stamp_i=None
 for robt_i in range(10,50):
@@ -343,14 +345,13 @@ nb_neighbors=40
 std_ratio=0.5
 ## clustering
 cluster_neighbor=0.75
-min_points=50
+min_points=50*4
 ######################
 
 ## crop point clouds
 if crop_flag:
     bbox = o3d.geometry.AxisAlignedBoundingBox(min_bound=min_bound,max_bound=max_bound)
     pcd_combined=pcd_combined.crop(bbox)
-visualize_pcd([pcd_combined])
 
 #### processing
 ## voxel down sample
