@@ -46,3 +46,14 @@ T_basemarker = Transform(curve_R[positioner.base_rigid_id][0],curve_p[positioner
 T_toolmarker = Transform(curve_R[positioner.tool_rigid_id][0],curve_p[positioner.tool_rigid_id][0])
 
 print(positioner.T_base_basemarker.inv()*T_basemarker.inv()*T_toolmarker*positioner.T_tool_toolmarker)
+
+## Transformations
+# T_R2_R1 = robot_weld.T_base_basemarker.inv()*robot_scan.T_base_basemarker
+# T_S1_R1 = robot_weld.T_base_basemarker.inv()*turn_table.T_base_basemarker
+# robot_scan.base_H = H_from_RT(T_R2_R1.R,T_R2_R1.p)
+# turn_table.base_H = H_from_RT(T_S1_R1.R,T_S1_R1.p)
+# T_to_base = Transform(np.eye(3),[0,0,-380])
+# turn_table.base_H = np.matmul(turn_table.base_H,H_from_RT(T_to_base.R,T_to_base.p))
+# np.savetxt(config_dir+'MA1440_pose_mocapcalib.csv',robot_scan.base_H,delimiter=',')
+# np.savetxt(config_dir+'D500B_pose_mocapcalib.csv',turn_table.base_H,delimiter=',')
+# exit()
