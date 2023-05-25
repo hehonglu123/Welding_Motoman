@@ -64,7 +64,7 @@ class redundancy_resolution(object):
 						positioner_js_new[i][x][j]=np.average(positioner_js[i][x][start_point:end_point],axis=0)
 				###reverse
 				positioner_js_new2=copy.deepcopy(positioner_js_new)
-				for j in reversed(range(len(positioner_js[i]))):
+				for j in reversed(range(len(positioner_js[i][x]))):
 					if get_angle(self.positioner.fwd(positioner_js[i][x][j],world=True).R[:,-1],[0,0,1])<tolerance:
 						if j-steps<0:
 							start_point=0
@@ -136,17 +136,13 @@ class redundancy_resolution(object):
 	def baseline_joint(self,R_torch,curve_sliced_relative,curve_sliced_relative_base,q_init=np.zeros(6),positioner_q_init=[0,-2]):
 		####baseline redundancy resolution, with fixed orientation
 		positioner_js=self.positioner_resolution(curve_sliced_relative,q_seed=positioner_q_init)		#solve for positioner first
-		###TO FIX: override first layer positioner q2
-		for x in range(len(positioner_js[0])):
-			positioner_js[0][x][:,1]=positioner_js[1][x][0,-1]
 		
 		###singularity js smoothing
 		# positioner_js=self.conditional_rolling_average(positioner_js)
 		positioner_js=self.introducing_tolerance2(positioner_js)
 		positioner_js=self.conditional_rolling_average(positioner_js)
 		positioner_js=self.rolling_average(positioner_js)
-		for x in range(len(positioner_js[0])):
-			positioner_js[0][x][:,1]=positioner_js[1][x][0,-1]
+		positioner_js[0][0][:,1]=positioner_js[1][0][0,1]
 
 		
 		###append base layers positioner
@@ -227,34 +223,46 @@ class redundancy_resolution(object):
 
 		return H_from_RT(R,T)
 
-
-	def positioner_resolution(self,curve_sliced_relative,q_seed=[0,-1.]):
+		
+	def positioner_resolution(self,curve_sliced_relative,q_seed=[0,-1.],cross_pi=False):
 		###resolve 2DOF positioner joint angle 
 		positioner_js=[]
 		q_prev=q_seed
-		for i in range(len(curve_sliced_relative)):
+		for i in range(1,len(curve_sliced_relative)):
 			positioner_js_ith_layer=[]
 			for x in range(len(curve_sliced_relative[i])):
-				positioner_js_ith_layer_xth_section=[]
-				
-				for j in reversed(range(len(curve_sliced_relative[i][x]))):	###reverse, solve from the end because start may be upward
-					###curve normal as torch orientation, opposite of positioner
-					positioner_js_ith_layer_xth_section.append(self.positioner.inv(-curve_sliced_relative[i][x][j,3:],q_prev))
-				
-				q_prev=np.average(positioner_js_ith_layer_xth_section,axis=0)
+				positioner_js_ith_layer_xth_section=self.positioner.find_curve_js(-curve_sliced_relative[i][x][:,3:],q_prev)
 
-				positioner_js_ith_layer_xth_section.reverse()
-				positioner_js_ith_layer_xth_section=np.array(positioner_js_ith_layer_xth_section)
+				# positioner_js_ith_layer_xth_section=[]
+				# for j in reversed(range(len(curve_sliced_relative[i][x]))):	###reverse, solve from the end because start may be upward
+				# 	###curve normal as torch orientation, opposite of positioner
+				# 	positioner_js_ith_layer_xth_section.append(self.positioner.inv(-curve_sliced_relative[i][x][j,3:],q_prev))
+				
+				# 	if cross_pi and i>0:	###otherwise just use previous q due to large change
+				# 		# if i==1:
+				# 		# 	print(q_prev)
+				# 		q_prev=positioner_js_ith_layer_xth_section[-1]
+				# if i>0:
+				# 	q_prev=np.average(positioner_js_ith_layer_xth_section,axis=0)
+				# positioner_js_ith_layer_xth_section.reverse()
+				# positioner_js_ith_layer_xth_section=np.array(positioner_js_ith_layer_xth_section)
 
 				###filter noise
-				positioner_js_ith_layer_xth_section[:,0]=moving_average(positioner_js_ith_layer_xth_section[:,0],padding=True)
-				positioner_js_ith_layer_xth_section[:,1]=moving_average(positioner_js_ith_layer_xth_section[:,1],n=15,padding=True)
+				# positioner_js_ith_layer_xth_section[:,0]=moving_average(positioner_js_ith_layer_xth_section[:,0],padding=True)
+				# positioner_js_ith_layer_xth_section[:,1]=moving_average(positioner_js_ith_layer_xth_section[:,1],n=15,padding=True)
 
 				positioner_js_ith_layer.append(np.array(positioner_js_ith_layer_xth_section))
 
 			positioner_js.append(positioner_js_ith_layer)
 
+		###first layer resolution
+		q_base=self.positioner.inv([0,0,1],positioner_js[0][0][0])
+		positioner_js_0th_layer=[]
+		for x in range(len(curve_sliced_relative[0])):
+			positioner_js_0th_layer.append(np.array([q_base]*len(curve_sliced_relative[0][x])))
 		
+		
+		positioner_js.insert(0,positioner_js_0th_layer)
 		return positioner_js
 
 

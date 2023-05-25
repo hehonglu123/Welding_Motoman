@@ -7,11 +7,11 @@ from robot_def import *
 
 
 def main():
-	dataset='blade0.1/'
-	sliced_alg='auto_slice/'
+	dataset='cup/'
+	sliced_alg='circular_slice/'
 	data_dir='../data/'+dataset+sliced_alg
-	num_layers=758
-	num_baselayers=2
+	num_layers=105
+	num_baselayers=0
 	curve_sliced_relative_base=[]
 	curve_sliced_relative=[]
 	curve_sliced=[]
@@ -38,24 +38,15 @@ def main():
 		pulse2deg_file_path='../config/D500B_pulse2deg_real.csv',base_transformation_file='../config/D500B_pose.csv')
 
 
-	R_torch=np.array([[-0.7071, 0.7071, -0.    ],
-			[ 0.7071, 0.7071,  0.    ],
-			[0.,      0.,     -1.    ]])
-	q_seed=np.radians([-35.4291,56.6333,40.5194,4.5177,-52.2505,-11.6546])
-
 	rr=redundancy_resolution(robot,positioner,curve_sliced)
 	H=np.loadtxt(data_dir+'curve_pose.csv',delimiter=',')
 
-	positioner_js=rr.positioner_resolution(curve_sliced_relative,q_seed=[0,-2])		#solve for positioner first
-	###TO FIX: override first layer positioner q2
-	for x in range(len(positioner_js[0])):
-		positioner_js[0][x][:,1]=positioner_js[1][x][0,1]
+	positioner_js=rr.positioner_resolution(curve_sliced_relative,q_seed=[1,4],cross_pi=True)		#solve for positioner first
 	
 	###singularity js smoothing
 	positioner_js=rr.introducing_tolerance2(positioner_js)
 	positioner_js=rr.conditional_rolling_average(positioner_js)
-	for x in range(len(positioner_js[0])):
-		positioner_js[0][x][:,1]=positioner_js[1][x][0,1]
+	positioner_js[0][0][:,1]=positioner_js[1][0][0,1]
 
 
 	for i in range(num_layers):

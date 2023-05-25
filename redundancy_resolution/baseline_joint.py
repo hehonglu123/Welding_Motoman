@@ -7,11 +7,11 @@ from robot_def import *
 
 
 def main():
-	dataset='blade0.1/'
-	sliced_alg='auto_slice/'
+	dataset='cup/'
+	sliced_alg='circular_slice/'
 	data_dir='../data/'+dataset+sliced_alg
-	num_layers=757
-	num_baselayers=2
+	num_layers=105
+	num_baselayers=0
 	curve_sliced_relative_base=[]
 	curve_sliced_relative=[]
 	curve_sliced=[]

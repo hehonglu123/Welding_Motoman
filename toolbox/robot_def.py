@@ -224,6 +224,43 @@ class robot_obj(object):
 		
 		return q_all
 
+	###find a continous trajectory given Cartesion pose trajectory
+	def find_curve_js(self,curve,curve_R,q_seed=None):
+		q_inits=self.inv(curve[0],curve_R[0])
+		curve_js_all=[]
+		for q_init in q_inits:
+			curve_js=np.zeros((len(curve),6))
+			curve_js[0]=q_init
+			for i in range(1,len(curve)):
+				q_all=np.array(self.inv(curve[i],curve_R[i]))
+				if len(q_all)==0:
+					#if no solution
+					print('no solution available')
+					return
+
+				temp_q=q_all-curve_js[i-1]
+				order=np.argsort(np.linalg.norm(temp_q,axis=1))
+				if np.linalg.norm(q_all[order[0]]-curve_js[i-1])>0.5:
+					break	#if large changes in q, not continuous
+				else:
+					curve_js[i]=q_all[order[0]]
+
+			#check if all q found
+			if i==len(curve)-1:
+				curve_js_all.append(curve_js)
+		if q_seed is None:
+			return curve_js_all
+		else:
+			if len(curve_js_all)==1:
+				return curve_js_all[0]
+			else:
+				diff_min=[]
+				for curve_js in curve_js_all:
+					diff_min=np.linalg.norm(curve_js[0]-q_seed)
+
+				return curve_js_all[np.argmin(diff_min)]
+			
+
 
 class positioner_obj(object):
 	###robot object class
@@ -382,30 +419,79 @@ class positioner_obj(object):
 
 	# 	return np.array([-q1,-q2])		###2 solutions, 180 apart couple
 
-	def inv(self,n,q_seed=np.zeros(2)):
+	def inv(self,n,q_seed=None):
 		###p_tcp: point of the desired tcp wrt. positioner eef
 		###n: normal direction at the desired tcp wrt. positioner eef
 		###[q1,q2]: result joint angles that brings n to [0,0,1]
 		if n[2]==1:	##if already up, infinite solutions
-			return np.array([0-np.radians(15),q_seed[1]])
+			if q_seed is not None:
+				return np.array([0-np.radians(15),q_seed[1]])
+			else:
+				return np.array([0-np.radians(15),0])
 		q2=np.arctan2(n[1],n[0])
 		q1=np.arctan2(n[0]*np.cos(q2)+n[1]*np.sin(q2),n[2])
 
 		solutions = self.get_eq_solution([q1,q2])
-		solutions[0][0]-=np.radians(15)
-		solutions[1][0]-=np.radians(15)		###manual adjustment for tilt angle
+		for i in range(len(solutions)):
+			solutions[i][0]-=np.radians(15)		###manual adjustment for tilt angle
 
-		theta_dist = np.linalg.norm(np.subtract(solutions,q_seed), axis=1)
-		return solutions[np.argsort(theta_dist)[0]]
-
-	def get_eq_solution(self,q):		
-		solution2=[-q[0],q[1]-np.sign(q[1])*np.pi]
-
-		return np.array([q,solution2])
+		if q_seed is not None:
+			theta_dist = np.linalg.norm(np.subtract(solutions,q_seed), axis=1)
+			return solutions[np.argsort(theta_dist)[0]]
+		else:
+			return solutions
+	def get_eq_solution(self,q):
+		solutions=[q]
+		if q[1]+2*np.pi<self.upper_limit[1]:
+			solutions.append([q[0],q[1]+2*np.pi])
+		if q[1]+np.pi<self.upper_limit[1]:
+			solutions.append([-q[0],q[1]+np.pi])
+		if q[1]-np.pi>self.lower_limit[1]:
+			solutions.append([-q[0],q[1]-np.pi])
+		if q[1]-2*np.pi>self.lower_limit[1]:
+			solutions.append([q[0],q[1]-2*np.pi])
+		
+		return np.array(solutions)
 	
 	def jacobian(self,q):
 		return robotjacobian(self.robot,q)
 
+	###find a continous trajectory given Cartesion tool normal trajectory
+	def find_curve_js(self,normals,q_seed=None):
+		q_inits=self.inv(normals[0])
+		curve_js_all=[]
+		for q_init in q_inits:
+			curve_js=np.zeros((len(normals),2))
+			curve_js[0]=q_init
+			for i in range(1,len(normals)):
+				q_all=np.array(self.inv(normals[i]))
+				if len(q_all)==0:
+					#if no solution
+					print('no solution available')
+					return
+
+				temp_q=q_all-curve_js[i-1]
+				order=np.argsort(np.linalg.norm(temp_q,axis=1))
+				if np.linalg.norm(q_all[order[0]]-curve_js[i-1])>0.5:
+					break	#if large changes in q, not continuous
+				else:
+					curve_js[i]=q_all[order[0]]
+
+			#check if all q found
+			if i==len(normals)-1:
+				curve_js_all.append(curve_js)
+		if q_seed is None:
+			return curve_js_all
+		else:
+			if len(curve_js_all)==1:
+				return curve_js_all[0]
+			else:
+				diff_min=[]
+				for curve_js in curve_js_all:
+					diff_min=np.linalg.norm(curve_js[0]-q_seed)
+
+				return curve_js_all[np.argmin(diff_min)]
+			
 class Transform_all(object):
 	def __init__(self, p_all, R_all):
 		self.R_all=np.array(R_all)
