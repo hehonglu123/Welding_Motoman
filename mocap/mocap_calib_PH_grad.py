@@ -26,7 +26,7 @@ T_basemarker_base = T_base_basemarker.inv()
 robot_weld.T_tool_toolmarker=Transform(np.eye(3),[0,0,0])
 robot_weld.robot.T_flange = robot_weld.T_tool_flange
 
-data_dir='PH_grad_data/test0524_R1/train_data_'
+data_dir='PH_grad_data/test0516_R1/train_data_'
 
 try:
     robot_q = np.loadtxt(data_dir+'robot_q_align.csv',delimiter=',')
