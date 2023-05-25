@@ -1,4 +1,3 @@
-from audioop import reverse
 from copy import deepcopy
 from pathlib import Path
 import sys
@@ -47,10 +46,8 @@ def robot_weld_path_gen(all_layer_z):
 
 config_dir='../../config/'
 
-# robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',d=15,tool_file_path=config_dir+'torch.csv',\
-# 	pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv')
-# print(robot_weld.fwd(zero_config))
-# exit()
+robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',d=15,tool_file_path=config_dir+'torch.csv',\
+	pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv')
 robot_scan=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.yml',tool_file_path=config_dir+'scanner_tcp2.csv',\
 	base_transformation_file=config_dir+'MA1440_pose.csv',pulse2deg_file_path=config_dir+'MA1440_A0_pulse2deg_real.csv',\
     base_marker_config_file=config_dir+'MA1440_marker_config.yaml',tool_marker_config_file=config_dir+'scanner_marker_config.yaml')
