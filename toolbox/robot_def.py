@@ -256,7 +256,7 @@ class robot_obj(object):
 			else:
 				diff_min=[]
 				for curve_js in curve_js_all:
-					diff_min=np.linalg.norm(curve_js[0]-q_seed)
+					diff_min.append(np.linalg.norm(curve_js[0]-q_seed))
 
 				return curve_js_all[np.argmin(diff_min)]
 			
@@ -472,7 +472,7 @@ class positioner_obj(object):
 
 				temp_q=q_all-curve_js[i-1]
 				order=np.argsort(np.linalg.norm(temp_q,axis=1))
-				if np.linalg.norm(q_all[order[0]]-curve_js[i-1])>0.5:
+				if np.linalg.norm(q_all[order[0]]-curve_js[i-1])>np.pi/2:
 					break	#if large changes in q, not continuous
 				else:
 					curve_js[i]=q_all[order[0]]
@@ -480,6 +480,8 @@ class positioner_obj(object):
 			#check if all q found
 			if i==len(normals)-1:
 				curve_js_all.append(curve_js)
+		
+
 		if q_seed is None:
 			return curve_js_all
 		else:
@@ -488,7 +490,7 @@ class positioner_obj(object):
 			else:
 				diff_min=[]
 				for curve_js in curve_js_all:
-					diff_min=np.linalg.norm(curve_js[0]-q_seed)
+					diff_min.append(np.linalg.norm(curve_js[0]-q_seed))
 
 				return curve_js_all[np.argmin(diff_min)]
 			

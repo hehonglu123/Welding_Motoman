@@ -7,11 +7,25 @@ from robot_def import *
 
 
 def main():
-	dataset='cup/'
-	sliced_alg='circular_slice/'
+	robot=robot_obj('MA2010_A0',def_path='../config/MA2010_A0_robot_default_config.yml',tool_file_path='../config/torch.csv',\
+		pulse2deg_file_path='../config/MA2010_A0_pulse2deg_real.csv',d=15)
+	positioner=positioner_obj('D500B',def_path='../config/D500B_robot_default_config.yml',tool_file_path='../config/positioner_tcp.csv',\
+		pulse2deg_file_path='../config/D500B_pulse2deg_real.csv',base_transformation_file='../config/D500B_pose.csv')
+
+
+	# dataset='cup/'
+	# sliced_alg='circular_slice/'
+	# data_dir='../data/'+dataset+sliced_alg
+	# num_layers=105
+	# num_baselayers=0
+	# q_positioner_seed=[1,3]
+	dataset='blade0.1/'
+	sliced_alg='auto_slice/'
 	data_dir='../data/'+dataset+sliced_alg
-	num_layers=105
-	num_baselayers=0
+	num_layers=757
+	num_baselayers=2
+	q_positioner_seed=[0,-2]
+
 	curve_sliced_relative_base=[]
 	curve_sliced_relative=[]
 	curve_sliced=[]
@@ -32,16 +46,11 @@ def main():
 		curve_sliced_relative.append(curve_sliced_relative_ith_layer)
 		curve_sliced.append(curve_sliced_ith_layer)
 
-	robot=robot_obj('MA2010_A0',def_path='../config/MA2010_A0_robot_default_config.yml',tool_file_path='../config/torch.csv',\
-		pulse2deg_file_path='../config/MA2010_A0_pulse2deg_real.csv',d=15)
-	positioner=positioner_obj('D500B',def_path='../config/D500B_robot_default_config.yml',tool_file_path='../config/positioner_tcp.csv',\
-		pulse2deg_file_path='../config/D500B_pulse2deg_real.csv',base_transformation_file='../config/D500B_pose.csv')
-
 
 	rr=redundancy_resolution(robot,positioner,curve_sliced)
 	H=np.loadtxt(data_dir+'curve_pose.csv',delimiter=',')
 
-	positioner_js=rr.positioner_resolution(curve_sliced_relative,q_seed=[1,4],cross_pi=True)		#solve for positioner first
+	positioner_js=rr.positioner_resolution(curve_sliced_relative,q_seed=q_positioner_seed)		#solve for positioner first
 	
 	###singularity js smoothing
 	positioner_js=rr.introducing_tolerance2(positioner_js)

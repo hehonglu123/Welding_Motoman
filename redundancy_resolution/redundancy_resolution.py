@@ -133,9 +133,9 @@ class redundancy_resolution(object):
 
 
 
-	def baseline_joint(self,R_torch,curve_sliced_relative,curve_sliced_relative_base,q_init=np.zeros(6),positioner_q_init=[0,-2]):
+	def baseline_joint(self,R_torch,curve_sliced_relative,curve_sliced_relative_base,q_init=np.zeros(6),q_positioner_seed=[0,-2]):
 		####baseline redundancy resolution, with fixed orientation
-		positioner_js=self.positioner_resolution(curve_sliced_relative,q_seed=positioner_q_init)		#solve for positioner first
+		positioner_js=self.positioner_resolution(curve_sliced_relative,q_seed=q_positioner_seed)		#solve for positioner first
 		
 		###singularity js smoothing
 		# positioner_js=self.conditional_rolling_average(positioner_js)
@@ -224,7 +224,7 @@ class redundancy_resolution(object):
 		return H_from_RT(R,T)
 
 		
-	def positioner_resolution(self,curve_sliced_relative,q_seed=[0,-1.],cross_pi=False):
+	def positioner_resolution(self,curve_sliced_relative,q_seed=[0,-1.]):
 		###resolve 2DOF positioner joint angle 
 		positioner_js=[]
 		q_prev=q_seed
@@ -233,27 +233,14 @@ class redundancy_resolution(object):
 			for x in range(len(curve_sliced_relative[i])):
 				positioner_js_ith_layer_xth_section=self.positioner.find_curve_js(-curve_sliced_relative[i][x][:,3:],q_prev)
 
-				# positioner_js_ith_layer_xth_section=[]
-				# for j in reversed(range(len(curve_sliced_relative[i][x]))):	###reverse, solve from the end because start may be upward
-				# 	###curve normal as torch orientation, opposite of positioner
-				# 	positioner_js_ith_layer_xth_section.append(self.positioner.inv(-curve_sliced_relative[i][x][j,3:],q_prev))
-				
-				# 	if cross_pi and i>0:	###otherwise just use previous q due to large change
-				# 		# if i==1:
-				# 		# 	print(q_prev)
-				# 		q_prev=positioner_js_ith_layer_xth_section[-1]
-				# if i>0:
-				# 	q_prev=np.average(positioner_js_ith_layer_xth_section,axis=0)
-				# positioner_js_ith_layer_xth_section.reverse()
-				# positioner_js_ith_layer_xth_section=np.array(positioner_js_ith_layer_xth_section)
-
 				###filter noise
-				# positioner_js_ith_layer_xth_section[:,0]=moving_average(positioner_js_ith_layer_xth_section[:,0],padding=True)
-				# positioner_js_ith_layer_xth_section[:,1]=moving_average(positioner_js_ith_layer_xth_section[:,1],n=15,padding=True)
+				positioner_js_ith_layer_xth_section[:,0]=moving_average(positioner_js_ith_layer_xth_section[:,0],padding=True)
+				positioner_js_ith_layer_xth_section[:,1]=moving_average(positioner_js_ith_layer_xth_section[:,1],n=15,padding=True)
 
 				positioner_js_ith_layer.append(np.array(positioner_js_ith_layer_xth_section))
 
 			positioner_js.append(positioner_js_ith_layer)
+
 
 		###first layer resolution
 		q_base=self.positioner.inv([0,0,1],positioner_js[0][0][0])
