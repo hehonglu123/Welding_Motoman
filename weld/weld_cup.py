@@ -66,7 +66,7 @@ client=MotionProgramExecClient()
 mp=MotionProgram(ROBOT_CHOICE='RB1',ROBOT_CHOICE2='ST1',pulse2deg=robot.pulse2deg,pulse2deg_2=positioner.pulse2deg, tool_num = 12)
 num_sections=12
 num_layer_start=int(1*layer_height_num)
-num_layer_end=int(5*layer_height_num)
+num_layer_end=int(15*layer_height_num)
 q_prev=np.loadtxt(data_dir+'curve_sliced_js/D500B_js0_0.csv',delimiter=',')[-1]
 
 for layer in range(num_layer_start,num_layer_end,layer_height_num):
@@ -108,7 +108,7 @@ for layer in range(num_layer_start,num_layer_end,layer_height_num):
 		# mp.setArc(True,cond_num=306)
 		for j in range(1,len(breakpoints)):
 			target2=['MOVJ',np.degrees(positioner_js[breakpoints[j]]),0.5]
-			mp.MoveL(np.degrees(curve_sliced_js[breakpoints[j]]), s1_all[j],target2=target2)
+			mp.MoveL(np.degrees(curve_sliced_js[breakpoints[j]]), max(s1_all[j],0.1),target2=target2)
 		# mp.setArc(False)
 
 		q_prev=positioner_js[breakpoints[-1]]

@@ -4,7 +4,7 @@ from matplotlib import cm
 from sklearn.preprocessing import normalize
 
 total_height=100
-z_offset=2
+z_offset=4
 line_resolution=1
 point_distance=0.5
 

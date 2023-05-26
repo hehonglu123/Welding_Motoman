@@ -14,7 +14,10 @@ with open('recording1/mti_recording.pickle', 'rb') as file:
 
 pc=[]
 for i in range(len(mti_recording)):
-    line_scan=np.vstack((np.zeros(len(mti_recording[i][0])),mti_recording[i])).T
+    indices=np.argwhere(mti_recording[i][1,:]>10).flatten() ###filter out bad points
+
+    line_scan=np.vstack((np.zeros(len(mti_recording[i][0])),mti_recording[i])).T[indices]
+
     pose=robot2.fwd(joint_recording[i])
     pc.extend(transform_curve(line_scan,H_from_RT(pose.R,pose.p)))
 

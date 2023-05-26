@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
 
-z_offset=2
+z_offset=4
 line_width=4
 # Define the range and resolution of the surface
 z = np.linspace(0, 100, 100)
