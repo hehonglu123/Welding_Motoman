@@ -65,9 +65,14 @@ client=MotionProgramExecClient()
 ###########################################layer welding############################################
 mp=MotionProgram(ROBOT_CHOICE='RB1',ROBOT_CHOICE2='ST1',pulse2deg=robot.pulse2deg,pulse2deg_2=positioner.pulse2deg, tool_num = 12)
 num_sections=12
-num_layer_start=int(1*layer_height_num)
-num_layer_end=int(15*layer_height_num)
-q_prev=np.loadtxt(data_dir+'curve_sliced_js/D500B_js0_0.csv',delimiter=',')[-1]
+num_layer_start=int(38*layer_height_num)
+num_layer_end=int(40*layer_height_num)
+q_prev=client.getJointAnglesDB(positioner.pulse2deg)
+
+if num_layer_start==1:
+	num_sections=12
+else:
+	num_sections=1
 
 for layer in range(num_layer_start,num_layer_end,layer_height_num):
 	num_sections_prev=num_sections
@@ -102,14 +107,14 @@ for layer in range(num_layer_start,num_layer_end,layer_height_num):
 			waypoint_q=robot.inv(waypoint_pose.p,waypoint_pose.R,curve_sliced_js[breakpoints[0]])[0]
 			mp.MoveL(np.degrees(waypoint_q), 10,target2=target2)
 
-		target2=['MOVJ',np.degrees(positioner_js[breakpoints[0]]),10]
+		target2=['MOVJ',np.degrees(positioner_js[breakpoints[0]]),15]
 		mp.MoveL(np.degrees(curve_sliced_js[breakpoints[0]]), s1_all[0],target2=target2)
 
-		# mp.setArc(True,cond_num=306)
+		mp.setArc(True,cond_num=300)
 		for j in range(1,len(breakpoints)):
-			target2=['MOVJ',np.degrees(positioner_js[breakpoints[j]]),0.5]
+			target2=['MOVJ',np.degrees(positioner_js[breakpoints[j]]),10]
 			mp.MoveL(np.degrees(curve_sliced_js[breakpoints[j]]), max(s1_all[j],0.1),target2=target2)
-		# mp.setArc(False)
+		mp.setArc(False)
 
 		q_prev=positioner_js[breakpoints[-1]]
 	

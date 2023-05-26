@@ -1,4 +1,4 @@
-import sys, glob
+import sys, glob, os
 sys.path.append('../toolbox/')
 from robot_def import *
 from lambda_calc import *
@@ -37,7 +37,7 @@ robot=robot_obj('MA2010_A0',def_path='../config/MA2010_A0_robot_default_config.y
 	pulse2deg_file_path='../config/MA2010_A0_pulse2deg_real.csv',d=15,  base_marker_config_file=config_dir+'MA2010_marker_config.yaml',\
 		tool_marker_config_file=config_dir+'weldgun_marker_config.yaml')
 positioner=positioner_obj('D500B',def_path='../config/D500B_robot_default_config.yml',tool_file_path='../config/positioner_tcp.csv',\
-	pulse2deg_file_path='../config/D500B_pulse2deg_real.csv',base_transformation_file='../config/D500B_pose.csv',\
+	pulse2deg_file_path='../config/D500B_pulse2deg_real.csv',base_transformation_file='../config/D500B_pose_mocap.csv',\
 	base_marker_config_file=config_dir+'D500B_marker_config.yaml',\
 	tool_marker_config_file=config_dir+'positioner_tcp_marker_config.yaml')
 
@@ -154,6 +154,8 @@ for layer in range(num_layer_start,num_layer_end,layer_height_num):
 		target2=['MOVJ',np.degrees(positioner_js[breakpoints[0]]),30]
 		mp.MoveL(np.degrees(curve_sliced_js[breakpoints[0]]), s1_all[0],target2=target2)
 
+		client.execute_motion_program(mp)###GO TO START POINT FIRST
+
 		for j in range(1,len(breakpoints)):
 			target2=['MOVJ',np.degrees(positioner_js[breakpoints[j]]),10]
 			mp.MoveL(np.degrees(curve_sliced_js[breakpoints[j]]), s1_all[j],target2=target2)
@@ -161,27 +163,28 @@ for layer in range(num_layer_start,num_layer_end,layer_height_num):
 		q_prev=curve_sliced_js[breakpoints[-1]]
 	
 
+	save_dir='recorded_data/slice_'+str(layer)
+	if not os.path.exists(save_dir):
+		os.mkdir(save_dir)
+	mpl_obj.run_pose_listener()
+	timestamp,joint_recording,job_line,_=client.execute_motion_program(mp) 
+	mpl_obj.stop_pose_listener()
+	curve_exe_dict,curve_exe_R_dict,timestamp_dict = mpl_obj.get_robots_traj()
 
-mpl_obj.run_pose_listener()
+	curve_exe = np.array(curve_exe_dict[robot.robot_name])
+	curve_exe_R = np.array(curve_exe_R_dict[robot.robot_name])
+	timestamp = np.array(timestamp_dict[robot.robot_name])
+	len_min=min(len(timestamp),len(curve_exe),len(curve_exe_R))
+	curve_exe=curve_exe[:len_min]
+	timestamp=timestamp[:len_min]
+	curve_exe_R=curve_exe_R[:len_min]
+	np.savetxt(save_dir+'/mocap_robot.csv',np.hstack((timestamp.reshape(-1, 1),curve_exe,R2w(curve_exe_R,np.eye(3)))),delimiter=',')
 
-timestamp,joint_recording,job_line,_=client.execute_motion_program(mp) 
-mpl_obj.stop_pose_listener()
-curve_exe_dict,curve_exe_R_dict,timestamp_dict = mpl_obj.get_robots_traj()
-
-curve_exe = np.array(curve_exe_dict[robot.robot_name])
-curve_exe_R = np.array(curve_exe_R_dict[robot.robot_name])
-timestamp = np.array(timestamp_dict[robot.robot_name])
-len_min=min(len(timestamp),len(curve_exe),len(curve_exe_R))
-curve_exe=curve_exe[:len_min]
-timestamp=timestamp[:len_min]
-curve_exe_R=curve_exe_R[:len_min]
-np.savetxt('recorded_data/mocap_robot.csv',np.hstack((timestamp.reshape(-1, 1),curve_exe,R2w(curve_exe_R,np.eye(3)))),delimiter=',')
-
-curve_exe = np.array(curve_exe_dict[positioner.robot_name])
-curve_exe_R = np.array(curve_exe_R_dict[positioner.robot_name])
-timestamp = np.array(timestamp_dict[positioner.robot_name])
-len_min=min(len(timestamp),len(curve_exe),len(curve_exe_R))
-curve_exe=curve_exe[:len_min]
-timestamp=timestamp[:len_min]
-curve_exe_R=curve_exe_R[:len_min]
-np.savetxt('recorded_data/mocap_positioner.csv',np.hstack((timestamp.reshape(-1, 1),curve_exe,R2w(curve_exe_R,np.eye(3)))),delimiter=',')
+	curve_exe = np.array(curve_exe_dict[positioner.robot_name])
+	curve_exe_R = np.array(curve_exe_R_dict[positioner.robot_name])
+	timestamp = np.array(timestamp_dict[positioner.robot_name])
+	len_min=min(len(timestamp),len(curve_exe),len(curve_exe_R))
+	curve_exe=curve_exe[:len_min]
+	timestamp=timestamp[:len_min]
+	curve_exe_R=curve_exe_R[:len_min]
+	np.savetxt(save_dir+'/mocap_positioner.csv',np.hstack((timestamp.reshape(-1, 1),curve_exe,R2w(curve_exe_R,np.eye(3)))),delimiter=',')

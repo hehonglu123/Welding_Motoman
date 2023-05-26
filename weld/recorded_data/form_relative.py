@@ -74,8 +74,8 @@ def main():
 	relative_path_exe, relative_path_exe_R=form_relative_path_mocap(curve_exe_data[:,1:4],w2R(curve_exe_data[:,4:],np.eye(3)),curve_exe_positioner_data[:,1:4],w2R(curve_exe_positioner_data[:,4:],np.eye(3)),robot,positioner)
 
 	H=np.eye(4)
-	# H[:3,-1]=np.average(relative_path_exe_gt,axis=0)-np.average(relative_path_exe,axis=0)
-	# H=icp_align2(relative_path_exe,relative_path_exe_gt,H=H,icp_turns = 10,threshold=0.0001,max_iteration=100000)
+	H[:3,-1]=np.average(relative_path_exe_gt,axis=0)-np.average(relative_path_exe,axis=0)
+	H=icp_align2(relative_path_exe,relative_path_exe_gt,H=H,icp_turns = 10,threshold=0.0001,max_iteration=100000)
 	# print(H)
 	relative_path_exe_transformed=transform_curve(relative_path_exe,H)
 
