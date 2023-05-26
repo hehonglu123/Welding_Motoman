@@ -85,7 +85,7 @@ class ScanPathGen():
         self.Ry_angle=Ry_angle
         self.bounds_theta=bounds_theta
 
-    def _gen_scan_path(self,all_curve_sliced_relative,all_layer,all_scan_angle):
+    def _gen_scan_path(self,all_curve_sliced_relative,all_layer,all_scan_angle,R_path):
 
         ### path gen ###
         scan_p=[]
@@ -220,7 +220,11 @@ class ScanPathGen():
         scan_p=deepcopy(scan_p_detail)
         scan_R=deepcopy(scan_R_detail)
 
-        # visualize_frames(scan_R,scan_p,size=3)
+        for i in range(len(scan_R)):
+            scan_R[i] = np.matmul(scan_R[i],R_path)
+        
+        # visualize_frames(scan_R[::100],scan_p[::100],size=3)
+        print(scan_R[0])
 
         return scan_p,scan_R
     
@@ -298,7 +302,7 @@ class ScanPathGen():
         
         return q_out1,q_out2
     
-    def gen_scan_path(self,all_curve_sliced_relative,all_layer,all_scan_angle,solve_js_method=1,q_init_table=np.radians([-15,180]),scan_path_dir=None):
+    def gen_scan_path(self,all_curve_sliced_relative,all_layer,all_scan_angle,solve_js_method=1,q_init_table=np.radians([-15,180]),R_path=np.eye(3),scan_path_dir=None):
         
         try:
             scan_T=np.loadtxt(scan_path_dir + 'scan_T.csv',delimiter=',')
@@ -312,7 +316,7 @@ class ScanPathGen():
             q_out2=np.loadtxt(scan_path_dir + 'scan_js2.csv',delimiter=',')
         except:
             # generate cartesian path
-            scan_p,scan_R = self._gen_scan_path(all_curve_sliced_relative,all_layer,all_scan_angle)
+            scan_p,scan_R = self._gen_scan_path(all_curve_sliced_relative,all_layer,all_scan_angle,R_path)
             # generate joint space path
             q_out1,q_out2 = self._gen_js_path(scan_p,scan_R,solve_js_method,q_init_table)
             if scan_path_dir:
