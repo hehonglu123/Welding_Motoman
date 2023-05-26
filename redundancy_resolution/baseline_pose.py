@@ -7,12 +7,12 @@ from robot_def import *
 
 
 def main():
-	dataset='blade0.1/'
-	sliced_alg='auto_slice/'
+	dataset='cup/'
+	sliced_alg='circular_slice/'
 	data_dir='../data/'+dataset+sliced_alg
-	num_layers=757
+	num_layers=105
 	base_thickness=3
-	num_baselayers=2
+	num_baselayers=0
 	curve_sliced=[]
 	for i in range(num_layers):
 		###get number of disconnected sections
@@ -79,7 +79,7 @@ def main():
 			np.savetxt(data_dir+'curve_sliced_relative/baselayer'+str(i)+'_'+str(x)+'.csv',curve_sliced_relative_base[i][x],delimiter=',')
 
 
-	plt.title('0.1 blade first '+str(num_layers)+' slices')
+	plt.title(dataset[:-1]+' first '+str(num_layers)+' slices')
 	plt.show()
 
 
