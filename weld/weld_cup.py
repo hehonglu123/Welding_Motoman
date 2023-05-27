@@ -65,9 +65,10 @@ client=MotionProgramExecClient()
 ###########################################layer welding############################################
 mp=MotionProgram(ROBOT_CHOICE='RB1',ROBOT_CHOICE2='ST1',pulse2deg=robot.pulse2deg,pulse2deg_2=positioner.pulse2deg, tool_num = 12)
 num_sections=12
-num_layer_start=int(38*layer_height_num)
-num_layer_end=int(40*layer_height_num)
-q_prev=client.getJointAnglesDB(positioner.pulse2deg)
+num_layer_start=int(1*layer_height_num)
+num_layer_end=int(10*layer_height_num)
+# q_prev=client.getJointAnglesDB(positioner.pulse2deg)
+q_prev=np.array([9.53E-02,-2.71E+00])
 
 if num_layer_start==1:
 	num_sections=12
@@ -97,7 +98,7 @@ for layer in range(num_layer_start,num_layer_end,layer_height_num):
 		else:
 			breakpoints=np.linspace(len(curve_sliced_js)-1,0,num=num_points_layer).astype(int)
 
-		s1_all,_=calc_individual_speed(vd_relative,lam1,lam2,lam_relative,breakpoints)
+		s1_all,s2_all=calc_individual_speed(vd_relative,lam1,lam2,lam_relative,breakpoints)
 		
 		###move to intermidieate waypoint for collision avoidance if multiple section
 		if num_sections>1 or num_sections<num_sections_prev:
@@ -112,7 +113,8 @@ for layer in range(num_layer_start,num_layer_end,layer_height_num):
 
 		mp.setArc(True,cond_num=300)
 		for j in range(1,len(breakpoints)):
-			target2=['MOVJ',np.degrees(positioner_js[breakpoints[j]]),10]
+			positioner_w=vd_relative/np.linalg.norm(curve_sliced_relative[breakpoints[j]][:2])
+			target2=['MOVJ',np.degrees(positioner_js[breakpoints[j]]),100*positioner_w/positioner.joint_vel_limit[1]]
 			mp.MoveL(np.degrees(curve_sliced_js[breakpoints[j]]), max(s1_all[j],0.1),target2=target2)
 		mp.setArc(False)
 

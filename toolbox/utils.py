@@ -97,7 +97,7 @@ def interplate_timestamp(curve,timestamp,timestamp_d):
 	return np.array(curve_new).T
 
 	
-def replace_outliers2(data,threshold=0.0001):
+def replace_outliers2(data,rolling_window=30,threshold=0.0001):
 	###replace outlier with rolling average
 	rolling_window=30
 	rolling_window_half=int(rolling_window/2)
@@ -111,6 +111,20 @@ def replace_outliers(data, m=2):
 	###replace outlier with average
 	data[abs(data - np.mean(data)) > m * np.std(data)] = np.mean(data)
 	return data
+
+def identify_outliers2(data,rolling_window=30,threshold=0.0001):
+	###detect outlier with rolling average
+	indices=[]
+	rolling_window=30
+	rolling_window_half=int(rolling_window/2)
+	for i in range(rolling_window_half,len(data)-rolling_window_half):
+		rolling_avg=np.mean(data[i-rolling_window_half:i+rolling_window_half])
+		if np.abs(data[i]-rolling_avg)>threshold*rolling_avg:
+			indices.append(i)
+	return indices
+
+def identify_outliers(data,m=2):
+	return np.argwhere(abs(data - np.mean(data)) > m * np.std(data)).flatten()
 
 def quadrant(q,robot):
 	cf146=np.floor(np.array([q[0],q[3],q[5]])/(np.pi/2))
