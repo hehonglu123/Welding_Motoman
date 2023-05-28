@@ -21,45 +21,44 @@ def transform_curve(curve,H):
 		return curve_new
 
 def vector_to_plane(point, centroid, normal):		###find the vector from point to plane
-    return  np.dot(centroid - point,normal)*normal
+	return  np.dot(centroid - point,normal)*normal
 
 def point2plane_distance(p,centroid,normal):
 	return np.abs(np.dot(p - centroid, normal) / np.linalg.norm(normal))
 
 def fit_plane(points):
-    # Calculate the centroid of the points
-    centroid = np.mean(points, axis=0)
+	# Calculate the centroid of the points
+	centroid = np.mean(points, axis=0)
 
-    # Center the points by subtracting the centroid
-    centered_points = points - centroid
+	# Center the points by subtracting the centroid
+	centered_points = points - centroid
 
-    # Calculate the SVD of the centered points
-    u, s, vh = np.linalg.svd(centered_points)
+	# Calculate the SVD of the centered points
+	u, s, vh = np.linalg.svd(centered_points)
 
-    # The normal vector of the plane is the last column of vh
-    normal = vh[-1]
+	# The normal vector of the plane is the last column of vh
+	normal = vh[-1]
 
-    return normal, centroid
+	return normal, centroid
 
 def pose_regression(A,B):
 	###find transformation between ordered point lists A and B with regression
-    center_A = np.mean(A,axis=0)
-    center_B = np.mean(B,axis=0)
+	center_A = np.mean(A,axis=0)
+	center_B = np.mean(B,axis=0)
 
-    A_centered = A-center_A
-    B_centered = B-center_B
-    H = np.matmul(A_centered.T,B_centered)
-    u,s,vT = np.linalg.svd(H)
-    R = np.matmul(vT.T,u.T)
-    if np.linalg.det(R)<0:
-        u,s,v = np.linalg.svd(R)
-        v=v.T
-        v[:,2] = v[:,2]*-1
-        R = np.matmul(v,u.T)
+	A_centered = A-center_A
+	B_centered = B-center_B
+	H = np.matmul(A_centered.T,B_centered)
+	u,s,vT = np.linalg.svd(H)
 
-    t = center_B-np.dot(R,center_A)
+	R = np.matmul(vT.T,u.T)
+	if np.linalg.det(R)<0:
+		vT[2,:] *= -1
+		R = vT.T @ u.T
 
-    return R,t
+	t = center_B-np.dot(R,center_A)
+
+	return H_from_RT(R,t)
 
 
 def find_norm(p1,p2,p3):
@@ -266,6 +265,17 @@ def linear_interp(x,y):
 	x_new=np.linspace(x[0],x[-1],len(x))
 	return x_new, f(x_new).T
 
+def moving_averageNd(a,n=5,padding=False):
+	a_avg = []
+
+	for dim in range(a.shape[1]):
+		a_temp=a[:, dim]
+		if padding:
+			a_temp=np.hstack(([np.mean(a_temp[:int(n/2)])]*int(n/2),a_temp,[np.mean(a_temp[-int(n/2):])]*int(n/2)))
+		
+		a_avg.append(np.convolve(a_temp, np.ones(n), mode='valid') / n)
+	return np.array(a_avg).T
+
 def moving_average(a, n=11, padding=False):
 	#n needs to be odd for padding
 	if padding:
@@ -409,8 +419,8 @@ def plot_speed_error(lam,speed,error,angle_error,cmd_v,peaks=[],path='',error_wi
 
 def unwrapped_angle_check(q_init,q_all):
 
-    temp_q=q_all-q_init
-    temp_q = np.unwrap(temp_q)
-    order=np.argsort(np.linalg.norm(temp_q,axis=1))
-    # return q_all[order[0]]
-    return temp_q[order[0]]+q_init
+	temp_q=q_all-q_init
+	temp_q = np.unwrap(temp_q)
+	order=np.argsort(np.linalg.norm(temp_q,axis=1))
+	# return q_all[order[0]]
+	return temp_q[order[0]]+q_init

@@ -11,17 +11,20 @@ from scipy.signal import find_peaks
 def curve_segmentation(curve_all):
 	
 	return
-def equalize_curve_spacing(curve,num_points):
+def equalize_curve_spacing(curve,num_points,iteration=2):
 	###linearly interpolate a given curve with equally spaced num_points points
-	lam=calc_lam_cs(curve)
-	lam_new=np.linspace(0,lam,num_points)
-	curve_new=[curve[0]]
-	for i in range(1,len(lam)-1):
-		idx=np.sort(np.argsort(lam-lam_new[i])[:2])	###find closest 2 path indices
-		weight=(lam_new[i]-lam[idx[0]])/(lam[idx[1]]-lam[idx[0]])	###calc weight between 2 points
-		curve_new.append(weight*curve[idx[0]]+(1-weight)*curve[idx[1]])
+	#iteration given the case with zigzag redundant motion
 
-	return np.array(curve_new)
+	for i in range(iteration):
+		lam=calc_lam_cs(curve)
+		lam_new=np.linspace(0,lam[-1],num_points)
+		curve_new=[curve[0]]
+		for i in range(1,num_points):
+			idx=np.argsort(np.abs(lam - lam_new[i]))[:2]	###find closest 2 path indices
+			weight=(lam_new[i]-lam[idx[0]])/(lam[idx[1]]-lam[idx[0]])	###calc weight between 2 points
+			curve_new.append(weight*curve[idx[0]]+(1-weight)*curve[idx[1]])
+		curve=np.array(curve_new)
+	return curve
 
 def calc_curvature(curve):
 	lam=calc_lam_cs(curve)
