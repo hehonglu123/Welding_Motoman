@@ -37,7 +37,7 @@ layer_height=0.8
 # 	mp.setArc(False)
 # 	client.execute_motion_program(mp)
 
-for i in range(2,3):
+for i in range(7,8):
 	if i%2==0:
 		p1=p_start+np.array([0,0,2*base_layer_height+i*layer_height])
 		p2=p_end+np.array([0,0,2*base_layer_height+i*layer_height])

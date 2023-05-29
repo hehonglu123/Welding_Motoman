@@ -54,21 +54,21 @@ client=MotionProgramExecClient()
 # 	target2=['MOVJ',np.degrees(positioner_js[breakpoints[0]]),10]
 # 	mp.MoveL(np.degrees(curve_sliced_js[breakpoints[0]]), s1_all[0],target2=target2)
 
-# 	# mp.setArc(True,cond_num=310)
+# 	mp.setArc(True,cond_num=310)
 # 	for j in range(1,len(breakpoints)):
 # 		target2=['MOVJ',np.degrees(positioner_js[breakpoints[j]]),1]
 # 		mp.MoveL(np.degrees(curve_sliced_js[breakpoints[j]]), s1_all[j],target2=target2)
-# 	# mp.setArc(False)
+# 	mp.setArc(False)
 
 	
 
 ###########################################layer welding############################################
 mp=MotionProgram(ROBOT_CHOICE='RB1',ROBOT_CHOICE2='ST1',pulse2deg=robot.pulse2deg,pulse2deg_2=positioner.pulse2deg, tool_num = 12)
 num_sections=12
-num_layer_start=int(1*layer_height_num)
-num_layer_end=int(10*layer_height_num)
-# q_prev=client.getJointAnglesDB(positioner.pulse2deg)
-q_prev=np.array([9.53E-02,-2.71E+00])
+num_layer_start=int(44*layer_height_num)
+num_layer_end=int(46*layer_height_num)
+q_prev=client.getJointAnglesDB(positioner.pulse2deg)
+# q_prev=np.array([9.53E-02,-2.71E+00])
 
 if num_layer_start==1:
 	num_sections=12
