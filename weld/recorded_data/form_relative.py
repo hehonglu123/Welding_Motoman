@@ -93,7 +93,6 @@ def main():
 	H=np.eye(4)
 	# H[:3,-1]=np.average(np.vstack(relative_gt_all),axis=0)-np.average(np.vstack(relative_path_exe_all),axis=0)
 	# H=icp_align2(np.vstack(relative_path_exe_all),np.vstack(relative_gt_all),H=H,icp_turns = 10,threshold=0.0001,max_iteration=100000)
-	# H=pose_regression(np.vstack(relative_path_exe_all_downsampled),np.vstack(relative_gt_all))
 	H=pose_regression(relative_path_exe_all_downsampled[1],relative_gt_all[1])
 	# print(H)
 

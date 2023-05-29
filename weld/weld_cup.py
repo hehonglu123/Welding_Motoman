@@ -8,11 +8,11 @@ from WeldSend import *
 
 
 dataset='cup/'
-sliced_alg='circular_slice/'
+sliced_alg='circular_slice_shifted/'
 data_dir='../data/'+dataset+sliced_alg
 
 waypoint_distance=5 	###waypoint separation
-layer_height_num=int(1.1/1.)
+layer_height_num=int(1./1.)
 curve_sliced_js=[]
 positioner_js=[]
 
