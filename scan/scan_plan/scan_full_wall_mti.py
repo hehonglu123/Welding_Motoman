@@ -63,7 +63,7 @@ T_S1TCP_R1Base = np.linalg.inv(np.matmul(turn_table.base_H,H_from_RT(Table_home_
 
 data_dir='../../data/wall_weld_test/full_test_mti/'
 ######### enter your wanted z height #######
-all_layer_z = [0,30]
+all_layer_z = [20,37]
 ###########################################
 all_path_T = robot_weld_path_gen(all_layer_z)
 all_curve_sliced_relative=[]
@@ -87,16 +87,16 @@ print(robot_scan.fwd(zero_config))
 
 ### scan parameters
 scan_speed=10 # scanning speed (mm/sec)
-scan_stand_off_d = 50 ## mm
+scan_stand_off_d = 70 ## mm
 Rz_angle = np.radians(0) # point direction w.r.t welds
 Ry_angle = np.radians(0) # rotate in y a bit, z-axis not pointing down, to have ik solution
 # Rz_angle = np.radians(0) # point direction w.r.t welds
 # Ry_angle = np.radians(0) # rotate in y a bit, z-axis not pointing down, to have ik solution
 
-bounds_theta = np.radians(10) ## circular motion at start and end
+bounds_theta = np.radians(20) ## circular motion at start and end
 
 ## scan angle
-all_scan_angle = np.radians([-30,30]) ## scanning angless
+all_scan_angle = np.radians([-45,45]) ## scanning angless
 # all_scan_angle = np.radians([0]) ## scanning angless
 
 ######### enter your wanted layers #######
@@ -107,13 +107,16 @@ out_dir = data_dir+''
 
 # path gen
 spg = ScanPathGen(robot_scan,turn_table,scan_stand_off_d,Rz_angle,Ry_angle,bounds_theta)
-q_init_table=np.radians([-45,30])
+q_init_table=np.radians([-15,90])
 # q_init_table=np.radians([-15,180])
 
 ### the default coordinate is x pointing right, y pointing front and z pointing up
-mti_Rpath = np.array([[ 0.,-1.,0.],   
-                    [ 0.,0.,1.],
-                    [-1.,0.,0.]])
+# mti_Rpath = np.array([[ 0.,-1.,0.],   
+#                     [ 0.,0.,1.],
+#                     [-1.,0.,0.]])
+mti_Rpath = np.array([[ 1.,0.,0.],   
+                    [ 0.,-1.,0.],
+                    [0.,0.,-1.]])
 
 scan_p,scan_R,q_out1,q_out2=spg.gen_scan_path(all_curve_sliced_relative,all_layer,all_scan_angle,\
                   solve_js_method=1,q_init_table=q_init_table,R_path=mti_Rpath,scan_path_dir=None)
@@ -134,7 +137,7 @@ use_artec_studio=False
 input("Press Enter to start moving")
 
 ## move to start
-to_start_speed=3
+to_start_speed=2
 mp = MotionProgram(ROBOT_CHOICE='RB2',ROBOT_CHOICE2='ST1',pulse2deg=robot_scan.pulse2deg,pulse2deg_2=turn_table.pulse2deg)
 target2=['MOVJ',np.degrees(q_bp2[0][0]),to_start_speed]
 mp.MoveJ(np.degrees(q_bp1[0][0]), to_start_speed, 0, target2=target2)
@@ -208,5 +211,5 @@ Path(out_scan_dir).mkdir(exist_ok=True)
 # save poses
 np.savetxt(out_scan_dir + 'scan_js_exe.csv',q_out_exe,delimiter=',')
 np.savetxt(out_scan_dir + 'robot_stamps.csv',robot_stamps,delimiter=',')
-with open('mti_scans.pickle', 'wb') as file:
+with open(out_scan_dir+'mti_scans.pickle', 'wb') as file:
     pickle.dump(mti_recording, file)
