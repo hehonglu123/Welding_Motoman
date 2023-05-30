@@ -57,13 +57,16 @@ turn_table=positioner_obj('D500B',def_path=config_dir+'D500B_robot_default_confi
     base_transformation_file=config_dir+'D500B_pose.csv',pulse2deg_file_path=config_dir+'D500B_pulse2deg_real.csv',\
     base_marker_config_file=config_dir+'D500B_marker_config.yaml',tool_marker_config_file=config_dir+'positioner_tcp_marker_config.yaml')
 
+# print(robot_scan.fwd(zero_config))
+# exit()
+
 ## wall test path
 Table_home_T = turn_table.fwd(np.radians([-15,0]))
 T_S1TCP_R1Base = np.linalg.inv(np.matmul(turn_table.base_H,H_from_RT(Table_home_T.R,Table_home_T.p)))
 
 data_dir='../../data/wall_weld_test/top_layer_test_mti/'
 ######### enter your wanted z height #######
-all_layer_z = [30]
+all_layer_z = [37]
 ###########################################
 all_path_T = robot_weld_path_gen(all_layer_z)
 all_curve_sliced_relative=[]
@@ -83,11 +86,9 @@ turn_table.base_H = H_from_RT(turn_table.T_base_basemarker.R,turn_table.T_base_b
 T_to_base = Transform(np.eye(3),[0,0,-380])
 turn_table.base_H = np.matmul(turn_table.base_H,H_from_RT(T_to_base.R,T_to_base.p))
 
-print(robot_scan.fwd(zero_config))
-
 ### scan parameters
 scan_speed=10 # scanning speed (mm/sec)
-scan_stand_off_d = 50 ## mm
+scan_stand_off_d = 70 ## mm
 Rz_angle = np.radians(0) # point direction w.r.t welds
 Ry_angle = np.radians(0) # rotate in y a bit, z-axis not pointing down, to have ik solution
 # Rz_angle = np.radians(0) # point direction w.r.t welds
@@ -114,6 +115,9 @@ q_init_table=np.radians([-30,0])
 mti_Rpath = np.array([[ 0.,-1.,0.],   
                     [ 0.,0.,1.],
                     [-1.,0.,0.]])
+mti_Rpath = np.array([[ 1.,0.,0.],   
+                    [ 0.,-1.,0.],
+                    [0.,0.,-1.]])
 
 scan_p,scan_R,q_out1,q_out2=spg.gen_scan_path(all_curve_sliced_relative,all_layer,all_scan_angle,\
                   solve_js_method=0,q_init_table=q_init_table,R_path=mti_Rpath,scan_path_dir=None)
@@ -125,6 +129,7 @@ scan_p,scan_R,q_out1,q_out2=spg.gen_scan_path(all_curve_sliced_relative,all_laye
 q_bp1,q_bp2,s1_all,s2_all=spg.gen_motion_program(q_out1,q_out2,scan_p,scan_speed,init_sync_move=0)
 
 print(np.degrees(q_bp1))
+print(np.degrees(q_bp2))
 
 # exit()
 
@@ -178,7 +183,7 @@ while True:
         timestamp=data[0]+data[1]*1e-9
         robot_stamps.append(timestamp)
         ###MTI scans YZ point from tool frame
-        mti_recording.append(np.array([-mti_client.lineProfile.X_data,mti_client.lineProfile.Z_data]))
+        mti_recording.append(deepcopy(np.array([mti_client.lineProfile.X_data,mti_client.lineProfile.Z_data])))
 robot_client.servoMH(False)
 
 mti_recording=np.array(mti_recording)
@@ -208,5 +213,5 @@ Path(out_scan_dir).mkdir(exist_ok=True)
 # save poses
 np.savetxt(out_scan_dir + 'scan_js_exe.csv',q_out_exe,delimiter=',')
 np.savetxt(out_scan_dir + 'robot_stamps.csv',robot_stamps,delimiter=',')
-with open('mti_scans.pickle', 'wb') as file:
+with open(out_scan_dir + 'mti_scans.pickle', 'wb') as file:
     pickle.dump(mti_recording, file)

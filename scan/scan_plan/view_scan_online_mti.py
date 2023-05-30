@@ -21,19 +21,20 @@ import math
 mti_client = RRN.ConnectService("rr+tcp://192.168.55.10:60830/?service=MTI2D")
 mti_client.setExposureTime("25")
 
-scan_points=np.array([-mti_client.lineProfile.X_data,mti_client.lineProfile.Z_data])
+scan_points=np.array([mti_client.lineProfile.X_data,np.zeros(len(mti_client.lineProfile.Z_data)),mti_client.lineProfile.Z_data,])
+scan_points=scan_points.T
 
 pcd = o3d.geometry.PointCloud()
 pcd.points=o3d.utility.Vector3dVector(scan_points)
 
-d=50
+d=75
 width=0.5
 height=0.5
 bbox_mesh = o3d.geometry.TriangleMesh.create_box(width=width, height=height, depth=d)
 box_move=np.eye(4)
 box_move[0,3]=-width/2 # x-axis
 box_move[1,3]=-height/2 # y-axis
-box_move[2,3]=-d
+box_move[2,3]=0
 bbox_mesh.transform(box_move)
 
 visualize_pcd([pcd,bbox_mesh])
