@@ -19,29 +19,27 @@ def raw_data_filtering(single_scan):
 robot2=robot_obj('MA1440_A0',def_path='../config/MA1440_A0_robot_default_config.yml',tool_file_path='../config/mti.csv',\
     pulse2deg_file_path='../config/MA1440_A0_pulse2deg_real.csv')
 
-joint_recording=np.loadtxt('recording2/joint_recording.csv',delimiter=',')
-with open('recording2/mti_recording.pickle', 'rb') as file:
+joint_recording=np.loadtxt('recording3/joint_recording.csv',delimiter=',')
+with open('recording3/mti_recording.pickle', 'rb') as file:
     mti_recording=pickle.load(file)
 
 pc=[]
 fig = plt.figure(1)
 
 
-# for i in range(len(mti_recording)):
-#     line_scan=raw_data_filtering(mti_recording[i]) ###filter out bad points
-#     line_scan=np.vstack((np.zeros(len(line_scan[0])),line_scan)).T
+for i in range(len(mti_recording)):
+    line_scan=raw_data_filtering(mti_recording[i].T) ###filter out bad points
+    plt.plot(line_scan[:,0],line_scan[:,1], "x")
+    plt.xlim(-30,30)
+    plt.ylim(0,120)
+    plt.title('SCAN'+str(i))
+    plt.pause(0.001)
+    plt.clf()
 
-#     plt.plot(line_scan[0],line_scan[1], "x")
-#     plt.xlim(-30,30)
-#     plt.ylim(0,120)
-#     plt.pause(0.001)
-#     plt.clf()
 
-
-i=449
-line_scan=raw_data_filtering(mti_recording[i]) ###filter out bad points
-
-plt.plot(line_scan[0],line_scan[1], "x")
-plt.xlim(-30,30)
-plt.ylim(0,120)
-plt.show()
+# i=449
+# line_scan=raw_data_filtering(mti_recording[i].T) ###filter out bad points
+# plt.plot(line_scan[:,0],line_scan[:,1], "x")
+# plt.xlim(-30,30)
+# plt.ylim(0,120)
+# plt.show()

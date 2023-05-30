@@ -23,13 +23,14 @@ def raw_data_filtering(single_scan, noise_filter=False):
 robot2=robot_obj('MA1440_A0',def_path='../config/MA1440_A0_robot_default_config.yml',tool_file_path='../config/mti.csv',\
     pulse2deg_file_path='../config/MA1440_A0_pulse2deg_real.csv')
 
-joint_recording=np.loadtxt('recording1/joint_recording.csv',delimiter=',')
-with open('recording1/mti_recording.pickle', 'rb') as file:
+joint_recording=np.loadtxt('recording3/joint_recording.csv',delimiter=',')
+with open('recording3/mti_recording.pickle', 'rb') as file:
     mti_recording=pickle.load(file)
 
 pc=[]
-for i in range(len(mti_recording)):
-    line_scan=raw_data_filtering(mti_recording[i].T,noise_filter=True) ###filter out bad points
+for i in range(0,len(mti_recording),5):
+    line_scan=raw_data_filtering(mti_recording[i].T,noise_filter=False) ###filter out bad points
+    # line_scan[:,0]=-line_scan[:,0]
     line_scan=np.hstack((np.zeros((len(line_scan),1)),line_scan))
 
     pose=robot2.fwd(joint_recording[i])
