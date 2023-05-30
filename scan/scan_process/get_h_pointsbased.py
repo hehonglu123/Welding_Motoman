@@ -29,7 +29,7 @@ config_dir='../../config/'
 scanned_points = o3d.io.read_point_cloud(data_dir+'processed_pcd.pcd')
 print(len(scanned_points.points))
 
-visualize_pcd([scanned_points])
+# visualize_pcd([scanned_points])
 
 ###################### get the welding pieces ##################
 # This part will be replaced by welding path in the future
@@ -65,7 +65,7 @@ bbox_mesh.transform(box_move)
 bbox_min=(-40,-20,0)
 bbox_max=(40,20,45)
 
-visualize_pcd([scanned_points,bbox_mesh])
+# visualize_pcd([scanned_points,bbox_mesh])
 ##################### get welding pieces end ########################
 
 
@@ -77,7 +77,7 @@ z_height_start=35
 resolution_z=0.1
 windows_z=0.2
 resolution_x=0.1
-windows_x=0.5
+windows_x=1
 stop_thres=20
 stop_thres_w=10
 use_points_num=5 # use the largest/smallest N to compute w
@@ -158,8 +158,21 @@ profile_height_arr = []
 for x in profile_height.keys():
     profile_height_arr.append(np.array([x,profile_height[x]]))
 profile_height_arr=np.array(profile_height_arr)
-plt.scatter(profile_height_arr[:,0],profile_height_arr[:,1])
+
+profile_height_arr_argsort = np.argsort(profile_height_arr[:,0])
+profile_height_arr=profile_height_arr[profile_height_arr_argsort]
+
+# plt.scatter(profile_height_arr[:,0],profile_height_arr[:,1])
+# plt.show()
+
+profile_height=profile_height_arr
+profile_slope = np.diff(profile_height[:,1])/np.diff(profile_height[:,0])
+
+plt.scatter(profile_height_arr[:,0],profile_height_arr[:,1]-np.mean(profile_height_arr[:,1]))
+plt.plot(profile_height[1:,0],profile_slope)
 plt.show()
+
+
 
 # pickle.dump(all_welds_width, open(data_dir+'all_welds_width.pickle','wb'))
 # pickle.dump(all_welds_height, open(data_dir+'all_welds_height.pickle','wb'))
