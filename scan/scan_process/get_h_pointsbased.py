@@ -21,14 +21,15 @@ import pickle
 
 table_colors = list(mcolors.TABLEAU_COLORS.values())
 
-data_dir='../../data/wall_weld_test/top_layer_test/scans/'
+# data_dir='../../data/wall_weld_test/top_layer_test/scans/'
+data_dir='../../data/wall_weld_test/top_layer_test_mti/scans/'
 config_dir='../../config/'
 
 ######## read the combined point clouds
 scanned_points = o3d.io.read_point_cloud(data_dir+'processed_pcd.pcd')
 print(len(scanned_points.points))
 
-# visualize_pcd([scanned_points])
+visualize_pcd([scanned_points])
 
 ###################### get the welding pieces ##################
 # This part will be replaced by welding path in the future
@@ -76,7 +77,7 @@ z_height_start=35
 resolution_z=0.1
 windows_z=0.2
 resolution_x=0.1
-windows_x=1
+windows_x=0.5
 stop_thres=20
 stop_thres_w=10
 use_points_num=5 # use the largest/smallest N to compute w
@@ -86,7 +87,6 @@ width_thres=0.8 # prune width that is too close
 profile_height = {}
 z_max=np.max(np.asarray(scanned_points.points)[:,2])
 for z in np.arange(z_height_start,z_max+resolution_z,resolution_z):
-    print(z)
     #### crop z height
     min_bound = (-1e5,-1e5,z-windows_z/2)
     max_bound = (1e5,1e5,z+windows_z/2)

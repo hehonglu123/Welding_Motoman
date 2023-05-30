@@ -20,13 +20,8 @@ class ScanProcess():
         self.robot=robot
         self.positioner=positioner
     
-    def pcd_register(self,all_scan_points,scan_stamps,rob_js_exe,rob_stamps):
-
-        ## parameters need
-        threshold = 5
-        rmse_search_step=100
-        voxel_size=0.1
-        static_positioner_q = np.radians([-60,180])
+    def pcd_register(self,all_scan_points,scan_stamps,rob_js_exe,rob_stamps,voxel_size=0.1,static_positioner_q = np.radians([-60,180]),\
+                     icp_threshold = 5,rmse_search_step=100):
         
         ## auto get timestamp where scans/robot start moving
         scan_start_rmse=0.7
@@ -90,7 +85,7 @@ class ScanProcess():
             pcd_t1 = pcd_t1.voxel_down_sample(voxel_size=voxel_size)
 
             evaluation = o3d.pipelines.registration.evaluate_registration(
-                            pcd_t1, pcd_t0, threshold, np.eye(4))
+                            pcd_t1, pcd_t0, icp_threshold, np.eye(4))
             if evaluation.inlier_rmse<rmse_low:
                 rmse_low=evaluation.inlier_rmse
                 rmse_i=search_i
@@ -138,9 +133,39 @@ class ScanProcess():
             pcd = o3d.geometry.PointCloud()
             pcd.points=o3d.utility.Vector3dVector(scan_points)
 
-            ## paint pcd for visualization
-            color_dist = plt.get_cmap("rainbow")((scan_i-scan_i_start)/(scan_N-scan_i_start))
-            pcd = pcd.paint_uniform_color(color_dist[:3])
+            if pcd_combined is None:
+                pcd_combined=deepcopy(pcd)
+            else:
+                pcd_combined+=pcd
+        
+        return pcd_combined
+    
+    def pcd_register_mti(self,all_scan_points,rob_js_exe,rob_stamps,voxel_size=0.05,static_positioner_q=np.radians([-60,180])):
+
+        pcd_combined = None
+        scan_N = len(rob_stamps) ## total scans
+        for scan_i in range(scan_N):
+
+            if len(rob_js_exe[scan_i])<=6:
+                robt_T = self.robot.fwd(rob_js_exe[scan_i],world=True) # T_world^r2tool
+                T_origin = self.positioner.fwd(static_positioner_q,world=True).inv() # T_tabletool^world
+            else:
+                robt_T = self.robot.fwd(rob_js_exe[scan_i][:6],world=True) # T_world^r2tool
+                T_origin = self.positioner.fwd(rob_js_exe[scan_i][6:],world=True).inv() # T_tabletool^world
+                # T_origin = turn_table.fwd(np.radians([-30,0]),world=True).inv()
+            T_rob_positioner_top = T_origin*robt_T
+
+            scan_points=deepcopy(all_scan_points[scan_i])
+            scan_points = np.insert(scan_points,1,np.zeros(len(scan_points[0])),axis=0)
+            scan_points = scan_points.T
+            ## get the points closed to origin
+            scan_points = np.transpose(np.matmul(T_rob_positioner_top.R,np.transpose(scan_points)))+T_rob_positioner_top.p
+            # use legacy
+            pcd = o3d.geometry.PointCloud()
+            pcd.points=o3d.utility.Vector3dVector(scan_points)
+            
+            ## voxel down sample
+            pcd = pcd.voxel_down_sample(voxel_size=voxel_size)
 
             if pcd_combined is None:
                 pcd_combined=deepcopy(pcd)
@@ -149,25 +174,8 @@ class ScanProcess():
         
         return pcd_combined
     
-    def pcd_noise_remove(self,pcd_combined):
-
-        voxel_down_flag=True
-        crop_flag=True
-        outlier_remove=True
-        cluster_based_outlier_remove=True
-
-        ####### processing parameters
-        voxel_size=0.1
-        ## crop focused region
-        min_bound = (-50,-30,-10)
-        max_bound = (50,30,50)
-        ## outlier removal
-        nb_neighbors=40
-        std_ratio=0.5
-        ## clustering
-        cluster_neighbor=0.75
-        min_points=50*4
-        ######################
+    def pcd_noise_remove(self,pcd_combined,voxel_down_flag=True,voxel_size=0.1,crop_flag=True,min_bound=(-50,-30,-10),max_bound=(50,30,50),\
+                         outlier_remove=True,nb_neighbors=40,std_ratio=0.5,cluster_based_outlier_remove=True,cluster_neighbor=0.75,min_points=50*4):
 
         ## crop point clouds
         if crop_flag:
@@ -197,24 +205,24 @@ class ScanProcess():
         
         return pcd_combined
 
-    def pcd2height(self,scanned_points,z_height_start):
+    def pcd2height(self,scanned_points,z_height_start,resolution_z=0.1,windows_z=0.2,resolution_x=0.1,windows_x=1,stop_thres=20,use_points_num=5,width_thres=0.8):
 
         ##### cross section parameters
-        resolution_z=0.1
-        windows_z=0.2
-        resolution_x=0.1
-        windows_x=1
-        stop_thres=20
-        stop_thres_w=10
-        use_points_num=5 # use the largest/smallest N to compute w
-        width_thres=0.8 # prune width that is too close
+        # resolution_z=0.1
+        # windows_z=0.2
+        # resolution_x=0.1
+        # windows_x=1
+        # stop_thres=20
+        # stop_thres_w=10
+        # use_points_num=5 # use the largest/smallest N to compute w
+        # width_thres=0.8 # prune width that is too close
         ###################################
 
         ###################### get the welding pieces ##################
         # This part will be replaced by welding path in the future
         ######## make the plane normal as z-axis
         ####### plane segmentation
-        plane_model, inliers = scanned_points.segment_plane(distance_threshold=0.75,
+        plane_model, inliers = scanned_points.segment_plane(distance_icp_threshold=0.75,
                                                 ransac_n=5,
                                                 num_iterations=3000)
         ## Transform the plane to z=0
