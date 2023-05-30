@@ -3,9 +3,9 @@ from pathlib import Path
 import pickle
 import sys
 sys.path.append('../toolbox/')
-sys.path.append('scan_tools/')
-sys.path.append('scan_plan/')
-sys.path.append('scan_process/')
+sys.path.append('../scan/scan_tools/')
+sys.path.append('../scan/scan_plan/')
+sys.path.append('../scan/scan_process/')
 from robot_def import *
 from scan_utils import *
 from scan_continuous import *
@@ -49,7 +49,7 @@ def robot_weld_path_gen(all_layer_z,forward_flag,base_layer):
 			[-0.,      0.,     -1.    ]])
     x0 =  1684	# Origin x coordinate
     y0 = -1179 + 428	# Origin y coordinate
-    z0 = -245   # 10 mm distance to base
+    z0 = -260   # 10 mm distance to base
 
     weld_p=[]
     if base_layer: # base layer
@@ -70,7 +70,7 @@ def robot_weld_path_gen(all_layer_z,forward_flag,base_layer):
     for layer_z in all_layer_z:
         path_T=[]
         for p in weld_p:
-            path_T.append(Transform(R,p))
+            path_T.append(Transform(R,p+np.array([0,0,layer_z])))
 
         all_path_T.append(path_T)
     
@@ -83,14 +83,21 @@ robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_co
 	pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',\
     base_marker_config_file=config_dir+'MA2010_marker_config.yaml',tool_marker_config_file=config_dir+'weldgun_marker_config.yaml')
 robot_scan=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.yml',tool_file_path=config_dir+'scanner_tcp2.csv',\
-	base_transformation_file=config_dir+'MA1440_pose_mocapcalib.csv',pulse2deg_file_path=config_dir+'MA1440_A0_pulse2deg_real.csv',\
+	base_transformation_file=config_dir+'MA1440_pose.csv',pulse2deg_file_path=config_dir+'MA1440_A0_pulse2deg_real.csv',\
     base_marker_config_file=config_dir+'MA1440_marker_config.yaml',tool_marker_config_file=config_dir+'scanner_marker_config.yaml')
 positioner=positioner_obj('D500B',def_path=config_dir+'D500B_robot_default_config.yml',tool_file_path=config_dir+'positioner_tcp.csv',\
-    base_transformation_file=config_dir+'D500B_pose_mocapcalib.csv',pulse2deg_file_path=config_dir+'D500B_pulse2deg_real.csv',\
+    base_transformation_file=config_dir+'D500B_pose.csv',pulse2deg_file_path=config_dir+'D500B_pulse2deg_real.csv',\
     base_marker_config_file=config_dir+'D500B_marker_config.yaml',tool_marker_config_file=config_dir+'positioner_tcp_marker_config.yaml')
 
 Table_home_T = positioner.fwd(np.radians([-15,180]))
 T_S1TCP_R1Base = np.linalg.inv(np.matmul(positioner.base_H,H_from_RT(Table_home_T.R,Table_home_T.p)))
+T_R1Base_S1TCP = np.linalg.inv(T_S1TCP_R1Base)
+
+#### change base H to calibrated ones ####
+robot_scan.base_H = H_from_RT(robot_scan.T_base_basemarker.R,robot_scan.T_base_basemarker.p)
+positioner.base_H = H_from_RT(positioner.T_base_basemarker.R,positioner.T_base_basemarker.p)
+T_to_base = Transform(np.eye(3),[0,0,-380])
+positioner.base_H = np.matmul(positioner.base_H,H_from_RT(T_to_base.R,T_to_base.p))
 
 forward_flag = True
 base_layer = True
@@ -114,12 +121,11 @@ formatted_time = current_time.strftime('%Y_%m_%d_%H_%M_%S.%f')[:-7]
 data_dir='../data/wall_weld_test/weld_scan_'+formatted_time+'/'
 
 for i in range(len(weld_z_height)):
-
     if i>=2:
         base_layer=False
     this_z_height=weld_z_height[i]
     this_job_number=job_number[i]
-    this_weld_v=weld_velocity[i]
+    this_weld_v=[weld_velocity[i]]
 
     # 1. The curve path in "positioner tcp frame"
     ######### enter your wanted z height #######
@@ -133,6 +139,107 @@ for i in range(len(weld_z_height)):
         this_n = np.matmul(T_S1TCP_R1Base[:3,:3],path_p.R[:,-1])
         curve_sliced_relative.append(np.append(this_p,this_n))
     curve_sliced_relative=curve_sliced_relative[1:-1] # the start and end is for collision prevention
+    R_S1TCP = np.matmul(T_S1TCP_R1Base[:3,:3],path_p.R)
+
+    #### Correction ####
+    # TODO: Add fitering if near threshold
+    h_largest=this_z_height
+    if i>1:
+        h_largest = np.max(profile_height[:,1])
+        h_target = h_largest+1.2
+
+        profile_slope = np.diff(profile_height[:,1])/np.diff(profile_height[:,0])
+        profile_slope = np.append(profile_slope[0],profile_slope)
+        # find slope peak
+        peak_threshold=0.6
+        weld_terrain=[]
+        last_peak_i=None
+        lastlast_peak_i=None
+        for sample_i in range(len(profile_slope)):
+            if np.fabs(profile_slope[sample_i])<peak_threshold:
+                weld_terrain.append(0)
+            else:
+                if profile_slope[sample_i]>=peak_threshold:
+                    weld_terrain.append(1)
+                elif profile_slope[sample_i]<=peak_threshold:
+                    weld_terrain.append(-1)
+                if lastlast_peak_i:
+                    if (weld_terrain[-1]==weld_terrain[lastlast_peak_i]) and (weld_terrain[-1]!=weld_terrain[last_peak_i]):
+                        weld_terrain[last_peak_i]=0
+                lastlast_peak_i=last_peak_i
+                last_peak_i=sample_i
+
+        weld_terrain=np.array(weld_terrain)
+        weld_peak=[]
+        last_peak=None
+        last_peak_i=None
+        flat_threshold=2.5
+        for sample_i in range(len(profile_slope)):
+            if weld_terrain[sample_i]!=0:
+                if last_peak is None:
+                    weld_peak.append(profile_height[sample_i])
+                else:
+                    # if the terrain change
+                    if (last_peak>0 and weld_terrain[sample_i]<0) or (last_peak<0 and weld_terrain[sample_i]>0):
+                        weld_peak.append(profile_height[last_peak_i])
+                        weld_peak.append(profile_height[sample_i])
+                    else:
+                        # the terrain not change but flat too long
+                        if profile_height[sample_i,0]-profile_height[last_peak_i,0]>flat_threshold:
+                            weld_peak.append(profile_height[last_peak_i])
+                            weld_peak.append(profile_height[sample_i])
+                last_peak=deepcopy(weld_terrain[sample_i])
+                last_peak_i=sample_i
+        weld_peak=np.array(weld_peak)
+
+        if forward_flag:
+            weld_bp = weld_peak[np.arange(0,len(weld_peak)-1,2)+1]
+        else:
+            weld_bp = weld_peak[np.arange(0,len(weld_peak),2)][::-1]
+
+        plt.scatter(profile_height[:,0],profile_height[:,1]-np.mean(profile_height[:,1]))
+        plt.plot(profile_height[:,0],profile_slope)
+        plt.scatter(weld_peak[:,0],weld_peak[:,1]-np.mean(profile_height[:,1]))
+        plt.scatter(weld_bp[:,0],weld_bp[:,1]-np.mean(profile_height[:,1]))
+        plt.show()
+
+        # find v
+        # 140 ipm: dh=0.006477*v^2-0.2362v+3.339
+        # 160 ipm: dh=0.006043*v^2-0.2234v+3.335
+        this_weld_v = []
+        dh = min(h_target-weld_bp[0][1],2.5) # find first v
+        a=0.006477
+        b=-0.2362
+        c=3.339-dh
+        v=-b+np.sqrt(b**2-4*a*c)/(2*a)
+        this_weld_v.append(v)
+        for bpi in range(len(weld_bp)):
+            dh = h_target-weld_bp[bpi][1]
+            a=0.006477
+            b=-0.2362
+            c=3.339-dh
+            v=-b+np.sqrt(b**2-4*a*c)/(2*a)
+            this_weld_v.append(v)
+        # new curve in positioner frame
+        curve_sliced_relative_correct = [curve_sliced_relative[0]]
+        path_T_S1 = [Transform(R_S1TCP,curve_sliced_relative_correct[-1][:3])]
+        for bpi in range(1,len(weld_bp)):
+            this_p = np.array([weld_bp[bpi][0],curve_sliced_relative[0][1],h_largest])
+            curve_sliced_relative_correct.append(np.append(this_p,curve_sliced_relative_correct[0][3:]))
+            path_T_S1.append(Transform(R_S1TCP,curve_sliced_relative_correct[-1][:3]))
+        curve_sliced_relative_correct = [curve_sliced_relative[-1]]
+        path_T_S1 = [Transform(R_S1TCP,curve_sliced_relative_correct[-1][:3])]
+        curve_sliced_relative=curve_sliced_relative_correct
+        # find curve in R1 frame
+        path_T=[]
+        for tcp_T in path_T_S1:
+            this_p = T_R1Base_S1TCP[:3,:3]@tcp_T.p+T_R1Base_S1TCP[:3,-1]
+            this_R = T_R1Base_S1TCP[:3,:3]@tcp_T.R
+            path_T.append(Transform(this_R,this_p))
+        # add path collision avoidance
+        path_T.insert(0,Transform(path_T[0].R,path_T[0].p+np.array([0,0,10])))
+        path_T.append(Transform(path_T[-1].R,path_T[-1].p+np.array([0,0,10])))
+    ####################
 
     # 2. Scanning parameters
     ### scan parameters
@@ -142,36 +249,29 @@ for i in range(len(weld_z_height)):
     Ry_angle = np.radians(0) # rotate in y a bit
     bounds_theta = np.radians(10) ## circular motion at start and end
     all_scan_angle = np.radians([0]) ## scan angle
-    q_init_table=np.radians([-30,0]) ## init table
+    q_init_table=np.radians([-15,90]) ## init table
     save_output_points = True
-
     ### scanning path module
     spg = ScanPathGen(robot_scan,positioner,scan_stand_off_d,Rz_angle,Ry_angle,bounds_theta)
+    mti_Rpath = np.array([[ 1.,0.,0.],   
+                    [ 0.,-1.,0.],
+                    [0.,0.,-1.]])
     # generate scan path
-    scan_p,scan_R,q_out1,q_out2=spg.gen_scan_path([curve_sliced_relative],[0],all_scan_angle,\
-                    solve_js_method=0,q_init_table=q_init_table,scan_path_dir=None)
+    if forward_flag:
+        scan_p,scan_R,q_out1,q_out2=spg.gen_scan_path([curve_sliced_relative],[0],all_scan_angle,\
+                        solve_js_method=0,q_init_table=q_init_table,R_path=mti_Rpath,scan_path_dir=None)
+    else:
+        scan_p,scan_R,q_out1,q_out2=spg.gen_scan_path([curve_sliced_relative[::-1]],[0],all_scan_angle,\
+                        solve_js_method=0,q_init_table=q_init_table,R_path=mti_Rpath,scan_path_dir=None)
     # generate motion program
     q_bp1,q_bp2,s1_all,s2_all=spg.gen_motion_program(q_out1,q_out2,scan_p,scan_speed,init_sync_move=0)
+    # print(np.degrees(q_out1[:10]))
+    # print(np.degrees(q_out1[-10:]))
+    # exit()
+    #######################################
 
     ######################################################
     ########### Do welding #############
-    #### Correction ####
-    # TODO: Add fitering if near threshold
-    if i>1:
-        h_largest = np.max(profile_height[:,1])
-        if h_largest-profile_height[0,1]>correction_thres:
-            correct_part=True
-        else:
-            correct_part=False
-        correction_T=[profile_height[0]]
-        for sample_i in range(len(profile_height)):
-            if correct_part:
-                if h_largest-profile_height[sample_i][1]<correction_thres:
-                    correction_T.append(profile_height[sample_i])
-            else:
-                if h_largest-profile_height[sample_i][1]>correction_thres:
-                    correction_T.append(profile_height[sample_i])
-    ####################
     path_q = []
     for tcp_T in path_T:
         path_q.append(robot_weld.inv(tcp_T.p,tcp_T.R,zero_config)[0])
@@ -181,6 +281,7 @@ for i in range(len(weld_z_height)):
     mp.MoveJ(np.degrees(path_q[0]), 3, 0)
     mp.MoveL(np.degrees(path_q[1]), 10, 0)
 
+    input("Press Enter and start welding.")
     # weld state logging
     sub = RRN.SubscribeService('rr+tcp://192.168.55.10:60823?service=welder')
     obj = sub.GetDefaultClientWait(3)  # connect, timeout=30s
@@ -188,17 +289,28 @@ for i in range(len(weld_z_height)):
     welder_state_sub.WireValueChanged += wire_cb
     mp=MotionProgram(ROBOT_CHOICE='RB1',pulse2deg=robot_weld.pulse2deg)
     mp.setArc(select, this_job_number)
-    mp.MoveL(np.degrees(q3), this_weld_v, 0)
+    for bpi in range(len(this_weld_v)):
+        if bpi!=len(this_weld_v)-1:
+            mp.MoveL(np.degrees(path_q[bpi+2]), this_weld_v[bpi])
+        else:
+            mp.MoveL(np.degrees(path_q[bpi+2]), this_weld_v[bpi],0)
     mp.setArc(False)
+    mp.MoveL(np.degrees(path_q[-1]), 10, 0)
     clean_weld_record()
     rob_stamps,rob_js_exe,_,_= robot_client.execute_motion_program(mp)
+
+    # move home
+    input("Press Enter to Move Home")
+    mp=MotionProgram(ROBOT_CHOICE='RB1',pulse2deg=robot_weld.pulse2deg)
+    mp.MoveL(np.zeros[6], 3, 0)
+    robot_client.execute_motion_program(mp)
+
     if save_weld_record:
         layer_data_dir=data_dir+'layer_'+str(i)+'/'
         Path(layer_data_dir).mkdir(exist_ok=True)
         np.savetxt(layer_data_dir + 'welding.csv',
                     np.array([weld_timestamp, weld_voltage, weld_current, weld_feedrate, weld_energy]).T, delimiter=',',
                     header='timestamp,voltage,current,feedrate,energy', comments='')
-
     ######################################################
 
     ######## scanning motion #########
@@ -220,7 +332,7 @@ for i in range(len(weld_z_height)):
     mti_client.setExposureTime("25")
 
     ## motion start
-    mp = MotionProgram(ROBOT_CHOICE='RB2',ROBOT_CHOICE2='ST1',pulse2deg=robot_scan.pulse2deg,pulse2deg_2=turn_table.pulse2deg)
+    mp = MotionProgram(ROBOT_CHOICE='RB2',ROBOT_CHOICE2='ST1',pulse2deg=robot_scan.pulse2deg,pulse2deg_2=positioner.pulse2deg)
     # calibration motion
     target2=['MOVJ',np.degrees(q_bp2[1][0]),10]
     mp.MoveL(np.degrees(q_bp1[1][0]), scan_speed, 0, target2=target2)
@@ -290,7 +402,12 @@ for i in range(len(weld_z_height)):
 
     pcd = scan_process.pcd_register_mti(mti_recording,q_out_exe,robot_stamps)
     pcd = scan_process.pcd_noise_remove(pcd,nb_neighbors=10,std_ratio=0.85,cluster_based_outlier_remove=False)
-    z_height_start=this_z_height
+    z_height_start=h_largest
     profile_height = scan_process.pcd2height(pcd,z_height_start)
 
+    if np.mean(profile_height[:,1])>final_height:
+        break
+
     forward_flag=not forward_flag
+
+print("Welding End!!")
