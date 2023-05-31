@@ -266,12 +266,12 @@ for i in range(len(weld_z_height)):
                         solve_js_method=0,q_init_table=q_init_table,R_path=mti_Rpath,scan_path_dir=None)
     # generate motion program
     q_bp1,q_bp2,s1_all,s2_all=spg.gen_motion_program(q_out1,q_out2,scan_p,scan_speed,init_sync_move=0)
-    print(np.degrees(q_out1[:10]))
-    print(np.degrees(q_out1[-10:]))
-    print(scan_p[0],scan_R[0])
-    print(robot_scan.fwd(q_out1[0]))
-    print(robot_scan.fwd(np.zeros(6)))
-    exit()
+    # print(np.degrees(q_out1[:10]))
+    # print(np.degrees(q_out1[-10:]))
+    # print(scan_p[0],scan_R[0])
+    # print(robot_scan.fwd(q_out1[0]))
+    # print(robot_scan.fwd(np.zeros(6)))
+    # exit()
     #######################################
 
     ######################################################
@@ -406,6 +406,7 @@ for i in range(len(weld_z_height)):
 
     pcd = scan_process.pcd_register_mti(mti_recording,q_out_exe,robot_stamps)
     pcd = scan_process.pcd_noise_remove(pcd,nb_neighbors=10,std_ratio=0.85,cluster_based_outlier_remove=False)
+    visualize_pcd([pcd])
     z_height_start=h_largest
     profile_height = scan_process.pcd2height(pcd,z_height_start)
 
