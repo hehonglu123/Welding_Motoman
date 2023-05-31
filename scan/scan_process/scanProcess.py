@@ -122,8 +122,8 @@ class ScanProcess():
                 T_origin = self.positioner.fwd(static_positioner_q,world=True).inv() # T_tabletool^world
             else:
                 robt_T = self.robot.fwd(rob_js_exe[closest_i][:6],world=True) # T_world^r2tool
-                # T_origin = self.positioner.fwd(rob_js_exe[closest_i][6:],world=True).inv() # T_tabletool^world
-                T_origin = self.positioner.fwd(static_positioner_q,world=True).inv()
+                T_origin = self.positioner.fwd(rob_js_exe[closest_i][6:],world=True).inv() # T_tabletool^world
+                # T_origin = self.positioner.fwd(static_positioner_q,world=True).inv()
             
             T_rob_positioner_top = T_origin*robt_T
             
@@ -205,7 +205,7 @@ class ScanProcess():
         
         return pcd_combined
 
-    def pcd2height(self,scanned_points,z_height_start,resolution_z=0.1,windows_z=0.2,resolution_x=0.1,windows_x=1,stop_thres=20,stop_thres_w=10,use_points_num=5,width_thres=0.8):
+    def pcd2height(self,scanned_points,z_height_start,bbox_min=(-40,-20,0),bbox_max=(40,20,45),resolution_z=0.1,windows_z=0.2,resolution_x=0.1,windows_x=1,stop_thres=20,stop_thres_w=10,use_points_num=5,width_thres=0.8):
 
         ##### cross section parameters
         # resolution_z=0.1
@@ -222,9 +222,9 @@ class ScanProcess():
         # This part will be replaced by welding path in the future
         ######## make the plane normal as z-axis
         ####### plane segmentation
-        plane_model, inliers = scanned_points.segment_plane(distance_icp_threshold=0.75,
-                                                ransac_n=5,
-                                                num_iterations=3000)
+        plane_model, inliers = scanned_points.segment_plane(distance_threshold=float(0.75),
+                                                ransac_n=int(5),
+                                                num_iterations=int(3000))
         ## Transform the plane to z=0
         plain_norm = plane_model[:3]/np.linalg.norm(plane_model[:3])
         k = np.cross(plain_norm,[0,0,1])
@@ -239,8 +239,8 @@ class ScanProcess():
         # visualize_pcd([scanned_points])
 
         ## TODO:align path and scan
-        bbox_min=(-40,-20,0)
-        bbox_max=(40,20,45)
+        # bbox_min=(-40,-20,0)
+        # bbox_max=(40,20,45)
         ##################### get welding pieces end ########################
 
         ##### get projection of each z height
@@ -253,9 +253,6 @@ class ScanProcess():
             bbox = o3d.geometry.AxisAlignedBoundingBox(min_bound=min_bound,max_bound=max_bound)
             points_proj=scanned_points.crop(bbox)
             ##################
-
-            #### crop welds
-            all_welds_points = o3d.geometry.PointCloud()
             
             min_bound = bbox_min
             max_bound = bbox_max

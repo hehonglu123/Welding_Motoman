@@ -68,6 +68,9 @@ for scan_i in range(scan_N):
     T_rob_positioner_top = T_origin*robt_T
 
     scan_points=deepcopy(mti_recording[scan_i])
+    for i in range(len(scan_points[0])):
+        print(scan_points[:,i])
+    exit()
     scan_points = np.insert(scan_points,1,np.zeros(len(scan_points[0])),axis=0)
     scan_points = scan_points.T
     ## get the points closed to origin

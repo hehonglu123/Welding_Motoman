@@ -1,0 +1,11 @@
+Traceback (most recent call last):
+  File ".\weld_wall_scan.py", line 412, in <module>
+    mti_recording.append(deepcopy(np.array([mti_client.lineProfile.X_data,mti_client.lineProfile.Z_data])))
+  File "C:\Users\Motoman\AppData\Local\Programs\Python\Python38\lib\site-packages\RobotRaconteur\RobotRaconteurPythonUtil.py", line 212, in fget
+    def fget(self): return stub_getproperty(stub, m1.Name, m1)
+  File "C:\Users\Motoman\AppData\Local\Programs\Python\Python38\lib\site-packages\RobotRaconteur\RobotRaconteurPythonUtil.py", line 411, in stub_getproperty
+    return UnpackMessageElement(stub.PropertyGet(name), type1.Type, stub, stub.RRGetNode())
+  File "C:\Users\Motoman\AppData\Local\Programs\Python\Python38\lib\site-packages\RobotRaconteur\RobotRaconteurPython.py", line 6572, in PropertyGet
+    return _RobotRaconteurPython.WrappedServiceStub_PropertyGet(self, PropertyName)
+RobotRaconteur.RobotRaconteurPythonError.ConnectionException: RobotRaconteur.ConnectionError Transport connection to remote host not found
+
