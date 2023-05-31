@@ -10,9 +10,9 @@ def main():
 	dataset='cup/'
 	sliced_alg='circular_slice_shifted/'
 	data_dir='../data/'+dataset+sliced_alg
-	num_layers=53
+	num_layers=50
 	base_thickness=3
-	num_baselayers=0
+	num_baselayers=2
 	curve_sliced=[]
 	for i in range(num_layers):
 		###get number of disconnected sections

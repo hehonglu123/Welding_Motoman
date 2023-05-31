@@ -16,8 +16,8 @@ def main():
 	dataset='cup/'
 	sliced_alg='circular_slice_shifted/'
 	data_dir='../data/'+dataset+sliced_alg
-	num_layers=53
-	num_baselayers=0
+	num_layers=62
+	num_baselayers=2
 	q_positioner_seed=[1,3]
 	# dataset='blade0.1/'
 	# sliced_alg='auto_slice/'
