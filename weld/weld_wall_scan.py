@@ -82,9 +82,9 @@ config_dir='../config/'
 robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',d=15,tool_file_path=config_dir+'torch.csv',\
 	pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',\
     base_marker_config_file=config_dir+'MA2010_marker_config.yaml',tool_marker_config_file=config_dir+'weldgun_marker_config.yaml')
-robot_scan=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.yml',tool_file_path=config_dir+'scanner_tcp2.csv',\
+robot_scan=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.yml',tool_file_path=config_dir+'mti.csv',\
 	base_transformation_file=config_dir+'MA1440_pose.csv',pulse2deg_file_path=config_dir+'MA1440_A0_pulse2deg_real.csv',\
-    base_marker_config_file=config_dir+'MA1440_marker_config.yaml',tool_marker_config_file=config_dir+'scanner_marker_config.yaml')
+    base_marker_config_file=config_dir+'MA1440_marker_config.yaml')
 positioner=positioner_obj('D500B',def_path=config_dir+'D500B_robot_default_config.yml',tool_file_path=config_dir+'positioner_tcp.csv',\
     base_transformation_file=config_dir+'D500B_pose.csv',pulse2deg_file_path=config_dir+'D500B_pulse2deg_real.csv',\
     base_marker_config_file=config_dir+'D500B_marker_config.yaml',tool_marker_config_file=config_dir+'positioner_tcp_marker_config.yaml')
@@ -139,6 +139,7 @@ for i in range(len(weld_z_height)):
         this_n = np.matmul(T_S1TCP_R1Base[:3,:3],path_p.R[:,-1])
         curve_sliced_relative.append(np.append(this_p,this_n))
     curve_sliced_relative=curve_sliced_relative[1:-1] # the start and end is for collision prevention
+    print(curve_sliced_relative)
     R_S1TCP = np.matmul(T_S1TCP_R1Base[:3,:3],path_p.R)
 
     #### Correction ####
@@ -249,7 +250,7 @@ for i in range(len(weld_z_height)):
     Ry_angle = np.radians(0) # rotate in y a bit
     bounds_theta = np.radians(10) ## circular motion at start and end
     all_scan_angle = np.radians([0]) ## scan angle
-    q_init_table=np.radians([-15,90]) ## init table
+    q_init_table=np.radians([-15,200]) ## init table
     save_output_points = True
     ### scanning path module
     spg = ScanPathGen(robot_scan,positioner,scan_stand_off_d,Rz_angle,Ry_angle,bounds_theta)
@@ -265,9 +266,12 @@ for i in range(len(weld_z_height)):
                         solve_js_method=0,q_init_table=q_init_table,R_path=mti_Rpath,scan_path_dir=None)
     # generate motion program
     q_bp1,q_bp2,s1_all,s2_all=spg.gen_motion_program(q_out1,q_out2,scan_p,scan_speed,init_sync_move=0)
-    # print(np.degrees(q_out1[:10]))
-    # print(np.degrees(q_out1[-10:]))
-    # exit()
+    print(np.degrees(q_out1[:10]))
+    print(np.degrees(q_out1[-10:]))
+    print(scan_p[0],scan_R[0])
+    print(robot_scan.fwd(q_out1[0]))
+    print(robot_scan.fwd(np.zeros(6)))
+    exit()
     #######################################
 
     ######################################################

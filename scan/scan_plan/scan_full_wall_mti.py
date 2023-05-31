@@ -64,6 +64,7 @@ T_S1TCP_R1Base = np.linalg.inv(np.matmul(turn_table.base_H,H_from_RT(Table_home_
 data_dir='../../data/wall_weld_test/full_test_mti/'
 ######### enter your wanted z height #######
 all_layer_z = [20,37]
+all_layer_z = [0]
 ###########################################
 all_path_T = robot_weld_path_gen(all_layer_z)
 all_curve_sliced_relative=[]
@@ -74,6 +75,7 @@ for path_T in all_path_T:
         this_n = np.matmul(T_S1TCP_R1Base[:3,:3],path_p.R[:,-1])
         curve_sliced_relative.append(np.append(this_p,this_n))
     all_curve_sliced_relative.append(np.array(curve_sliced_relative))
+print(curve_sliced_relative)
 
 # print(all_curve_sliced_relative)
 
