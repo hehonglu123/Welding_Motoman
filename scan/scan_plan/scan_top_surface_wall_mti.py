@@ -57,8 +57,8 @@ turn_table=positioner_obj('D500B',def_path=config_dir+'D500B_robot_default_confi
     base_transformation_file=config_dir+'D500B_pose.csv',pulse2deg_file_path=config_dir+'D500B_pulse2deg_real.csv',\
     base_marker_config_file=config_dir+'D500B_marker_config.yaml',tool_marker_config_file=config_dir+'positioner_tcp_marker_config.yaml')
 
-# print(robot_scan.fwd(zero_config))
-# exit()
+print(robot_scan.fwd(zero_config))
+exit()
 
 ## wall test path
 Table_home_T = turn_table.fwd(np.radians([-15,0]))
