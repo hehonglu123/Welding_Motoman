@@ -248,6 +248,10 @@ class robot_obj(object):
 			#check if all q found
 			if i==len(curve)-1:
 				curve_js_all.append(curve_js)
+		
+		if len(curve_js_all)==0:
+			raise Exception('No Solution Found') 
+		
 		if q_seed is None:
 			return curve_js_all
 		else:
@@ -480,8 +484,10 @@ class positioner_obj(object):
 			#check if all q found
 			if i==len(normals)-1:
 				curve_js_all.append(curve_js)
-		
 
+		if len(curve_js_all)==0:
+			raise Exception('No Solution Found') 
+		
 		if q_seed is None:
 			return curve_js_all
 		else:

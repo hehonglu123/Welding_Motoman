@@ -19,8 +19,8 @@ robot2=robot_obj('MA1440_A0',def_path='../config/MA1440_A0_robot_default_config.
 R=np.array([[0., -1,  0.    ],
             [-1, 0.,  0.    ],
             [0., 0., -1.    ]])
-p_start=np.array([1000,430,-230])
-p_end=np.array([1000,330,-230])
+p_start=np.array([1000,400,-230])
+p_end=np.array([1000,300,-230])
 q_seed=np.zeros(6)
 q_init=np.degrees(robot2.inv(p_start,R,q_seed)[0])
 q_end=np.degrees(robot2.inv(p_end,R,q_seed)[0])
