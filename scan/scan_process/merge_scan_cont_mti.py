@@ -27,6 +27,7 @@ dtype = o3d.core.float32
 # data_dir='../../data/wall_weld_test/wall_param_1/scans/'
 # data_dir='../../data/wall_weld_test/scan_cont_newdx_1/scans/'
 # data_dir='../../data/wall_weld_test/wall_param_data_collection/path_Rz-45_Ry0_stand_off_d243_b_theta45_scan_angle-45_45_z0_35_/scans/'
+# data_dir='../../data/wall_weld_test/full_test_mti/scans/'
 data_dir='../../data/wall_weld_test/top_layer_test_mti/scans/'
 config_dir='../../config/'
 
