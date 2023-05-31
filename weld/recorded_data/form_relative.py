@@ -14,8 +14,6 @@ def main():
 	dataset='blade0.1/'
 	sliced_alg='auto_slice/'
 	data_dir='../../data/'+dataset+sliced_alg
-	curve_sliced_relative=[]
-	
 	layer_height_num=int(1.0/0.1)
 
 	config_dir='../../config/'
@@ -30,26 +28,45 @@ def main():
 	vis_step=5
 	fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
 
+	###LOAD DATA
+	num_layer_start=int(0*layer_height_num)
+	num_layer_end=int(9*layer_height_num)
 	##########nominal relative path#######################
-	positioner_js=[]
-	robot_js=[]
+	relative_gt_all=[]
 	num_layer_start=int(0*layer_height_num)
 	num_layer_end=int(9*layer_height_num)
 	for layer in range(num_layer_start,num_layer_end,layer_height_num):
-		positioner_js.extend(np.loadtxt(data_dir+'curve_sliced_js/D500B_js%i_0.csv'%layer,delimiter=','))
-		robot_js.extend(np.loadtxt(data_dir+'curve_sliced_js/MA2010_js%i_0.csv'%layer,delimiter=','))
-	positioner_js=np.array(positioner_js)
-	robot_js=np.array(robot_js)
-	positioner_pose=positioner.fwd(positioner_js)
-	robot_pose=robot.fwd(robot_js)
-	relative_path_exe_gt,_=form_relative_path_mocap(robot_pose.p_all,robot_pose.R_all,positioner_pose.p_all,positioner_pose.R_all,robot,positioner)
+		positioner_js=np.loadtxt(data_dir+'curve_sliced_js/D500B_js%i_0.csv'%layer,delimiter=',')
+		robot_js=np.loadtxt(data_dir+'curve_sliced_js/MA2010_js%i_0.csv'%layer,delimiter=',')
+		positioner_pose=positioner.fwd(positioner_js)
+		robot_pose=robot.fwd(robot_js)
+		relative_gt,_=form_relative_path_mocap(robot_pose.p_all,robot_pose.R_all,positioner_pose.p_all,positioner_pose.R_all,robot,positioner)
+		relative_gt_all.append(relative_gt)
 
 	
 
 	################mocap recorded path###########
-	curve_exe_data=np.loadtxt('mocap_robot.csv',delimiter=',')
-	curve_exe_positioner_data=np.loadtxt('mocap_positioner.csv',delimiter=',')
-	curve_exe_positioner_data[:,3]+=380
+	curve_exe_all=[]
+	curve_exe_positioner_all=[]
+	relative_path_exe_all=[]
+	relative_path_exe_all_downsampled=[]
+	i=0
+	for layer in range(num_layer_start,num_layer_end,layer_height_num):
+		slice_dir='slice_%i/' % layer
+		curve_exe=np.loadtxt(slice_dir+'mocap_robot.csv',delimiter=',')
+		curve_exe_positioner=np.loadtxt(slice_dir+'mocap_positioner.csv',delimiter=',')
+		###smooth out mocap data
+		curve_exe=moving_averageNd(curve_exe,padding=False)
+		curve_exe_positioner=moving_averageNd(curve_exe_positioner,padding=False)
+		curve_exe_positioner[:,3]+=380
+
+		curve_exe_all.append(curve_exe)
+		curve_exe_positioner_all.append(curve_exe_positioner)
+		###form relative trajectory from mocap
+		relative_path_exe, relative_path_exe_R=form_relative_path_mocap(curve_exe[:,1:4],w2R(curve_exe[:,4:],np.eye(3)),curve_exe_positioner[:,1:4],w2R(curve_exe_positioner[:,4:],np.eye(3)),robot,positioner)
+		relative_path_exe_all_downsampled.append(equalize_curve_spacing(relative_path_exe,len(relative_gt_all[i])))
+		relative_path_exe_all.append(relative_path_exe)
+		i+=1
 
 	pos_T_bottombase_basemarker = positioner.T_base_basemarker*Transform(np.eye(3),-1*(positioner.robot.P[:,0]))
 	T_posbase_robbase = robot.T_base_basemarker.inv()*pos_T_bottombase_basemarker
@@ -71,16 +88,19 @@ def main():
 	# 		relative_path_exe.append(curve_exe_data[i][1:4]-(T_posbase_robbase.R@curve_exe_positioner_data[i,1:4]+T_posbase_robbase.p))
 	# relative_path_exe=np.array(relative_path_exe)
 	
-	relative_path_exe, relative_path_exe_R=form_relative_path_mocap(curve_exe_data[:,1:4],w2R(curve_exe_data[:,4:],np.eye(3)),curve_exe_positioner_data[:,1:4],w2R(curve_exe_positioner_data[:,4:],np.eye(3)),robot,positioner)
+	
 
 	H=np.eye(4)
-	# H[:3,-1]=np.average(relative_path_exe_gt,axis=0)-np.average(relative_path_exe,axis=0)
-	# H=icp_align2(relative_path_exe,relative_path_exe_gt,H=H,icp_turns = 10,threshold=0.0001,max_iteration=100000)
+	# H[:3,-1]=np.average(np.vstack(relative_gt_all),axis=0)-np.average(np.vstack(relative_path_exe_all),axis=0)
+	# H=icp_align2(np.vstack(relative_path_exe_all),np.vstack(relative_gt_all),H=H,icp_turns = 10,threshold=0.0001,max_iteration=100000)
+	H=pose_regression(relative_path_exe_all_downsampled[1],relative_gt_all[1])
 	# print(H)
-	relative_path_exe_transformed=transform_curve(relative_path_exe,H)
 
-	ax.plot3D(relative_path_exe_gt[::vis_step,0],relative_path_exe_gt[::vis_step,1],relative_path_exe_gt[::vis_step,2],'g.-')
-	ax.plot3D(relative_path_exe_transformed[::vis_step,0],relative_path_exe_transformed[::vis_step,1],relative_path_exe_transformed[::vis_step,2],'r.-')
+
+	for i in range(len(relative_gt_all)):
+		ax.plot3D(relative_gt_all[i][::vis_step,0],relative_gt_all[i][::vis_step,1],relative_gt_all[i][::vis_step,2],'g.-')
+		relative_path_exe_transformed=transform_curve(relative_path_exe_all[i],H)
+		ax.plot3D(relative_path_exe_transformed[::vis_step,0],relative_path_exe_transformed[::vis_step,1],relative_path_exe_transformed[::vis_step,2],'r.-')
 	plt.show()
 if __name__ == '__main__':
 	main()

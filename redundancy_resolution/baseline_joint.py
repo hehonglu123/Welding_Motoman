@@ -13,9 +13,9 @@ def main():
 		pulse2deg_file_path='../config/D500B_pulse2deg_real.csv',base_transformation_file='../config/D500B_pose.csv')
 	
 	dataset='cup/'
-	sliced_alg='circular_slice/'
+	sliced_alg='circular_slice_shifted/'
 	data_dir='../data/'+dataset+sliced_alg
-	num_layers=105
+	num_layers=53
 	num_baselayers=0
 	q_positioner_seed=[1,3]
 

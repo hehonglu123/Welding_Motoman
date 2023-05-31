@@ -13,18 +13,18 @@ def main():
 		pulse2deg_file_path='../config/D500B_pulse2deg_real.csv',base_transformation_file='../config/D500B_pose.csv')
 
 
-	# dataset='cup/'
-	# sliced_alg='circular_slice/'
-	# data_dir='../data/'+dataset+sliced_alg
-	# num_layers=105
-	# num_baselayers=0
-	# q_positioner_seed=[1,3]
-	dataset='blade0.1/'
-	sliced_alg='auto_slice/'
+	dataset='cup/'
+	sliced_alg='circular_slice_shifted/'
 	data_dir='../data/'+dataset+sliced_alg
-	num_layers=757
-	num_baselayers=2
-	q_positioner_seed=[0,-2]
+	num_layers=53
+	num_baselayers=0
+	q_positioner_seed=[1,3]
+	# dataset='blade0.1/'
+	# sliced_alg='auto_slice/'
+	# data_dir='../data/'+dataset+sliced_alg
+	# num_layers=757
+	# num_baselayers=2
+	# q_positioner_seed=[0,-2]
 
 	curve_sliced_relative_base=[]
 	curve_sliced_relative=[]
