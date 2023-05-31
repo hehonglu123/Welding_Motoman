@@ -122,7 +122,7 @@ mti_Rpath = np.array([[ 1.,0.,0.],
 
 scan_p,scan_R,q_out1,q_out2=spg.gen_scan_path(all_curve_sliced_relative,all_layer,all_scan_angle,\
                   solve_js_method=0,q_init_table=q_init_table,R_path=mti_Rpath,scan_path_dir=None)
-exit()
+
 # print(np.degrees(q_out1[:10]))
 # print(np.degrees(q_out1[-10:]))
 # for i in range(6):
