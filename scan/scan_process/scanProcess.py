@@ -205,7 +205,7 @@ class ScanProcess():
         
         return pcd_combined
 
-    def pcd2height(self,scanned_points,z_height_start,resolution_z=0.1,windows_z=0.2,resolution_x=0.1,windows_x=1,stop_thres=20,use_points_num=5,width_thres=0.8):
+    def pcd2height(self,scanned_points,z_height_start,resolution_z=0.1,windows_z=0.2,resolution_x=0.1,windows_x=1,stop_thres=20,stop_thres_w=10,use_points_num=5,width_thres=0.8):
 
         ##### cross section parameters
         # resolution_z=0.1
@@ -312,6 +312,9 @@ class ScanProcess():
         for x in profile_height.keys():
             profile_height_arr.append(np.array([x,profile_height[x]]))
         profile_height_arr=np.array(profile_height_arr)
+
+        profile_height_arr_argsort = np.argsort(profile_height_arr[:,0])
+        profile_height_arr=profile_height_arr[profile_height_arr_argsort]
         
         return profile_height_arr
 

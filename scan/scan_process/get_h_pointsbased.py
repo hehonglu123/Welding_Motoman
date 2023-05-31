@@ -29,7 +29,7 @@ config_dir='../../config/'
 scanned_points = o3d.io.read_point_cloud(data_dir+'processed_pcd.pcd')
 print(len(scanned_points.points))
 
-visualize_pcd([scanned_points])
+# visualize_pcd([scanned_points])
 
 ###################### get the welding pieces ##################
 # This part will be replaced by welding path in the future
@@ -65,7 +65,7 @@ bbox_mesh.transform(box_move)
 bbox_min=(-40,-20,0)
 bbox_max=(40,20,45)
 
-visualize_pcd([scanned_points,bbox_mesh])
+# visualize_pcd([scanned_points,bbox_mesh])
 ##################### get welding pieces end ########################
 
 
@@ -77,7 +77,7 @@ z_height_start=35
 resolution_z=0.1
 windows_z=0.2
 resolution_x=0.1
-windows_x=0.5
+windows_x=1
 stop_thres=20
 stop_thres_w=10
 use_points_num=5 # use the largest/smallest N to compute w
@@ -158,8 +158,83 @@ profile_height_arr = []
 for x in profile_height.keys():
     profile_height_arr.append(np.array([x,profile_height[x]]))
 profile_height_arr=np.array(profile_height_arr)
-plt.scatter(profile_height_arr[:,0],profile_height_arr[:,1])
-plt.show()
+
+profile_height_arr_argsort = np.argsort(profile_height_arr[:,0])
+profile_height_arr=profile_height_arr[profile_height_arr_argsort]
+
+# plt.scatter(profile_height_arr[:,0],profile_height_arr[:,1])
+# plt.show()
 
 # pickle.dump(all_welds_width, open(data_dir+'all_welds_width.pickle','wb'))
 # pickle.dump(all_welds_height, open(data_dir+'all_welds_height.pickle','wb'))
+
+#### correction test
+profile_height=profile_height_arr
+profile_slope = np.diff(profile_height[:,1])/np.diff(profile_height[:,0])
+profile_slope = np.append(profile_slope[0],profile_slope)
+
+# plt.scatter(profile_height_arr[:,0],profile_height_arr[:,1]-np.mean(profile_height_arr[:,1]))
+# plt.plot(profile_height[:,0],profile_slope,'-o')
+# plt.show()
+
+h_largest = np.max(profile_height[:,1])
+h_target = h_largest+0.3
+
+# find slope peak
+peak_threshold=0.6
+weld_terrain=[]
+last_peak_i=None
+lastlast_peak_i=None
+for sample_i in range(len(profile_slope)):
+    if np.fabs(profile_slope[sample_i])<peak_threshold:
+        weld_terrain.append(0)
+    else:
+        if profile_slope[sample_i]>=peak_threshold:
+            weld_terrain.append(1)
+        elif profile_slope[sample_i]<=peak_threshold:
+            weld_terrain.append(-1)
+        if lastlast_peak_i:
+            if (weld_terrain[-1]==weld_terrain[lastlast_peak_i]) and (weld_terrain[-1]!=weld_terrain[last_peak_i]):
+                weld_terrain[last_peak_i]=0
+        lastlast_peak_i=last_peak_i
+        last_peak_i=sample_i
+
+weld_terrain=np.array(weld_terrain)
+weld_peak=[]
+last_peak=None
+last_peak_i=None
+flat_threshold=2.5
+for sample_i in range(len(profile_slope)):
+    if weld_terrain[sample_i]!=0:
+        if last_peak is None:
+            weld_peak.append(profile_height[sample_i])
+        else:
+            # if the terrain change
+            if (last_peak>0 and weld_terrain[sample_i]<0) or (last_peak<0 and weld_terrain[sample_i]>0):
+                weld_peak.append(profile_height[last_peak_i])
+                weld_peak.append(profile_height[sample_i])
+            else:
+                # the terrain not change but flat too long
+                if profile_height[sample_i,0]-profile_height[last_peak_i,0]>flat_threshold:
+                    weld_peak.append(profile_height[last_peak_i])
+                    weld_peak.append(profile_height[sample_i])
+        last_peak=deepcopy(weld_terrain[sample_i])
+        last_peak_i=sample_i
+weld_peak=np.array(weld_peak)
+# plt.scatter(profile_height_arr[:,0],profile_height_arr[:,1]-np.mean(profile_height_arr[:,1]))
+# plt.plot(profile_height[:,0],profile_slope)
+# plt.scatter(weld_peak[:,0],weld_peak[:,1]-np.mean(profile_height_arr[:,1]))
+# plt.show()
+
+weld_bp = weld_peak[np.arange(0,len(weld_peak)-1,2)+1]
+# weld_bp = weld_peak[np.arange(0,len(weld_peak),2)][::-1]
+plt.scatter(profile_height_arr[:,0],profile_height_arr[:,1]-np.mean(profile_height_arr[:,1]))
+plt.plot(profile_height[:,0],profile_slope)
+plt.scatter(weld_peak[:,0],weld_peak[:,1]-np.mean(profile_height_arr[:,1]))
+plt.scatter(weld_bp[:,0],weld_bp[:,1]-np.mean(profile_height_arr[:,1]))
+plt.show()
+
+# weld_bp=[]
+# for peak_i in range(len(weld_peak)):
+
+

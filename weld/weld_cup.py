@@ -8,11 +8,11 @@ from WeldSend import *
 
 
 dataset='cup/'
-sliced_alg='circular_slice/'
+sliced_alg='circular_slice_shifted/'
 data_dir='../data/'+dataset+sliced_alg
 
 waypoint_distance=5 	###waypoint separation
-layer_height_num=int(1.1/1.)
+layer_height_num=int(1./1.)
 curve_sliced_js=[]
 positioner_js=[]
 
@@ -54,20 +54,26 @@ client=MotionProgramExecClient()
 # 	target2=['MOVJ',np.degrees(positioner_js[breakpoints[0]]),10]
 # 	mp.MoveL(np.degrees(curve_sliced_js[breakpoints[0]]), s1_all[0],target2=target2)
 
-# 	# mp.setArc(True,cond_num=310)
+# 	mp.setArc(True,cond_num=310)
 # 	for j in range(1,len(breakpoints)):
 # 		target2=['MOVJ',np.degrees(positioner_js[breakpoints[j]]),1]
 # 		mp.MoveL(np.degrees(curve_sliced_js[breakpoints[j]]), s1_all[j],target2=target2)
-# 	# mp.setArc(False)
+# 	mp.setArc(False)
 
 	
 
 ###########################################layer welding############################################
 mp=MotionProgram(ROBOT_CHOICE='RB1',ROBOT_CHOICE2='ST1',pulse2deg=robot.pulse2deg,pulse2deg_2=positioner.pulse2deg, tool_num = 12)
 num_sections=12
-num_layer_start=int(1*layer_height_num)
-num_layer_end=int(15*layer_height_num)
-q_prev=np.loadtxt(data_dir+'curve_sliced_js/D500B_js0_0.csv',delimiter=',')[-1]
+num_layer_start=int(44*layer_height_num)
+num_layer_end=int(46*layer_height_num)
+q_prev=client.getJointAnglesDB(positioner.pulse2deg)
+# q_prev=np.array([9.53E-02,-2.71E+00])
+
+if num_layer_start==1:
+	num_sections=12
+else:
+	num_sections=1
 
 for layer in range(num_layer_start,num_layer_end,layer_height_num):
 	num_sections_prev=num_sections
@@ -92,7 +98,7 @@ for layer in range(num_layer_start,num_layer_end,layer_height_num):
 		else:
 			breakpoints=np.linspace(len(curve_sliced_js)-1,0,num=num_points_layer).astype(int)
 
-		s1_all,_=calc_individual_speed(vd_relative,lam1,lam2,lam_relative,breakpoints)
+		s1_all,s2_all=calc_individual_speed(vd_relative,lam1,lam2,lam_relative,breakpoints)
 		
 		###move to intermidieate waypoint for collision avoidance if multiple section
 		if num_sections>1 or num_sections<num_sections_prev:
@@ -102,14 +108,15 @@ for layer in range(num_layer_start,num_layer_end,layer_height_num):
 			waypoint_q=robot.inv(waypoint_pose.p,waypoint_pose.R,curve_sliced_js[breakpoints[0]])[0]
 			mp.MoveL(np.degrees(waypoint_q), 10,target2=target2)
 
-		target2=['MOVJ',np.degrees(positioner_js[breakpoints[0]]),10]
+		target2=['MOVJ',np.degrees(positioner_js[breakpoints[0]]),15]
 		mp.MoveL(np.degrees(curve_sliced_js[breakpoints[0]]), s1_all[0],target2=target2)
 
-		# mp.setArc(True,cond_num=306)
+		mp.setArc(True,cond_num=300)
 		for j in range(1,len(breakpoints)):
-			target2=['MOVJ',np.degrees(positioner_js[breakpoints[j]]),0.5]
+			positioner_w=vd_relative/np.linalg.norm(curve_sliced_relative[breakpoints[j]][:2])
+			target2=['MOVJ',np.degrees(positioner_js[breakpoints[j]]),100*positioner_w/positioner.joint_vel_limit[1]]
 			mp.MoveL(np.degrees(curve_sliced_js[breakpoints[j]]), max(s1_all[j],0.1),target2=target2)
-		# mp.setArc(False)
+		mp.setArc(False)
 
 		q_prev=positioner_js[breakpoints[-1]]
 	

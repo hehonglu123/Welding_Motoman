@@ -8,9 +8,9 @@ from robot_def import *
 
 def main():
 	dataset='cup/'
-	sliced_alg='circular_slice/'
+	sliced_alg='circular_slice_shifted/'
 	data_dir='../data/'+dataset+sliced_alg
-	num_layers=105
+	num_layers=53
 	base_thickness=3
 	num_baselayers=0
 	curve_sliced=[]
