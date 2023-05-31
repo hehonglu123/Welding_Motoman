@@ -226,7 +226,11 @@ weld_peak=np.array(weld_peak)
 # plt.scatter(weld_peak[:,0],weld_peak[:,1]-np.mean(profile_height_arr[:,1]))
 # plt.show()
 
-weld_bp = weld_peak[np.arange(0,len(weld_peak)-1,2)+1]
+forward_flag=False
+if not forward_flag:
+    weld_bp = weld_peak[np.arange(0,len(weld_peak)-1,2)+1]
+else:
+    weld_bp = weld_peak[np.arange(0,len(weld_peak),2)][::-1]
 # weld_bp = weld_peak[np.arange(0,len(weld_peak),2)][::-1]
 plt.scatter(profile_height_arr[:,0],profile_height_arr[:,1]-np.mean(profile_height_arr[:,1]))
 plt.plot(profile_height[:,0],profile_slope)

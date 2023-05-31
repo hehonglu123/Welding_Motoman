@@ -223,7 +223,7 @@ class ScanPathGen():
         for i in range(len(scan_R)):
             scan_R[i] = np.matmul(scan_R[i],R_path)
         
-        # visualize_frames(scan_R[::100],scan_p[::100],size=3)
+        # visualize_frames(scan_R[::10],scan_p[::10],size=3)
         # print(scan_R[0])
 
         return scan_p,scan_R
@@ -345,6 +345,11 @@ class ScanPathGen():
             q_bp2.append([q_out2[path_i]])
             p_bp1.append(scan_p[path_i])
             speed_bp.append(scan_speed) ## mm/sec
+        primitives.append('movel')
+        q_bp1.append([q_out1[-1]])
+        q_bp2.append([q_out2[-1]])
+        p_bp1.append(scan_p[-1])
+        speed_bp.append(scan_speed) ## mm/sec
         #################################
 
         ####### add extension for time sync ####
