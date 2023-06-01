@@ -29,7 +29,7 @@ client=MotionProgramExecClient()
 ####################Base Layer Welding##############################################
 # num_baselayer=2
 # mp=MotionProgram(ROBOT_CHOICE='RB1',ROBOT_CHOICE2='ST1',pulse2deg=robot.pulse2deg,pulse2deg_2=positioner.pulse2deg, tool_num = 12)
-# for base_layer in range(1,2):
+# for base_layer in range(0,1):
 # 	num_sections=len(glob.glob(data_dir+'curve_sliced_relative/baselayer'+str(base_layer)+'_*.csv'))
 # 	for x in range(0,num_sections,layer_width_num):
 # 		curve_sliced_js=np.loadtxt(data_dir+'curve_sliced_js/MA2010_base_js'+str(base_layer)+'_'+str(x)+'.csv',delimiter=',')
@@ -50,7 +50,7 @@ client=MotionProgramExecClient()
 # 		target2=['MOVJ',np.degrees(positioner_js[breakpoints[0]]),10]
 
 # 		mp.MoveL(np.degrees(curve_sliced_js[breakpoints[0]]), s1_all[0],target2=target2)
-# 		mp.setArc(True,cond_num=215)
+# 		mp.setArc(True,cond_num=420)
 # 		for j in range(1,len(breakpoints)):
 # 			target2=['MOVJ',np.degrees(positioner_js[breakpoints[j]]),10]
 # 			mp.MoveL(np.degrees(curve_sliced_js[breakpoints[j]]), s1_all[j],target2=target2)
@@ -62,7 +62,7 @@ client=MotionProgramExecClient()
 
 ###########################################layer welding############################################
 mp=MotionProgram(ROBOT_CHOICE='RB1',ROBOT_CHOICE2='ST1',pulse2deg=robot.pulse2deg,pulse2deg_2=positioner.pulse2deg, tool_num = 12)
-num_layer_start=int(45*layer_height_num)
+num_layer_start=int(47*layer_height_num)
 num_layer_end=int(51*layer_height_num)
 q_prev=client.getJointAnglesDB(positioner.pulse2deg)
 # q_prev=np.array([9.53E-02,-2.71E+00])
@@ -82,7 +82,7 @@ for layer in range(num_layer_start,num_layer_end,layer_height_num):
 		positioner_js=np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
 		curve_sliced_relative=np.loadtxt(data_dir+'curve_sliced_relative/slice'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
 
-		vd_relative=11
+		vd_relative=10
 		lam1=calc_lam_js(curve_sliced_js,robot)
 		lam2=calc_lam_js(positioner_js,positioner)
 		lam_relative=calc_lam_cs(curve_sliced_relative)
@@ -108,7 +108,7 @@ for layer in range(num_layer_start,num_layer_end,layer_height_num):
 		target2=['MOVJ',np.degrees(positioner_js[breakpoints[0]]),15]
 		mp.MoveL(np.degrees(curve_sliced_js[breakpoints[0]]), s1_all[0],target2=target2)
 
-		mp.setArc(True,cond_num=200)
+		mp.setArc(True,cond_num=403)
 		for j in range(1,len(breakpoints)):
 			positioner_w=vd_relative/np.linalg.norm(curve_sliced_relative[breakpoints[j]][:2])
 			target2=['MOVJ',np.degrees(positioner_js[breakpoints[j]]),min(100,100*positioner_w/positioner.joint_vel_limit[1])]
