@@ -113,11 +113,8 @@ q_init_table=np.radians([-15,90])
 # q_init_table=np.radians([-15,180])
 
 ### the default coordinate is x pointing right, y pointing front and z pointing up
-# mti_Rpath = np.array([[ 0.,-1.,0.],   
-#                     [ 0.,0.,1.],
-#                     [-1.,0.,0.]])
-mti_Rpath = np.array([[ 1.,0.,0.],   
-                    [ 0.,-1.,0.],
+mti_Rpath = np.array([[ -1.,0.,0.],   
+                    [ 0.,1.,0.],
                     [0.,0.,-1.]])
 
 scan_p,scan_R,q_out1,q_out2=spg.gen_scan_path(all_curve_sliced_relative,all_layer,all_scan_angle,\

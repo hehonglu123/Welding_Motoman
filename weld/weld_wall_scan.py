@@ -317,9 +317,9 @@ for i in range(0,len(weld_z_height)):
         save_output_points = True
         ### scanning path module
         spg = ScanPathGen(robot_scan,positioner,scan_stand_off_d,Rz_angle,Ry_angle,bounds_theta)
-        mti_Rpath = np.array([[ 1.,0.,0.],   
-                        [ 0.,-1.,0.],
-                        [0.,0.,-1.]])
+        mti_Rpath = np.array([[ -1.,0.,0.],   
+                    [ 0.,1.,0.],
+                    [0.,0.,-1.]])
         # generate scan path
         if forward_flag:
             scan_p,scan_R,q_out1,q_out2=spg.gen_scan_path([curve_sliced_relative],[0],all_scan_angle,\
