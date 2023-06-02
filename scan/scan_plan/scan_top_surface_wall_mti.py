@@ -57,8 +57,8 @@ turn_table=positioner_obj('D500B',def_path=config_dir+'D500B_robot_default_confi
     base_transformation_file=config_dir+'D500B_pose.csv',pulse2deg_file_path=config_dir+'D500B_pulse2deg_real.csv',\
     base_marker_config_file=config_dir+'D500B_marker_config.yaml',tool_marker_config_file=config_dir+'positioner_tcp_marker_config.yaml')
 
-print(robot_scan.fwd(zero_config))
-exit()
+# print(robot_scan.fwd(zero_config))
+# exit()
 
 ## wall test path
 Table_home_T = turn_table.fwd(np.radians([-15,0]))
@@ -112,11 +112,8 @@ q_init_table=np.radians([-30,0])
 # q_init_table=np.radians([-15,180])
 
 ### the default coordinate is x pointing right, y pointing front and z pointing up
-mti_Rpath = np.array([[ 0.,-1.,0.],   
-                    [ 0.,0.,1.],
-                    [-1.,0.,0.]])
-mti_Rpath = np.array([[ 1.,0.,0.],   
-                    [ 0.,-1.,0.],
+mti_Rpath = np.array([[ -1.,0.,0.],   
+                    [ 0.,1.,0.],
                     [0.,0.,-1.]])
 
 scan_p,scan_R,q_out1,q_out2=spg.gen_scan_path(all_curve_sliced_relative,all_layer,all_scan_angle,\

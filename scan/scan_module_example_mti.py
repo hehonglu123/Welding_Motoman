@@ -89,9 +89,13 @@ save_points_dir = ''
 
 ### scanning path module
 spg = ScanPathGen(robot_scan,positioner,scan_stand_off_d,Rz_angle,Ry_angle,bounds_theta)
+
+mti_Rpath = np.array([[ -1.,0.,0.],   
+                    [ 0.,1.,0.],
+                    [0.,0.,-1.]])
 # generate scan path
 scan_p,scan_R,q_out1,q_out2=spg.gen_scan_path([curve_sliced_relative],[0],all_scan_angle,\
-                  solve_js_method=0,q_init_table=q_init_table,scan_path_dir=None)
+                  solve_js_method=0,q_init_table=q_init_table,R_path=mti_Rpath,scan_path_dir=None)
 # generate motion program
 q_bp1,q_bp2,s1_all,s2_all=spg.gen_motion_program(q_out1,q_out2,scan_p,scan_speed,init_sync_move=0)
 

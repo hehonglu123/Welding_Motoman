@@ -95,7 +95,7 @@ for scan_i in range(scan_N):
     #         print(scan_points[:,i])
 
     scan_points = np.insert(scan_points,1,np.zeros(len(scan_points[0])),axis=0)
-    scan_points[0] = -1*scan_points[0]
+    # scan_points[0] = -1*scan_points[0]
     scan_points = scan_points.T
     ## get the points closed to origin
     scan_points = np.transpose(np.matmul(T_rob_positioner_top.R,np.transpose(scan_points)))+T_rob_positioner_top.p
