@@ -77,27 +77,52 @@ T_to_base = Transform(np.eye(3),[0,0,-380])
 positioner.base_H = np.matmul(positioner.base_H,H_from_RT(T_to_base.R,T_to_base.p))
 
 data_dir = '../data/wall_weld_test/full_test_weld_scan_2023_05_31_16_12_02/'
+# data_dir='../data/wall_weld_test/top_layer_test_mti/scans/'
 
 show_layer = [9,12]
 forward_flag=False
 
 all_profile_height=[]
 
-for i in range(0,30):
+for i in range(9,30):
     try:
         pcd = o3d.io.read_point_cloud(data_dir+'layer_'+str(i)+'/scans/processed_pcd.pcd')
         profile_height = np.load(data_dir+'layer_'+str(i)+'/scans/height_profile.npy')
-        all_profile_height.append(profile_height)
+        q_out_exe=np.loadtxt(data_dir +'layer_'+str(i)+ '/scans/scan_js_exe.csv',delimiter=',')
+        robot_stamps=np.loadtxt(data_dir +'layer_'+str(i)+ '/scans/robot_stamps.csv',delimiter=',')
+        with open(data_dir +'layer_'+str(i)+ '/scans/mti_scans.pickle', 'rb') as file:
+            mti_recording=pickle.load(file)
+        
+        # q_out_exe=np.loadtxt(data_dir +'scan_js_exe.csv',delimiter=',')
+        # robot_stamps=np.loadtxt(data_dir +'robot_stamps.csv',delimiter=',')
+        # with open(data_dir +'mti_scans.pickle', 'rb') as file:
+        #     mti_recording=pickle.load(file)
     except:
         break
     print("Layer",i)
     print("Forward:",not forward_flag)
 
-    # scan_process = ScanProcess(robot_scan,positioner)
-    # profile_height = scan_process.pcd2height(deepcopy(pcd),-1)
+    curve_x_start=43
+    curve_x_end=-41
+    crop_extend=10
+    z_height_start=20
+    scan_process = ScanProcess(robot_scan,positioner)
+    crop_min=(curve_x_end-crop_extend,-30,-10)
+    crop_max=(curve_x_start+crop_extend,30,z_height_start+30)
+    crop_h_min=(curve_x_end-crop_extend,-20,-10)
+    crop_h_max=(curve_x_start+crop_extend,20,z_height_start+30)
+    q_init_table=np.radians([-15,200])
+    pcd = scan_process.pcd_register_mti(mti_recording,q_out_exe,robot_stamps,static_positioner_q=q_init_table)
+    # visualize_pcd([pcd])
+    pcd = scan_process.pcd_noise_remove(pcd,nb_neighbors=40,std_ratio=1.5,\
+                                        min_bound=crop_min,max_bound=crop_max,cluster_based_outlier_remove=True,cluster_neighbor=1,min_points=100)
+    # visualize_pcd([pcd])
+    profile_height = scan_process.pcd2height(deepcopy(pcd),-1)
 
-    profile_slope = np.diff(profile_height[:,1])/np.diff(profile_height[:,0])
-    profile_slope = np.append(profile_slope[0],profile_slope)
+    all_profile_height.append(profile_height)
+
+    profile_slope = np.gradient(profile_height[:,1])/np.gradient(profile_height[:,0])
+    # profile_slope = np.append(profile_slope[0],profile_slope)
     # find slope peak
     peak_threshold=0.6
     weld_terrain=[]
