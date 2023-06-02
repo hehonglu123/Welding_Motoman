@@ -196,7 +196,7 @@ for i in range(0,len(weld_z_height)):
                 else:
                     if profile_slope[sample_i]>=peak_threshold:
                         weld_terrain.append(1)
-                    elif profile_slope[sample_i]<=peak_threshold:
+                    elif profile_slope[sample_i]<=-peak_threshold:
                         weld_terrain.append(-1)
                     if lastlast_peak_i:
                         if (weld_terrain[-1]==weld_terrain[lastlast_peak_i]) and (weld_terrain[-1]!=weld_terrain[last_peak_i]):
