@@ -183,10 +183,10 @@ for i in range(0,len(weld_z_height)):
             h_largest = np.max(profile_height[:,1])
             
             # 1. h_target = last height point + designated dh value
-            # h_target = h_largest+1.2
+            h_target = h_largest+1.2
             # 2. h_target = last mean h + last_dh
-            dh_last_layer = mean_h-last_mean_h
-            h_target = mean_h+dh_last_layer
+            # dh_last_layer = mean_h-last_mean_h
+            # h_target = mean_h+dh_last_layer
 
             profile_slope = np.diff(profile_height[:,1])/np.diff(profile_height[:,0])
             profile_slope = np.append(profile_slope[0],profile_slope)
@@ -493,8 +493,8 @@ for i in range(0,len(weld_z_height)):
     print(crop_max)
     scan_process = ScanProcess(robot_scan,positioner)
     pcd = scan_process.pcd_register_mti(mti_recording,q_out_exe,robot_stamps,static_positioner_q=q_init_table)
-    pcd = scan_process.pcd_noise_remove(pcd,nb_neighbors=40,std_ratio=1.5,\
-                                        min_bound=crop_min,max_bound=crop_max,cluster_based_outlier_remove=True,cluster_neighbor=1,min_points=100)
+    pcd = scan_process.pcd_noise_remove(pcd,nb_neighbors=60,std_ratio=0.85,\
+                                        min_bound=crop_min,max_bound=crop_max,cluster_based_outlier_remove=False)
     profile_height = scan_process.pcd2height(deepcopy(pcd),z_height_start,bbox_min=crop_h_min,bbox_max=crop_h_max)
     save_output_points=True
     if save_output_points:
