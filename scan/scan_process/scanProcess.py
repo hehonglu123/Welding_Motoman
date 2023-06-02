@@ -276,6 +276,7 @@ class ScanProcess():
                 sort_y=np.argsort(np.asarray(welds_points_x.points)[:,1])
                 y_min_index=sort_y[:use_points_num]
                 y_max_index=sort_y[-use_points_num:]
+                y_mid_index=sort_y[use_points_num:-use_points_num]
                 
                 ### get y and prune y that is too closed
                 y_min_all = np.asarray(welds_points_x.points)[y_min_index,1]
@@ -298,7 +299,8 @@ class ScanProcess():
                     y_min=np.mean(actual_y_min_all)
 
                 this_width=y_max-y_min
-                z_height_ave = np.mean(np.asarray(welds_points_x.points)[np.append(y_min_index,y_max_index),2])
+                # z_height_ave = np.mean(np.asarray(welds_points_x.points)[np.append(y_min_index,y_max_index),2])
+                z_height_ave = np.mean(np.asarray(welds_points_x.points)[:,2])
                 profile_p.append(np.array([x,this_width,z_height_ave]))
             profile_p = np.array(profile_p)
             
