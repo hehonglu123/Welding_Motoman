@@ -11,6 +11,7 @@ from scan_utils import *
 from scan_continuous import *
 from scanPathGen import *
 from scanProcess import *
+from weldCorrectionStrategy import *
 from dx200_motion_program_exec_client import *
 
 from general_robotics_toolbox import *
@@ -174,124 +175,22 @@ for i in range(0,len(weld_z_height)):
             if profile_height is None:
                 profile_height=np.load('../data/wall_weld_test/weld_scan_2023_05_31_16_12_02/layer_6/scans/height_profile.npy')
                 data_dir='../data/wall_weld_test/weld_scan_2023_05_31_16_12_02/'
-            
-            mean_h = np.mean(profile_height[:,1])
-            h_thres = 3
-            profile_height=np.delete(profile_height,np.where(profile_height[:,1]-mean_h>3),axis=0)
-            profile_height=np.delete(profile_height,np.where(profile_height[:,1]-mean_h<-3),axis=0)
 
-            h_largest = np.max(profile_height[:,1])
-            
-            # 1. h_target = last height point + designated dh value
-            # h_target = h_largest+1.2
-            # 2. h_target = last mean h + last_dh
-            dh_last_layer = mean_h-last_mean_h
-            h_target = mean_h+dh_last_layer
-
-            profile_slope = np.diff(profile_height[:,1])/np.diff(profile_height[:,0])
-            profile_slope = np.append(profile_slope[0],profile_slope)
-            # find slope peak
-            peak_threshold=0.6
-            weld_terrain=[]
-            last_peak_i=None
-            lastlast_peak_i=None
-            for sample_i in range(len(profile_slope)):
-                if np.fabs(profile_slope[sample_i])<peak_threshold:
-                    weld_terrain.append(0)
-                else:
-                    if profile_slope[sample_i]>=peak_threshold:
-                        weld_terrain.append(1)
-                    elif profile_slope[sample_i]<=-peak_threshold:
-                        weld_terrain.append(-1)
-                    if lastlast_peak_i:
-                        if (weld_terrain[-1]==weld_terrain[lastlast_peak_i]) and (weld_terrain[-1]!=weld_terrain[last_peak_i]):
-                            weld_terrain[last_peak_i]=0
-                    lastlast_peak_i=last_peak_i
-                    last_peak_i=sample_i
-
-            weld_terrain=np.array(weld_terrain)
-            weld_peak=[]
-            last_peak=None
-            last_peak_i=None
+            ## parameters
+            noise_h_thres = 3
+            peak_threshold=0.25
             flat_threshold=2.5
-            for sample_i in range(len(profile_slope)):
-                if weld_terrain[sample_i]!=0:
-                    if last_peak is None:
-                        weld_peak.append(profile_height[sample_i])
-                    else:
-                        # if the terrain change
-                        if (last_peak>0 and weld_terrain[sample_i]<0) or (last_peak<0 and weld_terrain[sample_i]>0):
-                            weld_peak.append(profile_height[last_peak_i])
-                            weld_peak.append(profile_height[sample_i])
-                        else:
-                            # the terrain not change but flat too long
-                            if profile_height[sample_i,0]-profile_height[last_peak_i,0]>flat_threshold:
-                                weld_peak.append(profile_height[last_peak_i])
-                                weld_peak.append(profile_height[sample_i])
-                    last_peak=deepcopy(weld_terrain[sample_i])
-                    last_peak_i=sample_i
-            weld_peak=np.array(weld_peak)
+            correct_thres = 1.5
+            patch_nb = 2 # 2*0.1
+            start_ramp_ratio = 0.67
+            end_ramp_ratio = 0.33
+            #############
 
-            if not forward_flag:
-                weld_bp = weld_peak[np.arange(0,len(weld_peak)-1,2)+1]
-            else:
-                weld_bp = weld_peak[np.arange(0,len(weld_peak),2)][::-1]
-
-            plt.scatter(profile_height[:,0],profile_height[:,1]-np.mean(profile_height[:,1]))
-            plt.plot(profile_height[:,0],profile_slope)
-            plt.scatter(weld_peak[:,0],weld_peak[:,1]-np.mean(profile_height[:,1]))
-            plt.scatter(weld_bp[:,0],weld_bp[:,1]-np.mean(profile_height[:,1]))
-            plt.show()
-            # exit()
-
-            # find v
-            # 140 ipm: dh=0.006477*v^2-0.2362v+3.339
-            # 160 ipm: dh=0.006043*v^2-0.2234v+3.335    
-            # new curve in positioner frame
-            curve_sliced_relative_correct = []
-            this_p = np.array([curve_sliced_relative[0][0],curve_sliced_relative[0][1],h_largest])
-            curve_sliced_relative_correct.append(np.append(this_p,curve_sliced_relative[0][3:]))
-            path_T_S1 = [Transform(R_S1TCP,curve_sliced_relative_correct[-1][:3])]
-            this_weld_v = []
-            all_dh=[]
-
-            for bpi in range(0,len(weld_bp)):
-                if forward_flag:
-                    if weld_bp[bpi][0]>curve_sliced_relative[0][0]:
-                        continue
-                    if weld_bp[bpi][0]<curve_sliced_relative[-1][0]:
-                        break
-                else:
-                    if weld_bp[bpi][0]<curve_sliced_relative[0][0]:
-                        continue
-                    if weld_bp[bpi][0]>curve_sliced_relative[-1][0]:
-                        break
-                if bpi==0:
-                    dh = min(h_target-weld_bp[bpi][1],2.5)
-                else:
-                    dh = min(h_target-weld_bp[bpi-1][1],2.5)
-                all_dh.append(dh)
-                a=0.006477
-                b=-0.2362
-                c=3.339-dh
-                v=(-b-np.sqrt(b**2-4*a*c))/(2*a)
-                this_weld_v.append(v)
-
-                this_p = np.array([weld_bp[bpi][0],curve_sliced_relative[0][1],h_largest])
-                curve_sliced_relative_correct.append(np.append(this_p,curve_sliced_relative_correct[0][3:]))
-                path_T_S1.append(Transform(R_S1TCP,curve_sliced_relative_correct[-1][:3]))
-            
-            dh = min(h_target-weld_bp[bpi-1][1],2.5)
-            all_dh.append(dh)
-            a=0.006477
-            b=-0.2362
-            c=3.339-dh
-            v=(-b-np.sqrt(b**2-4*a*c))/(2*a)
-            this_weld_v.append(v)
-            this_p = np.array([curve_sliced_relative[-1][0],curve_sliced_relative[0][1],h_largest])
-            curve_sliced_relative_correct.append(np.append(this_p,curve_sliced_relative[0][3:]))
-            path_T_S1.append(Transform(R_S1TCP,curve_sliced_relative_correct[-1][:3]))
-            curve_sliced_relative=deepcopy(curve_sliced_relative_correct)
+            curve_sliced_relative,path_T_S1,this_weld_v,all_dh=\
+                strategy_2(profile_height,last_mean_h,forward_flag,curve_sliced_relative,R_S1TCP,this_weld_v[0],\
+                        noise_h_thres=noise_h_thres,peak_threshold=peak_threshold,flat_threshold=flat_threshold,\
+                        correct_thres=correct_thres,patch_nb=patch_nb,\
+                        start_ramp_ratio=start_ramp_ratio,end_ramp_ratio=end_ramp_ratio)
 
             # find curve in R1 frame
             path_T=[]
@@ -489,8 +388,6 @@ for i in range(0,len(weld_z_height)):
     crop_max=(curve_x_start+crop_extend,30,z_height_start+30)
     crop_h_min=(curve_x_end-crop_extend,-20,-10)
     crop_h_max=(curve_x_start+crop_extend,20,z_height_start+30)
-    print(crop_min)
-    print(crop_max)
     scan_process = ScanProcess(robot_scan,positioner)
     pcd = scan_process.pcd_register_mti(mti_recording,q_out_exe,robot_stamps,static_positioner_q=q_init_table)
     pcd = scan_process.pcd_noise_remove(pcd,nb_neighbors=40,std_ratio=1.5,\
