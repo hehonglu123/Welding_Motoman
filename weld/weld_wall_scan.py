@@ -236,6 +236,9 @@ for i in range(0,len(weld_z_height)):
 
         # print(np.degrees(q_out1[:10]))
         # print(np.degrees(q_out1[-10:]))
+        # plt.plot(np.degrees(q_out1))
+        # plt.legend(['J1','J2','J3','J4','J5','J6'])
+        # plt.show()
         # print(scan_p[0],scan_R[0])
         # print(robot_scan.fwd(q_out1[0]))
         # print(robot_scan.fwd(np.zeros(6)))
