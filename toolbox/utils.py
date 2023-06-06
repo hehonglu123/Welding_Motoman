@@ -197,6 +197,13 @@ def find_j_min(robot,curve_js):
 
 	return sing_min
 
+def get_angle2(v1,v2,k=None):
+	#signed rotational angle from v1 to v2, rotation about k if provided
+	if k is not None:
+		return np.arctan2(np.dot(np.cross(v1, v2),k), np.dot(v1,v2))
+	else:
+		return np.arctan2(np.linalg.norm(np.cross(v1, v2)), np.dot(v1,v2))
+		
 def get_angle(v1,v2,less90=False):
 	v1=v1/np.linalg.norm(v1)
 	v2=v2/np.linalg.norm(v2)

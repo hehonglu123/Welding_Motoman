@@ -16,7 +16,7 @@ def main():
 	sliced_alg='circular_slice_shifted/'
 	data_dir='../data/'+dataset+sliced_alg
 	num_layers=50
-	num_baselayers=2
+	num_baselayers=0
 	q_positioner_seed=[1,3]
 
 	# dataset='blade0.1/'
