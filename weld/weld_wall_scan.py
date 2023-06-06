@@ -145,7 +145,7 @@ last_mean_h = 0
 
 for i in range(16,len(weld_z_height)):
     print("Layer:",i)
-    if i>=0 and True:
+    if i>=16 and True:
         if i>=2:
             base_layer=False
         this_z_height=weld_z_height[i]
@@ -165,15 +165,39 @@ for i in range(16,len(weld_z_height)):
             this_n = np.matmul(T_S1TCP_R1Base[:3,:3],path_p.R[:,-1])
             curve_sliced_relative.append(np.append(this_p,this_n))
         curve_sliced_relative=curve_sliced_relative[1:-1] # the start and end is for collision prevention
+        print(path_T[0])
         print(curve_sliced_relative)
         R_S1TCP = np.matmul(T_S1TCP_R1Base[:3,:3],path_p.R)
 
         #### Correction ####
         # TODO: Add fitering if near threshold
         h_largest=this_z_height
-        if (i<=2):
-            if profile_height is not None:
+        if (i<=999999999):
+            if (last_mean_h == 0) and (profile_height is not None):
                 last_mean_h=np.mean(profile_height[:,1])
+            else:
+                if i!=0:
+                    last_profile_height=np.load('../data/wall_weld_test/weld_scan_2023_06_06_15_28_31/layer_14/scans/height_profile.npy')
+                    last_mean_h=np.mean(last_profile_height[:,1])
+                    profile_height=np.load('../data/wall_weld_test/weld_scan_2023_06_06_15_28_31/layer_15/scans/height_profile.npy')
+                    data_dir='../data/wall_weld_test/weld_scan_2023_06_06_15_28_31/'
+
+            if (profile_height is not None) and (i>2):
+                mean_h = np.mean(profile_height[:,1])
+                dh_last_layer = mean_h-last_mean_h
+                h_target = mean_h+dh_last_layer
+
+                dh_direction = np.array([0,0,h_target-curve_sliced_relative[0][2]])
+                dh_direction_R1 = T_R1Base_S1TCP[:3,:3]@dh_direction
+
+                for curve_i in range(len(curve_sliced_relative)):
+                    curve_sliced_relative[curve_i][2]=h_target
+                
+                for path_i in range(len(path_T)):
+                    path_T[path_i].p=path_T[path_i].p+dh_direction_R1
+
+                last_mean_h=mean_h
+
         else: # start correction from 2nd top layer
             
             if profile_height is None:
@@ -213,12 +237,13 @@ for i in range(16,len(weld_z_height)):
         print("Nominal V:",weld_velocity[i])
         print("Correct V:",this_weld_v)
         print(curve_sliced_relative)
+        print(path_T[0])
         print(len(path_T))
         print(len(curve_sliced_relative))
 
         ######################################################
         ########### Do welding #############
-        to_start_speed=6
+        to_start_speed=8
         path_q = []
         for tcp_T in path_T:
             path_q.append(robot_weld.inv(tcp_T.p,tcp_T.R,zero_config)[0])
@@ -262,10 +287,13 @@ for i in range(16,len(weld_z_height)):
 
     if True:
         if curve_sliced_relative is None:
+            data_dir='../data/wall_weld_test/weld_scan_2023_06_06_15_28_31/'
+            last_profile_height=np.load('../data/wall_weld_test/weld_scan_2023_06_06_15_28_31/layer_14/scans/height_profile.npy')
+            last_mean_h=np.mean(last_profile_height[:,1])
+            h_largest=np.max(last_profile_height[:,1])
             layer_data_dir=data_dir+'layer_'+str(i)+'/'
-            curve_sliced_relative=[np.array([-3.19456051e+01,  1.72700000e+00,  1.95243306e+01,  1.55554573e-04,
-       -6.31394918e-20, -9.99881509e-01]), np.array([-3.01454496e+01,  1.72700000e+00,  1.95243306e+01,  1.55554573e-04,
-       -6.31394918e-20, -9.99881509e-01]), np.array([ 3.30466929e+01,  1.72700000e+00,  1.95243306e+01,  1.55554573e-04,
+            curve_sliced_relative=[np.array([-3.19473162e+01,  1.72700000e+00,  3.34460358e+01,  1.55554573e-04,
+       -6.31394918e-20, -9.99881509e-01]), np.array([ 3.30449818e+01,  1.72700000e+00,  3.34460358e+01,  1.55554573e-04,
        -6.31394918e-20, -9.99881509e-01])]
 
         # 2. Scanning parameters
@@ -310,7 +338,7 @@ for i in range(16,len(weld_z_height)):
         input("Press Enter and move to scanning startint point")
 
         ## move to start
-        to_start_speed=5
+        to_start_speed=7
         mp = MotionProgram(ROBOT_CHOICE='RB2',ROBOT_CHOICE2='ST1',pulse2deg=robot_scan.pulse2deg,pulse2deg_2=positioner.pulse2deg)
         target2=['MOVJ',np.degrees(q_bp2[0][0]),to_start_speed]
         mp.MoveJ(np.degrees(q_bp1[0][0]), to_start_speed, 0, target2=target2)
@@ -418,6 +446,7 @@ for i in range(16,len(weld_z_height)):
     pcd = scan_process.pcd_noise_remove(pcd,nb_neighbors=40,std_ratio=1.5,\
                                         min_bound=crop_min,max_bound=crop_max,cluster_based_outlier_remove=True,cluster_neighbor=1,min_points=100)
     profile_height,Transz0_H = scan_process.pcd2height(deepcopy(pcd),z_height_start,bbox_min=crop_h_min,bbox_max=crop_h_max,Transz0_H=Transz0_H)
+    print(Transz0_H)
     save_output_points=True
     if save_output_points:
         o3d.io.write_point_cloud(out_scan_dir+'processed_pcd.pcd',pcd)
