@@ -205,7 +205,9 @@ class ScanProcess():
         
         return pcd_combined
 
-    def pcd2height(self,scanned_points,z_height_start,bbox_min=(-40,-20,0),bbox_max=(40,20,45),resolution_z=0.1,windows_z=0.2,resolution_x=0.1,windows_x=1,stop_thres=20,stop_thres_w=10,use_points_num=5,width_thres=0.8):
+    def pcd2height(self,scanned_points,z_height_start,bbox_min=(-40,-20,0),bbox_max=(40,20,45),\
+                   resolution_z=0.1,windows_z=0.2,resolution_x=0.1,windows_x=1,stop_thres=20,\
+                   stop_thres_w=10,use_points_num=5,width_thres=0.8,Transz0_H=None):
 
         ##### cross section parameters
         # resolution_z=0.1
@@ -221,18 +223,19 @@ class ScanProcess():
         ###################### get the welding pieces ##################
         # This part will be replaced by welding path in the future
         ######## make the plane normal as z-axis
-        ####### plane segmentation
-        plane_model, inliers = scanned_points.segment_plane(distance_threshold=float(0.75),
-                                                ransac_n=int(5),
-                                                num_iterations=int(3000))
-        ## Transform the plane to z=0
-        plain_norm = plane_model[:3]/np.linalg.norm(plane_model[:3])
-        k = np.cross(plain_norm,[0,0,1])
-        k = k/np.linalg.norm(k)
-        theta = np.arccos(plain_norm[2])
-        Transz0 = Transform(rot(k,theta),[0,0,0])*\
-                    Transform(np.eye(3),[0,0,plane_model[3]/plane_model[2]])
-        Transz0_H=H_from_RT(Transz0.R,Transz0.p)
+        if Transz0_H is None:
+            ####### plane segmentation
+            plane_model, inliers = scanned_points.segment_plane(distance_threshold=float(0.75),
+                                                    ransac_n=int(5),
+                                                    num_iterations=int(3000))
+            ## Transform the plane to z=0
+            plain_norm = plane_model[:3]/np.linalg.norm(plane_model[:3])
+            k = np.cross(plain_norm,[0,0,1])
+            k = k/np.linalg.norm(k)
+            theta = np.arccos(plain_norm[2])
+            Transz0 = Transform(rot(k,theta),[0,0,0])*\
+                        Transform(np.eye(3),[0,0,plane_model[3]/plane_model[2]])
+            Transz0_H=H_from_RT(Transz0.R,Transz0.p)
         scanned_points.transform(Transz0_H)
         ### now the distance to plane is the z axis
 
@@ -258,6 +261,8 @@ class ScanProcess():
             max_bound = bbox_max
             bbox = o3d.geometry.AxisAlignedBoundingBox(min_bound=min_bound,max_bound=max_bound)
             welds_points=points_proj.crop(bbox)
+
+            # visualize_pcd([welds_points])
 
             #### get width with x-direction scanning
             if len(welds_points.points)<stop_thres:
@@ -315,6 +320,6 @@ class ScanProcess():
         profile_height_arr_argsort = np.argsort(profile_height_arr[:,0])
         profile_height_arr=profile_height_arr[profile_height_arr_argsort]
         
-        return profile_height_arr
+        return profile_height_arr,Transz0_H
 
         

@@ -1,5 +1,6 @@
 import numpy as np
 from copy import deepcopy
+from matplotlib import pyplot as plt
 from general_robotics_toolbox import *
 
 def strategy_1():
@@ -7,16 +8,16 @@ def strategy_1():
 
 def strategy_2(profile_height,last_mean_h,forward_flag,curve_sliced_relative,R_S1TCP,original_v,\
                noise_h_thres=3,peak_threshold=0.25,flat_threshold=2.5,correct_thres = 1.5,patch_nb = 2,\
-               start_ramp_ratio = 0.67,end_ramp_ratio = 0.33):
+               start_ramp_ratio = 0.67,end_ramp_ratio = 0.33,show_plot=False):
     
     ## parameters
-    noise_h_thres = 3
-    peak_threshold=0.25
-    flat_threshold=2.5
-    correct_thres = 1.5
-    patch_nb = 2 # 2*0.1
-    start_ramp_ratio = 0.67
-    end_ramp_ratio = 0.33
+    # noise_h_thres = 3
+    # peak_threshold=0.25
+    # flat_threshold=2.5
+    # correct_thres = 1.5
+    # patch_nb = 2 # 2*0.1
+    # start_ramp_ratio = 0.67
+    # end_ramp_ratio = 0.33
     #############
 
     ### delete noise
@@ -24,7 +25,7 @@ def strategy_2(profile_height,last_mean_h,forward_flag,curve_sliced_relative,R_S
     profile_height=np.delete(profile_height,np.where(profile_height[:,1]-mean_h>noise_h_thres),axis=0)
     profile_height=np.delete(profile_height,np.where(profile_height[:,1]-mean_h<-noise_h_thres),axis=0)
     ###
-
+    mean_h = np.mean(profile_height[:,1])
     h_largest = np.max(profile_height[:,1])
     # 1. h_target = last height point + designated dh value
     # h_target = h_largest+1.2
@@ -77,10 +78,20 @@ def strategy_2(profile_height,last_mean_h,forward_flag,curve_sliced_relative,R_S
                         weld_peak_id.append(sample_i)
             last_peak=deepcopy(weld_terrain[sample_i])
             last_peak_i=sample_i
+    weld_peak.append(profile_height[-1])
+    weld_peak_id.append(len(profile_height)-1)
     weld_peak=np.array(weld_peak)
     weld_peak_id=np.array(weld_peak_id)
 
+    weld_peak_id[0]=0 # ensure start at 0
+
     correction_index = np.where(profile_height[:,1]-h_largest<-1*correct_thres)[0]
+
+    # plt.scatter(profile_height[:,0],profile_height[:,1]-np.mean(profile_height[:,1]))
+    # plt.scatter(profile_height[correction_index,0],profile_height[correction_index,1]-np.mean(profile_height[:,1]))
+    # plt.scatter(profile_height[weld_peak_id,0],profile_height[weld_peak_id,1]-np.mean(profile_height[:,1]))
+    # plt.plot(profile_height[:,0],profile_slope)
+    # plt.show()
 
     # identified patch
     correction_patches = []
@@ -106,6 +117,7 @@ def strategy_2(profile_height,last_mean_h,forward_flag,curve_sliced_relative,R_S
         else:
             start_ramp_start_i = np.where(weld_peak_id<=start_i)[0][-1]
             start_ramp_end_i = np.where(weld_peak_id>start_i)[0][0]
+
             start_ramp_start_i = max(0,start_ramp_start_i)
             start_ramp_end_i = min(start_ramp_end_i,len(weld_peak_id)-1)
             if profile_slope[weld_peak_id[start_ramp_start_i]]>0:
@@ -151,18 +163,25 @@ def strategy_2(profile_height,last_mean_h,forward_flag,curve_sliced_relative,R_S
     if forward_flag:
         motion_patches=motion_patches[::-1]
 
+    plt.scatter(profile_height[:,0],profile_height[:,1]-np.mean(profile_height[:,1]))
+    plt.scatter(profile_height[correction_index,0],profile_height[correction_index,1]-np.mean(profile_height[:,1]))
+    plt.plot(profile_height[:,0],profile_slope)
+    for mo_pat in motion_patches:
+        plt.scatter(profile_height[mo_pat,0],profile_height[mo_pat,1]-np.mean(profile_height[:,1]))
+    plt.show()
+
     # find v
     # 140 ipm: dh=0.006477*v^2-0.2362v+3.339
     # 160 ipm: dh=0.006043*v^2-0.2234v+3.335    
     # new curve in positioner frame
     curve_sliced_relative_correct = []
-    this_p = np.array([curve_sliced_relative[0][0],curve_sliced_relative[0][1],h_largest])
+    this_p = np.array([curve_sliced_relative[0][0],curve_sliced_relative[0][1],h_target])
     curve_sliced_relative_correct.append(np.append(this_p,curve_sliced_relative[0][3:]))
     path_T_S1 = [Transform(R_S1TCP,curve_sliced_relative_correct[-1][:3])]
     this_weld_v = []
     all_dh=[]
-    curve_x_upper = np.max(curve_sliced_relative[0,0],curve_sliced_relative[-1,0])
-    curve_x_lower = np.min(curve_sliced_relative[0,0],curve_sliced_relative[-1,0]) 
+    curve_x_upper = np.max([curve_sliced_relative[0][0],curve_sliced_relative[-1][0]])
+    curve_x_lower = np.min([curve_sliced_relative[0][0],curve_sliced_relative[-1][0]]) 
     for mo_patch in motion_patches:
         if curve_x_upper>=profile_height[mo_patch[0],0]>=curve_x_lower:
             this_weld_v.append(original_v)
@@ -173,6 +192,7 @@ def strategy_2(profile_height,last_mean_h,forward_flag,curve_sliced_relative,R_S
             pass
         if curve_x_upper>=profile_height[mo_patch[-1],0]>=curve_x_lower:
             dh = h_largest-np.min(profile_height[np.min(mo_patch):np.max(mo_patch),1])
+            dh = min(2.7,dh)
             all_dh.append(dh)
 
             # 140 ipm
@@ -185,6 +205,7 @@ def strategy_2(profile_height,last_mean_h,forward_flag,curve_sliced_relative,R_S
             b=-0.2234
             c=3.335-dh
             v=(-b-np.sqrt(b**2-4*a*c))/(2*a)
+            v=min(original_v,v)
             
             this_weld_v.append(v)
 
@@ -193,6 +214,7 @@ def strategy_2(profile_height,last_mean_h,forward_flag,curve_sliced_relative,R_S
             path_T_S1.append(Transform(R_S1TCP,curve_sliced_relative_correct[-1][:3]))
         else:
             dh = h_largest-np.min(profile_height[np.min(motion_patches[-1]):np.max(motion_patches[-1]),1])
+            dh = min(2.7,dh)
             all_dh.append(dh)
 
             # 140 ipm
@@ -205,14 +227,15 @@ def strategy_2(profile_height,last_mean_h,forward_flag,curve_sliced_relative,R_S
             b=-0.2234
             c=3.335-dh
             v=(-b-np.sqrt(b**2-4*a*c))/(2*a)
+            v=min(original_v,v)
 
             this_weld_v.append(v)
 
     if len(this_weld_v)<len(curve_sliced_relative_correct):
         this_weld_v.append(original_v)
 
-    this_p = np.array([curve_sliced_relative[0][0],curve_sliced_relative[0][1],h_target])
+    this_p = np.array([curve_sliced_relative[-1][0],curve_sliced_relative[-1][1],h_target])
     curve_sliced_relative_correct.append(np.append(this_p,curve_sliced_relative_correct[0][3:]))
     path_T_S1.append(Transform(R_S1TCP,curve_sliced_relative_correct[-1][:3]))
 
-    return curve_sliced_relative_correct,path_T_S1,this_weld_v,all_dh
+    return curve_sliced_relative_correct,path_T_S1,this_weld_v,all_dh,mean_h
