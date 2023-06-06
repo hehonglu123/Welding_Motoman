@@ -174,10 +174,18 @@ def strategy_2(profile_height,last_mean_h,forward_flag,curve_sliced_relative,R_S
         if curve_x_upper>=profile_height[mo_patch[-1],0]>=curve_x_lower:
             dh = h_largest-np.min(profile_height[np.min(mo_patch):np.max(mo_patch),1])
             all_dh.append(dh)
-            a=0.006477
-            b=-0.2362
-            c=3.339-dh
+
+            # 140 ipm
+            # a=0.006477
+            # b=-0.2362
+            # c=3.339-dh
+            # v=(-b-np.sqrt(b**2-4*a*c))/(2*a)
+            # 160 ipm
+            a=0.006043
+            b=-0.2234
+            c=3.335-dh
             v=(-b-np.sqrt(b**2-4*a*c))/(2*a)
+            
             this_weld_v.append(v)
 
             this_p = np.array([profile_height[mo_patch[-1],0],curve_sliced_relative[0][1],h_target])
@@ -186,10 +194,18 @@ def strategy_2(profile_height,last_mean_h,forward_flag,curve_sliced_relative,R_S
         else:
             dh = h_largest-np.min(profile_height[np.min(motion_patches[-1]):np.max(motion_patches[-1]),1])
             all_dh.append(dh)
-            a=0.006477
-            b=-0.2362
-            c=3.339-dh
+
+            # 140 ipm
+            # a=0.006477
+            # b=-0.2362
+            # c=3.339-dh
+            # v=(-b-np.sqrt(b**2-4*a*c))/(2*a)
+            # 160 ipm
+            a=0.006043
+            b=-0.2234
+            c=3.335-dh
             v=(-b-np.sqrt(b**2-4*a*c))/(2*a)
+
             this_weld_v.append(v)
 
     if len(this_weld_v)<len(curve_sliced_relative_correct):
