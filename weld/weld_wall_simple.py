@@ -32,12 +32,12 @@ layer_height=0.8
 # 	q_init=np.degrees(robot.inv(p1,R,q_seed)[0])
 # 	q_end=np.degrees(robot.inv(p2,R,q_seed)[0])
 # 	mp.MoveJ(q_init,1,0)
-# 	mp.setArc(True,cond_num=310)
+# 	mp.setArc(True,cond_num=410)
 # 	mp.MoveL(q_end,5,0)
 # 	mp.setArc(False)
 # 	client.execute_motion_program(mp)
 
-for i in range(7,8):
+for i in range(2,3):
 	if i%2==0:
 		p1=p_start+np.array([0,0,2*base_layer_height+i*layer_height])
 		p2=p_end+np.array([0,0,2*base_layer_height+i*layer_height])
@@ -48,7 +48,7 @@ for i in range(7,8):
 	q_init=np.degrees(robot.inv(p1,R,q_seed)[0])
 	q_end=np.degrees(robot.inv(p2,R,q_seed)[0])
 	mp.MoveJ(q_init,1,0)
-	mp.setArc(True,cond_num=305)
+	mp.setArc(True,cond_num=401)
 	mp.MoveL(q_end,12,0)
 	mp.setArc(False)
 	client.execute_motion_program(mp)
