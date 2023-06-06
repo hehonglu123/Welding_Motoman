@@ -100,15 +100,12 @@ positioner.base_H = H_from_RT(positioner.T_base_basemarker.R,positioner.T_base_b
 T_to_base = Transform(np.eye(3),[0,0,-380])
 positioner.base_H = np.matmul(positioner.base_H,H_from_RT(T_to_base.R,T_to_base.p))
 
-forward_flag = True
-base_layer = True
-
-final_height=30
+final_height=50
 weld_z_height=[0,6,8] # two base layer height to first top layer
 weld_z_height=np.append(weld_z_height,np.arange(weld_z_height[-1],final_height,1)+1)
 # job_number=[115,115]
 job_number=[215,215]
-job_number=np.append(job_number,np.ones(len(weld_z_height)-2)*140)
+job_number=np.append(job_number,np.ones(len(weld_z_height)-2)*206)
 print(weld_z_height)
 print(job_number)
 
@@ -139,12 +136,16 @@ welder_state_sub.WireValueChanged += wire_cb
 mti_client = RRN.ConnectService("rr+tcp://192.168.55.10:60830/?service=MTI2D")
 mti_client.setExposureTime("25")
 ###################################
+forward_flag = True
+base_layer = True
 profile_height=None
-last_mean_h = None
+Transz0_H=None
+curve_sliced_relative=None
+last_mean_h = 0
 
-for i in range(0,len(weld_z_height)):
-    print("Layer:",i+1)
-    if True:
+for i in range(16,len(weld_z_height)):
+    print("Layer:",i)
+    if i>=0 and True:
         if i>=2:
             base_layer=False
         this_z_height=weld_z_height[i]
@@ -170,27 +171,33 @@ for i in range(0,len(weld_z_height)):
         #### Correction ####
         # TODO: Add fitering if near threshold
         h_largest=this_z_height
-        if i>2: # start correction from 2nd top layer
+        if (i<=2):
+            if profile_height is not None:
+                last_mean_h=np.mean(profile_height[:,1])
+        else: # start correction from 2nd top layer
             
             if profile_height is None:
-                profile_height=np.load('../data/wall_weld_test/weld_scan_2023_05_31_16_12_02/layer_6/scans/height_profile.npy')
-                data_dir='../data/wall_weld_test/weld_scan_2023_05_31_16_12_02/'
+                last_profile_height=np.load('../data/wall_weld_test/weld_scan_2023_06_06_12_43_57/layer_14/scans/height_profile.npy')
+                last_mean_h=np.mean(last_profile_height[:,1])
+                profile_height=np.load('../data/wall_weld_test/weld_scan_2023_06_06_12_43_57/layer_15/scans/height_profile.npy')
+                data_dir='../data/wall_weld_test/weld_scan_2023_06_06_12_43_57/'
 
             ## parameters
             noise_h_thres = 3
             peak_threshold=0.25
             flat_threshold=2.5
-            correct_thres = 1.5
+            correct_thres = 2
             patch_nb = 2 # 2*0.1
             start_ramp_ratio = 0.67
             end_ramp_ratio = 0.33
             #############
 
-            curve_sliced_relative,path_T_S1,this_weld_v,all_dh=\
+            curve_sliced_relative,path_T_S1,this_weld_v,all_dh,last_mean_h=\
                 strategy_2(profile_height,last_mean_h,forward_flag,curve_sliced_relative,R_S1TCP,this_weld_v[0],\
                         noise_h_thres=noise_h_thres,peak_threshold=peak_threshold,flat_threshold=flat_threshold,\
                         correct_thres=correct_thres,patch_nb=patch_nb,\
                         start_ramp_ratio=start_ramp_ratio,end_ramp_ratio=end_ramp_ratio)
+            h_largest = np.max(profile_height[:,1])
 
             # find curve in R1 frame
             path_T=[]
@@ -208,11 +215,63 @@ for i in range(0,len(weld_z_height)):
         print(curve_sliced_relative)
         print(len(path_T))
         print(len(curve_sliced_relative))
+
+        ######################################################
+        ########### Do welding #############
+        to_start_speed=6
+        path_q = []
+        for tcp_T in path_T:
+            path_q.append(robot_weld.inv(tcp_T.p,tcp_T.R,zero_config)[0])
         
+        input("Press Enter and move to weld starting point.")
+        mp = MotionProgram(ROBOT_CHOICE='RB1', pulse2deg=robot_weld.pulse2deg)
+        mp.MoveJ(np.degrees(path_q[0]), to_start_speed, 0)
+        
+        robot_client.execute_motion_program(mp)
+
+        input("Press Enter and start welding.")
+        mp=MotionProgram(ROBOT_CHOICE='RB1',pulse2deg=robot_weld.pulse2deg)
+        mp.MoveL(np.degrees(path_q[1]), 10, 0)
+        mp.setArc(select, int(this_job_number))
+        for bpi in range(len(this_weld_v)):
+            if bpi!=len(this_weld_v)-1:
+                mp.MoveL(np.degrees(path_q[bpi+2]), this_weld_v[bpi])
+            else:
+                mp.MoveL(np.degrees(path_q[bpi+2]), this_weld_v[bpi],0)
+        mp.setArc(False)
+        mp.MoveL(np.degrees(path_q[-1]), 10, 0)
+        clean_weld_record()
+        rob_stamps,rob_js_exe,_,_= robot_client.execute_motion_program(mp)
+
+        if save_weld_record:
+            Path(data_dir).mkdir(exist_ok=True)
+            layer_data_dir=data_dir+'layer_'+str(i)+'/'
+            Path(layer_data_dir).mkdir(exist_ok=True)
+            np.savetxt(layer_data_dir + 'welding.csv',
+                        np.array([weld_timestamp, weld_voltage, weld_current, weld_feedrate, weld_energy]).T, delimiter=',',
+                        header='timestamp,voltage,current,feedrate,energy', comments='')
+            np.savetxt(layer_data_dir + 'weld_js_exe.csv',rob_js_exe,delimiter=',')
+            np.savetxt(layer_data_dir + 'weld_robot_stamps.csv',rob_stamps,delimiter=',')
+
+        # move home
+        # input("Press Enter to Move Home")
+        mp=MotionProgram(ROBOT_CHOICE='RB1',pulse2deg=robot_weld.pulse2deg)
+        mp.MoveJ(np.zeros(6), to_start_speed, 0)
+        robot_client.execute_motion_program(mp)
+        ######################################################
+
+    if True:
+        if curve_sliced_relative is None:
+            layer_data_dir=data_dir+'layer_'+str(i)+'/'
+            curve_sliced_relative=[np.array([-3.19456051e+01,  1.72700000e+00,  1.95243306e+01,  1.55554573e-04,
+       -6.31394918e-20, -9.99881509e-01]), np.array([-3.01454496e+01,  1.72700000e+00,  1.95243306e+01,  1.55554573e-04,
+       -6.31394918e-20, -9.99881509e-01]), np.array([ 3.30466929e+01,  1.72700000e+00,  1.95243306e+01,  1.55554573e-04,
+       -6.31394918e-20, -9.99881509e-01])]
+
         # 2. Scanning parameters
         ### scan parameters
         scan_speed=10 # scanning speed (mm/sec)
-        scan_stand_off_d = 80 ## mm
+        scan_stand_off_d = 95 ## mm
         Rz_angle = np.radians(0) # point direction w.r.t welds
         Ry_angle = np.radians(0) # rotate in y a bit
         bounds_theta = np.radians(10) ## circular motion at start and end
@@ -245,54 +304,13 @@ for i in range(0,len(weld_z_height)):
         # exit()
         #######################################
 
-        ######################################################
-        ########### Do welding #############
-        path_q = []
-        for tcp_T in path_T:
-            path_q.append(robot_weld.inv(tcp_T.p,tcp_T.R,zero_config)[0])
-        
-        input("Press Enter and move to weld starting point.")
-        mp = MotionProgram(ROBOT_CHOICE='RB1', pulse2deg=robot_weld.pulse2deg)
-        mp.MoveJ(np.degrees(path_q[0]), 3, 0)
-        
-        robot_client.execute_motion_program(mp)
-
-        input("Press Enter and start welding.")
-        mp=MotionProgram(ROBOT_CHOICE='RB1',pulse2deg=robot_weld.pulse2deg)
-        mp.MoveL(np.degrees(path_q[1]), 10, 0)
-        mp.setArc(select, int(this_job_number))
-        for bpi in range(len(this_weld_v)):
-            if bpi!=len(this_weld_v)-1:
-                mp.MoveL(np.degrees(path_q[bpi+2]), this_weld_v[bpi])
-            else:
-                mp.MoveL(np.degrees(path_q[bpi+2]), this_weld_v[bpi],0)
-        mp.setArc(False)
-        mp.MoveL(np.degrees(path_q[-1]), 10, 0)
-        clean_weld_record()
-        rob_stamps,rob_js_exe,_,_= robot_client.execute_motion_program(mp)
-
-        if save_weld_record:
-            Path(data_dir).mkdir(exist_ok=True)
-            layer_data_dir=data_dir+'layer_'+str(i)+'/'
-            Path(layer_data_dir).mkdir(exist_ok=True)
-            np.savetxt(layer_data_dir + 'welding.csv',
-                        np.array([weld_timestamp, weld_voltage, weld_current, weld_feedrate, weld_energy]).T, delimiter=',',
-                        header='timestamp,voltage,current,feedrate,energy', comments='')
-
-        # move home
-        input("Press Enter to Move Home")
-        mp=MotionProgram(ROBOT_CHOICE='RB1',pulse2deg=robot_weld.pulse2deg)
-        mp.MoveJ(np.zeros(6), 3, 0)
-        robot_client.execute_motion_program(mp)
-        ######################################################
-
         ######## scanning motion #########
         ### execute motion ###
         robot_client=MotionProgramExecClient()
         input("Press Enter and move to scanning startint point")
 
         ## move to start
-        to_start_speed=3
+        to_start_speed=5
         mp = MotionProgram(ROBOT_CHOICE='RB2',ROBOT_CHOICE2='ST1',pulse2deg=robot_scan.pulse2deg,pulse2deg_2=positioner.pulse2deg)
         target2=['MOVJ',np.degrees(q_bp2[0][0]),to_start_speed]
         mp.MoveJ(np.degrees(q_bp1[0][0]), to_start_speed, 0, target2=target2)
@@ -338,7 +356,7 @@ for i in range(0,len(weld_z_height)):
         mti_recording=np.array(mti_recording)
         q_out_exe=joint_recording
 
-        input("Press Enter to Move Home")
+        # input("Press Enter to Move Home")
         # move robot to home
         q2=np.zeros(6)
         q2[0]=90
@@ -359,17 +377,17 @@ for i in range(0,len(weld_z_height)):
             Path(out_scan_dir).mkdir(exist_ok=True)
             # save poses
             np.savetxt(out_scan_dir + 'scan_js_exe.csv',q_out_exe,delimiter=',')
-            np.savetxt(out_scan_dir + 'robot_stamps.csv',robot_stamps,delimiter=',')
+            np.savetxt(out_scan_dir + 'scan_robot_stamps.csv',robot_stamps,delimiter=',')
             with open(out_scan_dir + 'mti_scans.pickle', 'wb') as file:
                 pickle.dump(mti_recording, file)
             print('Total scans:',len(mti_recording))
 
     ### for scan testing
-    # out_scan_dir=data_dir='../data/wall_weld_test/weld_scan_2023_05_31_13_05_55/layer_2/scans/'
+    # out_scan_dir=data_dir='../data/wall_weld_test/weld_scan_2023_06_06_12_43_57/layer_15/scans/'
     # q_init_table=np.radians([-15,200])
-    # h_largest=12
+    # h_largest=20
     # q_out_exe=np.loadtxt(out_scan_dir + 'scan_js_exe.csv',delimiter=',')
-    # robot_stamps=np.loadtxt(out_scan_dir + 'robot_stamps.csv',delimiter=',')
+    # robot_stamps=np.loadtxt(out_scan_dir + 'scan_robot_stamps.csv',delimiter=',')
     # with open(out_scan_dir + 'mti_scans.pickle', 'rb') as file:
     #     mti_recording=pickle.load(file)
     ########################
@@ -385,7 +403,11 @@ for i in range(0,len(weld_z_height)):
     except:
         curve_x_start=43
         curve_x_end=-41
-    z_height_start=h_largest-1
+    Transz0_H=np.array([[ 9.99982631e-01,-3.95246885e-06,-5.89383364e-03,-9.06998096e-03],
+                        [-3.95246885e-06,9.99999101e-01,-1.34120947e-03,-2.06397824e-03],
+                        [ 5.89383364e-03,1.34120947e-03, 9.99981732e-01, 1.53886516e+00],
+                        [ 0.00000000e+00,0.00000000e+00, 0.00000000e+00, 1.00000000e+00],])
+    z_height_start=h_largest-3
     crop_extend=10
     crop_min=(curve_x_end-crop_extend,-30,-10)
     crop_max=(curve_x_start+crop_extend,30,z_height_start+30)
@@ -395,7 +417,7 @@ for i in range(0,len(weld_z_height)):
     pcd = scan_process.pcd_register_mti(mti_recording,q_out_exe,robot_stamps,static_positioner_q=q_init_table)
     pcd = scan_process.pcd_noise_remove(pcd,nb_neighbors=40,std_ratio=1.5,\
                                         min_bound=crop_min,max_bound=crop_max,cluster_based_outlier_remove=True,cluster_neighbor=1,min_points=100)
-    profile_height = scan_process.pcd2height(deepcopy(pcd),z_height_start,bbox_min=crop_h_min,bbox_max=crop_h_max)
+    profile_height,Transz0_H = scan_process.pcd2height(deepcopy(pcd),z_height_start,bbox_min=crop_h_min,bbox_max=crop_h_max,Transz0_H=Transz0_H)
     save_output_points=True
     if save_output_points:
         o3d.io.write_point_cloud(out_scan_dir+'processed_pcd.pcd',pcd)
@@ -403,6 +425,7 @@ for i in range(0,len(weld_z_height)):
     visualize_pcd([pcd])
     plt.scatter(profile_height[:,0],profile_height[:,1])
     plt.show()
+    # exit()
 
     if np.mean(profile_height[:,1])>final_height:
         break
