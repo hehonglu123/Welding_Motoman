@@ -242,7 +242,7 @@ if not forward_flag:
 else:
     weld_bp = weld_peak[np.arange(0,len(weld_peak),2)][::-1]
 
-correct_thres = 1.5
+correct_thres = 1
 correction_index = np.where(profile_height[:,1]-h_largest<-1*correct_thres)[0]
 # plt.scatter(profile_height[:,0],profile_height[:,1]-np.mean(profile_height[:,1]))
 # plt.plot(profile_height[:,0],profile_slope)

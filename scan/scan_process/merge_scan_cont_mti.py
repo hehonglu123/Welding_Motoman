@@ -73,6 +73,11 @@ with open(data_dir + 'mti_scans.pickle', 'rb') as file:
 voxel_size=0.05
 #####################
 
+### read raw for checking
+raw_pcd = o3d.io.read_point_cloud(data_dir+'processed_pcd_raw.pcd')
+# raw_pcd.
+#########################
+
 pcd_combined = None
 scan_N = len(rob_stamps) ## total scans
 # scan_N = int(len(rob_stamps)/3)
@@ -103,6 +108,9 @@ for scan_i in range(scan_N):
     pcd = o3d.geometry.PointCloud()
     pcd.points=o3d.utility.Vector3dVector(scan_points)
 
+    if scan_i%100==0:
+        visualize_pcd([pcd,raw_pcd])
+
     # if scan_i==100:
     #     print(np.degrees(scan_js_exe[scan_i]))
     #     visualize_pcd([pcd])
@@ -118,7 +126,7 @@ for scan_i in range(scan_N):
     # visualize_pcd([pcd_combined])
 
 pcd_combined_down = pcd_combined.voxel_down_sample(voxel_size=0.5)
-visualize_pcd([pcd_combined])
+visualize_pcd([pcd_combined_down])
 # exit()
 
 o3d.io.write_point_cloud(data_dir+'processed_pcd_raw.pcd',pcd_combined)
