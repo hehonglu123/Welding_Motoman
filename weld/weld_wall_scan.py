@@ -210,7 +210,7 @@ for i in range(0,len(weld_z_height)):
             noise_h_thres = 3
             peak_threshold=0.25
             flat_threshold=2.5
-            correct_thres = 2
+            correct_thres = 2 # mm
             patch_nb = 2 # 2*0.1
             start_ramp_ratio = 0.67
             end_ramp_ratio = 0.33

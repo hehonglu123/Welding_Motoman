@@ -77,11 +77,14 @@ T_to_base = Transform(np.eye(3),[0,0,-380])
 positioner.base_H = np.matmul(positioner.base_H,H_from_RT(T_to_base.R,T_to_base.p))
 
 # data_dir = '../data/wall_weld_test/full_test_weld_scan_2023_06_06_12_43_57/'
-data_dir = '../data/wall_weld_test/baseline_weld_scan_2023_06_06_15_28_31/'
+# data_dir = '../data/wall_weld_test/baseline_weld_scan_2023_06_06_15_28_31/'
 # data_dir='../data/wall_weld_test/top_layer_test_mti/scans/'
 
 build_height_profile=False
 plot_correction=False
+
+x_lower = -31
+x_upper = 31
 
 datasets=['baseline','full_test']
 datasets_h_mean={}
@@ -133,6 +136,10 @@ for dataset in datasets:
                                                 min_bound=crop_min,max_bound=crop_max,cluster_based_outlier_remove=True,cluster_neighbor=1,min_points=100)
             # visualize_pcd([pcd])
             profile_height = scan_process.pcd2height(deepcopy(pcd),-1)
+
+        ### ignore x smaller and larger
+        profile_height=np.delete(profile_height,np.where(profile_height[:,0]>x_upper),axis=0)
+        profile_height=np.delete(profile_height,np.where(profile_height[:,0]<x_lower),axis=0)
 
         all_profile_height.append(profile_height)
 
