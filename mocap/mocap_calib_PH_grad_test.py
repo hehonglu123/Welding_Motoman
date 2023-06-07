@@ -36,6 +36,8 @@ assert len(test_robot_q)==len(test_mocap_T), f"Need to have the same amount of r
 
 with open(PH_data_dir+'calib_PH_q.pickle','rb') as file:
     PH_q=pickle.load(file)
+with open(PH_data_dir+'calib_one_PH.pickle','rb') as file:
+    PH_q_one=pickle.load(file)
 #### all train data q
 train_q = []
 training_error=[]
@@ -53,6 +55,15 @@ qzero_P = PH_q[train_q_zero_key]['P']
 qzero_H = PH_q[train_q_zero_key]['H']
 #############################
 
+#### one PH for all ####
+universal_P = PH_q_one['P']
+universal_H = PH_q_one['H']
+training_error_universal=PH_q_one['train_pos_error']
+plt.plot(np.linalg.norm(training_error_universal,ord=2,axis=1))
+plt.title("Average Position error norm of all poses")
+plt.show()
+########################
+
 #### using rotation PH (at zero) as baseline ####
 baseline_P = deepcopy(robot_weld.calib_P)
 baseline_H = deepcopy(robot_weld.calib_H)
@@ -68,6 +79,8 @@ error_pos_baseline = []
 error_ori_baseline = []
 error_pos_PHZero = []
 error_ori_PHZero = []
+error_pos_onePH = []
+error_ori_onePH = []
 q2q3=[]
 q1_all=[]
 pos_all=[]
@@ -94,6 +107,15 @@ for N in range(total_test_N):
     error_ori.append(k*np.degrees(theta))
 
     #### get error (zero)
+    robot_weld.robot.P=deepcopy(qzero_P)
+    robot_weld.robot.H=deepcopy(qzero_H)
+    robot_T = robot_weld.fwd(test_q)
+    k,theta = R2rot(robot_T.R.T@T_tool_base.R)
+    k=np.array(k)
+    error_pos_PHZero.append(T_tool_base.p-robot_T.p)
+    error_ori_PHZero.append(k*np.degrees(theta))
+
+    #### get error (one PH)
     robot_weld.robot.P=deepcopy(qzero_P)
     robot_weld.robot.H=deepcopy(qzero_H)
     robot_T = robot_weld.fwd(test_q)
