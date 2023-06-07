@@ -562,4 +562,8 @@ if save_PH:
     with open(data_dir+'calib_one_PH.pickle','wb') as file:
         pickle.dump(PH_q, file)
 
+plt.plot(np.mean(pos_error_norm_progress,axis=1))
+plt.title("Average Position error norm of all poses")
+plt.show()
+
 print("================")
