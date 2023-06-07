@@ -76,125 +76,164 @@ positioner.base_H = H_from_RT(positioner.T_base_basemarker.R,positioner.T_base_b
 T_to_base = Transform(np.eye(3),[0,0,-380])
 positioner.base_H = np.matmul(positioner.base_H,H_from_RT(T_to_base.R,T_to_base.p))
 
-data_dir = '../data/wall_weld_test/full_test_weld_scan_2023_05_31_16_12_02/'
+# data_dir = '../data/wall_weld_test/full_test_weld_scan_2023_06_06_12_43_57/'
+data_dir = '../data/wall_weld_test/baseline_weld_scan_2023_06_06_15_28_31/'
 # data_dir='../data/wall_weld_test/top_layer_test_mti/scans/'
 
-show_layer = [9,12]
-forward_flag=False
+build_height_profile=False
+plot_correction=False
 
-all_profile_height=[]
+datasets=['baseline','full_test']
+datasets_h_mean={}
+datasets_h_std={}
+for dataset in datasets:
 
-for i in range(9,30):
-    try:
-        pcd = o3d.io.read_point_cloud(data_dir+'layer_'+str(i)+'/scans/processed_pcd.pcd')
-        profile_height = np.load(data_dir+'layer_'+str(i)+'/scans/height_profile.npy')
-        q_out_exe=np.loadtxt(data_dir +'layer_'+str(i)+ '/scans/scan_js_exe.csv',delimiter=',')
-        robot_stamps=np.loadtxt(data_dir +'layer_'+str(i)+ '/scans/robot_stamps.csv',delimiter=',')
-        with open(data_dir +'layer_'+str(i)+ '/scans/mti_scans.pickle', 'rb') as file:
-            mti_recording=pickle.load(file)
-        
-        # q_out_exe=np.loadtxt(data_dir +'scan_js_exe.csv',delimiter=',')
-        # robot_stamps=np.loadtxt(data_dir +'robot_stamps.csv',delimiter=',')
-        # with open(data_dir +'mti_scans.pickle', 'rb') as file:
-        #     mti_recording=pickle.load(file)
-    except:
-        break
-    print("Layer",i)
-    print("Forward:",not forward_flag)
+    if dataset=='baseline':
+        data_dir = '../data/wall_weld_test/baseline_weld_scan_2023_06_06_15_28_31/'
+    elif dataset=='full_test':
+        data_dir = '../data/wall_weld_test/full_test_weld_scan_2023_06_06_12_43_57/'
 
-    curve_x_start=43
-    curve_x_end=-41
-    crop_extend=10
-    z_height_start=20
-    scan_process = ScanProcess(robot_scan,positioner)
-    crop_min=(curve_x_end-crop_extend,-30,-10)
-    crop_max=(curve_x_start+crop_extend,30,z_height_start+30)
-    crop_h_min=(curve_x_end-crop_extend,-20,-10)
-    crop_h_max=(curve_x_start+crop_extend,20,z_height_start+30)
-    q_init_table=np.radians([-15,200])
-    pcd = scan_process.pcd_register_mti(mti_recording,q_out_exe,robot_stamps,static_positioner_q=q_init_table)
-    # visualize_pcd([pcd])
-    pcd = scan_process.pcd_noise_remove(pcd,nb_neighbors=40,std_ratio=1.5,\
-                                        min_bound=crop_min,max_bound=crop_max,cluster_based_outlier_remove=True,cluster_neighbor=1,min_points=100)
-    # visualize_pcd([pcd])
-    profile_height = scan_process.pcd2height(deepcopy(pcd),-1)
+    show_layer = []
+    forward_flag=False
+    all_profile_height=[]
+    h_mean=[]
+    h_std=[]
+    for i in range(0,30):
+        try:
+            pcd = o3d.io.read_point_cloud(data_dir+'layer_'+str(i)+'/scans/processed_pcd.pcd')
+            profile_height = np.load(data_dir+'layer_'+str(i)+'/scans/height_profile.npy')
+            q_out_exe=np.loadtxt(data_dir +'layer_'+str(i)+ '/scans/scan_js_exe.csv',delimiter=',')
+            robot_stamps=np.loadtxt(data_dir +'layer_'+str(i)+ '/scans/scan_robot_stamps.csv',delimiter=',')
+            with open(data_dir +'layer_'+str(i)+ '/scans/mti_scans.pickle', 'rb') as file:
+                mti_recording=pickle.load(file)
+            
+            # q_out_exe=np.loadtxt(data_dir +'scan_js_exe.csv',delimiter=',')
+            # robot_stamps=np.loadtxt(data_dir +'robot_stamps.csv',delimiter=',')
+            # with open(data_dir +'mti_scans.pickle', 'rb') as file:
+            #     mti_recording=pickle.load(file)
+        except:
+            break
+        print("Layer",i)
+        print("Forward:",not forward_flag)
 
-    all_profile_height.append(profile_height)
+        if build_height_profile:
+            curve_x_start=43
+            curve_x_end=-41
+            crop_extend=10
+            z_height_start=20
+            scan_process = ScanProcess(robot_scan,positioner)
+            crop_min=(curve_x_end-crop_extend,-30,-10)
+            crop_max=(curve_x_start+crop_extend,30,z_height_start+30)
+            crop_h_min=(curve_x_end-crop_extend,-20,-10)
+            crop_h_max=(curve_x_start+crop_extend,20,z_height_start+30)
+            q_init_table=np.radians([-15,200])
+            pcd = scan_process.pcd_register_mti(mti_recording,q_out_exe,robot_stamps,static_positioner_q=q_init_table)
+            # visualize_pcd([pcd])
+            pcd = scan_process.pcd_noise_remove(pcd,nb_neighbors=40,std_ratio=1.5,\
+                                                min_bound=crop_min,max_bound=crop_max,cluster_based_outlier_remove=True,cluster_neighbor=1,min_points=100)
+            # visualize_pcd([pcd])
+            profile_height = scan_process.pcd2height(deepcopy(pcd),-1)
 
-    profile_slope = np.gradient(profile_height[:,1])/np.gradient(profile_height[:,0])
-    # profile_slope = np.append(profile_slope[0],profile_slope)
-    # find slope peak
-    peak_threshold=0.6
-    weld_terrain=[]
-    last_peak_i=None
-    lastlast_peak_i=None
-    for sample_i in range(len(profile_slope)):
-        if np.fabs(profile_slope[sample_i])<peak_threshold:
-            weld_terrain.append(0)
-        else:
-            if profile_slope[sample_i]>=peak_threshold:
-                weld_terrain.append(1)
-            elif profile_slope[sample_i]<=-peak_threshold:
-                weld_terrain.append(-1)
-            if lastlast_peak_i:
-                
-                if (weld_terrain[-1]==weld_terrain[lastlast_peak_i]) and (weld_terrain[-1]!=weld_terrain[last_peak_i]):
-                    weld_terrain[last_peak_i]=0
-            lastlast_peak_i=last_peak_i
-            last_peak_i=sample_i
+        all_profile_height.append(profile_height)
 
-    weld_terrain=np.array(weld_terrain)
-    weld_peak=[]
-    last_peak=None
-    last_peak_i=None
-    flat_threshold=2.5
-    for sample_i in range(len(profile_slope)):
-        if weld_terrain[sample_i]!=0:
-            if last_peak is None:
-                weld_peak.append(profile_height[sample_i])
-            else:
-                # if the terrain change
-                if (last_peak>0 and weld_terrain[sample_i]<0) or (last_peak<0 and weld_terrain[sample_i]>0):
-                    weld_peak.append(profile_height[last_peak_i])
-                    weld_peak.append(profile_height[sample_i])
+        if plot_correction:
+            profile_slope = np.gradient(profile_height[:,1])/np.gradient(profile_height[:,0])
+            # profile_slope = np.append(profile_slope[0],profile_slope)
+            # find slope peak
+            peak_threshold=0.6
+            weld_terrain=[]
+            last_peak_i=None
+            lastlast_peak_i=None
+            for sample_i in range(len(profile_slope)):
+                if np.fabs(profile_slope[sample_i])<peak_threshold:
+                    weld_terrain.append(0)
                 else:
-                    # the terrain not change but flat too long
-                    if profile_height[sample_i,0]-profile_height[last_peak_i,0]>flat_threshold:
-                        weld_peak.append(profile_height[last_peak_i])
+                    if profile_slope[sample_i]>=peak_threshold:
+                        weld_terrain.append(1)
+                    elif profile_slope[sample_i]<=-peak_threshold:
+                        weld_terrain.append(-1)
+                    if lastlast_peak_i:
+                        
+                        if (weld_terrain[-1]==weld_terrain[lastlast_peak_i]) and (weld_terrain[-1]!=weld_terrain[last_peak_i]):
+                            weld_terrain[last_peak_i]=0
+                    lastlast_peak_i=last_peak_i
+                    last_peak_i=sample_i
+
+            weld_terrain=np.array(weld_terrain)
+            weld_peak=[]
+            last_peak=None
+            last_peak_i=None
+            flat_threshold=2.5
+            for sample_i in range(len(profile_slope)):
+                if weld_terrain[sample_i]!=0:
+                    if last_peak is None:
                         weld_peak.append(profile_height[sample_i])
-            last_peak=deepcopy(weld_terrain[sample_i])
-            last_peak_i=sample_i
-    weld_peak=np.array(weld_peak)
+                    else:
+                        # if the terrain change
+                        if (last_peak>0 and weld_terrain[sample_i]<0) or (last_peak<0 and weld_terrain[sample_i]>0):
+                            weld_peak.append(profile_height[last_peak_i])
+                            weld_peak.append(profile_height[sample_i])
+                        else:
+                            # the terrain not change but flat too long
+                            if profile_height[sample_i,0]-profile_height[last_peak_i,0]>flat_threshold:
+                                weld_peak.append(profile_height[last_peak_i])
+                                weld_peak.append(profile_height[sample_i])
+                    last_peak=deepcopy(weld_terrain[sample_i])
+                    last_peak_i=sample_i
+            weld_peak=np.array(weld_peak)
 
-    if not forward_flag:
-        weld_bp = weld_peak[np.arange(0,len(weld_peak)-1,2)+1]
-    else:
-        weld_bp = weld_peak[np.arange(0,len(weld_peak),2)][::-1]
+            if not forward_flag:
+                weld_bp = weld_peak[np.arange(0,len(weld_peak)-1,2)+1]
+            else:
+                weld_bp = weld_peak[np.arange(0,len(weld_peak),2)][::-1]
 
-    if i in show_layer:
-        # plot pcd
-        visualize_pcd([pcd])
-        # plot height profile
-        plt.scatter(profile_height[:,0],profile_height[:,1])
-        plt.xlabel('x-axis')
-        plt.ylabel('z-axis')
-        plt.title("Height Profile of Layer "+str(i))
-        plt.show()
+        if i in show_layer:
+            # plot pcd
+            visualize_pcd([pcd])
+            # plot height profile
+            plt.scatter(profile_height[:,0],profile_height[:,1])
+            plt.xlabel('x-axis')
+            plt.ylabel('z-axis')
+            plt.title("Height Profile of Layer "+str(i))
+            plt.show()
 
-        plt.scatter(profile_height[:,0],profile_height[:,1]-np.mean(profile_height[:,1]),label='Height Profile')
-        plt.plot(profile_height[:,0],profile_slope,label='Slope')
-        plt.scatter(weld_peak[:,0],weld_peak[:,1]-np.mean(profile_height[:,1]))
-        plt.scatter(weld_bp[:,0],weld_bp[:,1]-np.mean(profile_height[:,1]),label='Welding Speed Change Point')
-        plt.xlabel('x-axis')
-        plt.ylabel('z-axis')
-        plt.legend()
-        plt.show()
-    
-    forward_flag= not forward_flag
+            if plot_correction:
+                plt.scatter(profile_height[:,0],profile_height[:,1]-np.mean(profile_height[:,1]),label='Height Profile')
+                plt.plot(profile_height[:,0],profile_slope,label='Slope')
+                plt.scatter(weld_peak[:,0],weld_peak[:,1]-np.mean(profile_height[:,1]))
+                plt.scatter(weld_bp[:,0],weld_bp[:,1]-np.mean(profile_height[:,1]),label='Welding Speed Change Point')
+                plt.xlabel('x-axis')
+                plt.ylabel('z-axis')
+                plt.legend()
+                plt.show()
+        
+        forward_flag= not forward_flag
 
-for profile_height in all_profile_height:
-    plt.plot(profile_height[:,0],profile_height[:,1])
-plt.xlabel('x-axis')
-plt.ylabel('z-axis')
-plt.title("Height Profile")
+        h_mean.append(np.mean(profile_height[:,1]))
+        h_std.append(np.std(profile_height[:,1]))
+
+    for profile_height in all_profile_height:
+        plt.plot(profile_height[:,0],profile_height[:,1])
+    plt.xlabel('x-axis')
+    plt.ylabel('z-axis')
+    plt.title("Height Profile")
+    plt.show()
+
+    datasets_h_mean[dataset]=np.array(h_mean)
+    datasets_h_std[dataset]=np.array(h_std)
+
+for dataset in datasets:
+    plt.plot(np.arange(len(datasets_h_mean[dataset])),datasets_h_mean[dataset],'-o',label=dataset)
+plt.legend()
+plt.xlabel('Layer')
+plt.ylabel('Mean Height (mm)')
+plt.title("Mean Height")
+plt.show()
+
+for dataset in datasets:
+    plt.plot(np.arange(len(datasets_h_std[dataset])),datasets_h_std[dataset],'-o',label=dataset)
+plt.legend()
+plt.xlabel('Layer')
+plt.ylabel('Height STD (mm)')
+plt.title("Height STD")
 plt.show()

@@ -143,9 +143,9 @@ Transz0_H=None
 curve_sliced_relative=None
 last_mean_h = 0
 
-for i in range(16,len(weld_z_height)):
+for i in range(0,len(weld_z_height)):
     print("Layer:",i)
-    if i>=16 and True:
+    if i>=0 and True:
         if i>=2:
             base_layer=False
         this_z_height=weld_z_height[i]
@@ -172,7 +172,7 @@ for i in range(16,len(weld_z_height)):
         #### Correction ####
         # TODO: Add fitering if near threshold
         h_largest=this_z_height
-        if (i<=999999999):
+        if (i<=2):
             if (last_mean_h == 0) and (profile_height is not None):
                 last_mean_h=np.mean(profile_height[:,1])
             else:
