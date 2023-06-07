@@ -13,7 +13,7 @@ data_dir='../data/'+dataset+sliced_alg
 
 waypoint_distance=5 	###waypoint separation
 line_width=1.
-layer_height_num=int(1./line_width)
+layer_height_num=int(1/line_width)
 layer_width_num=int(4/line_width)
 curve_sliced_js=[]
 positioner_js=[]
@@ -50,7 +50,7 @@ client=MotionProgramExecClient()
 # 		target2=['MOVJ',np.degrees(positioner_js[breakpoints[0]]),10]
 
 # 		mp.MoveL(np.degrees(curve_sliced_js[breakpoints[0]]), s1_all[0],target2=target2)
-# 		mp.setArc(True,cond_num=420)
+# 		mp.setArc(True,cond_num=220)
 # 		for j in range(1,len(breakpoints)):
 # 			target2=['MOVJ',np.degrees(positioner_js[breakpoints[j]]),10]
 # 			mp.MoveL(np.degrees(curve_sliced_js[breakpoints[j]]), s1_all[j],target2=target2)
@@ -62,7 +62,7 @@ client=MotionProgramExecClient()
 
 ###########################################layer welding############################################
 mp=MotionProgram(ROBOT_CHOICE='RB1',ROBOT_CHOICE2='ST1',pulse2deg=robot.pulse2deg,pulse2deg_2=positioner.pulse2deg, tool_num = 12)
-num_layer_start=int(47*layer_height_num)
+num_layer_start=int(48*layer_height_num)
 num_layer_end=int(51*layer_height_num)
 q_prev=client.getJointAnglesDB(positioner.pulse2deg)
 # q_prev=np.array([9.53E-02,-2.71E+00])
@@ -82,7 +82,7 @@ for layer in range(num_layer_start,num_layer_end,layer_height_num):
 		positioner_js=np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
 		curve_sliced_relative=np.loadtxt(data_dir+'curve_sliced_relative/slice'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
 
-		vd_relative=10
+		vd_relative=6
 		lam1=calc_lam_js(curve_sliced_js,robot)
 		lam2=calc_lam_js(positioner_js,positioner)
 		lam_relative=calc_lam_cs(curve_sliced_relative)
@@ -108,7 +108,7 @@ for layer in range(num_layer_start,num_layer_end,layer_height_num):
 		target2=['MOVJ',np.degrees(positioner_js[breakpoints[0]]),15]
 		mp.MoveL(np.degrees(curve_sliced_js[breakpoints[0]]), s1_all[0],target2=target2)
 
-		mp.setArc(True,cond_num=403)
+		mp.setArc(True,cond_num=200)
 		for j in range(1,len(breakpoints)):
 			positioner_w=vd_relative/np.linalg.norm(curve_sliced_relative[breakpoints[j]][:2])
 			target2=['MOVJ',np.degrees(positioner_js[breakpoints[j]]),min(100,100*positioner_w/positioner.joint_vel_limit[1])]

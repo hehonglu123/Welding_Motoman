@@ -1,0 +1,9 @@
+RobotRaconteur
+RobotRaconteurCompanion
+tesseract_robotics
+tesseract_robotics_viewer
+pickle
+numpy
+scipy
+pyyaml
+matplotlib
