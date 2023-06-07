@@ -26,12 +26,14 @@
 
 ## Dataset 0516
 ### Training Data
-||Mean (mm)|Std (mm)|Max (mm)|    
+||Mean (mm)|Std (mm)|Max (mm)|
 |-|-|-|-|
-|Rotate PH|0.0936|0.0519|0.4590|
+|One PH|0.2198|0.1166|0.7097|
+|Optimize PH|0.0936|0.0262|0.1927|
 ### Testing Data
-||Mean (mm)|Std (mm)|Max (mm)|    
+||Mean (mm)|Std (mm)|Max (mm)|
 |-|-|-|-|
-|Rotate PH|0.5145|0.2141|1.0707|  
-|Zero PH|0.5907|0.3426|1.9493|    
-|Optimize PH|0.2030|0.1082|0.7922|
+|Rotate PH|0.5145|0.2141|1.0707|
+|Zero PH|0.5907|0.3425|1.9491|
+|One PH|0.5911|0.4140|2.0903|
+|Optimize PH|0.2030|0.1083|0.7922|

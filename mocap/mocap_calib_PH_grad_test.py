@@ -59,7 +59,9 @@ qzero_H = PH_q[train_q_zero_key]['H']
 universal_P = PH_q_one['P']
 universal_H = PH_q_one['H']
 training_error_universal=PH_q_one['train_pos_error']
-plt.plot(np.linalg.norm(training_error_universal,ord=2,axis=1))
+plt.plot(np.mean(training_error_universal,axis=1))
+plt.xlabel("Iteration")
+plt.ylabel("Average Position Error Norm (mm)")
 plt.title("Average Position error norm of all poses")
 plt.show()
 ########################
@@ -116,13 +118,13 @@ for N in range(total_test_N):
     error_ori_PHZero.append(k*np.degrees(theta))
 
     #### get error (one PH)
-    robot_weld.robot.P=deepcopy(qzero_P)
-    robot_weld.robot.H=deepcopy(qzero_H)
+    robot_weld.robot.P=deepcopy(universal_P)
+    robot_weld.robot.H=deepcopy(universal_H)
     robot_T = robot_weld.fwd(test_q)
     k,theta = R2rot(robot_T.R.T@T_tool_base.R)
     k=np.array(k)
-    error_pos_PHZero.append(T_tool_base.p-robot_T.p)
-    error_ori_PHZero.append(k*np.degrees(theta))
+    error_pos_onePH.append(T_tool_base.p-robot_T.p)
+    error_ori_onePH.append(k*np.degrees(theta))
 
     #### get error (baseline)
     robot_weld.robot.P=deepcopy(baseline_P)
@@ -143,17 +145,19 @@ sort_q2q3_id = np.argsort(q2q3)
 q2q3=q2q3[sort_q2q3_id]
 error_pos_norm=np.linalg.norm(error_pos,ord=2,axis=1).flatten()
 error_pos_PHZero_norm=np.linalg.norm(error_pos_PHZero,ord=2,axis=1).flatten()
+error_pos_onePH_norm=np.linalg.norm(error_pos_onePH,ord=2,axis=1).flatten()
 error_pos_baseline_norm=np.linalg.norm(error_pos_baseline,ord=2,axis=1).flatten()
 
-plt.plot(error_pos_norm,'-o',markersize=1,label='Opt PH')
-plt.plot(error_pos_PHZero_norm,'-o',markersize=1,label='Zero PH')
 plt.plot(error_pos_baseline_norm,'-o',markersize=1,label='Rotation PH')
+plt.plot(error_pos_PHZero_norm,'-o',markersize=1,label='Zero PH')
+plt.plot(error_pos_onePH_norm,'-o',markersize=1,label='One PH')
+plt.plot(error_pos_norm,'-o',markersize=1,label='Opt PH')
 plt.legend()
 plt.title("Position Error using PH from Nearest q2q3")
 # plt.xticks(np.arange(0,total_test_N,100),np.round(q1_all[::100]))
 # plt.xlabel("J1 Angle at each Pose (degrees)")
 plt.xticks(np.arange(0,total_test_N,50),pos_all[::50])
-plt.xlabel("TCP Cartesian Position at poses")
+plt.xlabel("TCP Cartesian Position at Poses")
 plt.ylabel("Position Error (mm)")
 plt.show()
 
@@ -165,6 +169,8 @@ markdown_str+='|Rotate PH|'+format(round(np.mean(error_pos_baseline_norm),4),'.4
     format(round(np.std(error_pos_baseline_norm),4),'.4f')+'|'+format(round(np.max(error_pos_baseline_norm),4),'.4f')+'|\n'
 markdown_str+='|Zero PH|'+format(round(np.mean(error_pos_PHZero_norm),4),'.4f')+'|'+\
     format(round(np.std(error_pos_PHZero_norm),4),'.4f')+'|'+format(round(np.max(error_pos_PHZero_norm),4),'.4f')+'|\n'
+markdown_str+='|One PH|'+format(round(np.mean(error_pos_onePH_norm),4),'.4f')+'|'+\
+    format(round(np.std(error_pos_onePH_norm),4),'.4f')+'|'+format(round(np.max(error_pos_onePH_norm),4),'.4f')+'|\n'
 markdown_str+='|Optimize PH|'+format(round(np.mean(error_pos_norm),4),'.4f')+'|'+\
     format(round(np.std(error_pos_norm),4),'.4f')+'|'+format(round(np.max(error_pos_norm),4),'.4f')+'|\n'
 print(markdown_str)
@@ -173,6 +179,8 @@ print("Training Data")
 markdown_str=''
 markdown_str+='||Mean (mm)|Std (mm)|Max (mm)|\n'
 markdown_str+='|-|-|-|-|\n'
-markdown_str+='|Rotate PH|'+format(round(np.mean(training_error),4),'.4f')+'|'+\
+markdown_str+='|One PH|'+format(round(np.mean(training_error_universal[-1]),4),'.4f')+'|'+\
+    format(round(np.std(training_error_universal[-1]),4),'.4f')+'|'+format(round(np.max(training_error_universal[-1]),4),'.4f')+'|\n'
+markdown_str+='|Optimize PH|'+format(round(np.mean(training_error),4),'.4f')+'|'+\
     format(round(np.std(training_error),4),'.4f')+'|'+format(round(np.max(training_error),4),'.4f')+'|\n'
 print(markdown_str)
