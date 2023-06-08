@@ -82,7 +82,7 @@ positioner.base_H = np.matmul(positioner.base_H,H_from_RT(T_to_base.R,T_to_base.
 
 build_height_profile=False
 plot_correction=True
-show_layer = [8]
+show_layer = [5,6]
 
 x_lower = -99999
 x_upper = 999999
@@ -95,7 +95,7 @@ for dataset in datasets:
     if dataset=='baseline':
         data_dir = '../data/wall_weld_test/baseline_weld_scan_2023_06_06_15_28_31/'
     elif dataset=='full_test':
-        data_dir = '../data/wall_weld_test/full_test_weld_scan_2023_06_06_12_43_57/'
+        data_dir = '../data/wall_weld_test/full_test_weld_scan_2023_06_08_13_49_38/'
 
     forward_flag=False
     all_profile_height=[]
@@ -148,7 +148,7 @@ for dataset in datasets:
             noise_h_thres = 3
             peak_threshold=0.25
             flat_threshold=2.5
-            correct_thres = 2
+            correct_thres = 1.4
             patch_nb = 2 # 2*0.1
             start_ramp_ratio = 0.67
             end_ramp_ratio = 0.33

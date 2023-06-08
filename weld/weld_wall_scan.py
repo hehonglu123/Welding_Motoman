@@ -104,20 +104,20 @@ final_height=50
 weld_z_height=[0,6,8] # two base layer height to first top layer
 weld_z_height=np.append(weld_z_height,np.arange(weld_z_height[-1],final_height,1)+1)
 # job_number=[115,115]
-job_number=[420,420]
-job_number=np.append(job_number,np.ones(len(weld_z_height)-2)*415)
+job_number=[215,215]
+job_number=np.append(job_number,np.ones(len(weld_z_height)-2)*206)
 print(weld_z_height)
 print(job_number)
 
 weld_velocity=[5,5]
-weld_v=6
+weld_v=18
 for i in range(len(weld_z_height)-2):
     weld_velocity.append(weld_v)
     # if weld_v==weld_velocity[-2]:
     #     weld_v+=2
+
 print(weld_velocity)
 # exit()
-correction_thres=1.2 ## mm
 save_weld_record=True
 
 # exit()
@@ -145,9 +145,12 @@ curve_sliced_relative=None
 last_mean_h = 0
 
 for i in range(0,len(weld_z_height)):
+    cycle_st = time.time()
     print("Layer:",i)
     #### welding
+    weld_st = time.time()
     if i>=0 and True:
+        weld_plan_st = time.time()
         if i>=2:
             base_layer=False
         this_z_height=weld_z_height[i]
@@ -174,7 +177,7 @@ for i in range(0,len(weld_z_height)):
         #### Correction ####
         # TODO: Add fitering if near threshold
         h_largest=this_z_height
-        if (i<=2):
+        if (i<=999999):
             if (last_mean_h == 0) and (profile_height is not None):
                 last_mean_h=np.mean(profile_height[:,1])
             if profile_height is None:
@@ -212,7 +215,7 @@ for i in range(0,len(weld_z_height)):
             noise_h_thres = 3
             peak_threshold=0.25
             flat_threshold=2.5
-            correct_thres = 2 # mm
+            correct_thres = 1.4 # mm
             patch_nb = 2 # 2*0.1
             start_ramp_ratio = 0.67
             end_ramp_ratio = 0.33
@@ -243,20 +246,26 @@ for i in range(0,len(weld_z_height)):
         print(len(path_T))
         print(len(curve_sliced_relative))
 
+        print("Weld Plan time:",time.time()-weld_plan_st)
+
         ######################################################
         ########### Do welding #############
+        weld_motion_st = time.time()
         to_start_speed=8
         path_q = []
         for tcp_T in path_T:
             path_q.append(robot_weld.inv(tcp_T.p,tcp_T.R,zero_config)[0])
         
-        input("Press Enter and move to weld starting point.")
+        # input("Press Enter and move to weld starting point.")
         mp = MotionProgram(ROBOT_CHOICE='RB1', pulse2deg=robot_weld.pulse2deg)
         mp.MoveJ(np.degrees(path_q[0]), to_start_speed, 0)
         
         robot_client.execute_motion_program(mp)
 
-        input("Press Enter and start welding.")
+        print("Weld to start time:",time.time()-weld_motion_st)
+        
+        weld_motion_weld_st = time.time()
+        # input("Press Enter and start welding.")
         mp=MotionProgram(ROBOT_CHOICE='RB1',pulse2deg=robot_weld.pulse2deg)
         mp.MoveL(np.degrees(path_q[1]), 10, 0)
         mp.setArc(select, int(this_job_number))
@@ -279,16 +288,24 @@ for i in range(0,len(weld_z_height)):
                         header='timestamp,voltage,current,feedrate,energy', comments='')
             np.savetxt(layer_data_dir + 'weld_js_exe.csv',rob_js_exe,delimiter=',')
             np.savetxt(layer_data_dir + 'weld_robot_stamps.csv',rob_stamps,delimiter=',')
+        
+        print("Weld actual weld time:",time.time()-weld_motion_weld_st)
+        weld_to_home_st = time.time()
 
         # move home
         # input("Press Enter to Move Home")
         mp=MotionProgram(ROBOT_CHOICE='RB1',pulse2deg=robot_weld.pulse2deg)
         mp.MoveJ(np.zeros(6), to_start_speed, 0)
         robot_client.execute_motion_program(mp)
+
+        print("Weld to home time:",time.time()-weld_to_home_st)
+        print("Weld Motion Time:",time.time()-weld_motion_st)
         ######################################################
 
+        print("Weld Time:",time.time()-weld_st)
     #### scanning
     if True:
+        scan_st = time.time()
         if curve_sliced_relative is None:
             data_dir='../data/wall_weld_test/weld_scan_2023_06_06_15_28_31/'
             last_profile_height=np.load('../data/wall_weld_test/weld_scan_2023_06_06_15_28_31/layer_14/scans/height_profile.npy')
@@ -299,6 +316,7 @@ for i in range(0,len(weld_z_height)):
        -6.31394918e-20, -9.99881509e-01]), np.array([ 3.30449818e+01,  1.72700000e+00,  3.34460358e+01,  1.55554573e-04,
        -6.31394918e-20, -9.99881509e-01])]
 
+        scan_plan_st = time.time()
         # 2. Scanning parameters
         ### scan parameters
         scan_speed=10 # scanning speed (mm/sec)
@@ -335,10 +353,13 @@ for i in range(0,len(weld_z_height)):
         # exit()
         #######################################
 
+        print("Scan plan time:",time.time()-scan_plan_st)
+
+        scan_motion_st = time.time()
         ######## scanning motion #########
         ### execute motion ###
         robot_client=MotionProgramExecClient()
-        input("Press Enter and move to scanning startint point")
+        # input("Press Enter and move to scanning startint point")
 
         ## move to start
         to_start_speed=7
@@ -347,7 +368,11 @@ for i in range(0,len(weld_z_height)):
         mp.MoveJ(np.degrees(q_bp1[0][0]), to_start_speed, 0, target2=target2)
         robot_client.execute_motion_program(mp)
 
-        input("Press Enter to start moving and scanning")
+        print("Scan to home time:",time.time()-scan_motion_st)
+
+        # input("Press Enter to start moving and scanning")
+
+        scan_motion_scan_st = time.time()
 
         ## motion start
         mp = MotionProgram(ROBOT_CHOICE='RB2',ROBOT_CHOICE2='ST1',pulse2deg=robot_scan.pulse2deg,pulse2deg_2=positioner.pulse2deg)
@@ -384,6 +409,9 @@ for i in range(0,len(weld_z_height)):
                 mti_recording.append(deepcopy(np.array([mti_client.lineProfile.X_data,mti_client.lineProfile.Z_data])))
         robot_client.servoMH(False)
 
+        print("Scan motion scan time:",time.time()-scan_motion_scan_st)
+        
+        scan_to_home_st = time.time()
         mti_recording=np.array(mti_recording)
         q_out_exe=joint_recording
 
@@ -412,6 +440,11 @@ for i in range(0,len(weld_z_height)):
             with open(out_scan_dir + 'mti_scans.pickle', 'wb') as file:
                 pickle.dump(mti_recording, file)
             print('Total scans:',len(mti_recording))
+        
+        print("Scan to home:",time.time()-scan_to_home_st)
+        print("Scan motion time:",time.time()-scan_motion_st)
+        
+        print("Scan Time:",time.time()-scan_st)
 
     ### for scan testing
     # out_scan_dir=data_dir='../data/wall_weld_test/weld_scan_2023_06_06_12_43_57/layer_15/scans/'
@@ -423,6 +456,7 @@ for i in range(0,len(weld_z_height)):
     #     mti_recording=pickle.load(file)
     ########################
 
+    recon_3d_st = time.time()
     #### scanning process: processing point cloud and get h
     try:
         if forward_flag:
@@ -448,20 +482,27 @@ for i in range(0,len(weld_z_height)):
     pcd = scan_process.pcd_register_mti(mti_recording,q_out_exe,robot_stamps,static_positioner_q=q_init_table)
     pcd = scan_process.pcd_noise_remove(pcd,nb_neighbors=40,std_ratio=1.5,\
                                         min_bound=crop_min,max_bound=crop_max,cluster_based_outlier_remove=True,cluster_neighbor=1,min_points=100)
+    print("3D Reconstruction:",time.time()-recon_3d_st)
+    get_h_st = time.time()
     profile_height,Transz0_H = scan_process.pcd2height(deepcopy(pcd),z_height_start,bbox_min=crop_h_min,bbox_max=crop_h_max,Transz0_H=Transz0_H)
     print("Transz0_H:",Transz0_H)
+    
+    print("Get Height:",time.time()-get_h_st)
+
     save_output_points=True
     if save_output_points:
         o3d.io.write_point_cloud(out_scan_dir+'processed_pcd.pcd',pcd)
         np.save(out_scan_dir+'height_profile.npy',profile_height)
-    visualize_pcd([pcd])
-    plt.scatter(profile_height[:,0],profile_height[:,1])
-    plt.show()
+    # visualize_pcd([pcd])
+    # plt.scatter(profile_height[:,0],profile_height[:,1])
+    # plt.show()
     # exit()
 
     if np.mean(profile_height[:,1])>final_height:
         break
 
     forward_flag=not forward_flag
+
+    print("Print Cycle Time:",time.time()-cycle_st)
 
 print("Welding End!!")
