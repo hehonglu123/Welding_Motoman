@@ -104,18 +104,19 @@ final_height=50
 weld_z_height=[0,6,8] # two base layer height to first top layer
 weld_z_height=np.append(weld_z_height,np.arange(weld_z_height[-1],final_height,1)+1)
 # job_number=[115,115]
-job_number=[215,215]
-job_number=np.append(job_number,np.ones(len(weld_z_height)-2)*206)
+job_number=[420,420]
+job_number=np.append(job_number,np.ones(len(weld_z_height)-2)*415)
 print(weld_z_height)
 print(job_number)
 
 weld_velocity=[5,5]
-weld_v=4
+weld_v=6
 for i in range(len(weld_z_height)-2):
     weld_velocity.append(weld_v)
-    if weld_v==weld_velocity[-2]:
-        weld_v+=2
+    # if weld_v==weld_velocity[-2]:
+    #     weld_v+=2
 print(weld_velocity)
+# exit()
 correction_thres=1.2 ## mm
 save_weld_record=True
 
@@ -143,9 +144,10 @@ Transz0_H=None
 curve_sliced_relative=None
 last_mean_h = 0
 
-for i in range(16,len(weld_z_height)):
+for i in range(0,len(weld_z_height)):
     print("Layer:",i)
-    if i>=16 and True:
+    #### welding
+    if i>=0 and True:
         if i>=2:
             base_layer=False
         this_z_height=weld_z_height[i]
@@ -175,12 +177,12 @@ for i in range(16,len(weld_z_height)):
         if (i<=999999999):
             if (last_mean_h == 0) and (profile_height is not None):
                 last_mean_h=np.mean(profile_height[:,1])
-            else:
+            if profile_height is None:
                 if i!=0:
-                    last_profile_height=np.load('../data/wall_weld_test/weld_scan_2023_06_06_15_28_31/layer_14/scans/height_profile.npy')
+                    last_profile_height=np.load('../data/wall_weld_test/weld_scan_2023_06_07_16_52_41/layer_0/scans/height_profile.npy')
                     last_mean_h=np.mean(last_profile_height[:,1])
-                    profile_height=np.load('../data/wall_weld_test/weld_scan_2023_06_06_15_28_31/layer_15/scans/height_profile.npy')
-                    data_dir='../data/wall_weld_test/weld_scan_2023_06_06_15_28_31/'
+                    profile_height=np.load('../data/wall_weld_test/weld_scan_2023_06_07_16_52_41/layer_1/scans/height_profile.npy')
+                    data_dir='../data/wall_weld_test/weld_scan_2023_06_07_16_52_41/'
 
             if (profile_height is not None) and (i>2):
                 mean_h = np.mean(profile_height[:,1])
@@ -236,7 +238,7 @@ for i in range(16,len(weld_z_height)):
         print("dh:",all_dh)
         print("Nominal V:",weld_velocity[i])
         print("Correct V:",this_weld_v)
-        print(curve_sliced_relative)
+        print("curve_sliced_relative:",curve_sliced_relative)
         print(path_T[0])
         print(len(path_T))
         print(len(curve_sliced_relative))
@@ -285,6 +287,7 @@ for i in range(16,len(weld_z_height)):
         robot_client.execute_motion_program(mp)
         ######################################################
 
+    #### scanning
     if True:
         if curve_sliced_relative is None:
             data_dir='../data/wall_weld_test/weld_scan_2023_06_06_15_28_31/'
@@ -431,10 +434,10 @@ for i in range(16,len(weld_z_height)):
     except:
         curve_x_start=43
         curve_x_end=-41
-    Transz0_H=np.array([[ 9.99982631e-01,-3.95246885e-06,-5.89383364e-03,-9.06998096e-03],
-                        [-3.95246885e-06,9.99999101e-01,-1.34120947e-03,-2.06397824e-03],
-                        [ 5.89383364e-03,1.34120947e-03, 9.99981732e-01, 1.53886516e+00],
-                        [ 0.00000000e+00,0.00000000e+00, 0.00000000e+00, 1.00000000e+00],])
+    # Transz0_H=np.array([[ 9.99982631e-01,-3.95246885e-06,-5.89383364e-03,-9.06998096e-03],
+    #                     [-3.95246885e-06,9.99999101e-01,-1.34120947e-03,-2.06397824e-03],
+    #                     [ 5.89383364e-03,1.34120947e-03, 9.99981732e-01, 1.53886516e+00],
+    #                     [ 0.00000000e+00,0.00000000e+00, 0.00000000e+00, 1.00000000e+00],])
     z_height_start=h_largest-3
     crop_extend=10
     crop_min=(curve_x_end-crop_extend,-30,-10)
@@ -446,7 +449,7 @@ for i in range(16,len(weld_z_height)):
     pcd = scan_process.pcd_noise_remove(pcd,nb_neighbors=40,std_ratio=1.5,\
                                         min_bound=crop_min,max_bound=crop_max,cluster_based_outlier_remove=True,cluster_neighbor=1,min_points=100)
     profile_height,Transz0_H = scan_process.pcd2height(deepcopy(pcd),z_height_start,bbox_min=crop_h_min,bbox_max=crop_h_max,Transz0_H=Transz0_H)
-    print(Transz0_H)
+    print("Transz0_H:",Transz0_H)
     save_output_points=True
     if save_output_points:
         o3d.io.write_point_cloud(out_scan_dir+'processed_pcd.pcd',pcd)
