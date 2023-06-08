@@ -106,6 +106,15 @@ def strategy_2(profile_height,last_mean_h,forward_flag,curve_sliced_relative,R_S
             else:
                 patch.append(correction_index[i])
     correction_patches.append(deepcopy(patch))
+    if len(correction_patches[0])==0:
+        path_T_S1 = []
+        this_weld_v = []
+        for curve_i in range(len(curve_sliced_relative)):
+            path_T_S1.append(Transform(R_S1TCP,curve_sliced_relative[curve_i][:3]))
+            this_weld_v.append(original_v)
+        this_weld_v.pop()
+        return curve_sliced_relative,path_T_S1,this_weld_v,[],mean_h
+
     # find motion start/end using ramp before and after patch
     motion_patches=[]
     for patch in correction_patches:
