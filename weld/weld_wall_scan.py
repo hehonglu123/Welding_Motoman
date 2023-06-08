@@ -146,10 +146,7 @@ last_mean_h = 0
 
 for i in range(0,len(weld_z_height)):
     print("Layer:",i)
-<<<<<<< HEAD
     #### welding
-=======
->>>>>>> f60f583d721a9147f24a71f99ff89902af22f60d
     if i>=0 and True:
         if i>=2:
             base_layer=False
