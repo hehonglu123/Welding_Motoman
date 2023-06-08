@@ -74,7 +74,8 @@ voxel_size=0.05
 #####################
 
 ### read raw for checking
-raw_pcd = o3d.io.read_point_cloud(data_dir+'processed_pcd_raw.pcd')
+# raw_pcd = o3d.io.read_point_cloud(data_dir+'processed_pcd.pcd')
+# visualize_pcd([raw_pcd])
 # raw_pcd.
 #########################
 
@@ -108,8 +109,8 @@ for scan_i in range(scan_N):
     pcd = o3d.geometry.PointCloud()
     pcd.points=o3d.utility.Vector3dVector(scan_points)
 
-    if scan_i%100==0:
-        visualize_pcd([pcd,raw_pcd])
+    # if scan_i%100==0:
+    #     visualize_pcd([pcd,raw_pcd])
 
     # if scan_i==100:
     #     print(np.degrees(scan_js_exe[scan_i]))
@@ -134,7 +135,7 @@ o3d.io.write_point_cloud(data_dir+'processed_pcd_raw.pcd',pcd_combined)
 voxel_down_flag=True
 crop_flag=True
 outlier_remove=True
-cluster_based_outlier_remove=False
+cluster_based_outlier_remove=True
 
 ####### processing parameters
 voxel_size=0.05
@@ -145,8 +146,8 @@ max_bound = (50,30,50)
 nb_neighbors=10
 std_ratio=0.85
 ## clustering
-cluster_neighbor=0.75
-min_points=25
+cluster_neighbor=1
+min_points=100
 ######################
 
 ## crop point clouds
