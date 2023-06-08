@@ -23,3 +23,17 @@
 | **Std Position Error**     | 0.04207                           | 0.02676                           | 0.02546                           | 0.02825                           | 0.01705                           |
 | **Mean Orientation Error** | 0.05210                           | 0.00273                           | 1.37860                           | 2.58527                           | 2.23750                           |
 | **Std Orientation Error**  | 0.00190                           | 0.00099                           | 0.00167                           | 0.00215                           | 0.00131                           |
+
+## Dataset 0516
+### Training Data
+||Mean (mm)|Std (mm)|Max (mm)|
+|-|-|-|-|
+|One PH|0.2198|0.1166|0.7097|
+|Optimize PH|0.0936|0.0262|0.1927|
+### Testing Data
+||Mean (mm)|Std (mm)|Max (mm)|
+|-|-|-|-|
+|Rotate PH|0.5145|0.2141|1.0707|
+|Zero PH|0.5907|0.3425|1.9491|
+|One PH|0.5911|0.4140|2.0903|
+|Optimize PH|0.2030|0.1083|0.7922|
