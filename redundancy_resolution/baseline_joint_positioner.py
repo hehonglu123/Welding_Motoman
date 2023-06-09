@@ -16,8 +16,8 @@ def main():
 	dataset='cup/'
 	sliced_alg='circular_slice_shifted/'
 	data_dir='../data/'+dataset+sliced_alg
-	num_layers=62
-	num_baselayers=2
+	num_layers=507
+	num_baselayers=0
 	q_positioner_seed=[1,3]
 	# dataset='blade0.1/'
 	# sliced_alg='auto_slice/'
@@ -33,7 +33,7 @@ def main():
 		num_sections=len(glob.glob(data_dir+'curve_sliced_relative/baselayer'+str(i)+'_*.csv'))
 		curve_sliced_relative_base_ith_layer=[]
 		for x in range(num_sections):
-			curve_sliced_relative_base_ith_layer.append(np.loadtxt(data_dir+'curve_sliced_relative/baselayer'+str(i)+'_'+str(x)+'.csv',delimiter=','))
+			curve_sliced_relative_base_ith_layer.append(np.loadtxt(data_dir+'curve_sliced_relative/baselayer'+str(i)+'_'+str(x)+'.csv',delimiter=',').reshape((-1,6)))
 		curve_sliced_relative_base.append(curve_sliced_relative_base_ith_layer)
 
 	for i in range(num_layers):
@@ -41,8 +41,8 @@ def main():
 		curve_sliced_relative_ith_layer=[]
 		curve_sliced_ith_layer=[]
 		for x in range(num_sections):
-			curve_sliced_relative_ith_layer.append(np.loadtxt(data_dir+'curve_sliced_relative/slice'+str(i)+'_'+str(x)+'.csv',delimiter=','))
-			curve_sliced_ith_layer.append(np.loadtxt(data_dir+'curve_sliced/slice'+str(i)+'_'+str(x)+'.csv',delimiter=','))
+			curve_sliced_relative_ith_layer.append(np.loadtxt(data_dir+'curve_sliced_relative/slice'+str(i)+'_'+str(x)+'.csv',delimiter=',').reshape((-1,6)))
+			curve_sliced_ith_layer.append(np.loadtxt(data_dir+'curve_sliced/slice'+str(i)+'_'+str(x)+'.csv',delimiter=',').reshape((-1,6)))
 		curve_sliced_relative.append(curve_sliced_relative_ith_layer)
 		curve_sliced.append(curve_sliced_ith_layer)
 

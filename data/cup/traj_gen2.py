@@ -6,7 +6,7 @@ from sklearn.preprocessing import normalize
 total_height=50
 z_offset=3
 radii_coeff=10
-line_resolution=1
+line_resolution=0.1
 point_distance=0.5
 
 vis_step=2
@@ -23,6 +23,8 @@ section_num=0
 for r in radii:
 	diameter=2*np.pi*r
 	num_points=int(np.floor(diameter/point_distance))
+	if num_points==0:
+		continue
 	theta = np.linspace(0, 2 * np.pi, num_points)
 
 	section=np.vstack((r * np.cos(theta),r * np.sin(theta),np.zeros(num_points),np.zeros(num_points),np.zeros(num_points),-np.ones(num_points))).T

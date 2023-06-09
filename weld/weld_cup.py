@@ -12,7 +12,7 @@ sliced_alg='circular_slice_shifted/'
 data_dir='../data/'+dataset+sliced_alg
 
 waypoint_distance=5 	###waypoint separation
-line_width=1.
+line_width=0.1
 layer_height_num=int(1/line_width)
 layer_width_num=int(4/line_width)
 curve_sliced_js=[]

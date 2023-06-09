@@ -10,7 +10,7 @@ def main():
 	dataset='cup/'
 	sliced_alg='circular_slice_shifted/'
 	data_dir='../data/'+dataset+sliced_alg
-	num_layers=50
+	num_layers=527
 	base_thickness=3
 	num_baselayers=0
 	curve_sliced=[]
@@ -19,7 +19,7 @@ def main():
 		num_sections=len(glob.glob(data_dir+'curve_sliced/slice'+str(i)+'_*.csv'))
 		curve_sliced_ith_layer=[]
 		for x in range(num_sections):
-			curve_sliced_ith_layer.append(np.loadtxt(data_dir+'curve_sliced/slice'+str(i)+'_'+str(x)+'.csv',delimiter=','))
+			curve_sliced_ith_layer.append(np.loadtxt(data_dir+'curve_sliced/slice'+str(i)+'_'+str(x)+'.csv',delimiter=',').reshape((-1,6)))
 
 		curve_sliced.append(curve_sliced_ith_layer)
 
@@ -35,6 +35,7 @@ def main():
 
 	rr=redundancy_resolution(robot,positioner,curve_sliced)
 	H=rr.baseline_pose(vec=np.array([-0.95,0.31224989992]))
+	# H=rr.baseline_pose()
 	H[2,-1]+=num_baselayers*base_thickness
 
 	np.savetxt(data_dir+'curve_pose.csv',H,delimiter=',')
