@@ -133,15 +133,15 @@ class redundancy_resolution(object):
 
 
 
-	def baseline_joint(self,R_torch,curve_sliced_relative,curve_sliced_relative_base,q_init=np.zeros(6),q_positioner_seed=[0,-2]):
+	def baseline_joint(self,R_torch,curve_sliced_relative,curve_sliced_relative_base,q_init=np.zeros(6),q_positioner_seed=[0,-2],smooth_filter=True):
 		####baseline redundancy resolution, with fixed orientation
-		positioner_js=self.positioner_resolution(curve_sliced_relative,q_seed=q_positioner_seed)		#solve for positioner first
+		positioner_js=self.positioner_resolution(curve_sliced_relative,q_seed=q_positioner_seed,smooth_filter=smooth_filter)		#solve for positioner first
 		
 		###singularity js smoothing
-		# positioner_js=self.conditional_rolling_average(positioner_js)
 		positioner_js=self.introducing_tolerance2(positioner_js)
 		positioner_js=self.conditional_rolling_average(positioner_js)
-		positioner_js=self.rolling_average(positioner_js)
+		if smooth_filter:
+			positioner_js=self.rolling_average(positioner_js)
 		positioner_js[0][0][:,1]=positioner_js[1][0][0,1]
 
 		
@@ -224,7 +224,7 @@ class redundancy_resolution(object):
 		return H_from_RT(R,T)
 
 		
-	def positioner_resolution(self,curve_sliced_relative,q_seed=[0,-1.]):
+	def positioner_resolution(self,curve_sliced_relative,q_seed=[0,-1.],smooth_filter=True):
 		###resolve 2DOF positioner joint angle 
 		positioner_js=[]
 		q_prev=q_seed
@@ -234,8 +234,9 @@ class redundancy_resolution(object):
 				positioner_js_ith_layer_xth_section=self.positioner.find_curve_js(-curve_sliced_relative[i][x][:,3:],q_prev)
 
 				###filter noise
-				positioner_js_ith_layer_xth_section[:,0]=moving_average(positioner_js_ith_layer_xth_section[:,0],padding=True)
-				positioner_js_ith_layer_xth_section[:,1]=moving_average(positioner_js_ith_layer_xth_section[:,1],n=15,padding=True)
+				if smooth_filter:
+					positioner_js_ith_layer_xth_section[:,0]=moving_average(positioner_js_ith_layer_xth_section[:,0],padding=True)
+					positioner_js_ith_layer_xth_section[:,1]=moving_average(positioner_js_ith_layer_xth_section[:,1],n=15,padding=True)
 
 				positioner_js_ith_layer.append(np.array(positioner_js_ith_layer_xth_section))
 

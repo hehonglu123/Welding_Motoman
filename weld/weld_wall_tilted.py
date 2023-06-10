@@ -6,20 +6,19 @@ from dx200_motion_program_exec_client import *
 
 q_positioner_baselayer=np.radians([-15,180])
 tilt_angle=np.radians(45)
-q_positioner_tilted=q_positioner_baselayer+np.array([tilt_angle,0])
+
 robot=robot_obj('MA2010_A0',def_path='../config/MA2010_A0_robot_default_config.yml',tool_file_path='../config/torch.csv',\
 	pulse2deg_file_path='../config/MA2010_A0_pulse2deg_real.csv',d=15)
 positioner=positioner_obj('D500B',def_path='../config/D500B_robot_default_config.yml',tool_file_path='../config/positioner_tcp.csv',\
 	pulse2deg_file_path='../config/D500B_pulse2deg_real.csv',base_transformation_file='../config/D500B_pose.csv')
 
 pose_positioner_baselayer=positioner.fwd(q_positioner_baselayer,world=True)
-pose_positioner_tilted=positioner.fwd(q_positioner_tilted,world=True)
 
 R=np.array([[-0.7071, 0.7071, -0.    ],
 			[ 0.7071, 0.7071,  0.    ],
 			[0.,      0.,     -1.    ]])
-p_start=np.array([50,0,0])
-p_end=np.array([-50,0,0])
+p_start=np.array([-50,0,0])
+p_end=np.array([50,0,0])
 
 
 q_seed=np.radians([-35.4291,56.6333,40.5194,4.5177,-52.2505,-11.6546])
@@ -62,7 +61,7 @@ layer_height=0.8
 # 	mp.setArc(False)
 # 	client.execute_motion_program(mp)
 
-for i in range(2,3):
+for i in range(3,4):
 
 	if i%2==0:
 		p1=p_start+np.array([0,0,2*base_layer_height+i*layer_height])
@@ -73,7 +72,7 @@ for i in range(2,3):
 		p2=p_start+np.array([0,0,2*base_layer_height+i*layer_height])
 		q_positioner_tilted=q_positioner_baselayer+np.array([tilt_angle,-np.pi])
 
-
+	pose_positioner_tilted=positioner.fwd(q_positioner_tilted,world=True)
 	p_temp=transform_curve(np.array([p1+np.array([0,0,50])]),H_from_RT(pose_positioner_tilted.R,pose_positioner_tilted.p))[0]
 	q_temp=np.degrees(robot.inv(p_temp,R,q_seed)[0])
 	
