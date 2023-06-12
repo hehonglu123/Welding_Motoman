@@ -29,9 +29,6 @@ positioner=positioner_obj('D500B',def_path=config_dir+'D500B_robot_default_confi
     base_transformation_file=config_dir+'D500B_pose.csv',pulse2deg_file_path=config_dir+'D500B_pulse2deg_real.csv',\
     base_marker_config_file=config_dir+'D500B_marker_config.yaml',tool_marker_config_file=config_dir+'positioner_tcp_marker_config.yaml')
 
-Table_home_T = positioner.fwd(np.radians([-15,180]))
-T_S1TCP_R1Base = np.linalg.inv(np.matmul(positioner.base_H,H_from_RT(Table_home_T.R,Table_home_T.p)))
-T_R1Base_S1TCP = np.linalg.inv(T_S1TCP_R1Base)
 
 #### change base H to calibrated ones ####
 robot_scan.base_H = H_from_RT(robot_scan.T_base_basemarker.R,robot_scan.T_base_basemarker.p)
@@ -44,7 +41,9 @@ Path(data_dir).mkdir(exist_ok=True)
 out_scan_dir = data_dir+'scans/'
 Path(out_scan_dir).mkdir(exist_ok=True)
 
-data_collect=False
+data_collect=True
+
+print(robot_scan.fwd(zero_config))
 
 if data_collect:
     # MTI connect to RR
@@ -129,9 +128,76 @@ with open(out_scan_dir+ 'mti_scans.pickle', 'rb') as file:
 scan_process = ScanProcess(robot_scan,positioner)
 q_init_table=np.radians([-15,180])
 pcd = scan_process.pcd_register_mti(mti_recording,q_out_exe,robot_stamps,static_positioner_q=q_init_table)
-visualize_pcd([pcd])
+# visualize_pcd([pcd])
 o3d.io.write_point_cloud(out_scan_dir+'raw_pcd.pcd',pcd)
 pcd = scan_process.pcd_noise_remove(pcd,nb_neighbors=40,std_ratio=1.5,\
                                     min_bound=(-1e5,-1e5,10),max_bound=(1e5,1e5,30),cluster_based_outlier_remove=True,cluster_neighbor=0.75,min_points=150)
-# visualize_pcd([pcd])
+visualize_pcd([pcd])
 o3d.io.write_point_cloud(out_scan_dir+'processed_pcd.pcd',pcd)
+
+pcd_combined=pcd
+######## compare with scan mesh
+scan_mesh=o3d.io.read_triangle_mesh(data_dir+'../cad/scan_mesh.stl')
+scan_mesh.compute_vertex_normals()
+# visualize_pcd([scan_mesh])
+scan_mesh_points = o3d.io.read_point_cloud(data_dir+'../cad/scan_mesh_points.pcd')
+## register points (dont need this after the motion trackers (?))
+min_bound = (-1,-1,9)
+max_bound = (143.1+5,15.8+1,30.6+1)
+bbox = o3d.geometry.AxisAlignedBoundingBox(min_bound=min_bound,max_bound=max_bound)
+scan_mesh_points=scan_mesh_points.crop(bbox)
+
+trans_guess=np.eye(4)
+trans_guess[0,3]=70
+trans_guess[1,3]=10
+pcd_combined.transform(trans_guess)
+visualize_pcd([pcd_combined,scan_mesh_points])
+
+pcd_combined_reg = pcd_combined.voxel_down_sample(voxel_size=0.5)
+
+trans_init=np.eye(4)
+threshold = 20
+reg_p2p = o3d.pipelines.registration.registration_icp(
+    pcd_combined_reg, scan_mesh_points, threshold, trans_init,
+    o3d.pipelines.registration.TransformationEstimationPointToPoint(),
+    o3d.pipelines.registration.ICPConvergenceCriteria(max_iteration=1000))
+# print(reg_p2p)
+print(reg_p2p.transformation)
+# visualize_pcd([pcd_combined,scan_mesh])
+pcd_combined.transform(reg_p2p.transformation)
+# pcd_combined.paint_uniform_color([1, 0.706, 0])
+# scan_mesh_points.paint_uniform_color([0, 0.651, 0.929])
+visualize_pcd([pcd_combined,scan_mesh_points])
+visualize_pcd([pcd_combined,scan_mesh])
+
+##
+
+## crop scan mesh surfaces
+# normals = np.asarray(scan_mesh.triangle_normals)
+# normal_z_id = np.squeeze(np.argwhere(np.abs(normals[:,2])==1))
+scan_mesh_target=deepcopy(scan_mesh)
+# scan_mesh_target.triangles = o3d.utility.Vector3iVector(
+#     np.asarray(scan_mesh.triangles)[normal_z_id, :])
+# scan_mesh_target.triangle_normals = o3d.utility.Vector3dVector(
+#     np.asarray(scan_mesh.triangle_normals)[normal_z_id, :])
+# visualize_pcd([scan_mesh_target])
+# visualize_pcd([scan_mesh_target,pcd_combined])
+## calculate distance to mesh
+scan_mesh_target_t = o3d.t.geometry.TriangleMesh.from_legacy(scan_mesh_target)
+scene = o3d.t.geometry.RaycastingScene()
+scene.add_triangles(scan_mesh_target_t)
+query_points = o3d.core.Tensor(np.asarray(pcd_combined.points), dtype=o3d.core.Dtype.Float32)
+unsigned_distance = scene.compute_distance(query_points)
+unsigned_distance = unsigned_distance.numpy()
+min_dist=np.min(unsigned_distance)
+max_dist=np.max(unsigned_distance)
+print("unsigned distance", unsigned_distance)
+print("unsigned distance min", min_dist)
+print("unsigned distance max", max_dist)
+print("Unsigned distance mean", np.mean(unsigned_distance))
+print("Unsigned distance std", np.std(unsigned_distance))
+low_bound=0
+high_bound=max_dist+0.1
+color_dist = plt.get_cmap("rainbow")((unsigned_distance-low_bound)/(high_bound-low_bound))
+pcd_combined_dist_scan=deepcopy(pcd_combined)
+pcd_combined_dist_scan.colors = o3d.utility.Vector3dVector(color_dist[:, :3])
