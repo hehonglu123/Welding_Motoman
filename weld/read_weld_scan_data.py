@@ -20,6 +20,20 @@ import datetime
 import numpy as np
 import open3d as o3d
 
+def moving_average(a,w=3):
+    
+    if w%2==0:
+        w+=1
+
+    ## add padding
+    padd_n = int((w-1)/2)
+    a = np.append(np.ones(padd_n)*a[0],a)
+    a = np.append(a,np.ones(padd_n)*a[-1])
+    
+    ret = np.cumsum(a, dtype=float)
+    ret[w:] = ret[w:] - ret[:-w]
+    return ret[w - 1:] / w
+
 def robot_weld_path_gen(all_layer_z,forward_flag,base_layer):
     R=np.array([[-0.7071, 0.7071, -0.    ],
             [ 0.7071, 0.7071,  0.    ],
@@ -82,12 +96,13 @@ positioner.base_H = np.matmul(positioner.base_H,H_from_RT(T_to_base.R,T_to_base.
 
 build_height_profile=False
 plot_correction=True
-show_layer = [5,6]
+show_layer = []
 
 x_lower = -99999
 x_upper = 999999
 
 datasets=['baseline','full_test']
+# datasets=['full_test']
 datasets_h_mean={}
 datasets_h_std={}
 for dataset in datasets:
@@ -95,10 +110,11 @@ for dataset in datasets:
     if dataset=='baseline':
         data_dir = '../data/wall_weld_test/baseline_weld_scan_2023_06_06_15_28_31/'
     elif dataset=='full_test':
-        data_dir = '../data/wall_weld_test/full_test_weld_scan_2023_06_08_13_49_38/'
+        data_dir = '../data/wall_weld_test/full_test_weld_scan_2023_06_06_12_43_57/'
 
     forward_flag=False
     all_profile_height=[]
+    all_correction_seg=[[],[],[]]
     h_mean=[]
     h_std=[]
     for i in range(0,9999999):
@@ -143,12 +159,12 @@ for dataset in datasets:
 
         all_profile_height.append(profile_height)
 
-        if plot_correction and i>2:
+        if (plot_correction and i>2):
             ## parameters
             noise_h_thres = 3
             peak_threshold=0.25
             flat_threshold=2.5
-            correct_thres = 1.4
+            correct_thres = 2
             patch_nb = 2 # 2*0.1
             start_ramp_ratio = 0.67
             end_ramp_ratio = 0.33
@@ -277,9 +293,13 @@ for dataset in datasets:
                     motion_patches.append(motion_patch)
             if forward_flag:
                 motion_patches=motion_patches[::-1]
+            
+            draw_motion_patch = []
+            for mo_pat in motion_patches:
+                draw_motion_patch.extend(np.arange(np.min(mo_pat),np.max(mo_pat)+1))
+            # print(draw_motion_patch)
+            all_correction_seg.append(draw_motion_patch)
 
-        print(i)
-        print(show_layer)
         if i in show_layer:
             # plot pcd
             visualize_pcd([pcd])
@@ -291,11 +311,18 @@ for dataset in datasets:
             plt.show()
 
             if plot_correction and i>2:
-                plt.scatter(profile_height[:,0],profile_height[:,1]-np.mean(profile_height[:,1]))
-                plt.scatter(profile_height[correction_index,0],profile_height[correction_index,1]-np.mean(profile_height[:,1]))
-                plt.plot(profile_height[:,0],profile_slope)
+                plt.plot(profile_height[:,0],profile_height[:,1]-np.mean(profile_height[:,1]),'o',label="Weld Height")
+                plt.plot(profile_height[correction_index,0],profile_height[correction_index,1]-np.mean(profile_height[:,1]),'o',label="Weld Below Threshold")
+                
+                smooth_profile_height=deepcopy(profile_height)
+                # smooth_profile_height[:,1] = moving_average(smooth_profile_height[:,1],w=5)
+                smooth_profile_slope = np.gradient(smooth_profile_height[:,1])/np.gradient(smooth_profile_height[:,0])
+                
+                # plt.plot(profile_height[:,0],profile_slope)
+                plt.plot(profile_height[:,0],smooth_profile_slope,label="Weld Slope")
                 for mo_pat in motion_patches:
-                    plt.scatter(profile_height[mo_pat,0],profile_height[mo_pat,1]-np.mean(profile_height[:,1]))
+                    plt.plot(profile_height[mo_pat,0],profile_height[mo_pat,1]-np.mean(profile_height[:,1]),'o',label="Corrected Motion")
+                plt.legend()
                 plt.show()
         
         forward_flag= not forward_flag
@@ -303,10 +330,19 @@ for dataset in datasets:
         h_mean.append(np.mean(profile_height[:,1]))
         h_std.append(np.std(profile_height[:,1]))
 
+    i=0
+    m_size=12
     for profile_height in all_profile_height:
-        plt.plot(profile_height[:,0],profile_height[:,1])
+        plt.scatter(profile_height[:,0],profile_height[:,1],s=3)
+        if len(all_correction_seg)==len(all_profile_height) and dataset!='baseline':
+            if i==5:
+                plt.scatter(profile_height[all_correction_seg[i],0],profile_height[all_correction_seg[i],1],c='red',s=m_size,label='Correction', alpha=0.5)
+            else:
+                plt.scatter(profile_height[all_correction_seg[i],0],profile_height[all_correction_seg[i],1],c='red',s=m_size,alpha=0.5)
+        i+=1
     plt.xlabel('x-axis')
     plt.ylabel('z-axis')
+    plt.legend()
     plt.title("Height Profile")
     plt.show()
 
