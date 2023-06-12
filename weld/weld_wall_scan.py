@@ -221,11 +221,17 @@ for i in range(0,len(weld_z_height)):
             end_ramp_ratio = 0.33
             #############
 
+            # curve_sliced_relative,path_T_S1,this_weld_v,all_dh,last_mean_h=\
+            #     strategy_2(profile_height,last_mean_h,forward_flag,curve_sliced_relative,R_S1TCP,this_weld_v[0],\
+            #             noise_h_thres=noise_h_thres,peak_threshold=peak_threshold,flat_threshold=flat_threshold,\
+            #             correct_thres=correct_thres,patch_nb=patch_nb,\
+            #             start_ramp_ratio=start_ramp_ratio,end_ramp_ratio=end_ramp_ratio)
+            
+            num_l=30
+            input_dh=1
             curve_sliced_relative,path_T_S1,this_weld_v,all_dh,last_mean_h=\
-                strategy_2(profile_height,last_mean_h,forward_flag,curve_sliced_relative,R_S1TCP,this_weld_v[0],\
-                        noise_h_thres=noise_h_thres,peak_threshold=peak_threshold,flat_threshold=flat_threshold,\
-                        correct_thres=correct_thres,patch_nb=patch_nb,\
-                        start_ramp_ratio=start_ramp_ratio,end_ramp_ratio=end_ramp_ratio)
+                strategy_3(profile_height,input_dh,curve_sliced_relative,R_S1TCP,num_l,noise_h_thres = 3)
+            
             h_largest = np.max(profile_height[:,1])
 
             # find curve in R1 frame

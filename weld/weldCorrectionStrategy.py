@@ -3,6 +3,38 @@ from copy import deepcopy
 from matplotlib import pyplot as plt
 from general_robotics_toolbox import *
 
+def dh2v_loglog(dh,mode=140):
+
+    logdh = np.log(dh)
+
+    if mode==140:
+        # 140 ipm
+        # log(Δh)=-0.5068∗log(V)+1.643
+        logv = (logdh-1.643)/(-0.5068)
+    elif mode==160:
+        # 160 ipm
+        # log(Δh)=-0.4619∗log(V)+1.647 
+        logv = (logdh-1.647)/(-0.4619)
+    
+    v = np.exp(logv)
+    return v
+
+def dh2v_quadratic(dh,mode=140):
+
+    if mode==140:
+        # 140 ipm
+        a=0.006477
+        b=-0.2362
+        c=3.339-dh
+    elif mode==160:
+        # 160 ipm
+        a=0.006043
+        b=-0.2234
+        c=3.335-dh
+    
+    v=(-b-np.sqrt(b**2-4*a*c))/(2*a)
+    return v
+
 def strategy_1():
     pass
 
@@ -248,3 +280,57 @@ def strategy_2(profile_height,last_mean_h,forward_flag,curve_sliced_relative,R_S
     path_T_S1.append(Transform(R_S1TCP,curve_sliced_relative_correct[-1][:3]))
 
     return curve_sliced_relative_correct,path_T_S1,this_weld_v,all_dh,mean_h
+
+def strategy_3(profile_height,input_dh,curve_sliced_relative,R_S1TCP,num_l,noise_h_thres = 3):
+
+    ## parameters
+    # noise_h_thres = 3
+    ############
+
+    ### delete noise
+    mean_h = np.mean(profile_height[:,1])
+    profile_height=np.delete(profile_height,np.where(profile_height[:,1]-mean_h>noise_h_thres),axis=0)
+    profile_height=np.delete(profile_height,np.where(profile_height[:,1]-mean_h<-noise_h_thres),axis=0)
+    ###
+    mean_h = np.mean(profile_height[:,1])
+    h_largest = np.max(profile_height[:,1])
+    # 1. h_target = last height point + designated dh value
+    # h_target = h_largest+1.2
+    # 2. h_target = last mean h + last_dh
+    # dh_last_layer = mean_h-last_mean_h
+    # h_target = mean_h+dh_last_layer
+    # 3. h_target = mean_h + designated dh value
+    h_target = mean_h+input_dh
+
+    # chop curve
+    curve_sliced_relative_chop = np.linspace(curve_sliced_relative[0],curve_sliced_relative[-1],num_l+1)
+
+    # find v
+    # 140 ipm: dh=0.006477*v^2-0.2362v+3.339
+    # 160 ipm: dh=0.006043*v^2-0.2234v+3.335    
+    # new curve in positioner frame
+    curve_sliced_relative_correct = []
+    this_p = np.array([curve_sliced_relative_chop[0][0],curve_sliced_relative_chop[0][1],h_target])
+    curve_sliced_relative_correct.append(np.append(this_p,curve_sliced_relative_chop[0][3:]))
+    path_T_S1 = [Transform(R_S1TCP,curve_sliced_relative_correct[-1][:3])]
+    this_weld_v = []
+    all_dh= []
+    for l in range(num_l):
+        # path
+        this_p = np.array([curve_sliced_relative_chop[l][0],curve_sliced_relative_chop[l+1][0],h_target])
+        curve_sliced_relative_correct.append(np.append(this_p,curve_sliced_relative_chop[l][3:]))
+        path_T_S1.append(Transform(R_S1TCP,curve_sliced_relative_correct[-1][:3]))
+
+        # velocity
+        min_x = min(curve_sliced_relative_chop[l][0],curve_sliced_relative_chop[l+1][0])
+        max_x = max(curve_sliced_relative_chop[l][0],curve_sliced_relative_chop[l+1][0])
+        this_profile = deepcopy(profile_height[np.where(profile_height>=min_x)[0]])
+        this_profile = this_profile[np.where(max_x>=this_profile)[0]]
+        this_mean_h=np.mean(this_profile[:,1])
+        ## using model to get the velocity
+        this_dh = h_target-this_mean_h
+        this_v = dh2v_loglog(this_dh,mode=160)
+        this_weld_v.append(this_v)
+        all_dh.append(this_dh)
+    
+    return curve_sliced_relative,path_T_S1,this_weld_v,all_dh,mean_h
