@@ -11,7 +11,6 @@ from scan_utils import *
 from scan_continuous import *
 from scanPathGen import *
 from scanProcess import *
-from weldCorrectionStrategy import *
 from dx200_motion_program_exec_client import *
 
 from general_robotics_toolbox import *
@@ -30,12 +29,22 @@ positioner=positioner_obj('D500B',def_path=config_dir+'D500B_robot_default_confi
     base_transformation_file=config_dir+'D500B_pose.csv',pulse2deg_file_path=config_dir+'D500B_pulse2deg_real.csv',\
     base_marker_config_file=config_dir+'D500B_marker_config.yaml',tool_marker_config_file=config_dir+'positioner_tcp_marker_config.yaml')
 
+Table_home_T = positioner.fwd(np.radians([-15,180]))
+T_S1TCP_R1Base = np.linalg.inv(np.matmul(positioner.base_H,H_from_RT(Table_home_T.R,Table_home_T.p)))
+T_R1Base_S1TCP = np.linalg.inv(T_S1TCP_R1Base)
+
+#### change base H to calibrated ones ####
+robot_scan.base_H = H_from_RT(robot_scan.T_base_basemarker.R,robot_scan.T_base_basemarker.p)
+positioner.base_H = H_from_RT(positioner.T_base_basemarker.R,positioner.T_base_basemarker.p)
+T_to_base = Transform(np.eye(3),[0,0,-380])
+positioner.base_H = np.matmul(positioner.base_H,H_from_RT(T_to_base.R,T_to_base.p))
+
 data_dir='../../data/lego_brick/mti/'
 Path(data_dir).mkdir(exist_ok=True)
 out_scan_dir = data_dir+'scans/'
 Path(out_scan_dir).mkdir(exist_ok=True)
 
-data_collect=True
+data_collect=False
 
 if data_collect:
     # MTI connect to RR
@@ -44,9 +53,9 @@ if data_collect:
     mti_client.setExposureTime("25")
 
     ## path
-    q_bp1=[]
+    q_bp1=np.radians([[[18.7118,46.2071,-14.7867,1.7969,-30.7251,74.5963]],[[26.1357,50.3446,-6.9595,1.2165,-34.5150,67.7113]]])
 
-    to_start_speed=7
+    to_start_speed=5
     scan_speed=10
 
     ## move to start
@@ -61,9 +70,9 @@ if data_collect:
 
     ## motion start
     mp = MotionProgram(ROBOT_CHOICE='RB2',pulse2deg=robot_scan.pulse2deg)
-    # routine motion
-    for path_i in range(2,len(q_bp1)-1):
-        mp.MoveL(np.degrees(q_bp1[path_i][0]), scan_speed)
+    # # routine motion
+    # for path_i in range(1,len(q_bp1)-1):
+    #     mp.MoveL(np.degrees(q_bp1[path_i][0]), scan_speed)
     mp.MoveL(np.degrees(q_bp1[-1][0]), scan_speed, 0)
 
     robot_client.execute_motion_program_nonblocking(mp)
@@ -74,7 +83,7 @@ if data_collect:
     joint_recording=[]
     robot_stamps=[]
     mti_recording=[]
-    r_pulse2deg = np.append(robot_scan.pulse2deg)
+    r_pulse2deg = robot_scan.pulse2deg
     while True:
         if state_flag & 0x08 == 0 and time.time()-start_time>1.:
             break
@@ -123,6 +132,6 @@ pcd = scan_process.pcd_register_mti(mti_recording,q_out_exe,robot_stamps,static_
 visualize_pcd([pcd])
 o3d.io.write_point_cloud(out_scan_dir+'raw_pcd.pcd',pcd)
 pcd = scan_process.pcd_noise_remove(pcd,nb_neighbors=40,std_ratio=1.5,\
-                                    min_bound=(-1e5,-1e5,10),max_bound=(-1e5,-1e5,30),cluster_based_outlier_remove=True,cluster_neighbor=0.75,min_points=50)
-visualize_pcd([pcd])
+                                    min_bound=(-1e5,-1e5,10),max_bound=(1e5,1e5,30),cluster_based_outlier_remove=True,cluster_neighbor=0.75,min_points=150)
+# visualize_pcd([pcd])
 o3d.io.write_point_cloud(out_scan_dir+'processed_pcd.pcd',pcd)

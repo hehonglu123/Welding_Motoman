@@ -199,7 +199,6 @@ class ScanProcess():
             with o3d.utility.VerbosityContextManager(o3d.utility.VerbosityLevel.Debug) as cm:
                 labels = np.array(
                     pcd_combined.cluster_dbscan(eps=cluster_neighbor, min_points=min_points, print_progress=True))
-            max_label=labels.max()
             pcd_combined=pcd_combined.select_by_index(np.argwhere(labels>=0))
             print("Cluster based Outlier Removal done.")
         
