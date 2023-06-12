@@ -5,7 +5,7 @@ from dx200_motion_program_exec_client import *
 
 
 q_positioner_baselayer=np.radians([-15,180])
-tilt_angle=np.radians(45)
+tilt_angle=np.radians(30)
 
 robot=robot_obj('MA2010_A0',def_path='../config/MA2010_A0_robot_default_config.yml',tool_file_path='../config/torch.csv',\
 	pulse2deg_file_path='../config/MA2010_A0_pulse2deg_real.csv',d=15)
@@ -28,7 +28,7 @@ client=MotionProgramExecClient()
 base_layer_height=2
 layer_height=0.8
 
-# for i in range(0,1):
+# for i in range(1,2):
 # 	if i==0:
 # 		p_temp=transform_curve(np.array([p_start+np.array([0,0,50])]),H_from_RT(pose_positioner_baselayer.R,pose_positioner_baselayer.p))[0]
 # 		q_temp=np.degrees(robot.inv(p_temp,R,q_seed)[0])
@@ -61,7 +61,7 @@ layer_height=0.8
 # 	mp.setArc(False)
 # 	client.execute_motion_program(mp)
 
-for i in range(3,4):
+for i in range(7,9):
 
 	if i%2==0:
 		p1=p_start+np.array([0,0,2*base_layer_height+i*layer_height])
@@ -73,7 +73,7 @@ for i in range(3,4):
 		q_positioner_tilted=q_positioner_baselayer+np.array([tilt_angle,-np.pi])
 
 	pose_positioner_tilted=positioner.fwd(q_positioner_tilted,world=True)
-	p_temp=transform_curve(np.array([p1+np.array([0,0,50])]),H_from_RT(pose_positioner_tilted.R,pose_positioner_tilted.p))[0]
+	p_temp=transform_curve(np.array([p1+np.array([0,0,70])]),H_from_RT(pose_positioner_tilted.R,pose_positioner_tilted.p))[0]
 	q_temp=np.degrees(robot.inv(p_temp,R,q_seed)[0])
 	
 	mp=MotionProgram(ROBOT_CHOICE='RB1',ROBOT_CHOICE2='ST1',pulse2deg=robot.pulse2deg,pulse2deg_2=positioner.pulse2deg, tool_num = 12)
@@ -89,7 +89,7 @@ for i in range(3,4):
 	q_init=np.degrees(robot.inv(p1,R,q_seed)[0])
 	q_end=np.degrees(robot.inv(p2,R,q_seed)[0])
 	mp.MoveJ(q_init,1,0)
-	mp.setArc(True,cond_num=401)
-	mp.MoveL(q_end,12,0)
+	mp.setArc(True,cond_num=402)
+	mp.MoveL(q_end,10,0)
 	mp.setArc(False)
 	client.execute_motion_program(mp)

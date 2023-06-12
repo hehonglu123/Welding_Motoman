@@ -7,7 +7,7 @@ from robot_def import *
 
 
 def main():
-	dataset='funnel/'
+	dataset='cup/'
 	sliced_alg='circular_slice_shifted/'
 	data_dir='../data/'+dataset+sliced_alg
 	with open(data_dir+'slicing.yml', 'r') as file:

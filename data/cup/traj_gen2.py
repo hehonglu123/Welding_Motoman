@@ -6,7 +6,7 @@ from sklearn.preprocessing import normalize
 total_height=50
 z_offset=3
 radii_coeff=10
-line_resolution=0.1
+line_resolution=1.3
 point_distance=0.5
 
 vis_step=2
