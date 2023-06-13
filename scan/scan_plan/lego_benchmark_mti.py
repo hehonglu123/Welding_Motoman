@@ -19,6 +19,7 @@ import matplotlib.pyplot as plt
 import time
 import datetime
 import numpy as np
+import matplotlib
 
 zero_config=np.zeros(6)
 config_dir='../../config/'
@@ -41,7 +42,7 @@ Path(data_dir).mkdir(exist_ok=True)
 out_scan_dir = data_dir+'scans/'
 Path(out_scan_dir).mkdir(exist_ok=True)
 
-data_collect=True
+data_collect=False
 
 print(robot_scan.fwd(zero_config))
 
@@ -201,3 +202,26 @@ high_bound=max_dist+0.1
 color_dist = plt.get_cmap("rainbow")((unsigned_distance-low_bound)/(high_bound-low_bound))
 pcd_combined_dist_scan=deepcopy(pcd_combined)
 pcd_combined_dist_scan.colors = o3d.utility.Vector3dVector(color_dist[:, :3])
+
+visualize_pcd([pcd_combined_dist_scan,scan_mesh])
+
+#### histogram
+N_points = len(unsigned_distance)
+n_bins = 100
+fig = plt.figure()
+ax = fig.add_axes([0.05, 0.2, 0.9, 0.7])
+ax1 = fig.add_axes([0.05, 0.05, 0.9, 0.1])
+
+# We can set the number of bins with the *bins* keyword argument.
+N, bins, patches = ax.hist(unsigned_distance, bins=n_bins)
+# We'll color code by height, but you could use any scalar
+fracs = N / N.max()
+
+# Now, we'll loop through our objects and set the color of each accordingly
+for thisfrac, thispatch, thisbin in zip(fracs, patches,bins):
+    color = plt.cm.rainbow((thisbin-low_bound)/(high_bound-low_bound))
+    thispatch.set_facecolor(color)
+cb1 = matplotlib.colorbar.ColorbarBase(ax1, cmap=plt.cm.rainbow,
+                                norm= matplotlib.colors.Normalize(vmin=low_bound, vmax=high_bound),
+                                orientation='horizontal')
+plt.show()

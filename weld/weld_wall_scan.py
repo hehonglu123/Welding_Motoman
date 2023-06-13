@@ -144,12 +144,12 @@ Transz0_H=None
 curve_sliced_relative=None
 last_mean_h = 0
 
-for i in range(0,len(weld_z_height)):
+for i in range(18,len(weld_z_height)):
     cycle_st = time.time()
     print("Layer:",i)
     #### welding
     weld_st = time.time()
-    if i>=0 and True:
+    if i>=19 and True:
         weld_plan_st = time.time()
         if i>=2:
             base_layer=False
@@ -177,15 +177,16 @@ for i in range(0,len(weld_z_height)):
         #### Correction ####
         # TODO: Add fitering if near threshold
         h_largest=this_z_height
-        if (i<=999999):
+        if (i<=2):
             if (last_mean_h == 0) and (profile_height is not None):
                 last_mean_h=np.mean(profile_height[:,1])
             if profile_height is None:
                 if i!=0:
-                    last_profile_height=np.load('../data/wall_weld_test/weld_scan_2023_06_07_16_52_41/layer_0/scans/height_profile.npy')
+                    data_dir='../data/wall_weld_test/weld_scan_2023_06_13_10_56_01/'
+                    print("Using data:",data_dir)
+                    last_profile_height=np.load(data_dir+'layer_16/scans/height_profile.npy')
                     last_mean_h=np.mean(last_profile_height[:,1])
-                    profile_height=np.load('../data/wall_weld_test/weld_scan_2023_06_07_16_52_41/layer_1/scans/height_profile.npy')
-                    data_dir='../data/wall_weld_test/weld_scan_2023_06_07_16_52_41/'
+                    profile_height=np.load(data_dir+'layer_17/scans/height_profile.npy')
 
             if (profile_height is not None) and (i>2):
                 mean_h = np.mean(profile_height[:,1])
@@ -206,10 +207,12 @@ for i in range(0,len(weld_z_height)):
         else: # start correction from 2nd top layer
             
             if profile_height is None:
-                last_profile_height=np.load('../data/wall_weld_test/weld_scan_2023_06_06_12_43_57/layer_14/scans/height_profile.npy')
+                data_dir='../data/wall_weld_test/weld_scan_2023_06_13_10_56_01/'
+                print("Using data:",data_dir)
+                last_profile_height=np.load(data_dir+'layer_16/scans/height_profile.npy')
                 last_mean_h=np.mean(last_profile_height[:,1])
-                profile_height=np.load('../data/wall_weld_test/weld_scan_2023_06_06_12_43_57/layer_15/scans/height_profile.npy')
-                data_dir='../data/wall_weld_test/weld_scan_2023_06_06_12_43_57/'
+                profile_height=np.load(data_dir+'layer_17/scans/height_profile.npy')
+                
 
             ## parameters
             noise_h_thres = 3
@@ -227,8 +230,8 @@ for i in range(0,len(weld_z_height)):
             #             correct_thres=correct_thres,patch_nb=patch_nb,\
             #             start_ramp_ratio=start_ramp_ratio,end_ramp_ratio=end_ramp_ratio)
             
-            num_l=30
-            input_dh=1
+            num_l=40
+            input_dh=1.7
             curve_sliced_relative,path_T_S1,this_weld_v,all_dh,last_mean_h=\
                 strategy_3(profile_height,input_dh,curve_sliced_relative,R_S1TCP,num_l,noise_h_thres = 3)
             
@@ -271,7 +274,7 @@ for i in range(0,len(weld_z_height)):
         print("Weld to start time:",time.time()-weld_motion_st)
         
         weld_motion_weld_st = time.time()
-        # input("Press Enter and start welding.")
+        input("Press Enter and start welding.")
         mp=MotionProgram(ROBOT_CHOICE='RB1',pulse2deg=robot_weld.pulse2deg)
         mp.MoveL(np.degrees(path_q[1]), 10, 0)
         mp.setArc(select, int(this_job_number))
@@ -313,13 +316,13 @@ for i in range(0,len(weld_z_height)):
     if True:
         scan_st = time.time()
         if curve_sliced_relative is None:
-            data_dir='../data/wall_weld_test/weld_scan_2023_06_06_15_28_31/'
-            last_profile_height=np.load('../data/wall_weld_test/weld_scan_2023_06_06_15_28_31/layer_14/scans/height_profile.npy')
+            data_dir='../data/wall_weld_test/weld_scan_2023_06_13_10_56_01/'
+            last_profile_height=np.load('../data/wall_weld_test/weld_scan_2023_06_13_10_56_01/layer_17/scans/height_profile.npy')
             last_mean_h=np.mean(last_profile_height[:,1])
             h_largest=np.max(last_profile_height[:,1])
             layer_data_dir=data_dir+'layer_'+str(i)+'/'
-            curve_sliced_relative=[np.array([-3.19473162e+01,  1.72700000e+00,  3.34460358e+01,  1.55554573e-04,
-       -6.31394918e-20, -9.99881509e-01]), np.array([ 3.30449818e+01,  1.72700000e+00,  3.34460358e+01,  1.55554573e-04,
+            curve_sliced_relative=[np.array([ 3.30445152e+01,  1.72700000e+00,  3.31751393e+01,  1.55554573e-04,
+       -6.31394918e-20, -9.99881509e-01]), np.array([-3.19477829e+01,  1.72700000e+00,  3.31751393e+01,  1.55554573e-04,
        -6.31394918e-20, -9.99881509e-01])]
 
         scan_plan_st = time.time()
@@ -329,7 +332,7 @@ for i in range(0,len(weld_z_height)):
         scan_stand_off_d = 95 ## mm
         Rz_angle = np.radians(0) # point direction w.r.t welds
         Ry_angle = np.radians(0) # rotate in y a bit
-        bounds_theta = np.radians(10) ## circular motion at start and end
+        bounds_theta = np.radians(1) ## circular motion at start and end
         all_scan_angle = np.radians([0]) ## scan angle
         q_init_table=np.radians([-15,200]) ## init table
         save_output_points = True
@@ -376,7 +379,7 @@ for i in range(0,len(weld_z_height)):
 
         print("Scan to home time:",time.time()-scan_motion_st)
 
-        # input("Press Enter to start moving and scanning")
+        input("Press Enter to start moving and scanning")
 
         scan_motion_scan_st = time.time()
 
@@ -474,10 +477,10 @@ for i in range(0,len(weld_z_height)):
     except:
         curve_x_start=43
         curve_x_end=-41
-    # Transz0_H=np.array([[ 9.99982631e-01,-3.95246885e-06,-5.89383364e-03,-9.06998096e-03],
-    #                     [-3.95246885e-06,9.99999101e-01,-1.34120947e-03,-2.06397824e-03],
-    #                     [ 5.89383364e-03,1.34120947e-03, 9.99981732e-01, 1.53886516e+00],
-    #                     [ 0.00000000e+00,0.00000000e+00, 0.00000000e+00, 1.00000000e+00],])
+    Transz0_H=np.array([[ 9.99974559e-01, -7.29664987e-06, -7.13309345e-03, -1.06461758e-02],
+                        [-7.29664987e-06,  9.99997907e-01, -2.04583032e-03, -3.05341146e-03],
+                        [ 7.13309345e-03,  2.04583032e-03,  9.99972466e-01,  1.49246365e+00],
+                        [ 0.00000000e+00,  0.00000000e+00,  0.00000000e+00,  1.00000000e+00]])
     z_height_start=h_largest-3
     crop_extend=10
     crop_min=(curve_x_end-crop_extend,-30,-10)

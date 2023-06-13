@@ -3,6 +3,20 @@ from copy import deepcopy
 from matplotlib import pyplot as plt
 from general_robotics_toolbox import *
 
+def v2dh_loglog(v,mode=140):
+
+    if mode==140:
+        # 140 ipm
+        # log(Δh)=-0.5068*log(V)+1.643
+        logdh = -0.5068*np.log(v)+1.643
+    elif mode==160:
+        # 160 ipm
+        # log(Δh)=-0.4619*log(V)+1.647 
+        logdh = -0.4619*np.log(v)+1.647 
+    
+    dh = np.exp(logdh)
+    return dh
+
 def dh2v_loglog(dh,mode=140):
 
     logdh = np.log(dh)
@@ -281,7 +295,7 @@ def strategy_2(profile_height,last_mean_h,forward_flag,curve_sliced_relative,R_S
 
     return curve_sliced_relative_correct,path_T_S1,this_weld_v,all_dh,mean_h
 
-def strategy_3(profile_height,input_dh,curve_sliced_relative,R_S1TCP,num_l,noise_h_thres = 3):
+def strategy_3(profile_height,input_dh,curve_sliced_relative,R_S1TCP,num_l,noise_h_thres = 3,min_v=5,max_v=30,h_std_thres=0.48,nominal_v=18):
 
     ## parameters
     # noise_h_thres = 3
@@ -302,35 +316,82 @@ def strategy_3(profile_height,input_dh,curve_sliced_relative,R_S1TCP,num_l,noise
     # 3. h_target = mean_h + designated dh value
     h_target = mean_h+input_dh
 
-    # chop curve
-    curve_sliced_relative_chop = np.linspace(curve_sliced_relative[0],curve_sliced_relative[-1],num_l+1)
+    h_std = np.std(profile_height[:,1])
+    if h_std<=h_std_thres:
+        print("H std smaller than threshold. H STD:",h_std)
+        
+        nominal_dh = v2dh_loglog(nominal_v,mode=160)
+        print("Change target dh to:",nominal_dh)
+        h_target = mean_h+nominal_dh
+        
+        curve_sliced_relative_correct = []
+        path_T_S1 = []
+        this_weld_v = []
+        all_dh=[]
+        for curve_i in range(len(curve_sliced_relative)):
+            this_p = np.array([curve_sliced_relative[curve_i][0],curve_sliced_relative[curve_i][1],h_target])
+            curve_sliced_relative_correct.append(np.append(this_p,curve_sliced_relative[curve_i][3:]))
+            path_T_S1.append(Transform(R_S1TCP,curve_sliced_relative_correct[-1][:3]))
+            this_weld_v.append(nominal_v)
+            all_dh.append(nominal_dh)
+        this_weld_v.pop()
+        all_dh.pop()
 
-    # find v
-    # 140 ipm: dh=0.006477*v^2-0.2362v+3.339
-    # 160 ipm: dh=0.006043*v^2-0.2234v+3.335    
-    # new curve in positioner frame
-    curve_sliced_relative_correct = []
-    this_p = np.array([curve_sliced_relative_chop[0][0],curve_sliced_relative_chop[0][1],h_target])
-    curve_sliced_relative_correct.append(np.append(this_p,curve_sliced_relative_chop[0][3:]))
-    path_T_S1 = [Transform(R_S1TCP,curve_sliced_relative_correct[-1][:3])]
-    this_weld_v = []
-    all_dh= []
-    for l in range(num_l):
-        # path
-        this_p = np.array([curve_sliced_relative_chop[l][0],curve_sliced_relative_chop[l+1][0],h_target])
-        curve_sliced_relative_correct.append(np.append(this_p,curve_sliced_relative_chop[l][3:]))
-        path_T_S1.append(Transform(R_S1TCP,curve_sliced_relative_correct[-1][:3]))
+        plt.scatter(profile_height[:,0],profile_height[:,1]-np.mean(profile_height[:,1]))
+        plt.show()
 
-        # velocity
-        min_x = min(curve_sliced_relative_chop[l][0],curve_sliced_relative_chop[l+1][0])
-        max_x = max(curve_sliced_relative_chop[l][0],curve_sliced_relative_chop[l+1][0])
-        this_profile = deepcopy(profile_height[np.where(profile_height>=min_x)[0]])
-        this_profile = this_profile[np.where(max_x>=this_profile)[0]]
-        this_mean_h=np.mean(this_profile[:,1])
-        ## using model to get the velocity
-        this_dh = h_target-this_mean_h
-        this_v = dh2v_loglog(this_dh,mode=160)
-        this_weld_v.append(this_v)
-        all_dh.append(this_dh)
+    else:
+        # chop curve
+        curve_sliced_relative_chop = np.linspace(curve_sliced_relative[0],curve_sliced_relative[-1],num_l+1)
+
+        # find v
+        # 140 ipm: dh=0.006477*v^2-0.2362v+3.339
+        # 160 ipm: dh=0.006043*v^2-0.2234v+3.335    
+        # new curve in positioner frame
+        curve_sliced_relative_correct = []
+        this_p = np.array([curve_sliced_relative_chop[0][0],curve_sliced_relative_chop[0][1],h_target])
+        curve_sliced_relative_correct.append(np.append(this_p,curve_sliced_relative_chop[0][3:]))
+        path_T_S1 = [Transform(R_S1TCP,curve_sliced_relative_correct[-1][:3])]
+        this_weld_v = []
+        seg_mean_h = []
+        all_dh= []
+        all_profile=[]
+        for l in range(1,num_l+1):
+            # path
+            this_p = np.array([curve_sliced_relative_chop[l][0],curve_sliced_relative_chop[l][1],h_target])
+            curve_sliced_relative_correct.append(np.append(this_p,curve_sliced_relative_chop[l][3:]))
+            path_T_S1.append(Transform(R_S1TCP,curve_sliced_relative_correct[-1][:3]))
+
+            # velocity
+            min_x = min(curve_sliced_relative_chop[l-1][0],curve_sliced_relative_chop[l][0])
+            max_x = max(curve_sliced_relative_chop[l-1][0],curve_sliced_relative_chop[l][0])
+
+            this_profile = deepcopy(profile_height[np.where(profile_height[:,0]>=min_x)[0]])
+            this_profile = this_profile[np.where(max_x>=this_profile[:,0])[0]]
+
+
+            all_profile.append(this_profile)
+            this_mean_h=np.mean(this_profile[:,1])
+            ## using model to get the velocity
+            this_dh = h_target-this_mean_h
+            this_dh=max(0.01,this_dh) # to prevent inf or nan
+
+            this_v = dh2v_loglog(this_dh,mode=160)
+            this_v = min(max(min_v,this_v),max_v)
+
+            this_weld_v.append(this_v)
+            all_dh.append(this_dh)
+            seg_mean_h.append(this_mean_h)
+        
+        print("Mean H:",mean_h)
+        print("Target H:",h_target)
+        # print("Seg mean h:",seg_mean_h)
+        print("dh:",all_dh)
+        print("v:",this_weld_v)
+
+        plt.scatter(profile_height[:,0],profile_height[:,1]-np.mean(profile_height[:,1]))
+        for p in all_profile:
+            plt.scatter(p[:,0],p[:,1]-np.mean(profile_height[:,1]))
+        plt.show()
     
-    return curve_sliced_relative,path_T_S1,this_weld_v,all_dh,mean_h
+    return curve_sliced_relative_correct,path_T_S1,this_weld_v,all_dh,mean_h
