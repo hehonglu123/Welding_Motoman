@@ -37,7 +37,7 @@ class CalibRobotPH:
         self.mpl_obj = MocapFrameListener(self.mocap_cli,all_ids,'world',use_quat=True)
 
     def run_calib(self,base_marker_config_file,rob_IP=None,ROBOT_CHOICE=None,rob_p2d=None,paths=[],rob_speed=3,waittime=1,
-                  raw_data_dir='',split_motion=3):
+                  raw_data_dir='',split_motion=2):
 
         input("Press Enter and the robot will start moving.")
         robot_client = MotionProgramExecClient()

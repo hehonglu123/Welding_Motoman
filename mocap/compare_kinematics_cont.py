@@ -24,7 +24,7 @@ T_basemarker_base = T_base_basemarker.inv()
 robot_weld.T_tool_toolmarker=Transform(np.eye(3),[0,0,0])
 robot_weld.robot.T_flange = robot_weld.T_tool_flange
 
-data_dir='kinematic_raw_data/test0516/'
+data_dir='kinematic_raw_data/test0613/'
 
 try:
     robot_q = np.loadtxt(data_dir+'robot_q_align.csv',delimiter=',')
