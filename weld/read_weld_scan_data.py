@@ -111,7 +111,7 @@ for dataset in datasets:
     if dataset=='baseline':
         data_dir = '../data/wall_weld_test/baseline_weld_scan_2023_06_06_15_28_31/'
     elif dataset=='full_test':
-        data_dir = '../data/wall_weld_test/weld_scan_2023_06_13_10_56_01/'
+        data_dir = '../data/wall_weld_test/weld_scan_2023_06_13_15_08_08/'
 
     forward_flag=False
     all_profile_height=[]
@@ -362,6 +362,7 @@ plt.show()
 
 for dataset in datasets:
     plt.plot(np.arange(len(datasets_h_std[dataset])),datasets_h_std[dataset],'-o',label=dataset)
+plt.axhline(y = 0.48, color = 'r', linestyle = '-')
 plt.legend()
 plt.xlabel('Layer')
 plt.ylabel('Height STD (mm)')

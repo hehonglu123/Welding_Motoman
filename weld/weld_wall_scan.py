@@ -101,6 +101,7 @@ T_to_base = Transform(np.eye(3),[0,0,-380])
 positioner.base_H = np.matmul(positioner.base_H,H_from_RT(T_to_base.R,T_to_base.p))
 
 final_height=50
+final_h_std_thres=0.48
 weld_z_height=[0,6,8] # two base layer height to first top layer
 weld_z_height=np.append(weld_z_height,np.arange(weld_z_height[-1],final_height,1)+1)
 # job_number=[115,115]
@@ -144,12 +145,12 @@ Transz0_H=None
 curve_sliced_relative=None
 last_mean_h = 0
 
-for i in range(18,len(weld_z_height)):
+for i in range(0,len(weld_z_height)):
     cycle_st = time.time()
     print("Layer:",i)
     #### welding
     weld_st = time.time()
-    if i>=19 and True:
+    if i>=0 and True:
         weld_plan_st = time.time()
         if i>=2:
             base_layer=False
@@ -215,25 +216,31 @@ for i in range(18,len(weld_z_height)):
                 
 
             ## parameters
-            noise_h_thres = 3
-            peak_threshold=0.25
-            flat_threshold=2.5
-            correct_thres = 1.4 # mm
-            patch_nb = 2 # 2*0.1
-            start_ramp_ratio = 0.67
-            end_ramp_ratio = 0.33
+            # noise_h_thres = 3
+            # peak_threshold=0.25
+            # flat_threshold=2.5
+            # correct_thres = 1.4 # mm
+            # patch_nb = 2 # 2*0.1
+            # start_ramp_ratio = 0.67
+            # end_ramp_ratio = 0.33
             #############
-
             # curve_sliced_relative,path_T_S1,this_weld_v,all_dh,last_mean_h=\
             #     strategy_2(profile_height,last_mean_h,forward_flag,curve_sliced_relative,R_S1TCP,this_weld_v[0],\
             #             noise_h_thres=noise_h_thres,peak_threshold=peak_threshold,flat_threshold=flat_threshold,\
             #             correct_thres=correct_thres,patch_nb=patch_nb,\
             #             start_ramp_ratio=start_ramp_ratio,end_ramp_ratio=end_ramp_ratio)
-            
+
+            ## parameters
+            noise_h_thres = 3
             num_l=40
             input_dh=1.7
+            min_v=5
+            max_v=30
+            h_std_thres=0.48
+            nominal_v=18
             curve_sliced_relative,path_T_S1,this_weld_v,all_dh,last_mean_h=\
-                strategy_3(profile_height,input_dh,curve_sliced_relative,R_S1TCP,num_l,noise_h_thres = 3)
+                strategy_3(profile_height,input_dh,curve_sliced_relative,R_S1TCP,num_l,noise_h_thres=noise_h_thres,\
+                           min_v=min_v,max_v=max_v,h_std_thres=h_std_thres,nominal_v=nominal_v)
             
             h_largest = np.max(profile_height[:,1])
 
@@ -507,7 +514,7 @@ for i in range(18,len(weld_z_height)):
     # plt.show()
     # exit()
 
-    if np.mean(profile_height[:,1])>final_height:
+    if np.mean(profile_height[:,1])>final_height and np.std(profile_height[:,1])<final_h_std_thres:
         break
 
     forward_flag=not forward_flag
