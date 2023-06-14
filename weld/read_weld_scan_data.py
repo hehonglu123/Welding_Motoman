@@ -100,7 +100,8 @@ R_S1TCP = np.matmul(T_S1TCP_R1Base[:3,:3],path_R)
 
 build_height_profile=False
 plot_correction=True
-show_layer = [12]
+# show_layer = [12]
+show_layer = [29,30]
 
 x_lower = -99999
 x_upper = 999999
@@ -225,8 +226,10 @@ for dataset in datasets:
                 this_weld_v.pop()
                 all_dh.pop()
 
-                plt.scatter(profile_height[:,0],profile_height[:,1]-np.mean(profile_height[:,1]))
-                plt.show()
+                # plt.scatter(profile_height[:,0],profile_height[:,1]-np.mean(profile_height[:,1]))
+                # plt.show()
+
+                all_profile=[profile_height]
 
             else:
                 # chop curve
@@ -281,65 +284,104 @@ for dataset in datasets:
                 #     plt.scatter(p[:,0],p[:,1]-np.mean(profile_height[:,1]))
                 # plt.show()
 
-                ### plot velocity and actual velocity
-                next_weld_dir=data_dir+'layer_'+str(i+1)+'/'
-                next_weld_q=np.loadtxt(next_weld_dir+'weld_js_exe.csv',delimiter=',')
-                next_weld_stamp=np.loadtxt(next_weld_dir+'weld_robot_stamps.csv',delimiter=',')
-                next_scan_dir=next_weld_dir+'scans/'
-                next_profile_height = np.load(scan_dir+'height_profile.npy')
-                
-                robot_p_S1TCP=[]
-                for q in next_weld_q:
-                    r_tcp=robot_weld.fwd(q[:6])
-                    r_S1TCP=Transform(T_S1TCP_R1Base[:3,:3],T_S1TCP_R1Base[:3,-1])*r_tcp
-                    robot_p_S1TCP.append(r_S1TCP.p)
-                robot_p_S1TCP=np.array(robot_p_S1TCP)
+            ### plot velocity and actual velocity
+            next_weld_dir=data_dir+'layer_'+str(i+1)+'/'
+            next_weld_q=np.loadtxt(next_weld_dir+'weld_js_exe.csv',delimiter=',')
+            next_weld_stamp=np.loadtxt(next_weld_dir+'weld_robot_stamps.csv',delimiter=',')
+            next_scan_dir=next_weld_dir+'scans/'
+            next_profile_height = np.load(next_scan_dir+'height_profile.npy')
+            
+            robot_p_S1TCP=[]
+            for q in next_weld_q:
+                r_tcp=robot_weld.fwd(q[:6])
+                r_S1TCP=Transform(T_S1TCP_R1Base[:3,:3],T_S1TCP_R1Base[:3,-1])*r_tcp
+                robot_p_S1TCP.append(r_S1TCP.p)
+            robot_p_S1TCP=np.array(robot_p_S1TCP)
 
-                start_idx=300
-                end_idx=1700
-                robot_p_S1TCP=robot_p_S1TCP[start_idx:end_idx+1]
-                next_weld_stamp=next_weld_stamp[start_idx:end_idx+1]
-                
-                plan_x = np.array(curve_sliced_relative)[:,0]
-                plan_y = np.array(curve_sliced_relative)[:,1]
-                # plt.plot(plan_x,plan_y)
-                # plt.plot(robot_p_S1TCP[:,0],robot_p_S1TCP[:,1])
-                # plt.show()
-                robot_v_S1TCP=np.linalg.norm(np.diff(robot_p_S1TCP,axis=0),2,1)/np.diff(next_weld_stamp)
-                robot_v_S1TCP=np.append(robot_v_S1TCP[0],robot_v_S1TCP)
-                robot_v_S1TCP=moving_average(robot_v_S1TCP,padding=True)
-                # plt.plot(robot_v_S1TCP)
-                # plt.plot(robot_p_S1TCP[:,0],robot_v_S1TCP)
-                # plt.show()
+            # start_idx=0
+            # end_idx=-2
+            plan_x = np.array(curve_sliced_relative)[:,0]
+            plan_y = np.array(curve_sliced_relative)[:,1]
+            # plt.plot(plan_x,plan_y)
+            # plt.plot(robot_p_S1TCP[:,0],robot_p_S1TCP[:,1])
+            # plt.show()
+            robot_v_S1TCP=np.linalg.norm(np.diff(robot_p_S1TCP,axis=0),2,1)/np.diff(next_weld_stamp)
+            robot_v_S1TCP=np.append(robot_v_S1TCP[0],robot_v_S1TCP)
+            robot_v_S1TCP=moving_average(robot_v_S1TCP,padding=True)
+            start_idx=300
+            end_idx=np.where(robot_v_S1TCP==0)[0][-1]
+            robot_p_S1TCP=robot_p_S1TCP[start_idx:end_idx+1]
+            next_weld_stamp=next_weld_stamp[start_idx:end_idx+1]
+            robot_v_S1TCP=robot_v_S1TCP[start_idx:end_idx+1]
 
-                fig, ax1 = plt.subplots()
-                ax2 = ax1.twinx()
-                for seg_i in range(len(all_profile)):
-                    p=deepcopy(all_profile[seg_i])
-                    ax1.scatter(p[:,0],p[:,1]-np.mean(profile_height[:,1]))
-                    if seg_i==0:
-                        ax2.plot(p[:,0],np.repeat(this_weld_v[seg_i],len(p[:,0])))
-                    else:
-                        ax2.plot(np.append(all_profile[seg_i-1][-1,0],p[:,0]),np.append(this_weld_v[seg_i-1],np.repeat(this_weld_v[seg_i],len(p[:,0]))))
-                ax1.set_xlabel('X-axis (Lambda) (mm)')
-                ax1.set_ylabel('Height (mm)', color='g')
-                ax2.set_ylabel('Speed (mm/sec)', color='b')
-                plt.title("Height and Speed, 40 MoveL")
-                ax1.legend(loc=0)
-                ax2.legend(loc=0)
-                plt.legend()
-                plt.show()
+            # plt.plot(robot_v_S1TCP)
+            # plt.plot(robot_p_S1TCP[:,0],robot_v_S1TCP)
+            # plt.show()
 
-                # for seg_i in range(len(all_profile)):
-                #     p=deepcopy(all_profile[seg_i])
-                #     plt.scatter(p[:,0],p[:,1]-np.mean(profile_height[:,1]))
-                #     if seg_i==0:
-                #         plt.plot(p[:,0],np.repeat(this_weld_v[seg_i],len(p[:,0])))
-                #     else:
-                #         plt.plot(np.append(all_profile[seg_i-1][-1,0],p[:,0]),np.append(this_weld_v[seg_i-1],np.repeat(this_weld_v[seg_i],len(p[:,0]))))
-                # plt.plot(robot_p_S1TCP[:,0],robot_v_S1TCP,label='Actual Path')
-                # plt.legend()
-                # plt.show()
+            dh_in_layer = []
+            for curve_i in range(len(next_profile_height)):
+                px=next_profile_height[curve_i,0]
+                this_l_id=np.argmin(np.fabs(profile_height[:,0]-px))
+                dh_in_layer.append([px,next_profile_height[curve_i,1]-profile_height[this_l_id,1]])
+            dh_in_layer=np.array(dh_in_layer)
+
+            motion_dh = []
+            for curve_i in range(len(robot_p_S1TCP)):
+                px=robot_p_S1TCP[curve_i,0]
+                this_l_id=np.argmin(np.fabs(profile_height[:,0]-px))
+                motion_dh.append([px,robot_p_S1TCP[curve_i,2]-profile_height[this_l_id,1]])
+            motion_dh=np.array(motion_dh)
+
+
+            all_profile_plot=[]
+            all_profile_v_plot=[]
+            for seg_i in range(len(all_profile)):
+                p=deepcopy(all_profile[seg_i])
+                all_profile_plot.extend(all_profile[seg_i])
+                all_profile_v_plot.extend(np.array([p[:,0],np.repeat(this_weld_v[seg_i],len(p[:,0]))]).T)
+            all_profile_plot=np.array(all_profile_plot)
+            all_profile_v_plot=np.array(all_profile_v_plot)
+            
+            fig, ax1 = plt.subplots()
+            ax2 = ax1.twinx()
+            ax1.scatter(profile_height[:,0],profile_height[:,1],label='Height Layer'+str(i))
+            ax1.scatter(next_profile_height[:,0],next_profile_height[:,1],label='Height Layer'+str(i+1))
+            ax2.plot(all_profile_v_plot[:,0],all_profile_v_plot[:,1],label='Planned Corrected Speed')
+            ax2.plot(robot_p_S1TCP[:,0],robot_v_S1TCP,label='Actual Cartesian Speed')
+            ax1.set_xlabel('X-axis (Lambda) (mm)')
+            ax1.set_ylabel('Height (mm)', color='g')
+            ax2.set_ylabel('Speed (mm/sec)', color='b')
+            ax1.legend(loc=0)
+            ax2.legend(loc=0)
+            plt.title("Height and Speed, 40 MoveL")
+            plt.legend()
+            plt.show()
+
+            fig, ax1 = plt.subplots()
+            ax2 = ax1.twinx()
+            ax1.scatter(dh_in_layer[:,0],dh_in_layer[:,1],label='dH L'+str(i)+'L'+str(i+1))
+            ax2.plot(robot_p_S1TCP[:,0],robot_v_S1TCP,label='Actual Cartesian Speed')
+            ax1.set_xlabel('X-axis (Lambda) (mm)')
+            ax1.set_ylabel('dH (mm)', color='g')
+            ax2.set_ylabel('Speed (mm/sec)', color='b')
+            ax1.legend(loc=0)
+            ax2.legend(loc=0)
+            plt.title("dH and Speed, 40 MoveL")
+            plt.legend()
+            plt.show()
+
+            fig, ax1 = plt.subplots()
+            ax2 = ax1.twinx()
+            ax1.scatter(dh_in_layer[:,0],dh_in_layer[:,1],label='dH L'+str(i)+'L'+str(i+1))
+            ax2.scatter(motion_dh[:,0],motion_dh[:,1],c='tab:orange',label='Motion dH')
+            ax1.set_xlabel('X-axis (Lambda) (mm)')
+            ax1.set_ylabel('Layer dH (mm)', color='g')
+            ax2.set_ylabel('Motion dH (mm)', color='b')
+            ax1.legend(loc=2)
+            ax2.legend(loc=1)
+            plt.title("Layer dH and Motion dH, 40 MoveL")
+            # plt.legend()
+            plt.show()
 
         forward_flag= not forward_flag
 
