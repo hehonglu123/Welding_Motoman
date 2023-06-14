@@ -101,7 +101,7 @@ R_S1TCP = np.matmul(T_S1TCP_R1Base[:3,:3],path_R)
 build_height_profile=False
 plot_correction=True
 # show_layer = [12]
-show_layer = [29,30]
+show_layer = [12,29,30]
 
 x_lower = -99999
 x_upper = 999999
@@ -308,11 +308,15 @@ for dataset in datasets:
             robot_v_S1TCP=np.linalg.norm(np.diff(robot_p_S1TCP,axis=0),2,1)/np.diff(next_weld_stamp)
             robot_v_S1TCP=np.append(robot_v_S1TCP[0],robot_v_S1TCP)
             robot_v_S1TCP=moving_average(robot_v_S1TCP,padding=True)
+            robot_a_S1TCP=np.gradient(robot_v_S1TCP)/np.gradient(next_weld_stamp)
+            robot_a_S1TCP=moving_average(robot_a_S1TCP,padding=True)
+
             start_idx=300
             end_idx=np.where(robot_v_S1TCP==0)[0][-1]
             robot_p_S1TCP=robot_p_S1TCP[start_idx:end_idx+1]
             next_weld_stamp=next_weld_stamp[start_idx:end_idx+1]
             robot_v_S1TCP=robot_v_S1TCP[start_idx:end_idx+1]
+            robot_a_S1TCP=robot_a_S1TCP[start_idx:end_idx+1]
 
             # plt.plot(robot_v_S1TCP)
             # plt.plot(robot_p_S1TCP[:,0],robot_v_S1TCP)
@@ -331,7 +335,6 @@ for dataset in datasets:
                 this_l_id=np.argmin(np.fabs(profile_height[:,0]-px))
                 motion_dh.append([px,robot_p_S1TCP[curve_i,2]-profile_height[this_l_id,1]])
             motion_dh=np.array(motion_dh)
-
 
             all_profile_plot=[]
             all_profile_v_plot=[]
@@ -373,14 +376,13 @@ for dataset in datasets:
             fig, ax1 = plt.subplots()
             ax2 = ax1.twinx()
             ax1.scatter(dh_in_layer[:,0],dh_in_layer[:,1],label='dH L'+str(i)+'L'+str(i+1))
-            ax2.scatter(motion_dh[:,0],motion_dh[:,1],c='tab:orange',label='Motion dH')
+            ax2.plot(robot_p_S1TCP[:,0],robot_a_S1TCP,label='Actual Cart Acc')
             ax1.set_xlabel('X-axis (Lambda) (mm)')
-            ax1.set_ylabel('Layer dH (mm)', color='g')
-            ax2.set_ylabel('Motion dH (mm)', color='b')
+            ax1.set_ylabel('dH (mm)', color='g')
+            ax2.set_ylabel('Acceleration (mm/sec^2)', color='b')
             ax1.legend(loc=2)
             ax2.legend(loc=1)
-            plt.title("Layer dH and Motion dH, 40 MoveL")
-            # plt.legend()
+            plt.title("dH and Acceleration, 40 MoveL")
             plt.show()
 
         forward_flag= not forward_flag
