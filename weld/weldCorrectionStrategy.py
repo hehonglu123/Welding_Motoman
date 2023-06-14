@@ -317,8 +317,9 @@ def strategy_3(profile_height,input_dh,curve_sliced_relative,R_S1TCP,num_l,noise
     h_target = mean_h+input_dh
 
     h_std = np.std(profile_height[:,1])
+    print("H STD:",h_std)
     if h_std<=h_std_thres:
-        print("H std smaller than threshold. H STD:",h_std)
+        print("H std smaller than threshold.")
         
         nominal_dh = v2dh_loglog(nominal_v,mode=160)
         print("Change target dh to:",nominal_dh)
