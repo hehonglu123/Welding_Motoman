@@ -30,7 +30,7 @@
 |-|-|-|-|
 |One PH|0.2198|0.1166|0.7097|
 |Optimize PH|0.0936|0.0262|0.1927|
-### Testing Data
+### Testing Data (Position)
 ||Mean (mm)|Std (mm)|Max (mm)|
 |-|-|-|-|
 |Rotate PH|0.5145|0.2141|1.0707|
@@ -38,3 +38,15 @@
 |One PH|0.5911|0.4140|2.0903|
 |Nearest PH|0.2030|0.1083|0.7922|
 |Linear Interp PH|0.1932|0.0992|0.7150|
+|Cubic Interp PH|0.1960|0.1036|0.7114|
+|RBF Interp PH|0.1963|0.1024|0.7205|
+### Testing Data (Orientation)
+||Mean (deg)|Std (deg)|Max (deg)|
+|-|-|-|-|
+|Rotate PH|0.0682|0.0305|0.2058|
+|Zero PH|0.0631|0.0291|0.1962|
+|One PH|0.1191|0.0496|0.2497|
+|Nearest PH|0.0637|0.0258|0.1624|
+|Linear Interp PH|0.0635|0.0255|0.1664|
+|Cubic Interp PH|0.0635|0.0256|0.1653|
+|RBF Interp PH|0.0635|0.0255|0.1657|

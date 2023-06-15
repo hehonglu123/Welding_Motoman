@@ -76,7 +76,11 @@ total_test_N = len(test_robot_q)
 ph_param_near=PH_Param()
 ph_param_near.fit(PH_q,method='nearest')
 ph_param_lin=PH_Param()
-ph_param_lin.fit(PH_q,method='linear_interp')
+ph_param_lin.fit(PH_q,method='linear')
+ph_param_cub=PH_Param()
+ph_param_cub.fit(PH_q,method='cubic')
+ph_param_rbf=PH_Param()
+ph_param_rbf.fit(PH_q,method='RBF')
 # exit()
 
 #### Gradient
@@ -85,6 +89,10 @@ error_pos_near = []
 error_ori_near = []
 error_pos_lin = []
 error_ori_lin = []
+error_pos_cub = []
+error_ori_cub = []
+error_pos_rbf = []
+error_ori_rbf = []
 error_pos_baseline = []
 error_ori_baseline = []
 error_pos_PHZero = []
@@ -124,12 +132,29 @@ for N in range(total_test_N):
     error_pos_lin.append(T_tool_base.p-robot_T.p)
     error_ori_lin.append(k*np.degrees(theta))
 
-    if np.any(np.isnan(error_pos_lin)):
-        print(robot_T.p)
-        print("P",opt_P.T)
-        print("H",opt_H.T)
+    #### get error (cubic)
+    opt_P,opt_H = ph_param_cub.predict(test_q[1:3])
+    if np.any(opt_P is np.nan) or np.any(opt_H is np.nan):
         print(np.degrees(test_q))
-        print("====")
+    robot_weld.robot.P=deepcopy(opt_P)
+    robot_weld.robot.H=deepcopy(opt_H)
+    robot_T = robot_weld.fwd(test_q)
+    k,theta = R2rot(robot_T.R.T@T_tool_base.R)
+    k=np.array(k)
+    error_pos_cub.append(T_tool_base.p-robot_T.p)
+    error_ori_cub.append(k*np.degrees(theta))
+
+    #### get error (rbf)
+    opt_P,opt_H = ph_param_rbf.predict(test_q[1:3])
+    if np.any(opt_P is np.nan) or np.any(opt_H is np.nan):
+        print(np.degrees(test_q))
+    robot_weld.robot.P=deepcopy(opt_P)
+    robot_weld.robot.H=deepcopy(opt_H)
+    robot_T = robot_weld.fwd(test_q)
+    k,theta = R2rot(robot_T.R.T@T_tool_base.R)
+    k=np.array(k)
+    error_pos_rbf.append(T_tool_base.p-robot_T.p)
+    error_ori_rbf.append(k*np.degrees(theta))
 
     #### get error (zero)
     robot_weld.robot.P=deepcopy(qzero_P)
@@ -168,16 +193,29 @@ sort_q2q3_id = np.argsort(q2q3)
 q2q3=q2q3[sort_q2q3_id]
 error_pos_near_norm=np.linalg.norm(error_pos_near,ord=2,axis=1).flatten()
 error_pos_lin_norm=np.linalg.norm(error_pos_lin,ord=2,axis=1).flatten()
+error_pos_cub_norm=np.linalg.norm(error_pos_cub,ord=2,axis=1).flatten()
+error_pos_rbf_norm=np.linalg.norm(error_pos_rbf,ord=2,axis=1).flatten()
 error_pos_PHZero_norm=np.linalg.norm(error_pos_PHZero,ord=2,axis=1).flatten()
 error_pos_onePH_norm=np.linalg.norm(error_pos_onePH,ord=2,axis=1).flatten()
 error_pos_baseline_norm=np.linalg.norm(error_pos_baseline,ord=2,axis=1).flatten()
+
+error_ori_near_norm=np.linalg.norm(error_ori_near,ord=2,axis=1).flatten()
+error_ori_lin_norm=np.linalg.norm(error_ori_lin,ord=2,axis=1).flatten()
+error_ori_cub_norm=np.linalg.norm(error_ori_cub,ord=2,axis=1).flatten()
+error_ori_rbf_norm=np.linalg.norm(error_ori_rbf,ord=2,axis=1).flatten()
+error_ori_PHZero_norm=np.linalg.norm(error_ori_PHZero,ord=2,axis=1).flatten()
+error_ori_onePH_norm=np.linalg.norm(error_ori_onePH,ord=2,axis=1).flatten()
+error_ori_baseline_norm=np.linalg.norm(error_ori_baseline,ord=2,axis=1).flatten()
+
 plt.plot(error_pos_baseline_norm,'-o',markersize=1,label='Rotation PH')
 plt.plot(error_pos_PHZero_norm,'-o',markersize=1,label='Zero PH')
 plt.plot(error_pos_onePH_norm,'-o',markersize=1,label='One PH')
 plt.plot(error_pos_near_norm,'-o',markersize=1,label='Nearest PH')
 plt.plot(error_pos_lin_norm,'-o',markersize=1,label='Linear Interp PH')
+plt.plot(error_pos_cub_norm,'-o',markersize=1,label='Cubic Interp PH')
+plt.plot(error_pos_rbf_norm,'-o',markersize=1,label='RBF Interp PH')
 plt.legend()
-plt.title("Position Error using PH from Nearest q2q3")
+plt.title("Position Error using Optimized PH")
 # plt.xticks(np.arange(0,total_test_N,100),np.round(q1_all[::100]))
 # plt.xlabel("J1 Angle at each Pose (degrees)")
 plt.xticks(np.arange(0,total_test_N,50),pos_all[::50])
@@ -185,7 +223,23 @@ plt.xlabel("TCP Cartesian Position at Poses")
 plt.ylabel("Position Error (mm)")
 plt.show()
 
-print("Testing Data")
+plt.plot(error_ori_baseline_norm,'-o',markersize=1,label='Rotation PH')
+plt.plot(error_ori_PHZero_norm,'-o',markersize=1,label='Zero PH')
+plt.plot(error_ori_onePH_norm,'-o',markersize=1,label='One PH')
+plt.plot(error_ori_near_norm,'-o',markersize=1,label='Nearest PH')
+plt.plot(error_ori_lin_norm,'-o',markersize=1,label='Linear Interp PH')
+plt.plot(error_ori_cub_norm,'-o',markersize=1,label='Cubic Interp PH')
+plt.plot(error_ori_rbf_norm,'-o',markersize=1,label='RBF Interp PH')
+plt.legend()
+plt.title("Orientation Error using Optimized PH")
+# plt.xticks(np.arange(0,total_test_N,100),np.round(q1_all[::100]))
+# plt.xlabel("J1 Angle at each orie (degrees)")
+plt.xticks(np.arange(0,total_test_N,50),pos_all[::50])
+plt.xlabel("TCP Cartesian Position at Poses")
+plt.ylabel("Orientation Error (deg)")
+plt.show()
+
+print("Testing Data (Position)")
 markdown_str=''
 markdown_str+='||Mean (mm)|Std (mm)|Max (mm)|\n'
 markdown_str+='|-|-|-|-|\n'
@@ -199,6 +253,30 @@ markdown_str+='|Nearest PH|'+format(round(np.mean(error_pos_near_norm),4),'.4f')
     format(round(np.std(error_pos_near_norm),4),'.4f')+'|'+format(round(np.max(error_pos_near_norm),4),'.4f')+'|\n'
 markdown_str+='|Linear Interp PH|'+format(round(np.mean(error_pos_lin_norm),4),'.4f')+'|'+\
     format(round(np.std(error_pos_lin_norm),4),'.4f')+'|'+format(round(np.max(error_pos_lin_norm),4),'.4f')+'|\n'
+markdown_str+='|Cubic Interp PH|'+format(round(np.mean(error_pos_cub_norm),4),'.4f')+'|'+\
+    format(round(np.std(error_pos_cub_norm),4),'.4f')+'|'+format(round(np.max(error_pos_cub_norm),4),'.4f')+'|\n'
+markdown_str+='|RBF Interp PH|'+format(round(np.mean(error_pos_rbf_norm),4),'.4f')+'|'+\
+    format(round(np.std(error_pos_rbf_norm),4),'.4f')+'|'+format(round(np.max(error_pos_rbf_norm),4),'.4f')+'|\n'
+print(markdown_str)
+
+print("Testing Data (Orientation)")
+markdown_str=''
+markdown_str+='||Mean (deg)|Std (deg)|Max (deg)|\n'
+markdown_str+='|-|-|-|-|\n'
+markdown_str+='|Rotate PH|'+format(round(np.mean(error_ori_baseline_norm),4),'.4f')+'|'+\
+    format(round(np.std(error_ori_baseline_norm),4),'.4f')+'|'+format(round(np.max(error_ori_baseline_norm),4),'.4f')+'|\n'
+markdown_str+='|Zero PH|'+format(round(np.mean(error_ori_PHZero_norm),4),'.4f')+'|'+\
+    format(round(np.std(error_ori_PHZero_norm),4),'.4f')+'|'+format(round(np.max(error_ori_PHZero_norm),4),'.4f')+'|\n'
+markdown_str+='|One PH|'+format(round(np.mean(error_ori_onePH_norm),4),'.4f')+'|'+\
+    format(round(np.std(error_ori_onePH_norm),4),'.4f')+'|'+format(round(np.max(error_ori_onePH_norm),4),'.4f')+'|\n'
+markdown_str+='|Nearest PH|'+format(round(np.mean(error_ori_near_norm),4),'.4f')+'|'+\
+    format(round(np.std(error_ori_near_norm),4),'.4f')+'|'+format(round(np.max(error_ori_near_norm),4),'.4f')+'|\n'
+markdown_str+='|Linear Interp PH|'+format(round(np.mean(error_ori_lin_norm),4),'.4f')+'|'+\
+    format(round(np.std(error_ori_lin_norm),4),'.4f')+'|'+format(round(np.max(error_ori_lin_norm),4),'.4f')+'|\n'
+markdown_str+='|Cubic Interp PH|'+format(round(np.mean(error_ori_cub_norm),4),'.4f')+'|'+\
+    format(round(np.std(error_ori_cub_norm),4),'.4f')+'|'+format(round(np.max(error_ori_cub_norm),4),'.4f')+'|\n'
+markdown_str+='|RBF Interp PH|'+format(round(np.mean(error_ori_rbf_norm),4),'.4f')+'|'+\
+    format(round(np.std(error_ori_rbf_norm),4),'.4f')+'|'+format(round(np.max(error_ori_rbf_norm),4),'.4f')+'|\n'
 print(markdown_str)
 
 print("Training Data")
