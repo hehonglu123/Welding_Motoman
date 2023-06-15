@@ -7,8 +7,7 @@ import sys
 sys.path.append('../toolbox/')
 from robot_def import *
 from matplotlib import pyplot as plt
-
-from qpsolvers import solve_qp
+from PH_interp import *
 
 from numpy.random import default_rng
 rng = default_rng()
@@ -59,11 +58,11 @@ qzero_H = PH_q[train_q_zero_key]['H']
 universal_P = PH_q_one['P']
 universal_H = PH_q_one['H']
 training_error_universal=PH_q_one['train_pos_error']
-plt.plot(np.mean(training_error_universal,axis=1))
-plt.xlabel("Iteration")
-plt.ylabel("Average Position Error Norm (mm)")
-plt.title("Average Position error norm of all poses")
-plt.show()
+# plt.plot(np.mean(training_error_universal,axis=1))
+# plt.xlabel("Iteration")
+# plt.ylabel("Average Position Error Norm (mm)")
+# plt.title("Average Position error norm of all poses")
+# plt.show()
 ########################
 
 #### using rotation PH (at zero) as baseline ####
@@ -73,10 +72,19 @@ baseline_H = deepcopy(robot_weld.calib_H)
 
 total_test_N = len(test_robot_q)
 
+## PH_param
+ph_param_near=PH_Param()
+ph_param_near.fit(PH_q,method='nearest')
+ph_param_lin=PH_Param()
+ph_param_lin.fit(PH_q,method='linear_interp')
+# exit()
+
 #### Gradient
 plot_error=False
-error_pos = []
-error_ori = []
+error_pos_near = []
+error_ori_near = []
+error_pos_lin = []
+error_ori_lin = []
 error_pos_baseline = []
 error_ori_baseline = []
 error_pos_PHZero = []
@@ -88,25 +96,40 @@ q1_all=[]
 pos_all=[]
 for N in range(total_test_N):
     test_q = test_robot_q[N]
-    train_q_index = np.argmin(np.linalg.norm(train_q-test_q[1:3],ord=2,axis=1))
-    train_q_key = tuple(train_q[train_q_index])
-
     # print("Test q2q3:",np.round(np.degrees(test_q[1:3]),3))
     # print("Using Train q2q3:",np.round(np.degrees(train_q[train_q_index]),3))
 
     T_marker_base = Transform(q2R(test_mocap_T[N][3:]),test_mocap_T[N][:3])
     T_tool_base = T_marker_base*robot_weld.T_tool_toolmarker
 
-    #### get error
-    opt_P = PH_q[train_q_key]['P']
-    opt_H = PH_q[train_q_key]['H']
+    #### get error (nearest)
+    opt_P,opt_H = ph_param_near.predict(test_q[1:3])
     robot_weld.robot.P=deepcopy(opt_P)
     robot_weld.robot.H=deepcopy(opt_H)
     robot_T = robot_weld.fwd(test_q)
     k,theta = R2rot(robot_T.R.T@T_tool_base.R)
     k=np.array(k)
-    error_pos.append(T_tool_base.p-robot_T.p)
-    error_ori.append(k*np.degrees(theta))
+    error_pos_near.append(T_tool_base.p-robot_T.p)
+    error_ori_near.append(k*np.degrees(theta))
+
+    #### get error (linear)
+    opt_P,opt_H = ph_param_lin.predict(test_q[1:3])
+    if np.any(opt_P is np.nan) or np.any(opt_H is np.nan):
+        print(np.degrees(test_q))
+    robot_weld.robot.P=deepcopy(opt_P)
+    robot_weld.robot.H=deepcopy(opt_H)
+    robot_T = robot_weld.fwd(test_q)
+    k,theta = R2rot(robot_T.R.T@T_tool_base.R)
+    k=np.array(k)
+    error_pos_lin.append(T_tool_base.p-robot_T.p)
+    error_ori_lin.append(k*np.degrees(theta))
+
+    if np.any(np.isnan(error_pos_lin)):
+        print(robot_T.p)
+        print("P",opt_P.T)
+        print("H",opt_H.T)
+        print(np.degrees(test_q))
+        print("====")
 
     #### get error (zero)
     robot_weld.robot.P=deepcopy(qzero_P)
@@ -143,15 +166,16 @@ q2q3=np.array(q2q3)
 q1_all=np.array(q1_all)
 sort_q2q3_id = np.argsort(q2q3)
 q2q3=q2q3[sort_q2q3_id]
-error_pos_norm=np.linalg.norm(error_pos,ord=2,axis=1).flatten()
+error_pos_near_norm=np.linalg.norm(error_pos_near,ord=2,axis=1).flatten()
+error_pos_lin_norm=np.linalg.norm(error_pos_lin,ord=2,axis=1).flatten()
 error_pos_PHZero_norm=np.linalg.norm(error_pos_PHZero,ord=2,axis=1).flatten()
 error_pos_onePH_norm=np.linalg.norm(error_pos_onePH,ord=2,axis=1).flatten()
 error_pos_baseline_norm=np.linalg.norm(error_pos_baseline,ord=2,axis=1).flatten()
-
 plt.plot(error_pos_baseline_norm,'-o',markersize=1,label='Rotation PH')
 plt.plot(error_pos_PHZero_norm,'-o',markersize=1,label='Zero PH')
 plt.plot(error_pos_onePH_norm,'-o',markersize=1,label='One PH')
-plt.plot(error_pos_norm,'-o',markersize=1,label='Opt PH')
+plt.plot(error_pos_near_norm,'-o',markersize=1,label='Nearest PH')
+plt.plot(error_pos_lin_norm,'-o',markersize=1,label='Linear Interp PH')
 plt.legend()
 plt.title("Position Error using PH from Nearest q2q3")
 # plt.xticks(np.arange(0,total_test_N,100),np.round(q1_all[::100]))
@@ -171,8 +195,10 @@ markdown_str+='|Zero PH|'+format(round(np.mean(error_pos_PHZero_norm),4),'.4f')+
     format(round(np.std(error_pos_PHZero_norm),4),'.4f')+'|'+format(round(np.max(error_pos_PHZero_norm),4),'.4f')+'|\n'
 markdown_str+='|One PH|'+format(round(np.mean(error_pos_onePH_norm),4),'.4f')+'|'+\
     format(round(np.std(error_pos_onePH_norm),4),'.4f')+'|'+format(round(np.max(error_pos_onePH_norm),4),'.4f')+'|\n'
-markdown_str+='|Optimize PH|'+format(round(np.mean(error_pos_norm),4),'.4f')+'|'+\
-    format(round(np.std(error_pos_norm),4),'.4f')+'|'+format(round(np.max(error_pos_norm),4),'.4f')+'|\n'
+markdown_str+='|Nearest PH|'+format(round(np.mean(error_pos_near_norm),4),'.4f')+'|'+\
+    format(round(np.std(error_pos_near_norm),4),'.4f')+'|'+format(round(np.max(error_pos_near_norm),4),'.4f')+'|\n'
+markdown_str+='|Linear Interp PH|'+format(round(np.mean(error_pos_lin_norm),4),'.4f')+'|'+\
+    format(round(np.std(error_pos_lin_norm),4),'.4f')+'|'+format(round(np.max(error_pos_lin_norm),4),'.4f')+'|\n'
 print(markdown_str)
 
 print("Training Data")
