@@ -116,8 +116,8 @@ if robot_type=='R1':
 
     jN=6
 
-    # output_base_marker_config_file = config_dir+'MA2010_marker_config.yaml'
-    output_base_marker_config_file = config_dir+'MA2010_0516_marker_config.yaml'
+    output_base_marker_config_file = config_dir+'MA2010_marker_config.yaml'
+    # output_base_marker_config_file = config_dir+'MA2010_0516_marker_config.yaml'
     # output_base_marker_config_file = config_dir+'MA2010_0504_marker_config.yaml'
     # output_base_marker_config_file = config_dir+'MA2010_0504stretch_marker_config.yaml'
     # output_base_marker_config_file = config_dir+'MA2010_0504inward_marker_config.yaml'
@@ -355,6 +355,7 @@ if robot_type!='S1':
     marker_B = {}
     for marker_id in robot.tool_markers_id: # average across the captured
         marker_B[marker_id] = np.mean(curve_p[marker_id],axis=0)
+    
     # find center of A B
     marker_A = deepcopy(robot.tool_markers)
     center_A = []
@@ -386,7 +387,6 @@ if robot_type!='S1':
     T_tool_toolmarker = Transform(R,t)
     
 else:
-
     # T^tool_base
     tool_p = j2_center+180*-1*H[:,1] # 180 mm above j2_center
     print(j2_center)

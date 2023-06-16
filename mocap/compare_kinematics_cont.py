@@ -15,16 +15,19 @@ Ry=np.array([0,1,0])
 Rz=np.array([0,0,1])
 
 config_dir='../config/'
-robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path='',d=0,\
+# robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path='',d=0,\
+# pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',\
+# base_marker_config_file=config_dir+'MA2010_marker_config.yaml',tool_marker_config_file=config_dir+'weldgun_marker_config.yaml')
+robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path=config_dir+'torch.csv',d=15,\
 pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',\
 base_marker_config_file=config_dir+'MA2010_marker_config.yaml',tool_marker_config_file=config_dir+'weldgun_marker_config.yaml')
 
 T_base_basemarker = robot_weld.T_base_basemarker
 T_basemarker_base = T_base_basemarker.inv()
-robot_weld.T_tool_toolmarker=Transform(np.eye(3),[0,0,0])
+# robot_weld.T_tool_toolmarker=Transform(np.eye(3),[0,0,0])
 robot_weld.robot.T_flange = robot_weld.T_tool_flange
 
-data_dir='kinematic_raw_data/test0613/'
+data_dir='kinematic_raw_data/test0516/'
 
 try:
     robot_q = np.loadtxt(data_dir+'robot_q_align.csv',delimiter=',')
