@@ -105,6 +105,68 @@ class PH_Param(object):
 
         return self.data[train_q_key]['P'],self.data[train_q_key]['H']
 
+    def compare_nominal(self,nom_P,nom_H):
+
+        X = np.linspace(min(self.train_q[:,0]), max(self.train_q[:,0]),1000)
+        Y = np.linspace(min(self.train_q[:,1]), max(self.train_q[:,1]),1000)
+        X, Y = np.meshgrid(X, Y)
+
+        # plot P
+        print("**P Variation**")
+        markdown_str=''
+        markdown_str+='||Mean (mm)|Std (mm)|\n'
+        markdown_str+='|-|-|-|\n'
+        for i in range(len(nom_P[0])):
+            p_dist = []
+            for q in self.train_q:
+                p_dist.append(np.linalg.norm(self.data[tuple(q)]['P'][:,i]-nom_P[:,i]))
+            # use linear interp to plot
+            interp = LinearNDInterpolator(self.train_q, p_dist)
+            
+            Z = interp(X, Y)
+            # plt.pcolormesh(np.degrees(X), np.degrees(Y), Z, shading='auto')
+            # plt.plot(np.degrees(self.train_q[:,0]), np.degrees(self.train_q[:,1]), "ok",ms=3, label="Training Poses (q2q3)")
+            # plt.legend()
+            # plt.colorbar()
+            # # plt.axis("equal")
+            # plt.xlabel('q2 (deg)')
+            # plt.ylabel('q3 (deg)')
+            # plt.title("Distance to Nominal (mm), P"+str(i+1))
+            # plt.show()
+
+            markdown_str+='|P'+str(i+1)+'|'+format(round(np.mean(p_dist),4),'.4f')+'|'+format(round(np.std(p_dist),4),'.4f')+'|\n'
+        print(markdown_str)
+
+        # plot H
+        print("**H Variation**")
+        markdown_str=''
+        markdown_str+='||Mean (mm)|Std (mm)|\n'
+        markdown_str+='|-|-|-|\n'
+        for i in range(len(nom_H[0])):
+            h_ang = []
+            for q in self.train_q:
+                opt_H = self.data[tuple(q)]['H'][:,i]/np.linalg.norm(self.data[tuple(q)]['H'][:,i])
+                ori_H = nom_H[:,i]/np.linalg.norm(nom_H[:,i])
+                costh = np.dot(opt_H,ori_H)
+                sinth = np.linalg.norm(np.cross(opt_H,ori_H))
+                th = np.arctan2(sinth,costh)
+                h_ang.append(np.degrees(th))
+            # use linear interp to plot
+            interp = LinearNDInterpolator(self.train_q, h_ang)
+            Z = interp(X, Y)
+            # plt.pcolormesh(np.degrees(X), np.degrees(Y), Z, shading='auto')
+            # plt.plot(np.degrees(self.train_q[:,0]), np.degrees(self.train_q[:,1]), "ok",ms=3, label="Training Poses (q2q3)")
+            # plt.legend()
+            # plt.colorbar()
+            # # plt.axis("equal")
+            # plt.xlabel('q2 (deg)')
+            # plt.ylabel('q3 (deg)')
+            # plt.title("Angle to Nominal (deg), H"+str(i+1))
+            # plt.show()
+
+            markdown_str+='|H'+str(i+1)+'|'+format(round(np.mean(h_ang),4),'.4f')+'|'+format(round(np.std(h_ang),4),'.4f')+'|\n'
+        print(markdown_str)
+
 if __name__=='__main__':
 
     PH_data_dir='PH_grad_data/test0516_R1/train_data_'
@@ -115,4 +177,10 @@ if __name__=='__main__':
         PH_q=pickle.load(file)
 
     ph_param=PH_Param()
-    ph_param.fit(PH_q,method='linear_interp')
+    ph_param.fit(PH_q,method='linear')
+
+    nom_P=np.array([[0,0,0],[150,0,0],[0,0,760],\
+                   [1082,0,200],[0,0,0],[0,0,0],[100,0,0]]).T
+    nom_H=np.array([[0,0,1],[0,1,0],[0,-1,0],\
+                   [-1,0,0],[0,-1,0],[-1,0,0]]).T
+    ph_param.compare_nominal(nom_P,nom_H)
