@@ -378,10 +378,8 @@ if robot_type!='S1':
     u,s,vT = np.linalg.svd(H)
     R = np.matmul(vT.T,u.T)
     if np.linalg.det(R)<0:
-        u,s,v = np.linalg.svd(R)
-        v=v.T
-        v[:,2] = v[:,2]*-1
-        R = np.matmul(v,u.T)
+        vT[2,:] *= -1
+        R = vT.T @ u.T
 
     t = center_B-np.dot(R,center_A)
     T_tool_toolmarker = Transform(R,t)

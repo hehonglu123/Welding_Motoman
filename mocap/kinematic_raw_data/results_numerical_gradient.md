@@ -51,6 +51,29 @@
 |Cubic Interp PH|0.0635|0.0256|0.1653|
 |RBF Interp PH|0.0635|0.0255|0.1657|
 
+(using torch)
+### Testing Data (Position)
+||Mean (mm)|Std (mm)|Max (mm)|
+|-|-|-|-|
+|Rotate PH|0.6956|0.2610|1.4805|       
+|Zero PH|0.6551|0.3926|2.2572|
+|One PH|0.8437|0.4736|3.3480|
+|Nearest PH|0.3728|0.1944|1.1399|      
+|Linear Interp PH|0.3600|0.1887|1.0196|
+|Cubic Interp PH|0.3638|0.1930|1.0241| 
+|RBF Interp PH|0.3658|0.1951|1.0410|   
+
+### Testing Data (Orientation)
+||Mean (deg)|Std (deg)|Max (deg)|      
+|-|-|-|-|
+|Rotate PH|0.0682|0.0305|0.2058|       
+|Zero PH|0.0631|0.0291|0.1962|
+|One PH|0.1191|0.0496|0.2497|
+|Nearest PH|0.0637|0.0258|0.1624|      
+|Linear Interp PH|0.0635|0.0255|0.1664|
+|Cubic Interp PH|0.0635|0.0256|0.1653| 
+|RBF Interp PH|0.0635|0.0255|0.1657|
+
 **P Variation**
 ||Mean (mm)|Std (mm)|
 |-|-|-|
