@@ -20,17 +20,23 @@ config_dir='../config/'
 # robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path='',d=0,\
 # pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',\
 # base_marker_config_file=config_dir+'MA2010_0516_marker_config.yaml',tool_marker_config_file=config_dir+'weldgun_marker_config.yaml')
+### z pointing x-axis (with 22 deg angle), y pointing y-axis
 robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path=config_dir+'torch.csv',d=15,\
 pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',\
 base_marker_config_file=config_dir+'MA2010_marker_config.yaml',tool_marker_config_file=config_dir+'weldgun_marker_config.yaml')
 
-T_base_basemarker = robot_weld.T_base_basemarker
-T_basemarker_base = T_base_basemarker.inv()
-# robot_weld.T_tool_toolmarker=Transform(np.eye(3),[0,0,0])
-# robot_weld.robot.T_flange = robot_weld.T_tool_flange
-
 # print(robot_weld.fwd(np.zeros(6)))
 # exit()
+
+T_base_basemarker = robot_weld.T_base_basemarker
+T_basemarker_base = T_base_basemarker.inv()
+robot_weld.robot.T_flange = robot_weld.T_tool_flange
+
+#### using rigid body
+# robot_weld.T_tool_toolmarker=Transform(np.eye(3),[0,0,0])
+#### using tool
+robot_weld.robot.R_tool = robot_weld.T_tool_toolmarker.R
+robot_weld.robot.p_tool = robot_weld.T_tool_toolmarker.p
 
 PH_data_dir='PH_grad_data/test0516_R1/train_data_'
 test_data_dir='kinematic_raw_data/test0516/'
@@ -188,6 +194,11 @@ for N in range(total_test_N):
     k=np.array(k)
     error_pos_baseline.append(T_tool_base.p-robot_T.p)
     error_ori_baseline.append(k*np.degrees(theta))
+
+    # if np.all(test_q-np.zeros(6)<1e-3):
+    #     print(robot_T)
+    #     print(T_tool_base)
+    #     exit()
 
     q2q3.append(np.degrees(test_q[1]+-1*test_q[2]))
     q1_all.append(np.degrees(test_q[0]))

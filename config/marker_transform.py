@@ -2,8 +2,8 @@ from general_robotics_toolbox import *
 import numpy as np
 
 # weldgun markers
-R = np.array([[0.,1,0],[0,0,1],[1,0,0]]).T
-R = R@rot([0,1,0],np.radians(-22))
+R = np.array([[0.,-1,0],[0,0,-1],[1,0,0]]).T
+R = R@rot([0,1,0],np.radians(22))
 print(R)
 T = Transform(R,[423.9483,-49.9776,0])
 T = T.inv()
