@@ -1,6 +1,6 @@
-num_layers: 42
+num_layers: 527
 num_baselayers: 0
-line_resolution: 1.3
+line_resolution: 0.1
 baselayer_thickness: 0
 point_distance: 0.5
 smooth_filter: False
