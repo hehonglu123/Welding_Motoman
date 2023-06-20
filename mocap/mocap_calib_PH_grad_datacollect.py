@@ -36,7 +36,7 @@ class CalibRobotPH:
         all_ids.append(robot.tool_rigid_id)
         self.mpl_obj = MocapFrameListener(self.mocap_cli,all_ids,'world',use_quat=True)
 
-    def run_calib(self,base_marker_config_file,rob_IP=None,ROBOT_CHOICE=None,rob_p2d=None,paths=[],rob_speed=3,waittime=1,
+    def run_datacollect(self,base_marker_config_file,rob_IP=None,ROBOT_CHOICE=None,rob_p2d=None,paths=[],rob_speed=3,waittime=1,
                   raw_data_dir='',split_motion=2):
 
         input("Press Enter and the robot will start moving.")
@@ -61,6 +61,7 @@ class CalibRobotPH:
             self.mpl_obj.run_pose_listener()
             robot_stamps,curve_exe, job_line,job_step = robot_client.execute_motion_program(mp)
             self.mpl_obj.stop_pose_listener()
+
             curve_p,curve_R,timestamps = self.mpl_obj.get_frames_traj()
 
             if len(all_robot_q) ==0:
@@ -104,6 +105,80 @@ class CalibRobotPH:
                 pickle.dump(all_mocap_stamp, handle, protocol=pickle.HIGHEST_PROTOCOL)
             with open(raw_data_dir+'_robot_timestamps_cont.pickle', 'wb') as handle:
                 pickle.dump(all_robot_stamp, handle, protocol=pickle.HIGHEST_PROTOCOL)
+    
+    def run_datacollect_sync(self,base_marker_config_file,rob_IP=None,ROBOT_CHOICE=None,rob_p2d=None,paths=[],rob_speed=3,waittime=1,
+                  raw_data_dir='',split_motion=2):
+        
+        input("Press Enter and the robot will start moving.")
+        robot_client = MotionProgramExecClient()
+
+        mp=MotionProgram(ROBOT_CHOICE='RB1',pulse2deg=self.robot.pulse2deg)
+        for test_q in paths:
+            # move robot
+            mp.MoveJ(test_q,rob_speed,0)
+            mp.setWaitTime(waittime)
+        robot_client.execute_motion_program_nonblocking(mp)
+        
+        ###streaming
+        robot_client.StartStreaming()
+        start_time=time.time()
+
+        state_flag=0
+        robot_q_align=[]
+        mocap_T_align=[]
+        
+        joint_recording=[]
+        robot_stamps=[]
+        r_pulse2deg = self.robot.pulse2deg
+        T_base_basemarker = self.robot.T_base_basemarker
+        T_basemarker_base = T_base_basemarker.inv()
+        while True:
+            if state_flag & 0x08 == 0 and time.time()-start_time>1.:
+                break
+            res, data = robot_client.receive_from_robot(0.01)
+            if res:
+                state_flag=data[16]
+                if data[18]==1: # when the robot stop
+                    if len(joint_recording)==0:
+                        self.mpl_obj.run_pose_listener()
+                    joint_angle=np.radians(np.divide(np.array(data[20:26]),r_pulse2deg))
+                    joint_recording.append(joint_angle)
+                    timestamp=data[0]+data[1]*1e-9
+                    robot_stamps.append(timestamp)
+                else:
+                    if len(joint_recording)>0:
+                        self.mpl_obj.stop_pose_listener()
+                        mocap_curve_p,mocap_curve_R,mocap_timestamps = self.mpl_obj.get_frames_traj()
+                        start_i = np.argmin(np.fabs(mocap_timestamps[self.robot.base_rigid_id]-(mocap_timestamps[self.robot.base_rigid_id][0]+waittime/5)))
+                        end_i = np.argmin(np.fabs(mocap_timestamps[self.robot.base_rigid_id]-(mocap_timestamps[self.robot.base_rigid_id][0]+waittime/5*4)))
+                        this_mocap_ori = []
+                        this_mocap_p = []
+                        base_rigid_R=mocap_curve_R[self.robot.base_rigid_id]
+                        mocap_R=mocap_curve_R[self.robot.tool_rigid_id]
+                        base_rigid_p=mocap_curve_p[self.robot.base_rigid_id]
+                        mocap_p=mocap_curve_p[self.robot.tool_rigid_id]
+                        for k in range(start_i,end_i):
+                            T_mocap_basemarker = Transform(q2R(base_rigid_R[k]),base_rigid_p[k]).inv()
+                            T_marker_mocap = Transform(q2R(mocap_R[k]),mocap_p[k])
+                            T_marker_base = T_basemarker_base*T_mocap_basemarker*T_marker_mocap
+                            this_mocap_ori.append(R2rpy(T_marker_base.R))
+                            this_mocap_p.append(T_marker_base.p)
+                        this_mocap_p = np.mean(this_mocap_p,axis=0)
+                        this_mocap_ori = R2q(rpy2R(np.mean(this_mocap_ori,axis=0)))
+                        mocap_T_align.append(np.append(this_mocap_p,this_mocap_ori))
+
+                        start_i = np.argmin(np.fabs(robot_stamps-(robot_stamps[0]+waittime/5)))
+                        end_i = np.argmin(np.fabs(robot_stamps-(robot_stamps[0]+waittime/5*4)))
+                        joint_recording = joint_recording[start_i:end_i]
+                        robot_stamps = robot_stamps[start_i:end_i]
+                        robot_q_align.append(np.mean(joint_recording,axis=0))
+                        joint_recording=[]
+                        robot_stamps=[]
+                
+        robot_client.servoMH(False)
+
+        np.savetxt(raw_data_dir+'robot_q_align.csv',robot_q_align,delimiter=',')
+        np.savetxt(raw_data_dir+'mocap_T_align.csv',mocap_T_align,delimiter=',')
 
 def calib_S1():
 
@@ -134,7 +209,7 @@ def calib_S1():
     # raw_data_dir='PH_raw_data/valid_data_2'
     #####################
 
-    calib_obj.run_calib(config_dir+'D500B_robot_default_config.yaml','192.168.1.31','ST1',turn_table.pulse2deg,q_paths,rob_speed=3,waittime=0.5,repeat_N=1\
+    calib_obj.run_datacollect(config_dir+'D500B_robot_default_config.yaml','192.168.1.31','ST1',turn_table.pulse2deg,q_paths,rob_speed=3,waittime=0.5,repeat_N=1\
                         ,raw_data_dir=raw_data_dir) # save calib config to file
     print("Collect PH data done")
 
@@ -190,7 +265,7 @@ def calib_R1():
     raw_data_dir='PH_grad_data/train_data'
     #####################
 
-    calib_obj.run_calib(config_dir+'MA2010_marker_config.yaml','192.168.1.31','RB1',robot_weld.pulse2deg,q_paths,rob_speed=rob_speed,waittime=waittime\
+    calib_obj.run_datacollect(config_dir+'MA2010_marker_config.yaml','192.168.1.31','RB1',robot_weld.pulse2deg,q_paths,rob_speed=rob_speed,waittime=waittime\
                         ,raw_data_dir=raw_data_dir) # save calib config to file
     print("Collect PH data done")
 
