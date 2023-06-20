@@ -20,7 +20,7 @@ config_dir='../config/'
 # base_marker_config_file=config_dir+'MA2010_marker_config.yaml',tool_marker_config_file=config_dir+'weldgun_marker_config.yaml')
 robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path=config_dir+'torch.csv',d=15,\
 pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',\
-base_marker_config_file=config_dir+'MA2010_marker_config_rmsecalib.yaml',tool_marker_config_file=config_dir+'weldgun_marker_config.yaml')
+base_marker_config_file=config_dir+'MA2010_0613_marker_config.yaml',tool_marker_config_file=config_dir+'weldgun_marker_config.yaml')
 
 # test_qs = np.array([[0.,0.,0.,0.,0.,0.],[0,69,57,0,0,0],[0,-68,-68,0,0,0],[-36.6018,12.4119,-12.1251,-43.3579,-45.4297,68.1203],
 #                 [21.0753,-1.8803,-27.3509,13.1122,-25.1173,-25.2466]])
@@ -43,6 +43,8 @@ for i in range(len(sample_N)):
         this_p=start_T.p+dp_vector/sample_N[i]*n
         this_q=robot_weld.inv(this_p,this_R,last_joints=sample_q[i])[0]
         test_qs.append(np.round(np.degrees(this_q),4))
+
+# test_qs=[np.zeros(6),np.zeros(6)+2,np.zeros(6)+4,np.zeros(6)+6]
 
 # print(np.array(test_qs))
 print(len(test_qs))
@@ -71,7 +73,7 @@ for N in range(repeats_N):
     for test_q in test_qs:
         # move robot
         mp.MoveJ(test_q,rob_speed,0)
-        mp.setwaitTime(waitTime)
+        mp.setWaitTime(waitTime)
 
 # Run
 # mpl_obj.run_pose_listener()
@@ -119,7 +121,15 @@ while True:
     res, data = robot_client.receive_from_robot(0.01)
     if res:
         state_flag=data[16]
-        if data[18]==1: # when the robot stop
+
+        # print(data[18])
+        # if data[18]!=0 and data[18]%2==0:
+        #     print(time.time()-start_time)
+
+        # print(np.divide(np.array(data[20:26]),r_pulse2deg))
+        # print("================")
+        
+        if data[18]!=0 and data[18]%2==0: # when the robot stop
             if len(joint_recording)==0:
                 mpl_obj.run_pose_listener()
             joint_angle=np.radians(np.divide(np.array(data[20:26]),r_pulse2deg))
@@ -128,10 +138,18 @@ while True:
             robot_stamps.append(timestamp)
         else:
             if len(joint_recording)>0:
+
+                robot_stamps=np.array(robot_stamps)
+                joint_recording=np.array(joint_recording)
                 mpl_obj.stop_pose_listener()
                 mocap_curve_p,mocap_curve_R,mocap_timestamps = mpl_obj.get_frames_traj()
+
+                print("# of Mocap Data:",len(mocap_timestamps[robot_weld.base_rigid_id]))
+                print("# of Robot Data:",len(robot_stamps))
+
                 start_i = np.argmin(np.fabs(mocap_timestamps[robot_weld.base_rigid_id]-(mocap_timestamps[robot_weld.base_rigid_id][0]+waitTime/5)))
                 end_i = np.argmin(np.fabs(mocap_timestamps[robot_weld.base_rigid_id]-(mocap_timestamps[robot_weld.base_rigid_id][0]+waitTime/5*4)))
+                print("# of Mocap Data Used:",end_i-start_i)
                 this_mocap_ori = []
                 this_mocap_p = []
                 base_rigid_R=mocap_curve_R[robot_weld.base_rigid_id]
@@ -150,13 +168,36 @@ while True:
 
                 start_i = np.argmin(np.fabs(robot_stamps-(robot_stamps[0]+waitTime/5)))
                 end_i = np.argmin(np.fabs(robot_stamps-(robot_stamps[0]+waitTime/5*4)))
+                print("# of Robot Data Used:",end_i-start_i)
                 joint_recording = joint_recording[start_i:end_i]
                 robot_stamps = robot_stamps[start_i:end_i]
                 robot_q_align.append(np.mean(joint_recording,axis=0))
                 joint_recording=[]
                 robot_stamps=[]
-        
+                mpl_obj.clear_traj()
+
+                print("Q align num:",len(robot_q_align))
+                print("mocap align num:",len(mocap_T_align))
+                print("=========================")
+
 robot_client.servoMH(False)
 
 np.savetxt(data_dir+'robot_q_align.csv',robot_q_align,delimiter=',')
 np.savetxt(data_dir+'mocap_T_align.csv',mocap_T_align,delimiter=',')
+
+print("Q align num:",len(robot_q_align))
+print("mocap align num:",len(mocap_T_align))
+
+robot_weld.robot.P = robot_weld.calib_P
+robot_weld.robot.H = robot_weld.calib_H
+robot_weld.T_tool_toolmarker=Transform(np.eye(3),[0,0,0])
+#### using tool
+robot_weld.robot.R_tool = robot_weld.T_tool_toolmarker.R
+robot_weld.robot.p_tool = robot_weld.T_tool_toolmarker.p
+
+for i in range(0,len(robot_q_align),int(len(robot_q_align)/4)):
+    rob_T = robot_weld.fwd(robot_q_align[i])
+    print(rob_T)
+    mT = mocap_T_align[i]
+    print(Transform(q2R(mT[3:]),mT[:3]))
+    print("=========================")
