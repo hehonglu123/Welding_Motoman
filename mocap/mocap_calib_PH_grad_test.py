@@ -45,9 +45,9 @@ test_robot_q = np.loadtxt(test_data_dir+'robot_q_align.csv',delimiter=',')
 test_mocap_T = np.loadtxt(test_data_dir+'mocap_T_align.csv',delimiter=',')
 assert len(test_robot_q)==len(test_mocap_T), f"Need to have the same amount of robot_q and mocap_T"
 
-with open(PH_data_dir+'calib_PH_q.pickle','rb') as file:
+with open(PH_data_dir+'calib_PH_q_torch.pickle','rb') as file:
     PH_q=pickle.load(file)
-with open(PH_data_dir+'calib_one_PH.pickle','rb') as file:
+with open(PH_data_dir+'calib_one_PH_torch.pickle','rb') as file:
     PH_q_one=pickle.load(file)
 #### all train data q
 train_q = []

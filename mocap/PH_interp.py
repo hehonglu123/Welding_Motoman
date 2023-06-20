@@ -173,7 +173,7 @@ if __name__=='__main__':
     test_data_dir='kinematic_raw_data/test0516/'
 
     import pickle
-    with open(PH_data_dir+'calib_PH_q.pickle','rb') as file:
+    with open(PH_data_dir+'calib_PH_q_torch.pickle','rb') as file:
         PH_q=pickle.load(file)
 
     ph_param=PH_Param()
