@@ -70,7 +70,7 @@ except:
     print(len(mocap_stamps))
     print(len(base_rigid_p))
 
-    mocap_start_k = 1200
+    mocap_start_k = 1400
     mocap_R = mocap_R[mocap_start_k:]
     mocap_p = mocap_p[mocap_start_k:]
     mocap_stamps = mocap_stamps[mocap_start_k:]
@@ -120,6 +120,8 @@ except:
     mocap_v_thres = 50
     dt_ave_mocap = np.mean(np.gradient(mocap_stamps))
     dK_mocap = int(timewindow/dt_ave_mocap)
+    print(dt_ave_mocap)
+    print(dK_mocap)
     mocap_v_dev = []
     mocap_stop_k = []
     v_dev_flag = False
@@ -157,7 +159,7 @@ except:
     print("Total robot stop:",len(robot_stop_k))
     print("Total mocap stop:",len(mocap_stop_k))
 
-    # assert len(robot_stop_k)==len(mocap_stop_k), f"Mocap Stop and Robot Stop should be the same."
+    assert len(robot_stop_k)==len(mocap_stop_k), f"Mocap Stop and Robot Stop should be the same."
 
     if len(robot_stop_k)!=len(mocap_stop_k):
         # change robot PH to calib PH
@@ -272,7 +274,7 @@ lambda_P = 1
 start_t = time.time()
 
 PH_q = {}
-train_set=[]
+# train_set=[]
 for N in train_set:
     print("Training #"+str(N),"at Pose (q2q3):", np.round(np.degrees(robot_q_sample[N,1:3])))
     print("Progress:",str(N)+"/"+str(total_pose),"Time Pass:",str(np.round(time.time()-start_t)))
@@ -424,8 +426,8 @@ for N in train_set:
     print("================")
 
 # get just one optimal pose
-plot_grad=True
-plot_error=True
+plot_grad=False
+plot_error=False
 pos_error_progress = []
 pos_error_norm_progress = []
 ori_error_progress = []
