@@ -99,7 +99,7 @@ robot_type='R1'
 # robot_type='S1'
 
 # all_datasets=['train_data','valid_data_1','valid_data_2']
-all_datasets=['test0516_R1_aftercalib/train_data']
+all_datasets=['test0613_R1/train_data']
 
 if robot_type=='R1':
     base_marker_config_file=config_dir+'MA2010_marker_config.yaml'
@@ -116,9 +116,9 @@ if robot_type=='R1':
 
     jN=6
 
-    output_base_marker_config_file = config_dir+'MA2010_marker_config.yaml'
+    # output_base_marker_config_file = config_dir+'MA2010_marker_config.yaml'
     # output_base_marker_config_file = config_dir+'MA2010_0516_marker_config.yaml'
-    # output_base_marker_config_file = config_dir+'MA2010_0504_marker_config.yaml'
+    output_base_marker_config_file = config_dir+'MA2010_0613_marker_config.yaml'
     # output_base_marker_config_file = config_dir+'MA2010_0504stretch_marker_config.yaml'
     # output_base_marker_config_file = config_dir+'MA2010_0504inward_marker_config.yaml'
 

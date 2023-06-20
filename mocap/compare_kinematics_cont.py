@@ -27,7 +27,7 @@ T_basemarker_base = T_base_basemarker.inv()
 # robot_weld.T_tool_toolmarker=Transform(np.eye(3),[0,0,0])
 robot_weld.robot.T_flange = robot_weld.T_tool_flange
 
-data_dir='kinematic_raw_data/test0516/'
+data_dir='kinematic_raw_data/test0613/'
 
 try:
     robot_q = np.loadtxt(data_dir+'robot_q_align.csv',delimiter=',')
@@ -65,7 +65,7 @@ except:
     print(len(mocap_stamps))
     print(len(base_rigid_p))
 
-    mocap_start_k = 850
+    mocap_start_k = 3450
     mocap_R = mocap_R[mocap_start_k:]
     mocap_p = mocap_p[mocap_start_k:]
     mocap_stamps = mocap_stamps[mocap_start_k:]
@@ -75,10 +75,10 @@ except:
     base_rigid_R=base_rigid_R[mocap_start_k:]
     base_rigid_stamps=base_rigid_stamps[mocap_start_k:]
 
-    # plt.plot(mocap_pdot_norm)
-    # plt.show()
-    # plt.plot(robot_qdot_norm)
-    # plt.show()
+    plt.plot(robot_qdot_norm)
+    plt.show()
+    plt.plot(mocap_pdot_norm)
+    plt.show()
 
     timewindow = 0.3
 
@@ -111,8 +111,8 @@ except:
     robot_stop_k.append(np.argmin(robot_v_dev[robot_stop_k[-1]+dK_robot:])+robot_stop_k[-1]+dK_robot)
     all_dkrobot.append(dK_robot)
 
-    mocap_vdev_thres = 3
-    mocap_v_thres = 10
+    mocap_vdev_thres = 5
+    mocap_v_thres = 8
     dt_ave_mocap = np.mean(np.gradient(mocap_stamps))
     dK_mocap = int(timewindow/dt_ave_mocap)
     mocap_v_dev = []
@@ -134,14 +134,14 @@ except:
     mocap_stop_k.append(np.argmin(mocap_v_dev[mocap_stop_k[-1]+dK_mocap:])+mocap_stop_k[-1]+dK_mocap)
 
     # check 
-    # plt.plot(robot_v_dev)
-    # plt.scatter(robot_stop_k,robot_v_dev[robot_stop_k])
-    # plt.plot(robot_qdot_norm,'blue')
-    # for ki in range(len(robot_stop_k)):
-    #     k=robot_stop_k[ki]
-    #     dK_robot=all_dkrobot[ki]
-    #     plt.plot(np.arange(k,k+dK_robot),robot_qdot_norm[k:k+dK_robot])
-    # plt.show()
+    plt.plot(robot_v_dev)
+    plt.scatter(robot_stop_k,robot_v_dev[robot_stop_k])
+    plt.plot(robot_qdot_norm,'blue')
+    for ki in range(len(robot_stop_k)):
+        k=robot_stop_k[ki]
+        dK_robot=all_dkrobot[ki]
+        plt.plot(np.arange(k,k+dK_robot),robot_qdot_norm[k:k+dK_robot])
+    plt.show()
     plt.plot(mocap_v_dev)
     plt.plot(mocap_pdot_norm,'blue')
     for k in mocap_stop_k:

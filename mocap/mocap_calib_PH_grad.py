@@ -20,10 +20,10 @@ Rz=np.array([0,0,1])
 config_dir='../config/'
 robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path=config_dir+'torch.csv',d=15,\
 pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',\
-base_marker_config_file=config_dir+'MA2010_marker_config.yaml',tool_marker_config_file=config_dir+'weldgun_marker_config.yaml')
+base_marker_config_file=config_dir+'MA2010_0613_marker_config.yaml',tool_marker_config_file=config_dir+'weldgun_marker_config.yaml')
 
 #### using rigid body
-# robot_weld.T_tool_toolmarker=Transform(np.eye(3),[0,0,0])
+robot_weld.T_tool_toolmarker=Transform(np.eye(3),[0,0,0])
 
 T_base_basemarker = robot_weld.T_base_basemarker
 T_basemarker_base = T_base_basemarker.inv()
@@ -32,7 +32,7 @@ robot_weld.robot.T_flange = robot_weld.T_tool_flange
 robot_weld.robot.R_tool = robot_weld.T_tool_toolmarker.R
 robot_weld.robot.p_tool = robot_weld.T_tool_toolmarker.p
 
-data_dir='PH_grad_data/test0516_R1/train_data_'
+data_dir='PH_grad_data/test0613_R1/train_data_'
 
 try:
     robot_q = np.loadtxt(data_dir+'robot_q_align.csv',delimiter=',')
@@ -71,20 +71,21 @@ except:
     print(len(base_rigid_p))
 
     mocap_start_k = 1400
-    mocap_R = mocap_R[mocap_start_k:]
-    mocap_p = mocap_p[mocap_start_k:]
-    mocap_stamps = mocap_stamps[mocap_start_k:]
-    mocap_pdot = mocap_pdot[mocap_start_k:]
-    mocap_pdot_norm = mocap_pdot_norm[mocap_start_k:]
-    base_rigid_p=base_rigid_p[mocap_start_k:]
-    base_rigid_R=base_rigid_R[mocap_start_k:]
-    base_rigid_stamps=base_rigid_stamps[mocap_start_k:]
+    mocap_end_k = -110
+    mocap_R = mocap_R[mocap_start_k:mocap_end_k]
+    mocap_p = mocap_p[mocap_start_k:mocap_end_k]
+    mocap_stamps = mocap_stamps[mocap_start_k:mocap_end_k]
+    mocap_pdot = mocap_pdot[mocap_start_k:mocap_end_k]
+    mocap_pdot_norm = mocap_pdot_norm[mocap_start_k:mocap_end_k]
+    base_rigid_p=base_rigid_p[mocap_start_k:mocap_end_k]
+    base_rigid_R=base_rigid_R[mocap_start_k:mocap_end_k]
+    base_rigid_stamps=base_rigid_stamps[mocap_start_k:mocap_end_k]
 
-    plt.plot(mocap_pdot_norm)
-    plt.show()
     plt.plot(robot_qdot_norm)
     plt.show()
-
+    plt.plot(mocap_pdot_norm)
+    plt.show()
+    
     timewindow = 0.3
 
     # the robot stop 3 sec, 
@@ -159,7 +160,7 @@ except:
     print("Total robot stop:",len(robot_stop_k))
     print("Total mocap stop:",len(mocap_stop_k))
 
-    assert len(robot_stop_k)==len(mocap_stop_k), f"Mocap Stop and Robot Stop should be the same."
+    # assert len(robot_stop_k)==len(mocap_stop_k), f"Mocap Stop and Robot Stop should be the same."
 
     if len(robot_stop_k)!=len(mocap_stop_k):
         # change robot PH to calib PH
@@ -177,9 +178,15 @@ except:
 
             find_flag = False
             for j in range(i-mocap_start_offset,i-mocap_start_offset+5):
+                if j>=len(mocap_stop_k):
+                    break
                 T_mocap_basemarker = Transform(q2R(base_rigid_R[mocap_stop_k[j]]),base_rigid_p[mocap_stop_k[j]]).inv()
                 T_marker_mocap = Transform(q2R(mocap_R[mocap_stop_k[j]]),mocap_p[mocap_stop_k[j]])
                 T_marker_base = T_basemarker_base*T_mocap_basemarker*T_marker_mocap
+                # print(rob_T)
+                # print(T_marker_base)
+                # print(np.linalg.norm(rob_T.p-T_marker_base.p))
+                # exit()
                 if np.round(np.linalg.norm(rob_T.p-T_marker_base.p))<threshold:
                     find_flag=True
                     break
@@ -191,22 +198,38 @@ except:
         all_dkrobot = np.delete(all_dkrobot,erase_robot_stop)
         
         erase_both_stop=[]
+        robot_stop_k_groups=[]
+        all_dkrobot_groups=[]
+        mocap_stop_k_groups=[]
         threshold = 1
-        for i in range(0,len(robot_stop_k),7):
+        i = 0
+        while True:
             this_robot_q = np.mean(robot_q[robot_stop_k[i]:robot_stop_k[i]+all_dkrobot[i]],axis=0)
             find_flag = False
             for j in range(i+1,i+7):
+                if j>=len(robot_stop_k):
+                    find_flag=True
+                    break
                 compare_q = np.mean(robot_q[robot_stop_k[j]:robot_stop_k[j]+all_dkrobot[j]],axis=0)
                 if np.linalg.norm(np.degrees(this_robot_q[1:3]-compare_q[1:3]))>threshold:
                     find_flag=True
                     break
-            if find_flag:
-                erase_both_stop = np.arange(i,i+7-len(erase_robot_stop))
-                print(erase_both_stop)
+            if not find_flag:
+                robot_stop_k_groups.extend(robot_stop_k[i:i+7])
+                all_dkrobot_groups.extend(all_dkrobot[i:i+7])
+                mocap_stop_k_groups.extend(mocap_stop_k[i:i+7])
+                i+=7
+            else:
+                i=j
+            
+            if i>=len(robot_stop_k):
                 break
-        robot_stop_k = np.delete(robot_stop_k,erase_both_stop)
-        all_dkrobot = np.delete(all_dkrobot,erase_both_stop)
-        mocap_stop_k = np.delete(mocap_stop_k,erase_both_stop)
+
+        robot_stop_k = robot_stop_k_groups
+        all_dkrobot = all_dkrobot_groups
+        mocap_stop_k = mocap_stop_k_groups
+
+    assert len(robot_stop_k)==len(mocap_stop_k), f"Mocap Stop and Robot Stop should be the same."
 
     robot_stop_q = []
     mocap_stop_T = []
@@ -214,7 +237,7 @@ except:
         this_robot_q = np.mean(robot_q[robot_stop_k[i]:robot_stop_k[i]+all_dkrobot[i]],axis=0)
         this_mocap_ori = []
         this_mocap_p = []
-        for k in range(mocap_stop_k[i],mocap_stop_k[i]+dK_mocap):
+        for k in range(mocap_stop_k[i],min(mocap_stop_k[i]+dK_mocap,len(base_rigid_R))):
             T_mocap_basemarker = Transform(q2R(base_rigid_R[k]),base_rigid_p[k]).inv()
             T_marker_mocap = Transform(q2R(mocap_R[k]),mocap_p[k])
             T_marker_base = T_basemarker_base*T_mocap_basemarker*T_marker_mocap
