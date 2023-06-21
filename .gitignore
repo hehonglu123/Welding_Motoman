@@ -365,6 +365,7 @@ scan/jw_example/deferred_captured_mesh/
 *.JBI
 
 mocap/**/*.pickle
+mocap/**/*_raw.csv
 data/**/*.pcd
 
 scan/data/no_base_layer.stl

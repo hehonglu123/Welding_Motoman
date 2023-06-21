@@ -156,50 +156,169 @@ Testing Data (Position) (before)
 ||Mean (mm)|Std (mm)|Max (mm)|
 |-|-|-|-|
 |Rotate PH|0.4175|0.1819|1.1863|
-|Zero PH|0.5157|0.3194|1.4236|
-|One PH|0.5157|0.3194|1.4236|
-|Nearest PH|0.5387|0.4738|3.1936|
-|Linear Interp PH|0.4984|0.4093|2.4855|   
-|Cubic Interp PH|0.5222|0.4357|2.7005|    
-|RBF Interp PH|0.5168|0.4283|2.5933| 
+|Zero PH|0.4823|0.3019|1.4235|
+|One PH|0.3914|0.1784|0.9271|
+|Nearest PH|0.4408|0.3360|1.9513|
+|Linear Interp PH|0.4137|0.2980|1.5877|
+|Cubic Interp PH|0.4296|0.3154|1.7364|
+|RBF Interp PH|0.4258|0.3112|1.6834|
 
-Testing Data (Position) (after)
+Testing Data (Position) (before,torch)
+||Mean (mm)|Std (mm)|Max (mm)|
+|-|-|-|-|
+|Rotate PH|0.5924|0.2349|1.5129|
+|Zero PH|0.7702|0.4450|2.7884|
+|One PH|1.0353|0.6902|3.0205|
+|Nearest PH|0.9260|0.7248|4.8042|
+|Linear Interp PH|0.8810|0.6453|4.1698|
+|Cubic Interp PH|0.9063|0.6832|4.3914|
+|RBF Interp PH|0.9009|0.6751|4.3475|
+
+Testing Data (Position) (after 1 week, before calib)
 ||Mean (mm)|Std (mm)|Max (mm)|
 |-|-|-|-|
 |Rotate PH|1.3012|0.2026|1.8259|
-|Zero PH|1.7827|0.2607|2.6641|
-|One PH|1.7827|0.2607|2.6641|
-|Nearest PH|1.7286|0.4025|3.9458|
-|Linear Interp PH|1.7002|0.3400|3.5902|   
-|Cubic Interp PH|1.7158|0.3630|3.7019|    
-|RBF Interp PH|1.7152|0.3561|3.6689| 
+|Zero PH|1.7500|0.2436|2.6042|
+|One PH|1.4300|0.2566|2.0515|
+|Nearest PH|1.6342|0.2835|2.9202|
+|Linear Interp PH|1.6171|0.2508|2.9010|
+|Cubic Interp PH|1.6274|0.2630|2.9098|
+|RBF Interp PH|1.6274|0.2590|2.8778|
+
+Testing Data (Position) (after 1 week, before calib, torch)
+||Mean (mm)|Std (mm)|Max (mm)|
+|-|-|-|-|
+|Rotate PH|1.8892|0.2349|2.7754|
+|Zero PH|2.4756|0.3225|4.2251|
+|One PH|2.0352|0.7781|3.4674|
+|Nearest PH|2.4998|0.6391|6.6383|
+|Linear Interp PH|2.4641|0.5670|6.0772|
+|Cubic Interp PH|2.4848|0.5951|6.2547|
+|RBF Interp PH|2.4838|0.5856|6.2117|
+
+Testing Data (Position) (after 1 week, after calib)
+||Mean (mm)|Std (mm)|Max (mm)|
+|-|-|-|-|
+|Rotate PH|0.7685|0.0956|1.0443|
+|Zero PH|1.1428|0.2204|1.9760|
+|One PH|0.9655|0.2169|1.4482|
+|Nearest PH|1.1009|0.3024|2.4021|
+|Linear Interp PH|1.0833|0.2706|2.2642|
+|Cubic Interp PH|1.0934|0.2839|2.2715|
+|RBF Interp PH|1.0919|0.2798|2.2442|
+
+Testing Data (Position) (after 1 week, after calib, torch)
+||Mean (mm)|Std (mm)|Max (mm)|
+|-|-|-|-|
+|Rotate PH|1.3045|0.1885|2.3016|
+|Zero PH|1.8487|0.3287|3.6938|
+|One PH|1.6416|0.6828|3.1236|
+|Nearest PH|1.9174|0.7218|6.3543|
+|Linear Interp PH|1.8810|0.6522|5.7697|
+|Cubic Interp PH|1.9020|0.6805|5.9607|
+|RBF Interp PH|1.9002|0.6713|5.9170|
 
 ## 0620 
 
 Training Data
 ||Mean (mm)|Std (mm)|Max (mm)|
 |-|-|-|-|
-|One PH|0.0211|0.0000|0.0211|
-|Optimize PH|0.0753|0.0507|0.3553| 
+|One PH|0.2167|0.1146|0.7157|
+|Optimize PH|0.0770|0.0508|0.3594|
 
 Testing Data (Position)
 ||Mean (mm)|Std (mm)|Max (mm)|
 |-|-|-|-|
 |Rotate PH|0.2156|0.1458|0.7073|
-|Zero PH|0.2342|0.1361|0.7053|
-|One PH|0.2342|0.1361|0.7053|
-|Nearest PH|0.3684|0.3136|1.4661|
-|Linear Interp PH|0.3350|0.2766|1.3372|   
-|Cubic Interp PH|0.3427|0.2794|1.4196|    
-|RBF Interp PH|0.3395|0.2721|1.3567|      
+|Zero PH|0.2352|0.1380|0.7154|
+|One PH|0.5444|0.3289|1.3808|
+|Nearest PH|0.2761|0.2044|1.3278|
+|Linear Interp PH|0.2530|0.1859|1.2027|
+|Cubic Interp PH|0.2595|0.1894|1.2968|
+|RBF Interp PH|0.2564|0.1828|1.2375|
 
 Testing Data (Orientation)
 ||Mean (deg)|Std (deg)|Max (deg)|
 |-|-|-|-|
 |Rotate PH|0.0760|0.0397|0.2583|
-|Zero PH|0.0834|0.0445|0.2666|
-|One PH|0.0834|0.0445|0.2666|
-|Nearest PH|0.1146|0.0770|0.3622|
-|Linear Interp PH|0.1092|0.0698|0.3548|   
-|Cubic Interp PH|0.1113|0.0715|0.3531|    
-|RBF Interp PH|0.1106|0.0701|0.3523|
+|Zero PH|0.0824|0.0440|0.2667|
+|One PH|0.1637|0.0915|0.4145|
+|Nearest PH|0.0986|0.0526|0.2675|
+|Linear Interp PH|0.0955|0.0492|0.2552|
+|Cubic Interp PH|0.0970|0.0504|0.2603|
+|RBF Interp PH|0.0966|0.0493|0.2593|
+
+Testing Data (Position) (torch)
+||Mean (mm)|Std (mm)|Max (mm)|
+|-|-|-|-|
+|Rotate PH|0.3807|0.2312|1.2319|
+|Zero PH|0.4088|0.2282|1.2880|
+|One PH|1.2381|0.7869|3.4310|
+|Nearest PH|0.6765|0.5126|2.8029|
+|Linear Interp PH|0.6361|0.4622|2.6026|
+|Cubic Interp PH|0.6510|0.4751|2.7714|
+|RBF Interp PH|0.6475|0.4595|2.6637|
+
+Testing Data (Orientation) (torch)
+||Mean (deg)|Std (deg)|Max (deg)|
+|-|-|-|-|
+|Rotate PH|0.0760|0.0397|0.2583|
+|Zero PH|0.0824|0.0440|0.2667|
+|One PH|0.1637|0.0915|0.4145|
+|Nearest PH|0.0986|0.0526|0.2675|
+|Linear Interp PH|0.0955|0.0492|0.2552|
+|Cubic Interp PH|0.0970|0.0504|0.2603|
+|RBF Interp PH|0.0966|0.0493|0.2593|
+
+## 0621
+
+Training Data
+||Mean (mm)|Std (mm)|Max (mm)|
+|-|-|-|-|
+|One PH|0.2363|0.1289|0.8810|
+|Optimize PH|0.0910|0.0480|0.3778|
+
+Testing Data (Position)
+||Mean (mm)|Std (mm)|Max (mm)|
+|-|-|-|-|
+|Rotate PH|0.5761|0.2485|1.1654|
+|Zero PH|0.6521|0.2810|1.2294|
+|One PH|0.7860|0.5712|2.3508|
+|Nearest PH|0.3973|0.1837|0.9046|
+|Linear Interp PH|0.3913|0.1739|0.8530|
+|Cubic Interp PH|0.3954|0.1784|0.8621|
+|RBF Interp PH|0.3949|0.1793|0.8675|
+
+Testing Data (Orientation)
+||Mean (deg)|Std (deg)|Max (deg)|
+|-|-|-|-|
+|Rotate PH|0.0671|0.0328|0.2381|
+|Zero PH|0.0661|0.0308|0.2281|
+|One PH|0.1131|0.0644|0.3152|
+|Nearest PH|0.0684|0.0344|0.2320|
+|Linear Interp PH|0.0681|0.0342|0.2368|
+|Cubic Interp PH|0.0683|0.0343|0.2372|
+|RBF Interp PH|0.0683|0.0342|0.2371|
+
+Testing Data (Position) (torch)
+||Mean (mm)|Std (mm)|Max (mm)|
+|-|-|-|-|
+|Rotate PH|0.7075|0.3339|1.6284|
+|Zero PH|0.7802|0.3709|1.7224|
+|One PH|1.0171|0.6622|2.8564|
+|Nearest PH|0.5342|0.2424|1.2982|
+|Linear Interp PH|0.5272|0.2339|1.2782|
+|Cubic Interp PH|0.5314|0.2367|1.2986|
+|RBF Interp PH|0.5318|0.2363|1.3002|
+
+Testing Data (Orientation) (torch)
+||Mean (deg)|Std (deg)|Max (deg)|
+|-|-|-|-|
+|Rotate PH|0.0671|0.0328|0.2381|
+|Zero PH|0.0661|0.0308|0.2281|
+|One PH|0.1131|0.0644|0.3152|
+|Nearest PH|0.0684|0.0344|0.2320|
+|Linear Interp PH|0.0681|0.0342|0.2368|
+|Cubic Interp PH|0.0683|0.0343|0.2372|
+|RBF Interp PH|0.0683|0.0342|0.2371|
+
