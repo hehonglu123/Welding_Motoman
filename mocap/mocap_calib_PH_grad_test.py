@@ -23,7 +23,7 @@ config_dir='../config/'
 ### z pointing x-axis (with 22 deg angle), y pointing y-axis
 robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path=config_dir+'torch.csv',d=15,\
 pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',\
-base_marker_config_file=config_dir+'MA2010_marker_config.yaml',tool_marker_config_file=config_dir+'weldgun_marker_config.yaml')
+base_marker_config_file=config_dir+'MA2010_0613_marker_config.yaml',tool_marker_config_file=config_dir+'weldgun_marker_config.yaml')
 
 # print(robot_weld.fwd(np.zeros(6)))
 # exit()
@@ -33,21 +33,21 @@ T_basemarker_base = T_base_basemarker.inv()
 robot_weld.robot.T_flange = robot_weld.T_tool_flange
 
 #### using rigid body
-# robot_weld.T_tool_toolmarker=Transform(np.eye(3),[0,0,0])
+robot_weld.T_tool_toolmarker=Transform(np.eye(3),[0,0,0])
 #### using tool
 robot_weld.robot.R_tool = robot_weld.T_tool_toolmarker.R
 robot_weld.robot.p_tool = robot_weld.T_tool_toolmarker.p
 
-PH_data_dir='PH_grad_data/test0516_R1/train_data_'
-test_data_dir='kinematic_raw_data/test0516/'
+PH_data_dir='PH_grad_data/test0613_R1/train_data_'
+test_data_dir='kinematic_raw_data/test0613/'
 
 test_robot_q = np.loadtxt(test_data_dir+'robot_q_align.csv',delimiter=',')
 test_mocap_T = np.loadtxt(test_data_dir+'mocap_T_align.csv',delimiter=',')
 assert len(test_robot_q)==len(test_mocap_T), f"Need to have the same amount of robot_q and mocap_T"
 
-with open(PH_data_dir+'calib_PH_q_torch.pickle','rb') as file:
+with open(PH_data_dir+'calib_PH_q.pickle','rb') as file:
     PH_q=pickle.load(file)
-with open(PH_data_dir+'calib_one_PH_torch.pickle','rb') as file:
+with open(PH_data_dir+'calib_one_PH.pickle','rb') as file:
     PH_q_one=pickle.load(file)
 #### all train data q
 train_q = []
