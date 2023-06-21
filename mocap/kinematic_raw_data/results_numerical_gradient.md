@@ -173,3 +173,33 @@ Testing Data (Position) (after)
 |Linear Interp PH|1.7002|0.3400|3.5902|   
 |Cubic Interp PH|1.7158|0.3630|3.7019|    
 |RBF Interp PH|1.7152|0.3561|3.6689| 
+
+## 0620 
+
+Training Data
+||Mean (mm)|Std (mm)|Max (mm)|
+|-|-|-|-|
+|One PH|0.0211|0.0000|0.0211|
+|Optimize PH|0.0753|0.0507|0.3553| 
+
+Testing Data (Position)
+||Mean (mm)|Std (mm)|Max (mm)|
+|-|-|-|-|
+|Rotate PH|0.2156|0.1458|0.7073|
+|Zero PH|0.2342|0.1361|0.7053|
+|One PH|0.2342|0.1361|0.7053|
+|Nearest PH|0.3684|0.3136|1.4661|
+|Linear Interp PH|0.3350|0.2766|1.3372|   
+|Cubic Interp PH|0.3427|0.2794|1.4196|    
+|RBF Interp PH|0.3395|0.2721|1.3567|      
+
+Testing Data (Orientation)
+||Mean (deg)|Std (deg)|Max (deg)|
+|-|-|-|-|
+|Rotate PH|0.0760|0.0397|0.2583|
+|Zero PH|0.0834|0.0445|0.2666|
+|One PH|0.0834|0.0445|0.2666|
+|Nearest PH|0.1146|0.0770|0.3622|
+|Linear Interp PH|0.1092|0.0698|0.3548|   
+|Cubic Interp PH|0.1113|0.0715|0.3531|    
+|RBF Interp PH|0.1106|0.0701|0.3523|
