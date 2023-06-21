@@ -138,8 +138,9 @@ class CalibRobotPH:
             res, data = robot_client.receive_from_robot(0.01)
             if res:
                 state_flag=data[16]
-                if data[18]==1: # when the robot stop
+                if data[18]!=0 and data[18]%2==0: # when the robot stop
                     if len(joint_recording)==0:
+                        print("Start collect")
                         self.mpl_obj.run_pose_listener()
                     joint_angle=np.radians(np.divide(np.array(data[20:26]),r_pulse2deg))
                     joint_recording.append(joint_angle)
@@ -147,10 +148,17 @@ class CalibRobotPH:
                     robot_stamps.append(timestamp)
                 else:
                     if len(joint_recording)>0:
+                        robot_stamps=np.array(robot_stamps)
+                        joint_recording=np.array(joint_recording)
                         self.mpl_obj.stop_pose_listener()
                         mocap_curve_p,mocap_curve_R,mocap_timestamps = self.mpl_obj.get_frames_traj()
+
+                        print("# of Mocap Data:",len(mocap_timestamps[self.robot.base_rigid_id]))
+                        print("# of Robot Data:",len(robot_stamps))
+
                         start_i = np.argmin(np.fabs(mocap_timestamps[self.robot.base_rigid_id]-(mocap_timestamps[self.robot.base_rigid_id][0]+waittime/5)))
                         end_i = np.argmin(np.fabs(mocap_timestamps[self.robot.base_rigid_id]-(mocap_timestamps[self.robot.base_rigid_id][0]+waittime/5*4)))
+                        print("# of Mocap Data Used:",end_i-start_i)
                         this_mocap_ori = []
                         this_mocap_p = []
                         base_rigid_R=mocap_curve_R[self.robot.base_rigid_id]
@@ -169,16 +177,25 @@ class CalibRobotPH:
 
                         start_i = np.argmin(np.fabs(robot_stamps-(robot_stamps[0]+waittime/5)))
                         end_i = np.argmin(np.fabs(robot_stamps-(robot_stamps[0]+waittime/5*4)))
+                        print("# of Robot Data Used:",end_i-start_i)
                         joint_recording = joint_recording[start_i:end_i]
                         robot_stamps = robot_stamps[start_i:end_i]
                         robot_q_align.append(np.mean(joint_recording,axis=0))
                         joint_recording=[]
                         robot_stamps=[]
+                        self.mpl_obj.clear_traj()
+
+                        print("Q align num:",len(robot_q_align))
+                        print("mocap align num:",len(mocap_T_align))
+                        print("=========================")
                 
         robot_client.servoMH(False)
 
-        np.savetxt(raw_data_dir+'robot_q_align.csv',robot_q_align,delimiter=',')
-        np.savetxt(raw_data_dir+'mocap_T_align.csv',mocap_T_align,delimiter=',')
+        np.savetxt(raw_data_dir+'_robot_q_align.csv',robot_q_align,delimiter=',')
+        np.savetxt(raw_data_dir+'_mocap_T_align.csv',mocap_T_align,delimiter=',')
+
+        print("Q align num:",len(robot_q_align))
+        print("mocap align num:",len(mocap_T_align))
 
 def calib_S1():
 
@@ -265,7 +282,7 @@ def calib_R1():
     raw_data_dir='PH_grad_data/train_data'
     #####################
 
-    calib_obj.run_datacollect(config_dir+'MA2010_marker_config.yaml','192.168.1.31','RB1',robot_weld.pulse2deg,q_paths,rob_speed=rob_speed,waittime=waittime\
+    calib_obj.run_datacollect_sync(config_dir+'MA2010_marker_config.yaml','192.168.1.31','RB1',robot_weld.pulse2deg,q_paths,rob_speed=rob_speed,waittime=waittime\
                         ,raw_data_dir=raw_data_dir) # save calib config to file
     print("Collect PH data done")
 
