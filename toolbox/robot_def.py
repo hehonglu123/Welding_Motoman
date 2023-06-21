@@ -194,7 +194,7 @@ class robot_obj(object):
 
 		if q_all.ndim==1:
 			q=q_all
-			q = np.array(q)-self.calib_zero_config
+			# q = np.array(q)-self.calib_zero_config
 			pose_temp=fwdkin(self.robot,q)
 
 			if world:
