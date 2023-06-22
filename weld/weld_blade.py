@@ -44,9 +44,8 @@ q1_all=[]
 q2_all=[]
 v1_all=[]
 cond_all=[]
+primitives=[]
 ###########################################base layer welding############################################
-
-###baselayer
 # num_baselayer=2
 # q_prev=np.array([-3.791547245558870571e-01,7.167996965635117235e-01,2.745092098742105691e-01,2.111291009755724701e-01,-7.843516348888318612e-01,-5.300740197588397207e-01])
 # mp=MotionProgram(ROBOT_CHOICE='RB1',ROBOT_CHOICE2='ST1',pulse2deg=robot.pulse2deg,pulse2deg_2=positioner.pulse2deg, tool_num = 12)
@@ -76,10 +75,10 @@ cond_all=[]
 
 # 		s1_all,_=calc_individual_speed(vd_relative,lam1,lam2,lam_relative,breakpoints)
 
-
+# 		primitives.extend(['movej']+['movel']*(num_points_layer+1))
 # 		q1_all.extend([q_start]+curve_sliced_js[breakpoints].tolist()+[q_end])
 # 		q2_all.extend([positioner_js[breakpoints[0]]]+positioner_js[breakpoints].tolist()+[positioner_js[breakpoints[-1]]])
-# 		v1_all.extend([1]+s1_all+[s1_all[-1]])
+# 		v1_all.extend([1]+[s1_all[0]]+s1_all+[s1_all[-1]])
 # 		cond_all.extend([0]+[220]*(num_points_layer+1))					###extended baselayer welding
 		
 
@@ -133,25 +132,26 @@ for layer in range(num_layer_start,num_layer_end,layer_height_num):
 		
 		###move to intermidieate waypoint for collision avoidance if multiple section
 		if num_sections>1 or num_sections<num_sections_prev:
-			target2=['MOVJ',np.degrees(positioner_js[breakpoints[0]]),30]
 			waypoint_pose=robot.fwd(curve_sliced_js[breakpoints[0]])
 			waypoint_pose.p[-1]+=30
 			waypoint_q=robot.inv(waypoint_pose.p,waypoint_pose.R,curve_sliced_js[breakpoints[0]])[0]
 
 			q1_all.append(waypoint_q)
 			q2_all.append(positioner_js[breakpoints[0]])
-			v1_all.append(25)
+			v1_all.append(1)
 			cond_all.append(0)
+			primitives.append('movej')
 
 		q1_all.extend(curve_sliced_js[breakpoints].tolist())
 		q2_all.extend(positioner_js[breakpoints].tolist())
-		v1_all.extend([30]+s1_all[1:])
+		v1_all.extend([1]+s1_all)
 		cond_all.extend([0]+[210]*(num_points_layer-1))
+		primitives.extend(['movej']+['movel']*(num_points_layer-1))
 
 
 		q_prev=curve_sliced_js[breakpoints[-1]]
 	
 
 
-timestamp_robot,joint_recording,job_line,_=ws.weld_segment_dual(robot,positioner,q1_all,q2_all,v1_all,np.zeros(len(v1_all)),cond_all,arc=True)
+timestamp_robot,joint_recording,job_line,_=ws.weld_segment_dual(primitives,robot,positioner,q1_all,q2_all,v1_all,10*np.ones(len(v1_all)),cond_all,arc=True)
 np.savetxt('joint_recording.csv',np.hstack((timestamp_robot.reshape(-1, 1),job_line.reshape(-1, 1),joint_recording)),delimiter=',')

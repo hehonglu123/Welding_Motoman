@@ -97,16 +97,18 @@ for layer in range(num_layer_start,num_layer_end,layer_height_num):
 			q2=positioner_js[breakpoints[0]]
 			ws.jog_dual(robot,positioner,q1,q2)
 
-		q1_all=[]
-		q2_all=[]
-		v1_all=[]
-		v2_all=[]
-		for j in range(len(breakpoints)):
+		q1_all=[curve_sliced_js[breakpoints[0]]]
+		q2_all=[positioner_js[breakpoints[0]]]
+		v1_all=[1]
+		v2_all=[1]
+		primitives=['movej']
+		for j in range(1,len(breakpoints)):
 			q1_all.append(curve_sliced_js[breakpoints[j]])
 			q2_all.append(positioner_js[breakpoints[j]])
-			v1_all.append(max(s1_all[j],0.1))
+			v1_all.append(max(s1_all[j-1],0.1))
 			positioner_w=vd_relative/np.linalg.norm(curve_sliced_relative[breakpoints[j]][:2])
 			v2_all.append(min(100,100*positioner_w/positioner.joint_vel_limit[1]))
+			primitives.append('movel')
 
 		q_prev=positioner_js[breakpoints[-1]]
 	
@@ -121,7 +123,7 @@ for layer in range(num_layer_start,num_layer_end,layer_height_num):
 			feedrate=[]
 			energy=[]
 
-		timestamp_robot,joint_recording,job_line,_=ws.weld_segment_dual(robot,positioner,q1_all,q2_all,v1_all[1:],v2_all[1:],cond_all=[210],arc=False)
+		timestamp_robot,joint_recording,job_line,_=ws.weld_segment_dual(primitives,robot,positioner,q1_all,q2_all,v1_all,v2_all,cond_all=[210],arc=True)
 
 		if logging:
 			np.savetxt(local_recorded_dir +'welder_info.csv',

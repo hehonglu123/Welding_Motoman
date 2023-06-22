@@ -20,41 +20,50 @@ class WeldSend(object):
 	
 	def jog_dual(self,robot1,robot2,q1,q2,v=1):
 		mp=MotionProgram(ROBOT_CHOICE=self.ROBOT_CHOICE_MAP[robot1.robot_name],ROBOT_CHOICE2=self.ROBOT_CHOICE_MAP[robot2.robot_name],pulse2deg=robot1.pulse2deg,pulse2deg_2=robot2.pulse2deg, tool_num=self.ROBOT_TOOL_MAP[robot1.robot_name])
-		mp.MoveJ(np.degrees(q1),v,None,target2=['MOVJ',np.degrees(q2),1,0])
+		mp.MoveJ(np.degrees(q1),v,None,target2=['MOVJ',np.degrees(q2),1])
 		self.client.execute_motion_program(mp)
 
-	def weld_segment_single(self,robot,q_all,v_all,cond_all,arc=False):
+	def weld_segment_single(self,primitives,robot,q_all,v_all,cond_all,arc=False):
 		###single arm weld segment 
 		#q_all: list of joint angles (N x 6)
-		#v_all: list of segment speed (N-1 x 1)
-		#cond_all: list of job number (N-1 x 1) or (1,), 0 refers to off
+		#v_all: list of segment speed (N x 1)
+		#cond_all: list of job number (N x 1) or (1,), 0 refers to off
 		q_all=np.degrees(q_all)
 		arcof=True
 		
 		mp=MotionProgram(ROBOT_CHOICE=self.ROBOT_CHOICE_MAP[robot.robot_name],pulse2deg=robot.pulse2deg, tool_num=self.ROBOT_TOOL_MAP[robot.robot_name])
-		mp.MoveJ(q_all[0],1,None)
+		mp.primitive_call(primitives[0],q_all[0],v_all[0])
 		if arc:
-			mp.setArc(True,cond_num=cond_all[0])
-			arcof=False
+			if len(cond_all)==1: 
+				mp.setArc(True,cond_num=cond_all[0])
+				arcof=False
+			else:
+				if cond_all[1]!=0:
+					mp.setArc(True,cond_num=cond_all[1])
+					arcof=False
+
+
 		for i in range(1,len(q_all)):
-			mp.MoveL(q_all[i],v_all[i-1],None)
-			if len(cond_all)>1 and arc:
+			if len(cond_all)>1 and arc and i>1:
 				if arcof:
-					if cond_all[i-1]!=0:
-						mp.setArc(True, cond_all[i-1])
+					if cond_all[i]!=0:
+						mp.setArc(True, cond_all[i])
 						arcof=False
 				else:
-					if cond_all[i-1]==0:
+					if cond_all[i]==0:
 						mp.setArc(False)
-					else:
-						mp.changeArc(cond_all[i-1])
-		if arc:
-			mp.setArc(False)
-		self.client.execute_motion_program(mp)
+						arcof=True
+					elif cond_all[i]!=cond_all[i-1]:
+						mp.changeArc(cond_all[i])
 
-	def weld_segment_dual(self,robot1,robot2,q1_all,q2_all,v1_all,v2_all,cond_all,arc=False):
-		print(len(q1_all),len(q2_all),len(v1_all),len(v2_all))
-		###robot+positioner weld segment 
+			mp.primitive_call(primitives[i],q_all[i],v_all[i])
+			
+		if arc and not arcof:
+			mp.setArc(False)
+		return self.client.execute_motion_program(mp)
+
+	def weld_segment_dual(self,primitives,robot1,robot2,q1_all,q2_all,v1_all,v2_all,cond_all,arc=False):
+		###robot+positioner weld segment, MOVEJ + MOVEL x (N-1)
 		#q1_all: list of robot joint angles (N x 6)
 		#q2_all: list of positioenr joint angles (N x 2)
 		#v1_all: list of 1segment speed (N x 1)
@@ -66,7 +75,7 @@ class WeldSend(object):
 		arcof=True
 
 		mp=MotionProgram(ROBOT_CHOICE=self.ROBOT_CHOICE_MAP[robot1.robot_name],ROBOT_CHOICE2=self.ROBOT_CHOICE_MAP[robot2.robot_name],pulse2deg=robot1.pulse2deg,pulse2deg_2=robot2.pulse2deg, tool_num=self.ROBOT_TOOL_MAP[robot1.robot_name])
-		mp.MoveJ(q1_all[0], v1_all[0],None,target2=['MOVJ',q2_all[0],1,0])
+		mp.primitive_call_dual(primitives[0],q1_all[0],v1_all[0],target2=['MOVJ',q2_all[0],v2_all[0]])
 		if arc:
 			if len(cond_all)==1: 
 				mp.setArc(True,cond_num=cond_all[0])
@@ -87,10 +96,10 @@ class WeldSend(object):
 					if cond_all[i]==0:
 						mp.setArc(False)
 						arcof=True
-					else:
+					elif cond_all[i]!=cond_all[i-1]:
 						mp.changeArc(cond_all[i])
 
-			mp.MoveL(q1_all[i],v1_all[i-1],None,target2=['MOVJ',q2_all[i],v2_all[i-1],0])
+			mp.primitive_call_dual(primitives[i],q1_all[i],v1_all[i],target2=['MOVJ',q2_all[i],v2_all[i]])
 			
 		if arc and not arcof:
 			mp.setArc(False)
