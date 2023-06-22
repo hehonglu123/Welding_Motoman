@@ -1,4 +1,4 @@
-import wave
+import wave, time
 from RobotRaconteur.Client import *
 import numpy as np
 import matplotlib.pyplot as plt
@@ -6,26 +6,28 @@ import matplotlib.pyplot as plt
 samplerate = 44000
 channels = 1
 
+audio_recording=[]
+def new_frame(pipe_ep):
+    global audio_recording
+    #Loop to get the newest frame
+    while (pipe_ep.Available > 0):
+        #Receive the packet
+        audio_recording.extend(pipe_ep.ReceivePacket().audio_data)
+
 
 c = RRN.ConnectService('rr+tcp://192.168.55.20:60828?service=microphone')
 
-print("Begin recording")
-recording = c.capture_microphone(10)
-print("End recording")
-
-audio=[]
-for a in recording:
-    for audio_data in a.audio_data:
-        audio.append(a.audio_data)
+p = c.microphone_stream.Connect(-1)
 
 
-first_channel = np.concatenate([a1[0] for a1 in audio])
+p.PacketReceivedEvent+=new_frame
+now=time.time()
+input("press enter to quit")
+print('recorded time: ',time.time()-now)
+
+first_channel = np.concatenate(audio_recording)
 
 first_channel_int16=(first_channel*32767).astype(np.int16)
-plt.plot(first_channel_int16)
-plt.show()
-print(first_channel.shape)
-
 with wave.open('output.wav', 'wb') as wav_file:
     # Set the WAV file parameters
     wav_file.setnchannels(channels)
@@ -34,5 +36,3 @@ with wave.open('output.wav', 'wb') as wav_file:
 
     # Write the audio data to the WAV file
     wav_file.writeframes(first_channel_int16.tobytes())
-
-print('saving finished')

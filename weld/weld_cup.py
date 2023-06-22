@@ -52,8 +52,8 @@ client=MotionProgramExecClient()
 ws=WeldSend(client)
 
 ###########################################layer welding############################################
-num_layer_start=int(30*layer_height_num)
-num_layer_end=int(42*layer_height_num)
+num_layer_start=int(0*layer_height_num)
+num_layer_end=int(1*layer_height_num)
 # q_prev=client.getJointAnglesDB(positioner.pulse2deg)
 q_prev=np.array([9.53E-02,-2.71E+00])
 
@@ -123,7 +123,7 @@ for layer in range(num_layer_start,num_layer_end,layer_height_num):
 			feedrate=[]
 			energy=[]
 
-		timestamp_robot,joint_recording,job_line,_=ws.weld_segment_dual(primitives,robot,positioner,q1_all,q2_all,v1_all,v2_all,cond_all=[210],arc=True)
+		timestamp_robot,joint_recording,job_line,_=ws.weld_segment_dual(primitives,robot,positioner,q1_all,q2_all,v1_all,v2_all,cond_all=[210],arc=False)
 
 		if logging:
 			np.savetxt(local_recorded_dir +'welder_info.csv',

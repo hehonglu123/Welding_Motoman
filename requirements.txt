@@ -3,7 +3,6 @@ RobotRaconteurCompanion
 tesseract_robotics
 tesseract_robotics_viewer
 sounddevice
-pickle
 numpy
 scipy
 pyyaml
