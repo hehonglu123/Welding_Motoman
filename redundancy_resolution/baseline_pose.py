@@ -10,16 +10,17 @@ def main():
 	dataset='cup/'
 	sliced_alg='circular_slice_shifted/'
 	data_dir='../data/'+dataset+sliced_alg
-	num_layers=53
+	with open(data_dir+'slicing.yml', 'r') as file:
+		slicing_meta = yaml.safe_load(file)
+
 	base_thickness=3
-	num_baselayers=0
 	curve_sliced=[]
-	for i in range(num_layers):
+	for i in range(slicing_meta['num_layers']):
 		###get number of disconnected sections
 		num_sections=len(glob.glob(data_dir+'curve_sliced/slice'+str(i)+'_*.csv'))
 		curve_sliced_ith_layer=[]
 		for x in range(num_sections):
-			curve_sliced_ith_layer.append(np.loadtxt(data_dir+'curve_sliced/slice'+str(i)+'_'+str(x)+'.csv',delimiter=','))
+			curve_sliced_ith_layer.append(np.loadtxt(data_dir+'curve_sliced/slice'+str(i)+'_'+str(x)+'.csv',delimiter=',').reshape((-1,6)))
 
 		curve_sliced.append(curve_sliced_ith_layer)
 
@@ -34,8 +35,16 @@ def main():
 	q_seed=np.radians([-35.4291,56.6333,40.5194,4.5177,-52.2505,-11.6546])
 
 	rr=redundancy_resolution(robot,positioner,curve_sliced)
-	H=rr.baseline_pose(vec=np.array([-0.95,0.31224989992]))
-	H[2,-1]+=num_baselayers*base_thickness
+	# H=rr.baseline_pose(vec=np.array([-0.95,0.31224989992]))
+
+	if slicing_meta['H'] is not None:
+		H=np.array(slicing_meta['H'])
+	elif slicing_meta['placing_vector'] is not None:
+		H=rr.baseline_pose(vec=slicing_meta['placing_vector'])
+	else:
+		H=rr.baseline_pose()
+	
+	H[2,-1]+=slicing_meta['num_baselayers']*slicing_meta['baselayer_thickness']
 
 	np.savetxt(data_dir+'curve_pose.csv',H,delimiter=',')
 
@@ -68,18 +77,18 @@ def main():
 	
 	###base layer appendant
 	curve_sliced_relative_base=[]
-	for i in range(num_baselayers):
+	for i in range(slicing_meta['num_baselayers']):
 		curve_sliced_relative_base.append(copy.deepcopy(curve_sliced_relative[0]))
 		for x in range(len(curve_sliced_relative[0])):
 
-			curve_sliced_relative_base[-1][x][:,2]-=(num_baselayers-i)*base_thickness
+			curve_sliced_relative_base[-1][x][:,2]-=(slicing_meta['num_baselayers']-i)*base_thickness
 			ax.plot3D(curve_sliced_relative_base[i][x][::vis_step,0],curve_sliced_relative_base[i][x][::vis_step,1],curve_sliced_relative_base[i][x][::vis_step,2],'r.-')
 			ax.quiver(curve_sliced_relative_base[i][x][::vis_step,0],curve_sliced_relative_base[i][x][::vis_step,1],curve_sliced_relative_base[i][x][::vis_step,2],curve_sliced_relative_base[i][x][::vis_step,3],curve_sliced_relative_base[i][x][::vis_step,4],curve_sliced_relative_base[i][x][::vis_step,5],length=0.3, normalize=True)
 	
 			np.savetxt(data_dir+'curve_sliced_relative/baselayer'+str(i)+'_'+str(x)+'.csv',curve_sliced_relative_base[i][x],delimiter=',')
 
 
-	plt.title(dataset[:-1]+' first '+str(num_layers)+' slices')
+	plt.title(dataset[:-1]+' first '+str(slicing_meta['num_layers'])+' slices')
 	plt.show()
 
 
