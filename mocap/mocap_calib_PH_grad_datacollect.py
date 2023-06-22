@@ -126,6 +126,9 @@ class CalibRobotPH:
         state_flag=0
         robot_q_align=[]
         mocap_T_align=[]
+
+        robot_q_raw=[]
+        mocap_T_raw=[]
         
         joint_recording=[]
         robot_stamps=[]
@@ -168,7 +171,9 @@ class CalibRobotPH:
                         for k in range(start_i,end_i):
                             T_mocap_basemarker = Transform(q2R(base_rigid_R[k]),base_rigid_p[k]).inv()
                             T_marker_mocap = Transform(q2R(mocap_R[k]),mocap_p[k])
-                            T_marker_base = T_basemarker_base*T_mocap_basemarker*T_marker_mocap
+                            T_marker_basemarker = T_mocap_basemarker*T_marker_mocap
+                            mocap_T_raw.append(np.append(T_marker_basemarker.p,R2q(T_marker_basemarker.R)))
+                            T_marker_base = T_basemarker_base*T_marker_basemarker
                             this_mocap_ori.append(R2rpy(T_marker_base.R))
                             this_mocap_p.append(T_marker_base.p)
                         this_mocap_p = np.mean(this_mocap_p,axis=0)
@@ -187,15 +192,18 @@ class CalibRobotPH:
 
                         print("Q align num:",len(robot_q_align))
                         print("mocap align num:",len(mocap_T_align))
+                        print("mocap raw num:",len(mocap_T_raw))
                         print("=========================")
                 
         robot_client.servoMH(False)
 
         np.savetxt(raw_data_dir+'_robot_q_align.csv',robot_q_align,delimiter=',')
         np.savetxt(raw_data_dir+'_mocap_T_align.csv',mocap_T_align,delimiter=',')
+        np.savetxt(raw_data_dir+'_mocap_T_raw.csv',mocap_T_raw,delimiter=',')
 
         print("Q align num:",len(robot_q_align))
         print("mocap align num:",len(mocap_T_align))
+        print("mocap raw num:",len(mocap_T_raw))
 
 def calib_S1():
 
@@ -232,10 +240,12 @@ def calib_S1():
 
 def calib_R1():
 
+    dataset_date = '0621'
+
     config_dir='../config/'
     robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path=config_dir+'torch.csv',\
 	pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',\
-    base_marker_config_file=config_dir+'MA2010_marker_config.yaml',tool_marker_config_file=config_dir+'weldgun_marker_config.yaml')
+    base_marker_config_file=config_dir+'MA2010_'+dataset_date+'_marker_config.yaml',tool_marker_config_file=config_dir+'weldgun_'+dataset_date+'_marker_config.yaml')
 
     mocap_url = 'rr+tcp://localhost:59823?service=optitrack_mocap'
     mocap_cli = RRN.ConnectService(mocap_url)
@@ -249,19 +259,19 @@ def calib_R1():
     q3_low_sample = np.array([[-55,-70],[0,-50],[50,0]]) #[[q2 q3]]
     d_angle = 5 # 5 degree
     # add 7 points (at least 6 is needed)
-    # dq_sample = [[0,0,0,0,0,0],\
-    #       [-1,0,0,0,0,0],[1,0,0,0,0,0],\
-    #       [0,-1,-1,0,0,0],[0,-1,1,0,0,0],\
-    #       [0,1,1,0,0,0],[0,1,-1,0,0,0]]
+    dq_sample = [[0,0,0,0,0,0],\
+          [-1,0,0,0,0,0],[1,0,0,0,0,0],\
+          [0,-1,-1,0,0,0],[0,-1,1,0,0,0],\
+          [0,1,1,0,0,0],[0,1,-1,0,0,0]]
     # dq_sample = [[0,0,0,0,0,0],\
     #       [-9,0,0,-9,-9,9],[-6,0,0,-6,-6,6],\
     #       [-3,0,0,-3,-3,3],[4,0,0,4,4,-4],\
     #       [8,0,0,8,8,-8],[12,0,0,12,12,-12]]
-    dq_sample = [[0,0,0,0,0,0],\
-          [-3,0,0,-3,-3,3],[-2,0,0,-2,-2,2],\
-          [-1,0,0,-1,-1,1],[1,0,0,1,1,-1],\
-          [2,0,0,2,2,-2],[3,0,0,3,3,-3]]
-    scale=2
+    # dq_sample = [[0,0,0,0,0,0],\
+    #       [-3,0,0,-3,-3,3],[-2,0,0,-2,-2,2],\
+    #       [-1,0,0,-1,-1,1],[1,0,0,1,1,-1],\
+    #       [2,0,0,2,2,-2],[3,0,0,3,3,-3]]
+    scale=1
     dq_sample = np.array(dq_sample)*scale
 
     # speed

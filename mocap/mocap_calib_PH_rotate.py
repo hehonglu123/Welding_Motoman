@@ -99,7 +99,8 @@ robot_type='R1'
 # robot_type='S1'
 
 # all_datasets=['train_data','valid_data_1','valid_data_2']
-all_datasets=['test0613_R1/train_data']
+dataset_date='0621'
+all_datasets=['test'+dataset_date+'_R1/train_data']
 
 if robot_type=='R1':
     base_marker_config_file=config_dir+'MA2010_marker_config.yaml'
@@ -117,10 +118,12 @@ if robot_type=='R1':
     jN=6
 
     # output_base_marker_config_file = config_dir+'MA2010_marker_config.yaml'
-    # output_base_marker_config_file = config_dir+'MA2010_0516_marker_config.yaml'
-    output_base_marker_config_file = config_dir+'MA2010_0613_marker_config.yaml'
+    output_base_marker_config_file = config_dir+'MA2010_'+dataset_date+'_marker_config.yaml'
+    # output_base_marker_config_file = config_dir+'MA2010_0613_marker_config.yaml'
     # output_base_marker_config_file = config_dir+'MA2010_0504stretch_marker_config.yaml'
     # output_base_marker_config_file = config_dir+'MA2010_0504inward_marker_config.yaml'
+
+    output_tool_marker_config_file = config_dir+'weldgun_'+dataset_date+'_marker_config.yaml'
 
 elif robot_type=='R2':
     base_marker_config_file=config_dir+'MA1440_marker_config.yaml'
@@ -410,6 +413,6 @@ tool_marker_data['calib_tool_toolmarker_pose']['orientation']['x'] = float(quat[
 tool_marker_data['calib_tool_toolmarker_pose']['orientation']['y'] = float(quat[2])
 tool_marker_data['calib_tool_toolmarker_pose']['orientation']['z'] = float(quat[3])
 
-with open(tool_marker_config_file,'w') as file:
+with open(output_tool_marker_config_file,'w') as file:
     yaml.safe_dump(tool_marker_data,file)
 print("Done")

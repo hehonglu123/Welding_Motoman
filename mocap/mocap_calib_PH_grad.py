@@ -17,6 +17,8 @@ Rx=np.array([1,0,0])
 Ry=np.array([0,1,0])
 Rz=np.array([0,0,1])
 
+dataset_date='0621'
+
 config_dir='../config/'
 
 # robot_weld_collect=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',\
@@ -29,7 +31,7 @@ robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_co
                     #  tool_file_path=config_dir+'torch.csv',d=15,\
                      tool_file_path='',d=0,\
 pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',\
-base_marker_config_file=config_dir+'MA2010_0620_marker_config.yaml',tool_marker_config_file=config_dir+'weldgun_marker_config.yaml')
+base_marker_config_file=config_dir+'MA2010_'+dataset_date+'_marker_config.yaml',tool_marker_config_file=config_dir+'weldgun_'+dataset_date+'_marker_config.yaml')
 
 #### using rigid body
 robot_weld.T_tool_toolmarker=Transform(np.eye(3),[0,0,0])
@@ -41,7 +43,7 @@ robot_weld.robot.T_flange = robot_weld.T_tool_flange
 robot_weld.robot.R_tool = robot_weld.T_tool_toolmarker.R
 robot_weld.robot.p_tool = robot_weld.T_tool_toolmarker.p
 
-data_dir='PH_grad_data/test0620_R1/train_data_'
+data_dir='PH_grad_data/test'+dataset_date+'_R1/train_data_'
 
 try:
     robot_q = np.loadtxt(data_dir+'robot_q_align.csv',delimiter=',')
@@ -292,6 +294,7 @@ robot_q_sample = deepcopy(robot_q[0:-1:N_per_pose])
 
 train_N = total_pose
 train_set=np.arange(train_N).astype(int)
+print(data_dir)
 print(train_set)
 
 #### Gradient

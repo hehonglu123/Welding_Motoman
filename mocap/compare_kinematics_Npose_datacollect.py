@@ -14,13 +14,15 @@ import time
 import pickle
 from MocapPoseListener import *
 
+dataset_date = '0621'
+
 config_dir='../config/'
 # robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path=config_dir+'weldgun.csv',d=15,\
 # pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg.csv',\
 # base_marker_config_file=config_dir+'MA2010_marker_config.yaml',tool_marker_config_file=config_dir+'weldgun_marker_config.yaml')
 robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path=config_dir+'torch.csv',d=15,\
 pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',\
-base_marker_config_file=config_dir+'MA2010_0613_marker_config.yaml',tool_marker_config_file=config_dir+'weldgun_marker_config.yaml')
+base_marker_config_file=config_dir+'MA2010_'+dataset_date+'_marker_config.yaml',tool_marker_config_file=config_dir+'weldgun_'+dataset_date+'_marker_config.yaml')
 
 # test_qs = np.array([[0.,0.,0.,0.,0.,0.],[0,69,57,0,0,0],[0,-68,-68,0,0,0],[-36.6018,12.4119,-12.1251,-43.3579,-45.4297,68.1203],
 #                 [21.0753,-1.8803,-27.3509,13.1122,-25.1173,-25.2466]])
@@ -47,6 +49,7 @@ for i in range(len(sample_N)):
 # test_qs=[np.zeros(6),np.zeros(6)+2,np.zeros(6)+4,np.zeros(6)+6]
 
 # print(np.array(test_qs))
+print(dataset_date)
 print(len(test_qs))
 # exit()
 
@@ -110,6 +113,9 @@ state_flag=0
 robot_q_align=[]
 mocap_T_align=[]
 
+robot_q_raw=[]
+mocap_T_raw=[]
+
 joint_recording=[]
 robot_stamps=[]
 r_pulse2deg = robot_weld.pulse2deg
@@ -159,7 +165,9 @@ while True:
                 for k in range(start_i,end_i):
                     T_mocap_basemarker = Transform(q2R(base_rigid_R[k]),base_rigid_p[k]).inv()
                     T_marker_mocap = Transform(q2R(mocap_R[k]),mocap_p[k])
-                    T_marker_base = T_basemarker_base*T_mocap_basemarker*T_marker_mocap
+                    T_marker_basemarker = T_mocap_basemarker*T_marker_mocap
+                    mocap_T_raw.append(np.append(T_marker_basemarker.p,R2q(T_marker_basemarker.R)))
+                    T_marker_base = T_basemarker_base*T_marker_basemarker
                     this_mocap_ori.append(R2rpy(T_marker_base.R))
                     this_mocap_p.append(T_marker_base.p)
                 this_mocap_p = np.mean(this_mocap_p,axis=0)
@@ -178,15 +186,18 @@ while True:
 
                 print("Q align num:",len(robot_q_align))
                 print("mocap align num:",len(mocap_T_align))
+                print("mocap raw num:",len(mocap_T_raw))
                 print("=========================")
 
 robot_client.servoMH(False)
 
 np.savetxt(data_dir+'robot_q_align.csv',robot_q_align,delimiter=',')
 np.savetxt(data_dir+'mocap_T_align.csv',mocap_T_align,delimiter=',')
+np.savetxt(data_dir+'mocap_T_raw.csv',mocap_T_raw,delimiter=',')
 
 print("Q align num:",len(robot_q_align))
 print("mocap align num:",len(mocap_T_align))
+print("mocap raw num:",len(mocap_T_raw))
 
 robot_weld.robot.P = robot_weld.calib_P
 robot_weld.robot.H = robot_weld.calib_H
