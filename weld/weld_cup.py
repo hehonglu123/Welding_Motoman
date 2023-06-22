@@ -39,7 +39,7 @@ with open(data_dir+'slicing.yml', 'r') as file:
 recorded_dir='recorded_data/cup_ER316L/'
 
 waypoint_distance=5 	###waypoint separation
-layer_height_num=int(1.3/slicing_meta['line_resolution'])
+layer_height_num=int(1.5/slicing_meta['line_resolution'])
 layer_width_num=int(4/slicing_meta['line_resolution'])
 
 
@@ -52,12 +52,12 @@ client=MotionProgramExecClient()
 ws=WeldSend(client)
 
 ###########################################layer welding############################################
-num_layer_start=int(0*layer_height_num)
+num_layer_start=int(0*layer_height_num)	###modify layer num here
 num_layer_end=int(1*layer_height_num)
-# q_prev=client.getJointAnglesDB(positioner.pulse2deg)
-q_prev=np.array([9.53E-02,-2.71E+00])
+q_prev=client.getJointAnglesDB(positioner.pulse2deg)
+# q_prev=np.array([9.53E-02,-2.71E+00])	###for motosim tests only
 
-if num_layer_start<=1:
+if num_layer_start<=1*layer_height_num:
 	num_sections=len(glob.glob(data_dir+'curve_sliced_relative/slice0_*.csv'))
 else:
 	num_sections=1
@@ -70,11 +70,13 @@ for layer in range(num_layer_start,num_layer_end,layer_height_num):
 
 	####################DETERMINE CURVE ORDER##############################################
 	for x in range(0,num_sections,layer_width_num):
-		curve_sliced_js=np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
+		curve_sliced_js=np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(layer)+'_'+str(x)+'.csv',delimiter=',').reshape((-1,6))
+		if len(curve_sliced_js)<2:
+			continue
 		positioner_js=np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
 		curve_sliced_relative=np.loadtxt(data_dir+'curve_sliced_relative/slice'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
 
-		vd_relative=8
+		vd_relative=5
 		lam1=calc_lam_js(curve_sliced_js,robot)
 		lam2=calc_lam_js(positioner_js,positioner)
 		lam_relative=calc_lam_cs(curve_sliced_relative)
@@ -100,7 +102,7 @@ for layer in range(num_layer_start,num_layer_end,layer_height_num):
 		q1_all=[curve_sliced_js[breakpoints[0]]]
 		q2_all=[positioner_js[breakpoints[0]]]
 		v1_all=[1]
-		v2_all=[1]
+		v2_all=[10]
 		primitives=['movej']
 		for j in range(1,len(breakpoints)):
 			q1_all.append(curve_sliced_js[breakpoints[j]])
@@ -123,7 +125,7 @@ for layer in range(num_layer_start,num_layer_end,layer_height_num):
 			feedrate=[]
 			energy=[]
 
-		timestamp_robot,joint_recording,job_line,_=ws.weld_segment_dual(primitives,robot,positioner,q1_all,q2_all,v1_all,v2_all,cond_all=[210],arc=False)
+		timestamp_robot,joint_recording,job_line,_=ws.weld_segment_dual(primitives,robot,positioner,q1_all,q2_all,v1_all,v2_all,cond_all=[200],arc=True)
 
 		if logging:
 			np.savetxt(local_recorded_dir +'welder_info.csv',
