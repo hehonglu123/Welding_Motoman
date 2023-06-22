@@ -15,23 +15,43 @@ Ry=np.array([0,1,0])
 Rz=np.array([0,0,1])
 
 config_dir='../config/'
-# robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path='',d=0,\
+
+robot_weld_collect=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path='',d=0,\
+pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',\
+base_marker_config_file=config_dir+'MA2010_0613_marker_config.yaml',tool_marker_config_file=config_dir+'weldgun_marker_config.yaml')
+
+robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path='',d=0,\
+pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',\
+base_marker_config_file=config_dir+'MA2010_0613_marker_config.yaml',tool_marker_config_file=config_dir+'weldgun_marker_config.yaml')
+# robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',\
+#                      tool_file_path=config_dir+'torch.csv',d=15,\
 # pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',\
 # base_marker_config_file=config_dir+'MA2010_marker_config.yaml',tool_marker_config_file=config_dir+'weldgun_marker_config.yaml')
-robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path=config_dir+'torch.csv',d=15,\
-pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',\
-base_marker_config_file=config_dir+'MA2010_marker_config.yaml',tool_marker_config_file=config_dir+'weldgun_marker_config.yaml')
 
 T_base_basemarker = robot_weld.T_base_basemarker
 T_basemarker_base = T_base_basemarker.inv()
-# robot_weld.T_tool_toolmarker=Transform(np.eye(3),[0,0,0])
+robot_weld.T_tool_toolmarker=Transform(np.eye(3),[0,0,0])
 robot_weld.robot.T_flange = robot_weld.T_tool_flange
+#### using tool
+robot_weld.robot.R_tool = robot_weld.T_tool_toolmarker.R
+robot_weld.robot.p_tool = robot_weld.T_tool_toolmarker.p
 
-data_dir='kinematic_raw_data/test0613/'
+data_dir='kinematic_raw_data/test0620_aftercalib/'
 
 try:
     robot_q = np.loadtxt(data_dir+'robot_q_align.csv',delimiter=',')
-    mocap_T = np.loadtxt(data_dir+'mocap_T_align.csv',delimiter=',')
+    mocap_T = np.loadtxt(data_dir+'mocap_T_align_origin.csv',delimiter=',')
+
+    mocap_T_actual=[]
+    for mT in mocap_T:
+        T_toolrigid_base_collect=Transform(q2R(mT[3:]),mT[:3])
+        T_toolrigid_basemarker = robot_weld_collect.T_base_basemarker*T_toolrigid_base_collect
+        T_toolrigid_base = T_basemarker_base*T_toolrigid_basemarker
+        mocap_T_actual.append(np.append(T_toolrigid_base.p,R2q(T_toolrigid_base.R)))
+
+    mocap_T_actual = np.array(mocap_T_actual)
+    np.savetxt(data_dir+'mocap_T_align.csv',mocap_T_actual,delimiter=',')
+    exit()
 
 except:
 
@@ -65,7 +85,7 @@ except:
     print(len(mocap_stamps))
     print(len(base_rigid_p))
 
-    mocap_start_k = 3450
+    mocap_start_k = 3000
     mocap_R = mocap_R[mocap_start_k:]
     mocap_p = mocap_p[mocap_start_k:]
     mocap_stamps = mocap_stamps[mocap_start_k:]
