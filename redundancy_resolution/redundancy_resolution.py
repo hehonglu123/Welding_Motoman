@@ -3,6 +3,7 @@ import sys, traceback, time, copy
 from general_robotics_toolbox import *
 import matplotlib.pyplot as plt
 from qpsolvers import solve_qp
+from scipy.optimize import differential_evolution, shgo, NonlinearConstraint, minimize, fminbound
 
 sys.path.append('../toolbox')
 from robot_def import *
@@ -133,15 +134,15 @@ class redundancy_resolution(object):
 
 
 
-	def baseline_joint(self,R_torch,curve_sliced_relative,curve_sliced_relative_base,q_init=np.zeros(6),q_positioner_seed=[0,-2]):
+	def baseline_joint(self,R_torch,curve_sliced_relative,curve_sliced_relative_base,q_init=np.zeros(6),q_positioner_seed=[0,-2],smooth_filter=True):
 		####baseline redundancy resolution, with fixed orientation
-		positioner_js=self.positioner_resolution(curve_sliced_relative,q_seed=q_positioner_seed)		#solve for positioner first
+		positioner_js=self.positioner_resolution(curve_sliced_relative,q_seed=q_positioner_seed,smooth_filter=smooth_filter)		#solve for positioner first
 		
 		###singularity js smoothing
-		# positioner_js=self.conditional_rolling_average(positioner_js)
 		positioner_js=self.introducing_tolerance2(positioner_js)
 		positioner_js=self.conditional_rolling_average(positioner_js)
-		positioner_js=self.rolling_average(positioner_js)
+		if smooth_filter:
+			positioner_js=self.rolling_average(positioner_js)
 		positioner_js[0][0][:,1]=positioner_js[1][0][0,1]
 
 		
@@ -224,7 +225,7 @@ class redundancy_resolution(object):
 		return H_from_RT(R,T)
 
 		
-	def positioner_resolution(self,curve_sliced_relative,q_seed=[0,-1.]):
+	def positioner_resolution(self,curve_sliced_relative,q_seed=[0,-1.],smooth_filter=True):
 		###resolve 2DOF positioner joint angle 
 		positioner_js=[]
 		q_prev=q_seed
@@ -234,8 +235,9 @@ class redundancy_resolution(object):
 				positioner_js_ith_layer_xth_section=self.positioner.find_curve_js(-curve_sliced_relative[i][x][:,3:],q_prev)
 
 				###filter noise
-				positioner_js_ith_layer_xth_section[:,0]=moving_average(positioner_js_ith_layer_xth_section[:,0],padding=True)
-				positioner_js_ith_layer_xth_section[:,1]=moving_average(positioner_js_ith_layer_xth_section[:,1],n=15,padding=True)
+				if smooth_filter:
+					positioner_js_ith_layer_xth_section[:,0]=moving_average(positioner_js_ith_layer_xth_section[:,0],padding=True)
+					positioner_js_ith_layer_xth_section[:,1]=moving_average(positioner_js_ith_layer_xth_section[:,1],n=15,padding=True)
 
 				positioner_js_ith_layer.append(np.array(positioner_js_ith_layer_xth_section))
 
@@ -252,31 +254,64 @@ class redundancy_resolution(object):
 		positioner_js.insert(0,positioner_js_0th_layer)
 		return positioner_js
 
+	def positioner_error_calc(self,alpha,q,qdot,n_d):
+		q_next=q+alpha*qdot
+		n_next=self.positioner.base_H[:3,:3]@self.positioner.fwd_rotation(q_next)@n_d ###get current pointing direction
+		return get_angle(n_next,[0,0,1])
 
-	# def positioner_qp(self,q_now,ez_relative):
-	# 	R_now=self.positioner.fwd(q_now,world=True).R
-	# 	n_now=R_now[:,-1]
-	# 	error_angle=get_angle(n_now,[0,0,1])
+	def positioner_resolution_qp(self,curve_sliced_relative,q_seed=[0,-1.],tolerance=np.radians(3)):
+		positioner_js=[]
+		q_prev=q_seed
+		for i in range(1,len(curve_sliced_relative)):
+			positioner_js_ith_layer=[]
+			for x in range(len(curve_sliced_relative[i])):
+				positioner_js_ith_layer_xth_section=[]
+				###first point uses invkin 
+				q_prev=self.positioner.inv(-curve_sliced_relative[i][x][0,3:],q_prev)
+				for j in range(1,len(curve_sliced_relative[i][x])):
+					q_now=copy.deepcopy(q_prev)
+					n_now=self.positioner.base_H[:3,:3]@self.positioner.fwd_rotation(q_now)@(-curve_sliced_relative[i][x][j,3:]) ###get current pointing direction
+					error_angle=get_angle(n_now,[0,0,1])
+					qp_iter=0
+					while error_angle>tolerance or qp_iter==0:		###iterate until tolerance satisfied
+						J=self.positioner.jacobian(q_now)
+						JR_mod=-hat(-curve_sliced_relative[i][x][j,3:])@J[:3,:]
+						JR_mod=self.positioner.base_H[:3,:3]@JR_mod
+
+						H=np.dot(np.transpose(JR_mod),JR_mod)
+						H=(H+np.transpose(H))/2
+
+						ndotd=(np.array([0,0,1])-n_now)	###desired normal moving direction
+
+						f=-np.transpose(JR_mod)@ndotd
+						qdot=solve_qp(H,f,lb=-0.01*np.ones(2),ub=0.01*np.ones(2))
+						
+						print(i,x,j,error_angle,n_now)
+						###line search of best step size
+						# alpha=fminbound(self.positioner_error_calc,0,2,args=(q_now,qdot,-curve_sliced_relative[i][x][j,3:],))
+						alpha=1
+						# if alpha<0.01:
+						# 	print(alpha)
+						# 	break
+							
+						###update and check error angle again
+						q_now+=alpha*qdot
+						n_now=self.positioner.base_H[:3,:3]@self.positioner.fwd_rotation(q_now)@(-curve_sliced_relative[i][x][j,3:]) ###get current pointing direction
+						error_angle=get_angle(n_now,[0,0,1])
+						qp_iter+=1
+					
+					###append solved points
+					positioner_js_ith_layer_xth_section.append(q_now)
+					q_prev=copy.deepcopy(q_now)
+				
+				positioner_js_ith_layer.append(positioner_js_ith_layer_xth_section)
+			
+			positioner_js.append(positioner_js_ith_layer)
 		
-	# 	J=self.positioner.jacobian(q_now)        #calculate current Jacobian
-	# 	JR=J[:3,:]
-	# 	JR_mod=-np.dot(hat(R_now),JR)
-
-	# 	H=np.dot(np.transpose(JR_mod),JR_mod)
-	# 	H=(H+np.transpose(H))/2
-
-	# 	ezdotd=(curve_normal[i]-pose_now.R[:,-1])
-
-	# 	f=-np.transpose(JR_mod)@ezdotd
-	# 	qdot=solve_qp(H,f)
-
-	# 	###line search
-	# 	alpha=fminbound(self.error_calc,0,0.999999999999999999999,args=(q_all[-1],qdot,curve_sliced_relative[i],))
-	# 	if alpha<0.01:
-	# 		break
-
+		return positioner_js
 			
 	def positioner_qp_smooth(self,positioner_js, curve_sliced_relative):
+		###NOT WORKING YET
 		### positioner trajectory smoothing with QP
 		positioner_js_out=[]
 		tolerance=np.radians(3)

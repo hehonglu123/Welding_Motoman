@@ -431,7 +431,7 @@ class positioner_obj(object):
 			if q_seed is not None:
 				return np.array([0-np.radians(15),q_seed[1]])
 			else:
-				return np.array([0-np.radians(15),0])
+				return [np.array([0-np.radians(15),0])]
 		q2=np.arctan2(n[1],n[0])
 		q1=np.arctan2(n[0]*np.cos(q2)+n[1]*np.sin(q2),n[2])
 

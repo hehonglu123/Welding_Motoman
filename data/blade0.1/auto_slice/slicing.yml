@@ -1,0 +1,21 @@
+num_layers: 758
+num_baselayers: 0
+line_resolution: 0.1
+baselayer_thickness: 0
+point_distance: 0.5
+smooth_filter: False
+q_positioner_seed: None
+q_seed: 
+  - -3.791544713877046391e-01
+  - 7.156749523014762637e-01
+  - 2.756772964158371586e-01
+  - 2.106493295914119712e-01
+  - -7.865937103692784982e-01
+  - -5.293956242391706368e-01
+placing_vector: None
+H: 
+  - -0.95
+  - 0.31224989992
+
+
+
