@@ -59,13 +59,14 @@ print(all_curve_sliced_relative[0][0])
 
 ### scan parameters
 scan_speed=30 # scanning speed (mm/sec)
-scan_stand_off_d = 50 ## mm
+scan_stand_off_d = 85 ## mm
 Rz_angle = np.radians(0) # point direction w.r.t welds
 Ry_angle = np.radians(0) # rotate in y a bit, z-axis not pointing down, to have ik solution
 # Rz_angle = np.radians(0) # point direction w.r.t welds
 # Ry_angle = np.radians(0) # rotate in y a bit, z-axis not pointing down, to have ik solution
 
 bounds_theta = np.radians(5) ## circular motion at start and end
+extension = 10 # mm
 
 ## scan angle
 all_scan_angle = np.radians([-30,30]) ## scanning angless
@@ -79,7 +80,7 @@ if all_layer[-1]!=len(all_curve_sliced_relative)-1:
 out_dir = data_dir+''
 
 # path gen
-spg = ScanPathGen(robot_scan,turn_table,scan_stand_off_d,Rz_angle,Ry_angle,bounds_theta)
+spg = ScanPathGen(robot_scan,turn_table,scan_stand_off_d,Rz_angle,Ry_angle,bounds_theta,extension)
 q_init_table=np.radians([30,70])
 # q_init_table=np.radians([-15,180])
 # q_init_table=np.radians([-70,150])

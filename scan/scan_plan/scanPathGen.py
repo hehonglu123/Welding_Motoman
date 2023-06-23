@@ -20,7 +20,7 @@ import numpy as np
 
 zero_config=np.array([0.,0.,0.,0.,0.,0.])
 
-def get_bound_circle(p,R,pc,k,theta):
+def get_bound_circle(p,R,pc,k,theta,extension=0,extension_dir=[1,0,0]):
 
     if theta==0:
         return [p,p],[R,R]
@@ -32,9 +32,15 @@ def get_bound_circle(p,R,pc,k,theta):
     
     all_p_bound=[]
     all_R_bound=[]
-    for th in np.arange(0,theta,np.sign(theta)*np.radians(1)):
+
+    all_th = np.arange(0,theta+1e-7,np.sign(theta)*np.radians(1))
+    all_ext = np.linspace(0,extension,len(all_th))
+    all_th_ext = np.array([all_th,all_ext]).T
+    extension_dir=np.array(extension_dir)/np.linalg.norm(extension_dir)
+
+    for th,ext in all_th_ext:
         rot_R = rot(k,th)
-        p_bound = np.matmul(rot_R,(p-pc))+pc
+        p_bound = np.matmul(rot_R,(p-pc))+pc+extension_dir*ext
         R_bound = np.matmul(rot_R,R)
         all_p_bound.append(p_bound)
         all_R_bound.append(R_bound)
@@ -76,7 +82,7 @@ def get_connect_circle(start_p,start_R,end_p,end_R,pc,scan_stand_off_d):
     return all_p_bound,all_R_bound
 
 class ScanPathGen():
-    def __init__(self,robot,positioner,scan_stand_off_d=243,Rz_angle=0,Ry_angle=0,bounds_theta=0) -> None:
+    def __init__(self,robot,positioner,scan_stand_off_d=243,Rz_angle=0,Ry_angle=0,bounds_theta=0,extension=0) -> None:
         
         self.robot=robot
         self.positioner=positioner
@@ -84,8 +90,9 @@ class ScanPathGen():
         self.Rz_angle=Rz_angle
         self.Ry_angle=Ry_angle
         self.bounds_theta=bounds_theta
+        self.extension=extension
 
-    def _gen_scan_path(self,all_curve_sliced_relative,all_layer,all_scan_angle,R_path):
+    def _gen_scan_path(self,all_curve_sliced_relative,all_layer,all_scan_angle,R_path,extension=0):
 
         ### path gen ###
         scan_p=[]
@@ -113,7 +120,11 @@ class ScanPathGen():
                         sub_scan_p.append(this_scan_p)
                         sub_scan_R.append(this_scan_R)
                         k = deepcopy(this_scan_R[:,0])
-                        p_bound_path,R_bound_path=get_bound_circle(this_scan_p,this_scan_R,this_p,k,-self.bounds_theta)
+
+                        extension_dir = np.array(curve_sliced_relative[pT_i][:3])-np.array(curve_sliced_relative[pT_i-1][:3])
+                        extension_dir = extension_dir/np.linalg.norm(extension_dir)
+                        p_bound_path,R_bound_path=get_bound_circle(this_scan_p,this_scan_R,this_p,k,-self.bounds_theta,self.extension,extension_dir)
+
                         sub_scan_p.extend(p_bound_path[::-1])
                         sub_scan_R.extend(R_bound_path[::-1])
                         break
@@ -139,7 +150,9 @@ class ScanPathGen():
                     # add start bound condition
                     if pT_i == 0:
                         k = deepcopy(Rx)
-                        p_bound_path,R_bound_path=get_bound_circle(this_scan_p,this_scan_R,this_p,k,self.bounds_theta)
+                        extension_dir = np.array(curve_sliced_relative[pT_i][:3])-np.array(curve_sliced_relative[pT_i-1][:3])
+                        extension_dir = extension_dir/np.linalg.norm(extension_dir)
+                        p_bound_path,R_bound_path=get_bound_circle(this_scan_p,this_scan_R,this_p,k,self.bounds_theta,self.extension,extension_dir)
                         sub_scan_p.extend(p_bound_path)
                         sub_scan_R.extend(R_bound_path)
                     
@@ -223,7 +236,7 @@ class ScanPathGen():
         for i in range(len(scan_R)):
             scan_R[i] = np.matmul(scan_R[i],R_path)
         
-        # visualize_frames(scan_R[::10],scan_p[::10],size=3)
+        visualize_frames(scan_R[::10],scan_p[::10],size=3)
         # print(scan_R[0])
 
         return scan_p,scan_R
