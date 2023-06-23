@@ -140,7 +140,7 @@ class PH_Param(object):
         # plot H
         print("**H Variation**")
         markdown_str=''
-        markdown_str+='||Mean (mm)|Std (mm)|\n'
+        markdown_str+='||Mean (deg)|Std (deg)|\n'
         markdown_str+='|-|-|-|\n'
         for i in range(len(nom_H[0])):
             h_ang = []
