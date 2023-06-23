@@ -45,7 +45,7 @@ def get_bound_circle(p,R,pc,k,theta,extension=0,extension_dir=[1,0,0]):
         all_p_bound.append(p_bound)
         all_R_bound.append(R_bound)
     rot_R = rot(k,theta)
-    all_p_bound.append(np.matmul(rot_R,(p-pc))+pc)
+    all_p_bound.append(np.matmul(rot_R,(p-pc))+pc+extension_dir*extension)
     all_R_bound.append(np.matmul(rot_R,R))
     all_p_bound=all_p_bound[::-1]
     all_R_bound=all_R_bound[::-1]
@@ -54,10 +54,14 @@ def get_bound_circle(p,R,pc,k,theta,extension=0,extension_dir=[1,0,0]):
 
 def get_connect_circle(start_p,start_R,end_p,end_R,pc,scan_stand_off_d):
 
+    radius = np.linalg.norm(start_p-pc)
+
     k = np.cross((end_p-start_p),start_R[:,-1])
     k = k/np.linalg.norm(k)
 
-    theta = -2*np.arcsin(np.linalg.norm(end_p-start_p)/2/scan_stand_off_d)
+    theta = -2*np.arcsin(np.linalg.norm(end_p-start_p)/2/radius)
+
+    rot_R = rot(k,theta)
 
     dR = np.matmul(start_R.T,end_R)
     dRk,dRtheta = R2rot(dR)
@@ -122,6 +126,7 @@ class ScanPathGen():
                         k = deepcopy(this_scan_R[:,0])
 
                         extension_dir = np.array(curve_sliced_relative[pT_i][:3])-np.array(curve_sliced_relative[pT_i-1][:3])
+                        # extension_dir = -1*extension_dir
                         extension_dir = extension_dir/np.linalg.norm(extension_dir)
                         p_bound_path,R_bound_path=get_bound_circle(this_scan_p,this_scan_R,this_p,k,-self.bounds_theta,self.extension,extension_dir)
 
@@ -151,6 +156,7 @@ class ScanPathGen():
                     if pT_i == 0:
                         k = deepcopy(Rx)
                         extension_dir = np.array(curve_sliced_relative[pT_i][:3])-np.array(curve_sliced_relative[pT_i-1][:3])
+                        # extension_dir = -1*extension_dir
                         extension_dir = extension_dir/np.linalg.norm(extension_dir)
                         p_bound_path,R_bound_path=get_bound_circle(this_scan_p,this_scan_R,this_p,k,self.bounds_theta,self.extension,extension_dir)
                         sub_scan_p.extend(p_bound_path)
@@ -196,47 +202,47 @@ class ScanPathGen():
         scan_R = np.matmul(scan_R,rot([0.,0.,1.],self.Rz_angle))
         scan_R = np.matmul(scan_R,rot([0.,1.,0.],self.Ry_angle))
 
-        ####### add detail path ################
-        delta_p = 0.1
-        scan_p_detail=None
-        scan_R_detail=None
-        for scan_p_i in range(len(scan_p)-1):
-            this_scan_p=deepcopy(scan_p[scan_p_i])
-            next_scan_p=deepcopy(scan_p[scan_p_i+1])
+        # ####### add detail path ################
+        # delta_p = 0.1
+        # scan_p_detail=None
+        # scan_R_detail=None
+        # for scan_p_i in range(len(scan_p)-1):
+        #     this_scan_p=deepcopy(scan_p[scan_p_i])
+        #     next_scan_p=deepcopy(scan_p[scan_p_i+1])
 
-            if np.all(this_scan_p==next_scan_p):
-                continue
+        #     if np.all(this_scan_p==next_scan_p):
+        #         continue
 
-            travel_v=next_scan_p-this_scan_p
-            total_l=np.linalg.norm(travel_v)
-            travel_v=travel_v/total_l
-            travel_v=travel_v*delta_p
+        #     travel_v=next_scan_p-this_scan_p
+        #     total_l=np.linalg.norm(travel_v)
+        #     travel_v=travel_v/total_l
+        #     travel_v=travel_v*delta_p
 
-            scan_p_mid=[]
-            this_scan_p_mid=deepcopy(this_scan_p)
-            while True:
-                scan_p_mid.append(deepcopy(this_scan_p_mid))
-                this_scan_p_mid+=travel_v
-                if np.linalg.norm(this_scan_p_mid-this_scan_p)>=total_l:
-                    break
-            scan_p_mid=np.array(scan_p_mid)
-            scan_R_mid = np.tile(scan_R[scan_p_i],(len(scan_p_mid),1,1))
-            if scan_p_detail is None:
-                scan_p_detail=deepcopy(scan_p_mid)
-                scan_R_detail=deepcopy(scan_R_mid)
-            else:
-                scan_p_detail = np.vstack((scan_p_detail,scan_p_mid))
-                scan_R_detail = np.vstack((scan_R_detail,scan_R_mid))
-        ########################################
-        scan_p_detail=np.vstack((scan_p_detail,[scan_p[-1]]))
-        scan_R_detail=np.vstack((scan_R_detail,[scan_R[-1]]))
-        scan_p=deepcopy(scan_p_detail)
-        scan_R=deepcopy(scan_R_detail)
+        #     scan_p_mid=[]
+        #     this_scan_p_mid=deepcopy(this_scan_p)
+        #     while True:
+        #         scan_p_mid.append(deepcopy(this_scan_p_mid))
+        #         this_scan_p_mid+=travel_v
+        #         if np.linalg.norm(this_scan_p_mid-this_scan_p)>=total_l:
+        #             break
+        #     scan_p_mid=np.array(scan_p_mid)
+        #     scan_R_mid = np.tile(scan_R[scan_p_i],(len(scan_p_mid),1,1))
+        #     if scan_p_detail is None:
+        #         scan_p_detail=deepcopy(scan_p_mid)
+        #         scan_R_detail=deepcopy(scan_R_mid)
+        #     else:
+        #         scan_p_detail = np.vstack((scan_p_detail,scan_p_mid))
+        #         scan_R_detail = np.vstack((scan_R_detail,scan_R_mid))
+        # ########################################
+        # scan_p_detail=np.vstack((scan_p_detail,[scan_p[-1]]))
+        # scan_R_detail=np.vstack((scan_R_detail,[scan_R[-1]]))
+        # scan_p=deepcopy(scan_p_detail)
+        # scan_R=deepcopy(scan_R_detail)
 
         for i in range(len(scan_R)):
             scan_R[i] = np.matmul(scan_R[i],R_path)
         
-        visualize_frames(scan_R[::10],scan_p[::10],size=3)
+        visualize_frames(scan_R,scan_p,size=3)
         # print(scan_R[0])
 
         return scan_p,scan_R
