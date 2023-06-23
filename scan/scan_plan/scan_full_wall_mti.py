@@ -64,7 +64,7 @@ T_S1TCP_R1Base = np.linalg.inv(np.matmul(turn_table.base_H,H_from_RT(Table_home_
 data_dir='../../data/wall_weld_test/full_test_mti/'
 ######### enter your wanted z height #######
 all_layer_z = [20,37]
-all_layer_z = [0]
+# all_layer_z = [0]
 ###########################################
 all_path_T = robot_weld_path_gen(all_layer_z)
 all_curve_sliced_relative=[]
@@ -89,13 +89,14 @@ print(robot_scan.fwd(zero_config))
 
 ### scan parameters
 scan_speed=10 # scanning speed (mm/sec)
-scan_stand_off_d = 70 ## mm
+scan_stand_off_d = 85 ## mm
 Rz_angle = np.radians(0) # point direction w.r.t welds
 Ry_angle = np.radians(0) # rotate in y a bit, z-axis not pointing down, to have ik solution
 # Rz_angle = np.radians(0) # point direction w.r.t welds
 # Ry_angle = np.radians(0) # rotate in y a bit, z-axis not pointing down, to have ik solution
 
-bounds_theta = np.radians(20) ## circular motion at start and end
+bounds_theta = np.radians(45) ## circular motion at start and end
+extension = 20 # mm
 
 ## scan angle
 all_scan_angle = np.radians([-45,45]) ## scanning angless
@@ -108,7 +109,7 @@ print(all_layer)
 out_dir = data_dir+''
 
 # path gen
-spg = ScanPathGen(robot_scan,turn_table,scan_stand_off_d,Rz_angle,Ry_angle,bounds_theta)
+spg = ScanPathGen(robot_scan,turn_table,scan_stand_off_d,Rz_angle,Ry_angle,bounds_theta,extension)
 q_init_table=np.radians([-15,90])
 # q_init_table=np.radians([-15,180])
 
