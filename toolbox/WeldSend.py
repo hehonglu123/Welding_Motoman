@@ -20,7 +20,7 @@ class WeldSend(object):
 	
 	def jog_dual(self,robot1,robot2,q1,q2,v=1):
 		mp=MotionProgram(ROBOT_CHOICE=self.ROBOT_CHOICE_MAP[robot1.robot_name],ROBOT_CHOICE2=self.ROBOT_CHOICE_MAP[robot2.robot_name],pulse2deg=robot1.pulse2deg,pulse2deg_2=robot2.pulse2deg, tool_num=self.ROBOT_TOOL_MAP[robot1.robot_name])
-		mp.MoveJ(np.degrees(q1),v,None,target2=['MOVJ',np.degrees(q2),1])
+		mp.MoveJ(np.degrees(q1),v,None,target2=['MOVJ',np.degrees(q2),10])
 		self.client.execute_motion_program(mp)
 
 	def weld_segment_single(self,primitives,robot,q_all,v_all,cond_all,arc=False):

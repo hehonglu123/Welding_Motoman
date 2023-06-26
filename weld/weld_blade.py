@@ -29,7 +29,7 @@ with open(data_dir+'slicing.yml', 'r') as file:
 	slicing_meta = yaml.safe_load(file)
 
 waypoint_distance=5 	###waypoint separation
-layer_height_num=int(1.3/slicing_meta['line_resolution'])
+layer_height_num=int(1.5/slicing_meta['line_resolution'])
 layer_width_num=int(4/slicing_meta['line_resolution'])
 
 robot=robot_obj('MA2010_A0',def_path='../config/MA2010_A0_robot_default_config.yml',tool_file_path='../config/torch.csv',\
@@ -56,7 +56,7 @@ primitives=[]
 # 		positioner_js=np.loadtxt(data_dir+'curve_sliced_js/D500B_base_js'+str(base_layer)+'_'+str(x)+'.csv',delimiter=',')
 # 		curve_sliced_relative=np.loadtxt(data_dir+'curve_sliced_relative/baselayer'+str(base_layer)+'_'+str(x)+'.csv',delimiter=',')
 
-# 		vd_relative=5
+# 		vd_relative=8
 # 		lam1=calc_lam_js(curve_sliced_js,robot)
 # 		lam2=calc_lam_js(positioner_js,positioner)
 # 		lam_relative=calc_lam_cs(curve_sliced_relative)
@@ -79,17 +79,17 @@ primitives=[]
 # 		q1_all.extend([q_start]+curve_sliced_js[breakpoints].tolist()+[q_end])
 # 		q2_all.extend([positioner_js[breakpoints[0]]]+positioner_js[breakpoints].tolist()+[positioner_js[breakpoints[-1]]])
 # 		v1_all.extend([1]+[s1_all[0]]+s1_all+[s1_all[-1]])
-# 		cond_all.extend([0]+[220]*(num_points_layer+1))					###extended baselayer welding
+# 		cond_all.extend([0]+[218]*(num_points_layer+1))					###extended baselayer welding
 		
 
 # 		q_prev=curve_sliced_js[breakpoints[-1]]
 
 ###########################################layer welding############################################
-q_prev=np.array([-3.791544713877046391e-01,7.156749523014762637e-01,2.756772964158371586e-01,2.106493295914119712e-01,-7.865937103692784982e-01,-5.293956242391706368e-01])
-# q_prev=client.getJointAnglesMH(robot.pulse2deg)
+# q_prev=np.array([-3.791544713877046391e-01,7.156749523014762637e-01,2.756772964158371586e-01,2.106493295914119712e-01,-7.865937103692784982e-01,-5.293956242391706368e-01])
+q_prev=client.getJointAnglesMH(robot.pulse2deg)
 
-num_layer_start=int(0*layer_height_num)
-num_layer_end=int(10*layer_height_num)
+num_layer_start=int(50*layer_height_num)
+num_layer_end=int(51*layer_height_num)
 num_sections=1
 for layer in range(num_layer_start,num_layer_end,layer_height_num):
 	num_sections_prev=num_sections
@@ -115,7 +115,7 @@ for layer in range(num_layer_start,num_layer_end,layer_height_num):
 		positioner_js=np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
 		curve_sliced_relative=np.loadtxt(data_dir+'curve_sliced_relative/slice'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
 
-		vd_relative=12
+		vd_relative=7
 		lam1=calc_lam_js(curve_sliced_js,robot)
 		lam2=calc_lam_js(positioner_js,positioner)
 		lam_relative=calc_lam_cs(curve_sliced_relative)
@@ -145,7 +145,7 @@ for layer in range(num_layer_start,num_layer_end,layer_height_num):
 		q1_all.extend(curve_sliced_js[breakpoints].tolist())
 		q2_all.extend(positioner_js[breakpoints].tolist())
 		v1_all.extend([1]+s1_all)
-		cond_all.extend([0]+[210]*(num_points_layer-1))
+		cond_all.extend([0]+[200]*(num_points_layer-1))
 		primitives.extend(['movej']+['movel']*(num_points_layer-1))
 
 
