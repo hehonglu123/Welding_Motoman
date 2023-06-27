@@ -139,7 +139,7 @@ mti_client = RRN.ConnectService("rr+tcp://192.168.55.10:60830/?service=MTI2D")
 mti_client.setExposureTime("25")
 ###################################
 forward_flag = True
-base_layer = True
+base_layer = False
 profile_height=None
 Transz0_H=None
 curve_sliced_relative=None
@@ -150,7 +150,7 @@ for i in range(0,len(weld_z_height)):
     print("Layer:",i)
     #### welding
     weld_st = time.time()
-    if i>=0 and True:
+    if i>=999999 and True:
         weld_plan_st = time.time()
         if i>=2:
             base_layer=False
@@ -183,11 +183,11 @@ for i in range(0,len(weld_z_height)):
                 last_mean_h=np.mean(profile_height[:,1])
             if profile_height is None:
                 if i!=0:
-                    data_dir='../data/wall_weld_test/weld_scan_2023_06_13_10_56_01/'
+                    data_dir='../data/wall_weld_test/moveL_weld_scan_2023_06_13_15_08_08/'
                     print("Using data:",data_dir)
-                    last_profile_height=np.load(data_dir+'layer_16/scans/height_profile.npy')
+                    last_profile_height=np.load(data_dir+'layer_35/scans/height_profile.npy')
                     last_mean_h=np.mean(last_profile_height[:,1])
-                    profile_height=np.load(data_dir+'layer_17/scans/height_profile.npy')
+                    profile_height=np.load(data_dir+'layer_36/scans/height_profile.npy')
 
             if (profile_height is not None) and (i>2):
                 mean_h = np.mean(profile_height[:,1])
@@ -208,11 +208,11 @@ for i in range(0,len(weld_z_height)):
         else: # start correction from 2nd top layer
             
             if profile_height is None:
-                data_dir='../data/wall_weld_test/weld_scan_2023_06_13_10_56_01/'
+                data_dir='../data/wall_weld_test/weld_scan_2023_06_16_11_33_46/'
                 print("Using data:",data_dir)
-                last_profile_height=np.load(data_dir+'layer_16/scans/height_profile.npy')
+                last_profile_height=np.load(data_dir+'layer_5/scans/height_profile.npy')
                 last_mean_h=np.mean(last_profile_height[:,1])
-                profile_height=np.load(data_dir+'layer_17/scans/height_profile.npy')
+                profile_height=np.load(data_dir+'layer_6/scans/height_profile.npy')
                 
 
             ## parameters
@@ -234,9 +234,15 @@ for i in range(0,len(weld_z_height)):
             noise_h_thres = 3
             num_l=40
             input_dh=1.7
-            min_v=5
-            max_v=30
-            h_std_thres=0.48
+            
+            # min_v=5
+            # max_v=30
+            # h_std_thres=0.48
+
+            min_v=-1
+            max_v=1000
+            h_std_thres=-1
+
             nominal_v=18
             curve_sliced_relative,path_T_S1,this_weld_v,all_dh,last_mean_h=\
                 strategy_3(profile_height,input_dh,curve_sliced_relative,R_S1TCP,num_l,noise_h_thres=noise_h_thres,\
@@ -284,13 +290,13 @@ for i in range(0,len(weld_z_height)):
         input("Press Enter and start welding.")
         mp=MotionProgram(ROBOT_CHOICE='RB1',pulse2deg=robot_weld.pulse2deg)
         mp.MoveL(np.degrees(path_q[1]), 10, 0)
-        mp.setArc(select, int(this_job_number))
+        # mp.setArc(select, int(this_job_number))
         for bpi in range(len(this_weld_v)):
             if bpi!=len(this_weld_v)-1:
                 mp.MoveL(np.degrees(path_q[bpi+2]), this_weld_v[bpi])
             else:
                 mp.MoveL(np.degrees(path_q[bpi+2]), this_weld_v[bpi],0)
-        mp.setArc(False)
+        # mp.setArc(False)
         mp.MoveL(np.degrees(path_q[-1]), 10, 0)
         clean_weld_record()
         rob_stamps,rob_js_exe,_,_= robot_client.execute_motion_program(mp)
@@ -323,8 +329,8 @@ for i in range(0,len(weld_z_height)):
     if True:
         scan_st = time.time()
         if curve_sliced_relative is None:
-            data_dir='../data/wall_weld_test/weld_scan_2023_06_13_10_56_01/'
-            last_profile_height=np.load('../data/wall_weld_test/weld_scan_2023_06_13_10_56_01/layer_17/scans/height_profile.npy')
+            data_dir='../data/wall_weld_test/moveL_weld_scan_2023_06_13_15_08_08/'
+            last_profile_height=np.load('../data/wall_weld_test/moveL_weld_scan_2023_06_13_15_08_08/layer_36/scans/height_profile.npy')
             last_mean_h=np.mean(last_profile_height[:,1])
             h_largest=np.max(last_profile_height[:,1])
             layer_data_dir=data_dir+'layer_'+str(i)+'/'
@@ -378,7 +384,7 @@ for i in range(0,len(weld_z_height)):
         # input("Press Enter and move to scanning startint point")
 
         ## move to start
-        to_start_speed=7
+        to_start_speed=3
         mp = MotionProgram(ROBOT_CHOICE='RB2',ROBOT_CHOICE2='ST1',pulse2deg=robot_scan.pulse2deg,pulse2deg_2=positioner.pulse2deg)
         target2=['MOVJ',np.degrees(q_bp2[0][0]),to_start_speed]
         mp.MoveJ(np.degrees(q_bp1[0][0]), to_start_speed, 0, target2=target2)
