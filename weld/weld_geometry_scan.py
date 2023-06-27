@@ -12,6 +12,7 @@ from scan_continuous import *
 from scanPathGen import *
 from scanProcess import *
 from weldCorrectionStrategy import *
+from WeldSend import *
 from dx200_motion_program_exec_client import *
 
 from general_robotics_toolbox import *
@@ -20,6 +21,7 @@ import matplotlib.pyplot as plt
 import time
 import datetime
 import numpy as np
+import glob
 
 weld_timestamp=[]
 weld_voltage=[]
@@ -67,6 +69,26 @@ positioner.base_H = H_from_RT(positioner.T_base_basemarker.R,positioner.T_base_b
 T_to_base = Transform(np.eye(3),[0,0,-380])
 positioner.base_H = np.matmul(positioner.base_H,H_from_RT(T_to_base.R,T_to_base.p))
 
+# exit()
+
+#### data directory
+dataset='cup/'
+sliced_alg='circular_slice_shifted/'
+curve_data_dir = '../data/'+dataset+sliced_alg
+
+current_time = datetime.datetime.now()
+formatted_time = current_time.strftime('%Y_%m_%d_%H_%M_%S.%f')[:-7]
+data_dir=curve_data_dir+'../weld_scan_'+formatted_time+'/'
+
+#### welding spec, goal
+with open(data_dir+'slicing.yml', 'r') as file:
+    slicing_meta = yaml.safe_load(file)
+
+des_dh = 1.5
+des_dw = 4
+waypoint_distance=5 	###waypoint separation
+layer_width_num=int(4/slicing_meta['line_resolution'])
+
 final_height=50
 final_h_std_thres=0.48
 weld_z_height=[0,6,8] # two base layer height to first top layer
@@ -88,18 +110,9 @@ print(weld_velocity)
 # exit()
 save_weld_record=True
 
-# exit()
-
-dataset='cup/'
-sliced_alg='circular_slice_shifted/'
-curve_data_dir = '../data/'+dataset+sliced_alg
-
-current_time = datetime.datetime.now()
-formatted_time = current_time.strftime('%Y_%m_%d_%H_%M_%S.%f')[:-7]
-data_dir=curve_data_dir+'../weld_scan_'+formatted_time+'/'
-
 # ## rr drivers and all other drivers
-robot_client=MotionProgramExecClient()
+# robot_client=MotionProgramExecClient()
+ws=WeldSend(robot_client)
 # # weld state logging
 # sub = RRN.SubscribeService('rr+tcp://192.168.55.10:60823?service=welder')
 # obj = sub.GetDefaultClientWait(3)  # connect, timeout=30s
@@ -109,176 +122,108 @@ robot_client=MotionProgramExecClient()
 # mti_client = RRN.ConnectService("rr+tcp://192.168.55.10:60830/?service=MTI2D")
 # mti_client.setExposureTime("25")
 ###################################
-base_layer = False
 profile_height=None
-Transz0_H=np.eye(4)
 curve_sliced_relative=None
 last_mean_h = 0
 
-for i in range(0,len(weld_z_height)):
-    cycle_st = time.time()
-    print("Layer:",i)
-    #### welding
-    weld_st = time.time()
-    if i>=0 and False:
-        weld_plan_st = time.time()
-        if i>=2:
-            base_layer=False
-        this_z_height=weld_z_height[i]
-        this_job_number=job_number[i]
-        this_weld_v=[weld_velocity[i]]
-        all_dh=[]
+layer=0
+while True:
+    print("Layer:",layer)
+    ####################DETERMINE CURVE ORDER##############################################
+    all_curve_relative=[]
+    num_sections=len(glob.glob(curve_data_dir+'curve_sliced_relative/slice'+str(layer)+'_*.csv'))
+    for x in range(0,num_sections,layer_width_num):
+        #### welding
+        if layer>=0 and True:
 
-        # 1. The curve path in "positioner tcp frame"
-        ######### enter your wanted z height #######
-        all_layer_z = [this_z_height]
-        ###########################################
-        all_path_T = robot_weld_path_gen(all_layer_z,forward_flag,base_layer) # this is your path
-        path_T=all_path_T[0]
-        curve_sliced_relative=[]
-        for path_p in path_T:
-            this_p = np.matmul(T_S1TCP_R1Base[:3,:3],path_p.p)+T_S1TCP_R1Base[:3,-1]
-            this_n = np.matmul(T_S1TCP_R1Base[:3,:3],path_p.R[:,-1])
-            curve_sliced_relative.append(np.append(this_p,this_n))
-        curve_sliced_relative=curve_sliced_relative[1:-1] # the start and end is for collision prevention
-        print(path_T[0])
-        print(curve_sliced_relative)
-        R_S1TCP = np.matmul(T_S1TCP_R1Base[:3,:3],path_p.R)
+            # 1. The curve path in "positioner tcp frame"
+            curve_sliced_js=np.loadtxt(curve_data_dir+'curve_sliced_js/MA2010_js'+str(layer)+'_'+str(x)+'.csv',delimiter=',').reshape((-1,6))
+            if len(curve_sliced_js)<2:
+                continue
+            positioner_js=np.loadtxt(curve_data_dir+'curve_sliced_js/D500B_js'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
+            curve_sliced_relative=np.loadtxt(curve_data_dir+'curve_sliced_relative/slice'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
 
-        #### Correction ####
-        # TODO: Add fitering if near threshold
-        h_largest=this_z_height
-        if (i<=2):
-            if (last_mean_h == 0) and (profile_height is not None):
-                last_mean_h=np.mean(profile_height[:,1])
-            if profile_height is None:
-                if i!=0:
-                    data_dir='../data/wall_weld_test/weld_scan_2023_06_13_10_56_01/'
-                    print("Using data:",data_dir)
-                    last_profile_height=np.load(data_dir+'layer_16/scans/height_profile.npy')
-                    last_mean_h=np.mean(last_profile_height[:,1])
-                    profile_height=np.load(data_dir+'layer_17/scans/height_profile.npy')
+            #### Correction ####
+            if (i<=2): # no correction
+                pass
 
-            if (profile_height is not None) and (i>2):
-                mean_h = np.mean(profile_height[:,1])
-                dh_last_layer = mean_h-last_mean_h
-                h_target = mean_h+dh_last_layer
-
-                dh_direction = np.array([0,0,h_target-curve_sliced_relative[0][2]])
-                dh_direction_R1 = T_R1Base_S1TCP[:3,:3]@dh_direction
-
-                for curve_i in range(len(curve_sliced_relative)):
-                    curve_sliced_relative[curve_i][2]=h_target
+            else: # start correction from 2nd top layer
                 
-                for path_i in range(len(path_T)):
-                    path_T[path_i].p=path_T[path_i].p+dh_direction_R1
+                if profile_height is None:
+                    data_dir=curve_data_dir+'../weld_scan_2023_06_13_10_56_01/'
+                    layer_data_dir=data_dir+'layer_'+str(layer)+'/'
+                    profile_height=np.load(layer_data_dir+'scans/height_profile.npy')
 
-                last_mean_h=mean_h
+                ## parameters
+                nominal_v=18
+                curve_sliced_relative,this_weld_v,all_dh=\
+                    strategy_4()
+            ####################
+            print("dh:",all_dh)
+            print("Nominal V:",weld_velocity[i])
+            print("Correct V:",this_weld_v)
+            print("curve_sliced_relative:",curve_sliced_relative)
+            print(len(curve_sliced_relative))
 
-        else: # start correction from 2nd top layer
-            
-            if profile_height is None:
-                data_dir='../data/wall_weld_test/weld_scan_2023_06_16_11_33_46/'
-                print("Using data:",data_dir)
-                last_profile_height=np.load(data_dir+'layer_5/scans/height_profile.npy')
-                last_mean_h=np.mean(last_profile_height[:,1])
-                profile_height=np.load(data_dir+'layer_6/scans/height_profile.npy')
+            #### convert to R1 and S1 motion
+            lam1=calc_lam_js(curve_sliced_js,robot_weld)
+            lam2=calc_lam_js(positioner_js,positioner)
+            lam_relative=calc_lam_cs(curve_sliced_relative)
 
-            ## parameters
-            noise_h_thres = 3
-            num_l=40
-            input_dh=1.7
-            
-            # min_v=5
-            # max_v=30
-            # h_std_thres=0.48
+            num_points_layer=max(2,int(lam_relative[-1]/waypoint_distance))
 
-            min_v=-1
-            max_v=1000
-            h_std_thres=-1
-
-            nominal_v=18
-            curve_sliced_relative,path_T_S1,this_weld_v,all_dh,last_mean_h=\
-                strategy_3(profile_height,input_dh,curve_sliced_relative,R_S1TCP,num_l,noise_h_thres=noise_h_thres,\
-                           min_v=min_v,max_v=max_v,h_std_thres=h_std_thres,nominal_v=nominal_v)
-            
-            h_largest = np.max(profile_height[:,1])
-
-            # find curve in R1 frame
-            path_T=[]
-            for tcp_T in path_T_S1:
-                this_p = T_R1Base_S1TCP[:3,:3]@tcp_T.p+T_R1Base_S1TCP[:3,-1]
-                this_R = T_R1Base_S1TCP[:3,:3]@tcp_T.R
-                path_T.append(Transform(this_R,this_p))
-            # add path collision avoidance
-            path_T.insert(0,Transform(path_T[0].R,path_T[0].p+np.array([0,0,10])))
-            path_T.append(Transform(path_T[-1].R,path_T[-1].p+np.array([0,0,10])))
-        ####################
-        print("dh:",all_dh)
-        print("Nominal V:",weld_velocity[i])
-        print("Correct V:",this_weld_v)
-        print("curve_sliced_relative:",curve_sliced_relative)
-        print(path_T[0])
-        print(len(path_T))
-        print(len(curve_sliced_relative))
-
-        print("Weld Plan time:",time.time()-weld_plan_st)
-
-        ######################################################
-        ########### Do welding #############
-        weld_motion_st = time.time()
-        to_start_speed=8
-        path_q = []
-        for tcp_T in path_T:
-            path_q.append(robot_weld.inv(tcp_T.p,tcp_T.R,zero_config)[0])
-        
-        # input("Press Enter and move to weld starting point.")
-        mp = MotionProgram(ROBOT_CHOICE='RB1', pulse2deg=robot_weld.pulse2deg)
-        mp.MoveJ(np.degrees(path_q[0]), to_start_speed, 0)
-        
-        robot_client.execute_motion_program(mp)
-
-        print("Weld to start time:",time.time()-weld_motion_st)
-        
-        weld_motion_weld_st = time.time()
-        input("Press Enter and start welding.")
-        mp=MotionProgram(ROBOT_CHOICE='RB1',pulse2deg=robot_weld.pulse2deg)
-        mp.MoveL(np.degrees(path_q[1]), 10, 0)
-        mp.setArc(select, int(this_job_number))
-        for bpi in range(len(this_weld_v)):
-            if bpi!=len(this_weld_v)-1:
-                mp.MoveL(np.degrees(path_q[bpi+2]), this_weld_v[bpi])
+            ###find which end to start depending on how close to joint limit
+            if positioner.upper_limit[1]-q_prev[1]>q_prev[1]-positioner.lower_limit[1]:
+                breakpoints=np.linspace(0,len(curve_sliced_js)-1,num=num_points_layer).astype(int)
             else:
-                mp.MoveL(np.degrees(path_q[bpi+2]), this_weld_v[bpi],0)
-        mp.setArc(False)
-        mp.MoveL(np.degrees(path_q[-1]), 10, 0)
-        clean_weld_record()
-        rob_stamps,rob_js_exe,_,_= robot_client.execute_motion_program(mp)
+                breakpoints=np.linspace(len(curve_sliced_js)-1,0,num=num_points_layer).astype(int)
 
-        if save_weld_record:
-            Path(data_dir).mkdir(exist_ok=True)
-            layer_data_dir=data_dir+'layer_'+str(i)+'/'
-            Path(layer_data_dir).mkdir(exist_ok=True)
-            np.savetxt(layer_data_dir + 'welding.csv',
-                        np.array([weld_timestamp, weld_voltage, weld_current, weld_feedrate, weld_energy]).T, delimiter=',',
-                        header='timestamp,voltage,current,feedrate,energy', comments='')
-            np.savetxt(layer_data_dir + 'weld_js_exe.csv',rob_js_exe,delimiter=',')
-            np.savetxt(layer_data_dir + 'weld_robot_stamps.csv',rob_stamps,delimiter=',')
-        
-        print("Weld actual weld time:",time.time()-weld_motion_weld_st)
-        weld_to_home_st = time.time()
+            ## use vel=1 and times the desired speed
+            s1_all,s2_all=calc_individual_speed(1,lam1,lam2,lam_relative,breakpoints)
+            s1_all=np.multiply(s1_all,this_weld_v)
+            s2_all=np.multiply(s2_all,this_weld_v)
 
-        # move home
-        # input("Press Enter to Move Home")
-        mp=MotionProgram(ROBOT_CHOICE='RB1',pulse2deg=robot_weld.pulse2deg)
-        mp.MoveJ(np.zeros(6), to_start_speed, 0)
-        robot_client.execute_motion_program(mp)
+            ###move to intermidieate waypoint for collision avoidance if multiple section
+            # if num_sections!=num_sections_prev:
+            waypoint_pose=robot_weld.fwd(curve_sliced_js[breakpoints[0]])
+            waypoint_pose.p[-1]+=50
+            q1=robot_weld.inv(waypoint_pose.p,waypoint_pose.R,curve_sliced_js[breakpoints[0]])[0]
+            q2=positioner_js[breakpoints[0]]
+            ws.jog_dual(robot_weld,positioner,q1,q2)
 
-        print("Weld to home time:",time.time()-weld_to_home_st)
-        print("Weld Motion Time:",time.time()-weld_motion_st)
-        ######################################################
+            ######################################################
+            ########### Do welding #############
+            q1_all=[curve_sliced_js[breakpoints[0]]]
+            q2_all=[positioner_js[breakpoints[0]]]
+            v1_all=[1]
+            v2_all=[10]
+            primitives=['movej']
+            for j in range(1,len(breakpoints)):
+                q1_all.append(curve_sliced_js[breakpoints[j]])
+                q2_all.append(positioner_js[breakpoints[j]])
+                v1_all.append(max(s1_all[j-1],0.1))
+                positioner_w=vd_relative/np.linalg.norm(curve_sliced_relative[breakpoints[j]][:2])
+                v2_all.append(min(100,100*positioner_w/positioner.joint_vel_limit[1]))
+                primitives.append('movel')
 
-        print("Weld Time:",time.time()-weld_st)
+            q_prev=positioner_js[breakpoints[-1]]
+
+            ####DATA LOGGING
+            if save_weld_record:
+                clean_weld_record()
+            rob_stamps,rob_js_exe,_,_=ws.weld_segment_dual(primitives,robot_weld,positioner,q1_all,q2_all,v1_all,v2_all,cond_all=[200],arc=True)
+            if save_weld_record:
+                Path(data_dir).mkdir(exist_ok=True)
+                layer_data_dir=data_dir+'layer_'+str(layer)+'_'+str(x)+'/'
+                Path(layer_data_dir).mkdir(exist_ok=True)
+                np.savetxt(layer_data_dir + 'welding.csv',
+                            np.array([weld_timestamp, weld_voltage, weld_current, weld_feedrate, weld_energy]).T, delimiter=',',
+                            header='timestamp,voltage,current,feedrate,energy', comments='')
+                np.savetxt(layer_data_dir + 'weld_js_exe.csv',rob_js_exe,delimiter=',')
+                np.savetxt(layer_data_dir + 'weld_robot_stamps.csv',rob_stamps,delimiter=',')
+            
+            all_curve_relative.append(curve_sliced_relative)
+
     #### scanning
     if True:
         scan_st = time.time()
@@ -293,7 +238,7 @@ for i in range(0,len(weld_z_height)):
             # exit()
 
             data_dir=curve_data_dir+'../weld_scan_2023_06_13_10_56_01/'
-            layer_data_dir=data_dir+'layer_'+str(i)+'/'
+            layer_data_dir=data_dir+'layer_'+str(layer)+'/'
             
         scan_plan_st = time.time()
         # 2. Scanning parameters
@@ -458,5 +403,8 @@ for i in range(0,len(weld_z_height)):
         break
 
     print("Print Cycle Time:",time.time()-cycle_st)
+
+    ## increase layer num
+    layer+=1
 
 print("Welding End!!")
