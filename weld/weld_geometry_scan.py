@@ -44,41 +44,8 @@ def wire_cb(sub, value, ts):
     weld_feedrate.append(value.wire_speed)
     weld_energy.append(value.welding_energy)
 
-def robot_weld_path_gen(all_layer_z,forward_flag,base_layer):
-    R=np.array([[-0.7071, 0.7071, -0.    ],
-            [ 0.7071, 0.7071,  0.    ],
-            [0.,      0.,     -1.    ]])
-    x0 =  1684	# Origin x coordinate
-    y0 = -1179 + 428	# Origin y coordinate
-    z0 = -260   # 10 mm distance to base
-
-    weld_p=[]
-    if base_layer: # base layer
-        weld_p.append([x0 - 33, y0 - 20, z0+10])
-        weld_p.append([x0 - 33, y0 - 20, z0])
-        weld_p.append([x0 - 33, y0 - 105 , z0])
-        weld_p.append([x0 - 33, y0 - 105 , z0+10])
-    else: # top layer
-        weld_p.append([x0 - 33, y0 - 30, z0+10])
-        weld_p.append([x0 - 33, y0 - 30, z0])
-        weld_p.append([x0 - 33, y0 - 95 , z0])
-        weld_p.append([x0 - 33, y0 - 95 , z0+10])
-
-    if not forward_flag:
-        weld_p = weld_p[::-1]
-
-    all_path_T=[]
-    for layer_z in all_layer_z:
-        path_T=[]
-        for p in weld_p:
-            path_T.append(Transform(R,p+np.array([0,0,layer_z])))
-
-        all_path_T.append(path_T)
-    
-    return all_path_T
-
 zero_config=np.zeros(6)
-# 0. robots. Note use "(robot)_pose_mocapcalib.csv"
+# 0. robots.
 config_dir='../config/'
 robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',d=15,tool_file_path=config_dir+'torch.csv',\
 	pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',\
@@ -123,25 +90,28 @@ save_weld_record=True
 
 # exit()
 
+dataset='cup/'
+sliced_alg='circular_slice_shifted/'
+curve_data_dir = '../data/'+dataset+sliced_alg
+
 current_time = datetime.datetime.now()
 formatted_time = current_time.strftime('%Y_%m_%d_%H_%M_%S.%f')[:-7]
-data_dir='../data/wall_weld_test/weld_scan_'+formatted_time+'/'
+data_dir=curve_data_dir+'../weld_scan_'+formatted_time+'/'
 
-## rr drivers and all other drivers
+# ## rr drivers and all other drivers
 robot_client=MotionProgramExecClient()
-# weld state logging
-sub = RRN.SubscribeService('rr+tcp://192.168.55.10:60823?service=welder')
-obj = sub.GetDefaultClientWait(3)  # connect, timeout=30s
-welder_state_sub = sub.SubscribeWire("welder_state")
-welder_state_sub.WireValueChanged += wire_cb
-# MTI connect to RR
-mti_client = RRN.ConnectService("rr+tcp://192.168.55.10:60830/?service=MTI2D")
-mti_client.setExposureTime("25")
+# # weld state logging
+# sub = RRN.SubscribeService('rr+tcp://192.168.55.10:60823?service=welder')
+# obj = sub.GetDefaultClientWait(3)  # connect, timeout=30s
+# welder_state_sub = sub.SubscribeWire("welder_state")
+# welder_state_sub.WireValueChanged += wire_cb
+# # MTI connect to RR
+# mti_client = RRN.ConnectService("rr+tcp://192.168.55.10:60830/?service=MTI2D")
+# mti_client.setExposureTime("25")
 ###################################
-forward_flag = False
 base_layer = False
 profile_height=None
-Transz0_H=None
+Transz0_H=np.eye(4)
 curve_sliced_relative=None
 last_mean_h = 0
 
@@ -150,7 +120,7 @@ for i in range(0,len(weld_z_height)):
     print("Layer:",i)
     #### welding
     weld_st = time.time()
-    if i>=0 and True:
+    if i>=0 and False:
         weld_plan_st = time.time()
         if i>=2:
             base_layer=False
@@ -213,22 +183,6 @@ for i in range(0,len(weld_z_height)):
                 last_profile_height=np.load(data_dir+'layer_5/scans/height_profile.npy')
                 last_mean_h=np.mean(last_profile_height[:,1])
                 profile_height=np.load(data_dir+'layer_6/scans/height_profile.npy')
-                
-
-            ## parameters
-            # noise_h_thres = 3
-            # peak_threshold=0.25
-            # flat_threshold=2.5
-            # correct_thres = 1.4 # mm
-            # patch_nb = 2 # 2*0.1
-            # start_ramp_ratio = 0.67
-            # end_ramp_ratio = 0.33
-            #############
-            # curve_sliced_relative,path_T_S1,this_weld_v,all_dh,last_mean_h=\
-            #     strategy_2(profile_height,last_mean_h,forward_flag,curve_sliced_relative,R_S1TCP,this_weld_v[0],\
-            #             noise_h_thres=noise_h_thres,peak_threshold=peak_threshold,flat_threshold=flat_threshold,\
-            #             correct_thres=correct_thres,patch_nb=patch_nb,\
-            #             start_ramp_ratio=start_ramp_ratio,end_ramp_ratio=end_ramp_ratio)
 
             ## parameters
             noise_h_thres = 3
@@ -329,15 +283,18 @@ for i in range(0,len(weld_z_height)):
     if True:
         scan_st = time.time()
         if curve_sliced_relative is None:
-            data_dir='../data/wall_weld_test/weld_scan_2023_06_13_10_56_01/'
-            last_profile_height=np.load('../data/wall_weld_test/weld_scan_2023_06_13_10_56_01/layer_17/scans/height_profile.npy')
-            last_mean_h=np.mean(last_profile_height[:,1])
-            h_largest=np.max(last_profile_height[:,1])
-            layer_data_dir=data_dir+'layer_'+str(i)+'/'
-            curve_sliced_relative=[np.array([ 3.30445152e+01,  1.72700000e+00,  3.31751393e+01,  1.55554573e-04,
-       -6.31394918e-20, -9.99881509e-01]), np.array([-3.19477829e+01,  1.72700000e+00,  3.31751393e+01,  1.55554573e-04,
-       -6.31394918e-20, -9.99881509e-01])]
+            curve_sliced_relative=np.loadtxt(curve_data_dir+'curve_sliced_relative/slice'+str(1)+'_'+str(0)+'.csv',delimiter=',')
+            
+            # print(curve_sliced_relative)
+            # dlam = np.linalg.norm(np.diff(curve_sliced_relative[:,:3],axis=0),axis=1)
+            # print(dlam[:10])
+            # plt.plot(dlam,'-o')
+            # plt.show()
+            # exit()
 
+            data_dir=curve_data_dir+'../weld_scan_2023_06_13_10_56_01/'
+            layer_data_dir=data_dir+'layer_'+str(i)+'/'
+            
         scan_plan_st = time.time()
         # 2. Scanning parameters
         ### scan parameters
@@ -355,11 +312,7 @@ for i in range(0,len(weld_z_height)):
                     [ 0.,1.,0.],
                     [0.,0.,-1.]])
         # generate scan path
-        if forward_flag:
-            scan_p,scan_R,q_out1,q_out2=spg.gen_scan_path([curve_sliced_relative],[0],all_scan_angle,\
-                            solve_js_method=0,q_init_table=q_init_table,R_path=mti_Rpath,scan_path_dir=None)
-        else:
-            scan_p,scan_R,q_out1,q_out2=spg.gen_scan_path([curve_sliced_relative[::-1]],[0],all_scan_angle,\
+        scan_p,scan_R,q_out1,q_out2=spg.gen_scan_path([curve_sliced_relative],[0],all_scan_angle,\
                             solve_js_method=0,q_init_table=q_init_table,R_path=mti_Rpath,scan_path_dir=None)
         # generate motion program
         q_bp1,q_bp2,s1_all,s2_all=spg.gen_motion_program(q_out1,q_out2,scan_p,scan_speed,init_sync_move=0)
@@ -380,7 +333,6 @@ for i in range(0,len(weld_z_height)):
         scan_motion_st = time.time()
         ######## scanning motion #########
         ### execute motion ###
-        robot_client=MotionProgramExecClient()
         # input("Press Enter and move to scanning startint point")
 
         ## move to start
@@ -480,36 +432,18 @@ for i in range(0,len(weld_z_height)):
 
     recon_3d_st = time.time()
     #### scanning process: processing point cloud and get h
-    try:
-        if forward_flag:
-            curve_x_start = deepcopy(curve_sliced_relative[0][0])
-            curve_x_end = deepcopy(curve_sliced_relative[-1][0])
-        else:
-            curve_x_start = deepcopy(curve_sliced_relative[-1][0])
-            curve_x_end = deepcopy(curve_sliced_relative[0][0])
-    except:
-        curve_x_start=43
-        curve_x_end=-41
-    # Transz0_H=np.array([[ 9.99974559e-01, -7.29664987e-06, -7.13309345e-03, -1.06461758e-02],
-    #                     [-7.29664987e-06,  9.99997907e-01, -2.04583032e-03, -3.05341146e-03],
-    #                     [ 7.13309345e-03,  2.04583032e-03,  9.99972466e-01,  1.49246365e+00],
-    #                     [ 0.00000000e+00,  0.00000000e+00,  0.00000000e+00,  1.00000000e+00]])
-    z_height_start=h_largest-3
     crop_extend=10
-    crop_min=(curve_x_end-crop_extend,-30,-10)
-    crop_max=(curve_x_start+crop_extend,30,z_height_start+30)
-    crop_h_min=(curve_x_end-crop_extend,-20,-10)
-    crop_h_max=(curve_x_start+crop_extend,20,z_height_start+30)
+    crop_min=tuple(np.min(curve_sliced_relative[:][:3],axis=0)-crop_extend)
+    crop_max=tuple(np.max(curve_sliced_relative[:][:3],axis=0)+crop_extend)
     scan_process = ScanProcess(robot_scan,positioner)
-    pcd = scan_process.pcd_register_mti(mti_recording,q_out_exe,robot_stamps,static_positioner_q=q_init_table)
+    pcd = scan_process.pcd_register_mti(mti_recording,q_out_exe,robot_stamps)
     pcd = scan_process.pcd_noise_remove(pcd,nb_neighbors=40,std_ratio=1.5,\
                                         min_bound=crop_min,max_bound=crop_max,cluster_based_outlier_remove=True,cluster_neighbor=1,min_points=100)
-    print("3D Reconstruction:",time.time()-recon_3d_st)
+    print("3D Reconstruction Time:",time.time()-recon_3d_st)
     get_h_st = time.time()
-    profile_height,Transz0_H = scan_process.pcd2height(deepcopy(pcd),z_height_start,bbox_min=crop_h_min,bbox_max=crop_h_max,Transz0_H=Transz0_H)
-    print("Transz0_H:",Transz0_H)
+    profile_height = scan_process.pcd2dh(pcd,curve_sliced_relative)
     
-    print("Get Height:",time.time()-get_h_st)
+    print("Get Height Time:",time.time()-get_h_st)
 
     save_output_points=True
     if save_output_points:
@@ -522,8 +456,6 @@ for i in range(0,len(weld_z_height)):
 
     if np.mean(profile_height[:,1])>final_height and np.std(profile_height[:,1])<final_h_std_thres:
         break
-
-    forward_flag=not forward_flag
 
     print("Print Cycle Time:",time.time()-cycle_st)
 
