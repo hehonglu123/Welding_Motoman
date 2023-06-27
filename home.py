@@ -17,7 +17,7 @@ positioner=positioner_obj('D500B',def_path=config_dir+'D500B_robot_default_confi
 
 q1=np.array([0,0,0,0,0,0])
 q2=np.array([90,0,0,0,0,0])
-q3=[-15,180]
+q3=[-15,18]
 
 robot_client=MotionProgramExecClient()
 mp = MotionProgram(ROBOT_CHOICE='RB1', pulse2deg=robot_weld.pulse2deg)
