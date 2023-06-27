@@ -396,3 +396,7 @@ def strategy_3(profile_height,input_dh,curve_sliced_relative,R_S1TCP,num_l,noise
         plt.show()
     
     return curve_sliced_relative_correct,path_T_S1,this_weld_v,all_dh,mean_h
+
+def strategy_4():
+
+    pass
