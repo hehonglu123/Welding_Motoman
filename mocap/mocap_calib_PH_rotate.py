@@ -99,8 +99,8 @@ robot_type='R1'
 # robot_type='S1'
 
 # all_datasets=['train_data','valid_data_1','valid_data_2']
-dataset_date='0621'
-all_datasets=['test'+dataset_date+'_R1/train_data']
+dataset_date='0627'
+all_datasets=['test'+dataset_date+'_R1_aftercalib/train_data']
 
 if robot_type=='R1':
     base_marker_config_file=config_dir+'MA2010_marker_config.yaml'

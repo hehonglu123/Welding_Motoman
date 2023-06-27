@@ -240,7 +240,7 @@ def calib_S1():
 
 def calib_R1():
 
-    dataset_date = '0621'
+    dataset_date = '0627'
 
     config_dir='../config/'
     robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path=config_dir+'torch.csv',\
@@ -289,6 +289,7 @@ def calib_R1():
             for dq in dq_sample:
                 q_paths.append(target_q+dq)
     print("total pose:",len(q_paths))
+    print("Data Base:",dataset_date)
 
     # exit()
 

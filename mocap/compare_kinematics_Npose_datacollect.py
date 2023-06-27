@@ -14,7 +14,7 @@ import time
 import pickle
 from MocapPoseListener import *
 
-dataset_date = '0621'
+dataset_date = '0627'
 
 config_dir='../config/'
 # robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path=config_dir+'weldgun.csv',d=15,\
