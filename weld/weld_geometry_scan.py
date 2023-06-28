@@ -87,7 +87,8 @@ with open(data_dir+'slicing.yml', 'r') as file:
 des_dh = 1.5
 des_dw = 4
 waypoint_distance=5 	###waypoint separation
-layer_width_num=int(4/slicing_meta['line_resolution'])
+layer_height_num=int(1.5/slicing_meta['line_resolution']) # preplanned
+layer_width_num=int(4/slicing_meta['line_resolution']) # preplanned
 
 final_height=50
 final_h_std_thres=0.48
@@ -127,8 +128,10 @@ curve_sliced_relative=None
 last_mean_h = 0
 
 layer=0
+layer_count=0
 while True:
     print("Layer:",layer)
+    print("Layer Count:",layer)
     ####################DETERMINE CURVE ORDER##############################################
     all_curve_relative=[]
     num_sections=len(glob.glob(curve_data_dir+'curve_sliced_relative/slice'+str(layer)+'_*.csv'))
@@ -156,6 +159,8 @@ while True:
 
                 ## parameters
                 nominal_v=18
+
+                #### correction strategy
                 curve_sliced_relative,this_weld_v,all_dh=\
                     strategy_4()
             ####################
