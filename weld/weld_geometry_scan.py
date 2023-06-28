@@ -22,6 +22,8 @@ import time
 import datetime
 import numpy as np
 import glob
+import yaml
+from math import ceil,floor
 
 weld_timestamp=[]
 weld_voltage=[]
@@ -83,33 +85,22 @@ data_dir=curve_data_dir+'../weld_scan_'+formatted_time+'/'
 #### welding spec, goal
 with open(data_dir+'slicing.yml', 'r') as file:
     slicing_meta = yaml.safe_load(file)
+line_resolution = slicing_meta['line_resolution']
 
-des_dh = 1.5
+weld_mode=160
+des_dh = 1.4
+des_v = round(dh2v_loglog(des_dh,weld_mode),1)
+print("The Desired speed (according to desired h",des_dh,"will be",\
+      des_v,"mm/sec")
 des_dw = 4
-waypoint_distance=5 	###waypoint separation
-layer_height_num=int(1.5/slicing_meta['line_resolution']) # preplanned
-layer_width_num=int(4/slicing_meta['line_resolution']) # preplanned
+waypoint_distance=1.625 	###waypoint separation (calculate from 40moveL/95mm, where we did the test)
+layer_height_num=int(des_dh/line_resolution) # preplanned
+layer_width_num=int(des_dw/line_resolution) # preplanned
+des_job=200
 
-final_height=50
-final_h_std_thres=0.48
-weld_z_height=[0,6,8] # two base layer height to first top layer
-weld_z_height=np.append(weld_z_height,np.arange(weld_z_height[-1],final_height,1)+1)
-# job_number=[115,115]
-job_number=[215,215]
-job_number=np.append(job_number,np.ones(len(weld_z_height)-2)*206)
-print(weld_z_height)
-print(job_number)
-
-weld_velocity=[5,5]
-weld_v=18
-for i in range(len(weld_z_height)-2):
-    weld_velocity.append(weld_v)
-    # if weld_v==weld_velocity[-2]:
-    #     weld_v+=2
-
-print(weld_velocity)
-# exit()
-save_weld_record=True
+### preplanned v,height for first few layer
+planned_v=[5,5]
+planned_layer=[0,layer_height_num]
 
 # ## rr drivers and all other drivers
 # robot_client=MotionProgramExecClient()
@@ -123,15 +114,26 @@ ws=WeldSend(robot_client)
 # mti_client = RRN.ConnectService("rr+tcp://192.168.55.10:60830/?service=MTI2D")
 # mti_client.setExposureTime("25")
 ###################################
+start_feedback=2
+save_weld_record=True
+
 profile_height=None
 curve_sliced_relative=None
-last_mean_h = 0
-
+last_curve_sliced_relative=None
 layer=0
 layer_count=0
+mean_h=0
+mean_layer_dh=None
 while True:
-    print("Layer:",layer)
-    print("Layer Count:",layer)
+    print("Layer Count:",layer_count)
+    ####### Decide which layer to print #######
+    if layer_count!=0 and layer_count<start_feedback:
+        layer+=layer_height_num
+    else:
+        dlayer = int(round(mean_layer_dh/line_resolution)) # find the "delta layer" using dh
+        layer = layer+dlayer # update layer
+
+    print("Print Layer:",layer)
     ####################DETERMINE CURVE ORDER##############################################
     all_curve_relative=[]
     num_sections=len(glob.glob(curve_data_dir+'curve_sliced_relative/slice'+str(layer)+'_*.csv'))
@@ -140,35 +142,12 @@ while True:
         if layer>=0 and True:
 
             # 1. The curve path in "positioner tcp frame"
+            # Load nominal path given the layer
             curve_sliced_js=np.loadtxt(curve_data_dir+'curve_sliced_js/MA2010_js'+str(layer)+'_'+str(x)+'.csv',delimiter=',').reshape((-1,6))
             if len(curve_sliced_js)<2:
                 continue
             positioner_js=np.loadtxt(curve_data_dir+'curve_sliced_js/D500B_js'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
             curve_sliced_relative=np.loadtxt(curve_data_dir+'curve_sliced_relative/slice'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
-
-            #### Correction ####
-            if (i<=2): # no correction
-                pass
-
-            else: # start correction from 2nd top layer
-                
-                if profile_height is None:
-                    data_dir=curve_data_dir+'../weld_scan_2023_06_13_10_56_01/'
-                    layer_data_dir=data_dir+'layer_'+str(layer)+'/'
-                    profile_height=np.load(layer_data_dir+'scans/height_profile.npy')
-
-                ## parameters
-                nominal_v=18
-
-                #### correction strategy
-                curve_sliced_relative,this_weld_v,all_dh=\
-                    strategy_4()
-            ####################
-            print("dh:",all_dh)
-            print("Nominal V:",weld_velocity[i])
-            print("Correct V:",this_weld_v)
-            print("curve_sliced_relative:",curve_sliced_relative)
-            print(len(curve_sliced_relative))
 
             #### convert to R1 and S1 motion
             lam1=calc_lam_js(curve_sliced_js,robot_weld)
@@ -182,6 +161,26 @@ while True:
                 breakpoints=np.linspace(0,len(curve_sliced_js)-1,num=num_points_layer).astype(int)
             else:
                 breakpoints=np.linspace(len(curve_sliced_js)-1,0,num=num_points_layer).astype(int)
+
+            #### Correction ####
+            if (layer_count<start_feedback): # no correction
+                pass
+            else: # start correction after "start_feedback"
+                if profile_height is None:
+                    data_dir=curve_data_dir+'../weld_scan_2023_06_13_10_56_01/'
+                    layer_data_dir=data_dir+'layer_'+str(layer)+'/'
+                    profile_height=np.load(layer_data_dir+'scans/height_profile'+str(x)+'.npy')
+
+                ## parameters
+
+                #### correction strategy
+                this_weld_v,all_dh=\
+                    strategy_4(profile_height,des_dh,curve_sliced_relative,last_curve_sliced_relative,breakpoints)
+            ####################
+            print("dh:",all_dh)
+            print("Nominal V:",des_v)
+            print("Corrected V:",this_weld_v)
+            print(len(curve_sliced_relative))
 
             ## use vel=1 and times the desired speed
             s1_all,s2_all=calc_individual_speed(1,lam1,lam2,lam_relative,breakpoints)
@@ -409,7 +408,7 @@ while True:
 
     print("Print Cycle Time:",time.time()-cycle_st)
 
-    ## increase layer num
-    layer+=1
+    ## increase layer count
+    layer_count+=1
 
 print("Welding End!!")
