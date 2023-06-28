@@ -52,3 +52,6 @@ if __name__=='__main__':
     quad_v=dh2v_quadratic(dh,160)
     print(loglog_v)
     print(quad_v)
+
+    print(v2dh_loglog(17.,160))
+    print(dh2v_loglog(1.4,160))
