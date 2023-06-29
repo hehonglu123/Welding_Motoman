@@ -83,7 +83,7 @@ formatted_time = current_time.strftime('%Y_%m_%d_%H_%M_%S.%f')[:-7]
 data_dir=curve_data_dir+'../weld_scan_'+formatted_time+'/'
 
 #### welding spec, goal
-with open(data_dir+'slicing.yml', 'r') as file:
+with open(curve_data_dir+'slicing.yml', 'r') as file:
     slicing_meta = yaml.safe_load(file)
 line_resolution = slicing_meta['line_resolution']
 
@@ -102,6 +102,16 @@ des_job=200
 planned_v=[5,5]
 planned_layer=[0,layer_height_num]
 
+# 2. Scanning parameters
+### scan parameters
+scan_speed=10 # scanning speed (mm/sec)
+scan_stand_off_d = 95 ## mm
+Rz_angle = np.radians(0) # point direction w.r.t welds
+Ry_angle = np.radians(0) # rotate in y a bit
+bounds_theta = np.radians(1) ## circular motion at start and end
+all_scan_angle = np.radians([0]) ## scan angle
+q_init_table=np.radians([-15,200]) ## init table
+
 # ## rr drivers and all other drivers
 # robot_client=MotionProgramExecClient()
 ws=WeldSend(robot_client)
@@ -116,11 +126,13 @@ ws=WeldSend(robot_client)
 ###################################
 start_feedback=2
 save_weld_record=True
+save_output_points=True
 
-profile_height=None
+all_profile_height=None
 curve_sliced_relative=None
-last_curve_sliced_relative=None
+all_last_curve_relative=None
 layer=0
+last_layer=-1
 layer_count=0
 mean_h=0
 mean_layer_dh=None
@@ -131,6 +143,7 @@ while True:
         layer+=layer_height_num
     else:
         dlayer = int(round(mean_layer_dh/line_resolution)) # find the "delta layer" using dh
+        last_layer = layer # update last layer
         layer = layer+dlayer # update layer
 
     print("Print Layer:",layer)
@@ -164,18 +177,23 @@ while True:
 
             #### Correction ####
             if (layer_count<start_feedback): # no correction
-                pass
+                this_weld_v=planned_v[layer_count]
             else: # start correction after "start_feedback"
-                if profile_height is None:
-                    data_dir=curve_data_dir+'../weld_scan_2023_06_13_10_56_01/'
-                    layer_data_dir=data_dir+'layer_'+str(layer)+'/'
-                    profile_height=np.load(layer_data_dir+'scans/height_profile'+str(x)+'.npy')
+                if all_profile_height is None:
+                    last_num_sections=len(glob.glob(curve_data_dir+'curve_sliced_relative/slice'+str(last_layer)+'_*.csv'))
+                    all_profile_height=[]
+                    all_last_curve_relative=[]
+                    for x in range(0,last_num_sections,layer_width_num):
+                        all_last_curve_relative.extend(np.loadtxt(curve_data_dir+'curve_sliced_relative/slice'+str(last_layer)+'_'+str(x)+'.csv',delimiter=','))
+                        layer_data_dir=data_dir+'layer_'+str(layer)+'_'+str(x)+'/'
+                        out_scan_dir = layer_data_dir+'scans/'
+                        all_profile_height.extend(np.load(out_scan_dir+'height_profile.npy'))
 
                 ## parameters
-
                 #### correction strategy
                 this_weld_v,all_dh=\
-                    strategy_4(profile_height,des_dh,curve_sliced_relative,last_curve_sliced_relative,breakpoints)
+                    strategy_4(all_profile_height,des_dh,curve_sliced_relative,all_last_curve_relative,breakpoints)
+                
             ####################
             print("dh:",all_dh)
             print("Nominal V:",des_v)
@@ -230,183 +248,130 @@ while True:
 
     #### scanning
     if True:
-        scan_st = time.time()
-        if curve_sliced_relative is None:
-            curve_sliced_relative=np.loadtxt(curve_data_dir+'curve_sliced_relative/slice'+str(1)+'_'+str(0)+'.csv',delimiter=',')
+        if len(all_curve_relative) ==0:
+            num_sections=len(glob.glob(curve_data_dir+'curve_sliced_relative/slice'+str(layer)+'_*.csv'))
+            all_curve_relative=[]
+            for x in range(0,num_sections,layer_width_num):
+                all_curve_relative.append(np.loadtxt(curve_data_dir+'curve_sliced_relative/slice'+str(layer)+'_'+str(x)+'.csv',delimiter=','))
+
+        all_profile_height=[]
+        all_last_curve_relative=[]
+        section_count=0
+        for curve_sliced_relative in all_curve_relative:    
+        
+            ### scanning path module
+            spg = ScanPathGen(robot_scan,positioner,scan_stand_off_d,Rz_angle,Ry_angle,bounds_theta)
+            mti_Rpath = np.array([[ -1.,0.,0.],   
+                        [ 0.,1.,0.],
+                        [0.,0.,-1.]])
+            # generate scan path
+            scan_p,scan_R,q_out1,q_out2=spg.gen_scan_path([curve_sliced_relative],[0],all_scan_angle,\
+                                solve_js_method=1,q_init_table=q_init_table,R_path=mti_Rpath,scan_path_dir=None)
+            # generate motion program
+            q_bp1,q_bp2,s1_all,s2_all=spg.gen_motion_program(q_out1,q_out2,scan_p,scan_speed,init_sync_move=0)
+            #######################################
+
+            ######## scanning motion #########
+            ### execute motion ###
+            # input("Press Enter and move to scanning startint point")
+
+            ## move to start
+            to_start_speed=7
+            mp = MotionProgram(ROBOT_CHOICE='RB2',ROBOT_CHOICE2='ST1',pulse2deg=robot_scan.pulse2deg,pulse2deg_2=positioner.pulse2deg)
+            target2=['MOVJ',np.degrees(q_bp2[0][0]),to_start_speed]
+            mp.MoveJ(np.degrees(q_bp1[0][0]), to_start_speed, 0, target2=target2)
+            robot_client.execute_motion_program(mp)
+
+            input("Press Enter to start moving and scanning")
+
+            ## motion start
+            mp = MotionProgram(ROBOT_CHOICE='RB2',ROBOT_CHOICE2='ST1',pulse2deg=robot_scan.pulse2deg,pulse2deg_2=positioner.pulse2deg)
+            # calibration motion
+            target2=['MOVJ',np.degrees(q_bp2[1][0]),s2_all[0]]
+            mp.MoveL(np.degrees(q_bp1[1][0]), scan_speed, 0, target2=target2)
+            # routine motion
+            for path_i in range(2,len(q_bp1)-1):
+                target2=['MOVJ',np.degrees(q_bp2[path_i][0]),s2_all[path_i]]
+                mp.MoveL(np.degrees(q_bp1[path_i][0]), s1_all[path_i], target2=target2)
+            target2=['MOVJ',np.degrees(q_bp2[-1][0]),s2_all[-1]]
+            mp.MoveL(np.degrees(q_bp1[-1][0]), s1_all[-1], 0, target2=target2)
+
+            robot_client.execute_motion_program_nonblocking(mp)
+            ###streaming
+            robot_client.StartStreaming()
+            start_time=time.time()
+            state_flag=0
+            joint_recording=[]
+            robot_stamps=[]
+            mti_recording=[]
+            r_pulse2deg = np.append(robot_scan.pulse2deg,positioner.pulse2deg)
+            while True:
+                if state_flag & 0x08 == 0 and time.time()-start_time>1.:
+                    break
+                res, data = robot_client.receive_from_robot(0.01)
+                if res:
+                    joint_angle=np.radians(np.divide(np.array(data[26:34]),r_pulse2deg))
+                    state_flag=data[16]
+                    joint_recording.append(joint_angle)
+                    timestamp=data[0]+data[1]*1e-9
+                    robot_stamps.append(timestamp)
+                    ###MTI scans YZ point from tool frame
+                    mti_recording.append(deepcopy(np.array([mti_client.lineProfile.X_data,mti_client.lineProfile.Z_data])))
+            robot_client.servoMH(False)
             
-            # print(curve_sliced_relative)
-            # dlam = np.linalg.norm(np.diff(curve_sliced_relative[:,:3],axis=0),axis=1)
-            # print(dlam[:10])
-            # plt.plot(dlam,'-o')
+            mti_recording=np.array(mti_recording)
+            q_out_exe=joint_recording
+
+            # input("Press Enter to Move Home")
+            # move robot to home
+            q2=np.zeros(6)
+            q2[0]=90
+            q3=[-15,180]
+            mp=MotionProgram(ROBOT_CHOICE='RB2',pulse2deg=robot_scan.pulse2deg)
+            mp.MoveJ(q2,5,0)
+            robot_client.execute_motion_program(mp)
+            mp=MotionProgram(ROBOT_CHOICE='ST1',pulse2deg=positioner.pulse2deg)
+            mp.MoveJ(q3,10,0)
+            robot_client.execute_motion_program(mp)
+            #####################
+            # exit()
+
+            print("Total exe len:",len(q_out_exe))
+            if save_output_points:
+                layer_data_dir=data_dir+'layer_'+str(layer)+'_'+str(section_count)+'/'
+                out_scan_dir = layer_data_dir+'scans/'
+                Path(out_scan_dir).mkdir(exist_ok=True)
+                ## save traj
+                # save poses
+                np.savetxt(out_scan_dir + 'scan_js_exe.csv',q_out_exe,delimiter=',')
+                np.savetxt(out_scan_dir + 'scan_robot_stamps.csv',robot_stamps,delimiter=',')
+                with open(out_scan_dir + 'mti_scans.pickle', 'wb') as file:
+                    pickle.dump(mti_recording, file)
+                print('Total scans:',len(mti_recording))
+            ########################
+
+            #### scanning process: processing point cloud and get h
+            crop_extend=10
+            crop_min=tuple(np.min(curve_sliced_relative[:][:3],axis=0)-crop_extend)
+            crop_max=tuple(np.max(curve_sliced_relative[:][:3],axis=0)+crop_extend)
+            scan_process = ScanProcess(robot_scan,positioner)
+            pcd = scan_process.pcd_register_mti(mti_recording,q_out_exe,robot_stamps)
+            pcd = scan_process.pcd_noise_remove(pcd,nb_neighbors=40,std_ratio=1.5,\
+                                                min_bound=crop_min,max_bound=crop_max,cluster_based_outlier_remove=True,cluster_neighbor=1,min_points=100)
+            profile_height = scan_process.pcd2dh(pcd,curve_sliced_relative)
+
+            all_profile_height.extend(profile_height)
+            all_last_curve_relative.extend(curve_sliced_relative)
+            
+            if save_output_points:
+                o3d.io.write_point_cloud(out_scan_dir+'processed_pcd.pcd',pcd)
+                np.save(out_scan_dir+'height_profile.npy',profile_height)
+            # visualize_pcd([pcd])
+            # plt.scatter(profile_height[:,0],profile_height[:,1])
             # plt.show()
             # exit()
 
-            data_dir=curve_data_dir+'../weld_scan_2023_06_13_10_56_01/'
-            layer_data_dir=data_dir+'layer_'+str(layer)+'/'
-            
-        scan_plan_st = time.time()
-        # 2. Scanning parameters
-        ### scan parameters
-        scan_speed=10 # scanning speed (mm/sec)
-        scan_stand_off_d = 95 ## mm
-        Rz_angle = np.radians(0) # point direction w.r.t welds
-        Ry_angle = np.radians(0) # rotate in y a bit
-        bounds_theta = np.radians(1) ## circular motion at start and end
-        all_scan_angle = np.radians([0]) ## scan angle
-        q_init_table=np.radians([-15,200]) ## init table
-        save_output_points = True
-        ### scanning path module
-        spg = ScanPathGen(robot_scan,positioner,scan_stand_off_d,Rz_angle,Ry_angle,bounds_theta)
-        mti_Rpath = np.array([[ -1.,0.,0.],   
-                    [ 0.,1.,0.],
-                    [0.,0.,-1.]])
-        # generate scan path
-        scan_p,scan_R,q_out1,q_out2=spg.gen_scan_path([curve_sliced_relative],[0],all_scan_angle,\
-                            solve_js_method=0,q_init_table=q_init_table,R_path=mti_Rpath,scan_path_dir=None)
-        # generate motion program
-        q_bp1,q_bp2,s1_all,s2_all=spg.gen_motion_program(q_out1,q_out2,scan_p,scan_speed,init_sync_move=0)
-
-        # print(np.degrees(q_out1[:10]))
-        # print(np.degrees(q_out1[-10:]))
-        # plt.plot(np.degrees(q_out1))
-        # plt.legend(['J1','J2','J3','J4','J5','J6'])
-        # plt.show()
-        # print(scan_p[0],scan_R[0])
-        # print(robot_scan.fwd(q_out1[0]))
-        # print(robot_scan.fwd(np.zeros(6)))
-        # exit()
-        #######################################
-
-        print("Scan plan time:",time.time()-scan_plan_st)
-
-        scan_motion_st = time.time()
-        ######## scanning motion #########
-        ### execute motion ###
-        # input("Press Enter and move to scanning startint point")
-
-        ## move to start
-        to_start_speed=7
-        mp = MotionProgram(ROBOT_CHOICE='RB2',ROBOT_CHOICE2='ST1',pulse2deg=robot_scan.pulse2deg,pulse2deg_2=positioner.pulse2deg)
-        target2=['MOVJ',np.degrees(q_bp2[0][0]),to_start_speed]
-        mp.MoveJ(np.degrees(q_bp1[0][0]), to_start_speed, 0, target2=target2)
-        robot_client.execute_motion_program(mp)
-
-        print("Scan to home time:",time.time()-scan_motion_st)
-
-        input("Press Enter to start moving and scanning")
-
-        scan_motion_scan_st = time.time()
-
-        ## motion start
-        mp = MotionProgram(ROBOT_CHOICE='RB2',ROBOT_CHOICE2='ST1',pulse2deg=robot_scan.pulse2deg,pulse2deg_2=positioner.pulse2deg)
-        # calibration motion
-        target2=['MOVJ',np.degrees(q_bp2[1][0]),s2_all[0]]
-        mp.MoveL(np.degrees(q_bp1[1][0]), scan_speed, 0, target2=target2)
-        # routine motion
-        for path_i in range(2,len(q_bp1)-1):
-            target2=['MOVJ',np.degrees(q_bp2[path_i][0]),s2_all[path_i]]
-            mp.MoveL(np.degrees(q_bp1[path_i][0]), s1_all[path_i], target2=target2)
-        target2=['MOVJ',np.degrees(q_bp2[-1][0]),s2_all[-1]]
-        mp.MoveL(np.degrees(q_bp1[-1][0]), s1_all[-1], 0, target2=target2)
-
-        robot_client.execute_motion_program_nonblocking(mp)
-        ###streaming
-        robot_client.StartStreaming()
-        start_time=time.time()
-        state_flag=0
-        joint_recording=[]
-        robot_stamps=[]
-        mti_recording=[]
-        r_pulse2deg = np.append(robot_scan.pulse2deg,positioner.pulse2deg)
-        while True:
-            if state_flag & 0x08 == 0 and time.time()-start_time>1.:
-                break
-            res, data = robot_client.receive_from_robot(0.01)
-            if res:
-                joint_angle=np.radians(np.divide(np.array(data[26:34]),r_pulse2deg))
-                state_flag=data[16]
-                joint_recording.append(joint_angle)
-                timestamp=data[0]+data[1]*1e-9
-                robot_stamps.append(timestamp)
-                ###MTI scans YZ point from tool frame
-                mti_recording.append(deepcopy(np.array([mti_client.lineProfile.X_data,mti_client.lineProfile.Z_data])))
-        robot_client.servoMH(False)
-
-        print("Scan motion scan time:",time.time()-scan_motion_scan_st)
-        
-        scan_to_home_st = time.time()
-        mti_recording=np.array(mti_recording)
-        q_out_exe=joint_recording
-
-        # input("Press Enter to Move Home")
-        # move robot to home
-        q2=np.zeros(6)
-        q2[0]=90
-        q3=[-15,180]
-        mp=MotionProgram(ROBOT_CHOICE='RB2',pulse2deg=robot_scan.pulse2deg)
-        mp.MoveJ(q2,5,0)
-        robot_client.execute_motion_program(mp)
-        mp=MotionProgram(ROBOT_CHOICE='ST1',pulse2deg=positioner.pulse2deg)
-        mp.MoveJ(q3,10,0)
-        robot_client.execute_motion_program(mp)
-        #####################
-        # exit()
-
-        print("Total exe len:",len(q_out_exe))
-        if save_output_points:
-            out_scan_dir = layer_data_dir+'scans/'
-            ## save traj
-            Path(out_scan_dir).mkdir(exist_ok=True)
-            # save poses
-            np.savetxt(out_scan_dir + 'scan_js_exe.csv',q_out_exe,delimiter=',')
-            np.savetxt(out_scan_dir + 'scan_robot_stamps.csv',robot_stamps,delimiter=',')
-            with open(out_scan_dir + 'mti_scans.pickle', 'wb') as file:
-                pickle.dump(mti_recording, file)
-            print('Total scans:',len(mti_recording))
-        
-        print("Scan to home:",time.time()-scan_to_home_st)
-        print("Scan motion time:",time.time()-scan_motion_st)
-        
-        print("Scan Time:",time.time()-scan_st)
-
-    ### for scan testing
-    # out_scan_dir=data_dir='../data/wall_weld_test/weld_scan_2023_06_06_12_43_57/layer_15/scans/'
-    # q_init_table=np.radians([-15,200])
-    # h_largest=20
-    # q_out_exe=np.loadtxt(out_scan_dir + 'scan_js_exe.csv',delimiter=',')
-    # robot_stamps=np.loadtxt(out_scan_dir + 'scan_robot_stamps.csv',delimiter=',')
-    # with open(out_scan_dir + 'mti_scans.pickle', 'rb') as file:
-    #     mti_recording=pickle.load(file)
-    ########################
-
-    recon_3d_st = time.time()
-    #### scanning process: processing point cloud and get h
-    crop_extend=10
-    crop_min=tuple(np.min(curve_sliced_relative[:][:3],axis=0)-crop_extend)
-    crop_max=tuple(np.max(curve_sliced_relative[:][:3],axis=0)+crop_extend)
-    scan_process = ScanProcess(robot_scan,positioner)
-    pcd = scan_process.pcd_register_mti(mti_recording,q_out_exe,robot_stamps)
-    pcd = scan_process.pcd_noise_remove(pcd,nb_neighbors=40,std_ratio=1.5,\
-                                        min_bound=crop_min,max_bound=crop_max,cluster_based_outlier_remove=True,cluster_neighbor=1,min_points=100)
-    print("3D Reconstruction Time:",time.time()-recon_3d_st)
-    get_h_st = time.time()
-    profile_height = scan_process.pcd2dh(pcd,curve_sliced_relative)
-    
-    print("Get Height Time:",time.time()-get_h_st)
-
-    save_output_points=True
-    if save_output_points:
-        o3d.io.write_point_cloud(out_scan_dir+'processed_pcd.pcd',pcd)
-        np.save(out_scan_dir+'height_profile.npy',profile_height)
-    # visualize_pcd([pcd])
-    # plt.scatter(profile_height[:,0],profile_height[:,1])
-    # plt.show()
-    # exit()
-
-    if np.mean(profile_height[:,1])>final_height and np.std(profile_height[:,1])<final_h_std_thres:
-        break
-
-    print("Print Cycle Time:",time.time()-cycle_st)
+            section_count+=layer_width_num
 
     ## increase layer count
     layer_count+=1
