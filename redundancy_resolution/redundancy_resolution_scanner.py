@@ -52,9 +52,12 @@ class redundancy_resolution_scanner(object):
         for i in range(len(self.scan_p)):
             # if i%100==0:
             #     print(i)
+            print("==================")
+            print(i,'/',len(self.scan_p))
             try:
                 error_fb=999
                 while error_fb>0.001:
+                    print(error_fb)
                     poset1_1=self.robot.fwd(q_all1[-1])
                     poset2_2=self.positioner.fwd(q_all2[-1])
                     poset2_1=self.R2baseR_table*poset2_2
