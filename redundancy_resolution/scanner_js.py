@@ -38,6 +38,12 @@ Table_home_T = positioner.fwd(np.radians([-15,180]))
 T_S1TCP_R1Base = np.linalg.inv(np.matmul(positioner.base_H,H_from_RT(Table_home_T.R,Table_home_T.p)))
 T_R1Base_S1TCP = np.linalg.inv(T_S1TCP_R1Base)
 
+#### change limit
+robot_scan.upper_limit[4]=np.radians(82)
+robot_scan.robot.joint_upper_limit[4]=np.radians(82)
+robot_scan.lower_limit[4]=np.radians(-82)
+robot_scan.robot.joint_lower_limit[4]=np.radians(-82)
+
 #### change base H to calibrated ones ####
 robot_scan.base_H = H_from_RT(robot_scan.T_base_basemarker.R,robot_scan.T_base_basemarker.p)
 positioner.base_H = H_from_RT(positioner.T_base_basemarker.R,positioner.T_base_basemarker.p)
@@ -70,13 +76,16 @@ mti_Rpath = np.array([[ -1.,0.,0.],
                     [ 0.,1.,0.],
                     [0.,0.,-1.]])
 
-for i in range(slicing_meta['num_layers']):
+for i in range(1,slicing_meta['num_layers']):
     num_sections=len(glob.glob(curve_data_dir+'curve_sliced_relative/slice'+str(i)+'_*.csv'))
     
     for x in range(num_sections):
         print(i,',',x)
         curve_sliced_relative = np.loadtxt(curve_data_dir+'curve_sliced_relative/slice'+str(i)+'_'+str(x)+'.csv',delimiter=',').reshape((-1,6))
         positioner_weld_js = np.loadtxt(curve_data_dir+'curve_sliced_js/D500B_js'+str(i)+'_'+str(x)+'.csv',delimiter=',')
+
+        curve_sliced_relative=curve_sliced_relative[::-1]
+        positioner_weld_js=positioner_weld_js[::-1]
 
         if len(curve_sliced_relative)<2:
             continue
