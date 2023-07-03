@@ -155,8 +155,8 @@ class ScanPathGen():
                     # add start bound condition
                     if pT_i == 0:
                         k = deepcopy(Rx)
-                        extension_dir = np.array(curve_sliced_relative[pT_i][:3])-np.array(curve_sliced_relative[pT_i-1][:3])
-                        # extension_dir = -1*extension_dir
+                        extension_dir = np.array(curve_sliced_relative[pT_i+1][:3])-np.array(curve_sliced_relative[pT_i][:3])
+                        extension_dir = -1*extension_dir
                         extension_dir = extension_dir/np.linalg.norm(extension_dir)
                         p_bound_path,R_bound_path=get_bound_circle(this_scan_p,this_scan_R,this_p,k,self.bounds_theta,self.extension,extension_dir)
                         sub_scan_p.extend(p_bound_path)
@@ -247,7 +247,7 @@ class ScanPathGen():
 
         return scan_p,scan_R
     
-    def _gen_js_path(self,scan_p,scan_R,solve_js_method,q_init_table=np.radians([-15,180])):
+    def _gen_js_path(self,scan_p,scan_R,solve_js_method,q_init_table=np.radians([-15,180]),R1_w=0.01,R2_w=0.01):
 
         T_S1Base_R2Base = np.matmul(np.linalg.inv(self.robot.base_H),self.positioner.base_H)
         T_S1Base_R2Base = Transform(T_S1Base_R2Base[:3,:3],T_S1Base_R2Base[:3,-1])
@@ -265,7 +265,7 @@ class ScanPathGen():
             q_out1 = []
             # ik
             q_init=self.robot.inv(scan_p_R2Base[0],scan_R_R2Base[0],zero_config)[0]
-            print(np.degrees(q_init))
+            # print(np.degrees(q_init))
             q_out1.append(q_init)
             for path_i in range(len(scan_p_R2Base)):
                 this_js = self.robot.inv(scan_p_R2Base[path_i],scan_R_R2Base[path_i],q_out1[-1])
@@ -290,11 +290,23 @@ class ScanPathGen():
 
             pose_R2_table=T_S1Base_R2Base*self.positioner.fwd(q_init_table)
             q_init_robot = self.robot.inv(np.matmul(pose_R2_table.R,scan_p[0])+pose_R2_table.p,np.matmul(pose_R2_table.R,scan_R[0]),zero_config)[0]
-            print(np.degrees(q_init_robot))
+            # print(np.degrees(q_init_robot))
             
-            # q_out1, q_out2, j_out1, j_out2=rrs.arm_table_stepwise_opt(q_init_robot,q_init_table,w2=0.03)
-            q_out1, q_out2, j_out1, j_out2=rrs.arm_table_stepwise_opt_Rz(q_init_robot,q_init_table,w2=0.03)
+            q_out1, q_out2, j_out1, j_out2=rrs.arm_table_stepwise_opt(q_init_robot,q_init_table,w1=R1_w,w2=R2_w)
+            # q_out1, q_out2, j_out1, j_out2=rrs.arm_table_stepwise_opt_Rz(q_init_robot,q_init_table,w2=0.03)
             # q_out1, q_out2, j_out1, j_out2=rrs.arm_table_stepwise_opt_Rz(q_init_robot,q_init_table,w2=5)
+
+            q_out1=np.array(q_out1)
+            q_out2=np.array(q_out2)
+            # print(np.degrees(q_out1[:,-1]))
+            # if np.mean(q_out1[:,-1])>=np.radians(135) or np.mean(q_out1[:,-1])<=np.radians(-135):
+            #     print("Reversed Scan R")
+            #     self.Rz_angle+=np.pi
+            #     if self.Rz_angle >= 2*np.pi:
+            #         self.Rz_angle-=2*np.pi
+            #     scan_R = np.matmul(scan_R,rot([0.,0.,1.],self.Rz_angle))
+            #     q_init_robot = self.robot.inv(np.matmul(pose_R2_table.R,scan_p[0])+pose_R2_table.p,np.matmul(pose_R2_table.R,scan_R[0]),zero_config)[0]
+            #     q_out1, q_out2, j_out1, j_out2=rrs.arm_table_stepwise_opt(q_init_robot,q_init_table,w1=R1_w,w2=R2_w)
 
             scan_act_R=[]
             scan_act_p=[]
@@ -321,7 +333,8 @@ class ScanPathGen():
         
         return q_out1,q_out2
     
-    def gen_scan_path(self,all_curve_sliced_relative,all_layer,all_scan_angle,solve_js_method=1,q_init_table=np.radians([-15,180]),R_path=np.eye(3),scan_path_dir=None):
+    def gen_scan_path(self,all_curve_sliced_relative,all_layer,all_scan_angle,solve_js_method=1,q_init_table=np.radians([-15,180]),R_path=np.eye(3),\
+                      R1_w=0.01,R2_w=0.01,scan_path_dir=None):
         
         try:
             scan_T=np.loadtxt(scan_path_dir + 'scan_T.csv',delimiter=',')
@@ -337,7 +350,7 @@ class ScanPathGen():
             # generate cartesian path
             scan_p,scan_R = self._gen_scan_path(all_curve_sliced_relative,all_layer,all_scan_angle,R_path)
             # generate joint space path
-            q_out1,q_out2 = self._gen_js_path(scan_p,scan_R,solve_js_method,q_init_table)
+            q_out1,q_out2 = self._gen_js_path(scan_p,scan_R,solve_js_method,q_init_table,R1_w=0.01,R2_w=0.01)
             if scan_path_dir:
                 scan_T=[]
                 for i in range(len(scan_p)):
