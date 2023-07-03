@@ -70,7 +70,7 @@ bounds_theta = np.radians(1) ## circular motion at start and end
 extension = 10 ## extension before and after (mm)
 all_scan_angle = np.radians([0]) ## scan angle
 q_init_table=np.radians([-15,200]) ## init table
-R1_w=0.1 ## regularization weight for two robots (R1)
+R1_w=0.5 ## regularization weight for two robots (R1)
 R2_w=0.01 ## regularization weight for two robots (R2)
 mti_Rpath = np.array([[ -1.,0.,0.],   
                     [ 0.,1.,0.],
@@ -94,7 +94,7 @@ for i in range(1,slicing_meta['num_layers']):
         spg = ScanPathGen(robot_scan,positioner,scan_stand_off_d,Rz_angle,Ry_angle,bounds_theta,extension)
         # generate scan path
         scan_p,scan_R,q_out1,q_out2=spg.gen_scan_path([curve_sliced_relative],[0],all_scan_angle,\
-                            solve_js_method=1,q_init_table=positioner_weld_js[-1],R_path=mti_Rpath,R1_w=R1_w,R2_w=R2_w,scan_path_dir=None)
+                            solve_js_method=1,q_init_table=positioner_weld_js[0],R_path=mti_Rpath,R1_w=R1_w,R2_w=R2_w,scan_path_dir=None)
         
         if i%10==1:
             plt.plot(np.degrees(np.hstack((q_out1,q_out2))),'-o')

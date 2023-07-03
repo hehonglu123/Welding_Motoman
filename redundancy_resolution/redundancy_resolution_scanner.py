@@ -54,9 +54,11 @@ class redundancy_resolution_scanner(object):
             #     print(i)
             print("==================")
             print(i,'/',len(self.scan_p))
+            print(np.degrees(np.append(q_all1[-1],q_all2[-1])))
             try:
                 error_fb=999
                 while error_fb>0.001:
+                    
                     print(error_fb)
                     poset1_1=self.robot.fwd(q_all1[-1])
                     poset2_2=self.positioner.fwd(q_all2[-1])
