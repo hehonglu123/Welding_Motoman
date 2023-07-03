@@ -70,7 +70,7 @@ mti_Rpath = np.array([[ -1.,0.,0.],
                     [ 0.,1.,0.],
                     [0.,0.,-1.]])
 
-for i in range(slicing_meta['num_layers']):
+for i in range(1,slicing_meta['num_layers']):
     num_sections=len(glob.glob(curve_data_dir+'curve_sliced_relative/slice'+str(i)+'_*.csv'))
     
     for x in range(num_sections):

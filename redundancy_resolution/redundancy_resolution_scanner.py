@@ -214,6 +214,19 @@ class redundancy_resolution_scanner(object):
         j_out2=j_out2[1:]
         return q_out1, q_out2, j_out1, j_out2
 
+    def arm_table_stepwise_opt_Rzup(self,q_table_seed):
+
+        pass
+        ####baseline redundancy resolution, with fixed orientation
+        positioner_js=self.positioner_resolution(curve_sliced_relative,q_seed=q_positioner_seed,smooth_filter=smooth_filter)		#solve for positioner first
+        
+        ###singularity js smoothing
+        positioner_js=self.introducing_tolerance2(positioner_js)
+        positioner_js=self.conditional_rolling_average(positioner_js)
+        if smooth_filter:
+            positioner_js=self.rolling_average(positioner_js)
+        positioner_js[0][0][:,1]=positioner_js[1][0][0,1]
+
 def main():
 
     config_dir='../config/'
