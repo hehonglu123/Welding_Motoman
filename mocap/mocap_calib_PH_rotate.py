@@ -1,8 +1,6 @@
 from copy import deepcopy
 import sys
 sys.path.append('../toolbox/')
-sys.path.append('../redundancy_resolution/')
-from utils import *
 from robot_def import * 
 from general_robotics_toolbox import *
 
@@ -99,7 +97,7 @@ robot_type='R1'
 # robot_type='S1'
 
 # all_datasets=['train_data','valid_data_1','valid_data_2']
-dataset_date='0627'
+dataset_date='0516'
 all_datasets=['test'+dataset_date+'_R1_aftercalib/train_data']
 
 if robot_type=='R1':

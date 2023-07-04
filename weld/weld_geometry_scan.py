@@ -111,6 +111,9 @@ Ry_angle = np.radians(0) # rotate in y a bit
 bounds_theta = np.radians(1) ## circular motion at start and end
 all_scan_angle = np.radians([0]) ## scan angle
 q_init_table=np.radians([-15,200]) ## init table
+mti_Rpath = np.array([[ -1.,0.,0.],   
+                        [ 0.,1.,0.],
+                        [0.,0.,-1.]])
 
 # ## rr drivers and all other drivers
 # robot_client=MotionProgramExecClient()
@@ -257,16 +260,25 @@ while True:
         all_profile_height=[]
         all_last_curve_relative=[]
         section_count=0
-        for curve_sliced_relative in all_curve_relative:    
+        for x in range(0,num_sections,layer_width_num):
+            curve_sliced_relative=np.loadtxt(curve_data_dir+'curve_sliced_relative/slice'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
+            positioner_js=np.loadtxt(curve_data_dir+'curve_sliced_js/D500B_js'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
+            ## reverse the welding path
+            curve_sliced_relative=curve_sliced_relative[::-1]
+            positioner_js=positioner_js[::-1]
+        
+        # for curve_sliced_relative in all_curve_relative:    
         
             ### scanning path module
             spg = ScanPathGen(robot_scan,positioner,scan_stand_off_d,Rz_angle,Ry_angle,bounds_theta)
-            mti_Rpath = np.array([[ -1.,0.,0.],   
-                        [ 0.,1.,0.],
-                        [0.,0.,-1.]])
-            # generate scan path
-            scan_p,scan_R,q_out1,q_out2=spg.gen_scan_path([curve_sliced_relative],[0],all_scan_angle,\
-                                solve_js_method=1,q_init_table=q_init_table,R_path=mti_Rpath,scan_path_dir=None)
+            
+            try:
+                q_out1=np.loadtxt(curve_data_dir+'curve_scan_js/MA1440_js'+str(layer)+'_'+str(x)+'.csv',delimiter=',').reshape((-1,6))
+                q_out2=np.loadtxt(curve_data_dir+'curve_scan_js/D500B_js'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
+            except:
+                # generate scan path
+                scan_p,scan_R,q_out1,q_out2=spg.gen_scan_path([curve_sliced_relative],[0],all_scan_angle,\
+                                    solve_js_method=1,q_init_table=positioner_js[0],R_path=mti_Rpath,scan_path_dir=None)
             # generate motion program
             q_bp1,q_bp2,s1_all,s2_all=spg.gen_motion_program(q_out1,q_out2,scan_p,scan_speed,init_sync_move=0)
             #######################################
