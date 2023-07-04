@@ -275,6 +275,7 @@ while True:
             try:
                 q_out1=np.loadtxt(curve_data_dir+'curve_scan_js/MA1440_js'+str(layer)+'_'+str(x)+'.csv',delimiter=',').reshape((-1,6))
                 q_out2=np.loadtxt(curve_data_dir+'curve_scan_js/D500B_js'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
+                scan_p=np.loadtxt(curve_data_dir+'curve_scan_relative/slice'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
             except:
                 # generate scan path
                 scan_p,scan_R,q_out1,q_out2=spg.gen_scan_path([curve_sliced_relative],[0],all_scan_angle,\
