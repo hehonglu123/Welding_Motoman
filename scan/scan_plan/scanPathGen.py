@@ -363,6 +363,18 @@ class ScanPathGen():
 
     def gen_motion_program(self,q_out1,q_out2,scan_p,scan_speed,init_sync_move = 50):
         
+        lam1=calc_lam_js(q_out1,self.robot)
+        lam2=calc_lam_js(q_out2,self.positioner)
+        lam_relative=calc_lam_cs(scan_p)
+
+        waypoint_distance=10 ## mm
+        breakpoints=[0]
+        for path_i in range(0,len(lam_relative)):
+            if (lam_relative[path_i]-lam_relative[breakpoints[-1]])>=waypoint_distance:
+                breakpoints.append(path_i)
+        if breakpoints[-1]!=len(lam_relative)-1:
+            breakpoints.append(len(lam_relative)-1)
+
         primitives=[]
         q_bp1=[]
         q_bp2=[]
@@ -370,13 +382,14 @@ class ScanPathGen():
         p_bp2=[]
         speed_bp=[]
         zone_bp=[]
-        step_motion=50
-        for path_i in range(0,len(scan_p),step_motion):
+        
+        for bp in breakpoints:
             primitives.append('movel')
-            q_bp1.append([q_out1[path_i]])
-            q_bp2.append([q_out2[path_i]])
-            p_bp1.append(scan_p[path_i])
+            q_bp1.append([q_out1[bp]])
+            q_bp2.append([q_out2[bp]])
+            p_bp1.append(scan_p[bp])
             speed_bp.append(scan_speed) ## mm/sec
+        
         primitives.append('movel')
         q_bp1.append([q_out1[-1]])
         q_bp2.append([q_out2[-1]])
@@ -398,11 +411,9 @@ class ScanPathGen():
         ########################################
 
         vd_relative=scan_speed
-        lam1=calc_lam_js(q_out1,self.robot)
-        lam2=calc_lam_js(q_out2,self.positioner)
-        lam_relative=calc_lam_cs(scan_p)
+        
         if lam2[-1]!=0:
-            s1_all,s2_all=calc_individual_speed(vd_relative,lam1,lam2,lam_relative,np.arange(0,len(scan_p),20).astype(int))
+            s1_all,s2_all=calc_individual_speed(vd_relative,lam1,lam2,lam_relative,breakpoints)
         else:
             s1_all=deepcopy(speed_bp)
             s2_all=np.zeros(len(s1_all))
