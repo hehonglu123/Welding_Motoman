@@ -51,10 +51,13 @@ T_to_base = Transform(np.eye(3),[0,0,-380])
 positioner.base_H = np.matmul(positioner.base_H,H_from_RT(T_to_base.R,T_to_base.p))
 
 #### data directory
-dataset='cup/'
-sliced_alg='circular_slice_shifted/'
+# dataset='cup/'
+# sliced_alg='circular_slice_shifted/'
+dataset='blade0.1/'
+sliced_alg='auto_slice/'
 curve_data_dir = '../data/'+dataset+sliced_alg
 scan_data_dir = '../data/'+dataset+sliced_alg+'curve_scan_js/'
+scan_p_data_dir = '../data/'+dataset+sliced_alg+'curve_scan_relative/'
 
 #### welding spec, goal
 with open(curve_data_dir+'slicing.yml', 'r') as file:
@@ -76,7 +79,7 @@ mti_Rpath = np.array([[ -1.,0.,0.],
                     [ 0.,1.,0.],
                     [0.,0.,-1.]])
 
-for i in range(1,slicing_meta['num_layers']):
+for i in range(0,slicing_meta['num_layers']):
     num_sections=len(glob.glob(curve_data_dir+'curve_sliced_relative/slice'+str(i)+'_*.csv'))
     
     for x in range(num_sections):
@@ -96,13 +99,21 @@ for i in range(1,slicing_meta['num_layers']):
         scan_p,scan_R,q_out1,q_out2=spg.gen_scan_path([curve_sliced_relative],[0],all_scan_angle,\
                             solve_js_method=1,q_init_table=positioner_weld_js[0],R_path=mti_Rpath,R1_w=R1_w,R2_w=R2_w,scan_path_dir=None)
         
-        if i%10==1:
-            plt.plot(np.degrees(np.hstack((q_out1,q_out2))),'-o')
-            plt.legend(['J1','J2','J3','J4','J5','J6','P1','P2'])
-            plt.show()
+        curve_scan_relative=[]
+        for path_i in range(len(scan_p)):
+            this_T = np.append(scan_p[path_i],R2q(scan_R[path_i]))
+            curve_scan_relative.append(this_T)
+        
+        # if i%10==1:
+        #     plt.plot(np.degrees(np.hstack((q_out1,q_out2))),'-o')
+        #     plt.legend(['J1','J2','J3','J4','J5','J6','P1','P2'])
+        #     plt.show()
         q_out1=np.array(q_out1)
         q_out2=np.array(q_out2)
         Path(scan_data_dir).mkdir(exist_ok=True)
+        Path(scan_p_data_dir).mkdir(exist_ok=True)
         np.savetxt(scan_data_dir+'D500B_js'+str(i)+'_'+str(x)+'.csv',q_out1,delimiter=',')
         np.savetxt(scan_data_dir+'MA1440_js'+str(i)+'_'+str(x)+'.csv',q_out2,delimiter=',')
+        np.savetxt(scan_p_data_dir+'scan_T'+str(i)+'_'+str(x)+'.csv',curve_scan_relative,delimiter=',')
+
         
