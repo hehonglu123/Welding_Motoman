@@ -55,3 +55,4 @@ if __name__=='__main__':
 
     print(v2dh_loglog(17.,160))
     print(dh2v_loglog(1.4,160))
+    print(dh2v_loglog(1,160))

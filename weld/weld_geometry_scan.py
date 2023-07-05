@@ -86,6 +86,7 @@ data_dir=curve_data_dir+'../weld_scan_'+formatted_time+'/'
 with open(curve_data_dir+'slicing.yml', 'r') as file:
     slicing_meta = yaml.safe_load(file)
 line_resolution = slicing_meta['line_resolution']
+total_layer = slicing_meta['num_layers']
 
 weld_mode=160
 des_dh = 1.4
@@ -96,11 +97,7 @@ des_dw = 4
 waypoint_distance=1.625 	###waypoint separation (calculate from 40moveL/95mm, where we did the test)
 layer_height_num=int(des_dh/line_resolution) # preplanned
 layer_width_num=int(des_dw/line_resolution) # preplanned
-des_job=200
-
-### preplanned v,height for first few layer
-planned_v=[5,5]
-planned_layer=[0,layer_height_num]
+des_job=215
 
 # 2. Scanning parameters
 ### scan parameters
@@ -115,6 +112,10 @@ mti_Rpath = np.array([[ -1.,0.,0.],
                         [ 0.,1.,0.],
                         [0.,0.,-1.]])
 
+# 3. Motion Param
+to_start_speed=3
+to_home_speed=7
+
 # ## rr drivers and all other drivers
 # robot_client=MotionProgramExecClient()
 ws=WeldSend(robot_client)
@@ -128,6 +129,13 @@ ws=WeldSend(robot_client)
 # mti_client.setExposureTime("25")
 ###################################
 start_feedback=2
+### preplanned v,height for first few layer
+planned_v=np.ones(start_feedback)*5
+planned_layer=np.arange(start_feedback)*layer_height_num
+planned_job=np.ones(start_feedback)*200
+
+print_min_dh = 0.5 # mm
+arc_on=False
 save_weld_record=True
 save_output_points=True
 
@@ -143,19 +151,36 @@ while True:
     print("Layer Count:",layer_count)
     ####### Decide which layer to print #######
     if layer_count!=0 and layer_count<start_feedback:
+        last_layer=layer
         layer+=layer_height_num
     else:
+        mean_layer_dh=[]
+        for profile_height in all_profile_height:
+            mean_layer_dh.extend(profile_height[:,1])
+        mean_layer_dh=np.mean(mean_layer_dh)
+
         dlayer = int(round(mean_layer_dh/line_resolution)) # find the "delta layer" using dh
         last_layer = layer # update last layer
         layer = layer+dlayer # update layer
+    
+    # if achieve total layer
+    if layer>=total_layer:
+        break
+    # if close to total layer
+    if layer+layer_height_num>=total_layer:
+        dlayer = total_layer-layer
+        des_dh = dlayer*line_resolution
+        if des_dh<print_min_dh: # to close to the total layer
+            break
 
     print("Print Layer:",layer)
     ####################DETERMINE CURVE ORDER##############################################
     all_curve_relative=[]
     num_sections=len(glob.glob(curve_data_dir+'curve_sliced_relative/slice'+str(layer)+'_*.csv'))
-    for x in range(0,num_sections,layer_width_num):
-        #### welding
-        if layer>=0 and True:
+    #### welding
+    if layer>=0 and True:
+        for x in range(0,num_sections,layer_width_num):
+            print("Print Layer",layer,"Sec.",x)
 
             # 1. The curve path in "positioner tcp frame"
             # Load nominal path given the layer
@@ -173,6 +198,7 @@ while True:
             num_points_layer=max(2,int(lam_relative[-1]/waypoint_distance))
 
             ###find which end to start depending on how close to joint limit
+            q_prev=robot_client.getJointAnglesDB(positioner.pulse2deg)
             if positioner.upper_limit[1]-q_prev[1]>q_prev[1]-positioner.lower_limit[1]:
                 breakpoints=np.linspace(0,len(curve_sliced_js)-1,num=num_points_layer).astype(int)
             else:
@@ -180,7 +206,8 @@ while True:
 
             #### Correction ####
             if (layer_count<start_feedback): # no correction
-                this_weld_v=planned_v[layer_count]
+                this_weld_v=np.ones(len(breakpoints)-1)*planned_v[layer_count]
+                weld_job=planned_job[layer_count]
             else: # start correction after "start_feedback"
                 if all_profile_height is None:
                     last_num_sections=len(glob.glob(curve_data_dir+'curve_sliced_relative/slice'+str(last_layer)+'_*.csv'))
@@ -196,7 +223,8 @@ while True:
                 #### correction strategy
                 this_weld_v,all_dh=\
                     strategy_4(all_profile_height,des_dh,curve_sliced_relative,all_last_curve_relative,breakpoints)
-                
+                weld_job=des_job
+
             ####################
             print("dh:",all_dh)
             print("Nominal V:",des_v)
@@ -214,7 +242,7 @@ while True:
             waypoint_pose.p[-1]+=50
             q1=robot_weld.inv(waypoint_pose.p,waypoint_pose.R,curve_sliced_js[breakpoints[0]])[0]
             q2=positioner_js[breakpoints[0]]
-            ws.jog_dual(robot_weld,positioner,q1,q2)
+            ws.jog_dual(robot_weld,positioner,q1,q2,v=to_start_speed)
 
             ######################################################
             ########### Do welding #############
@@ -227,16 +255,15 @@ while True:
                 q1_all.append(curve_sliced_js[breakpoints[j]])
                 q2_all.append(positioner_js[breakpoints[j]])
                 v1_all.append(max(s1_all[j-1],0.1))
-                positioner_w=vd_relative/np.linalg.norm(curve_sliced_relative[breakpoints[j]][:2])
+                
+                positioner_w=this_weld_v[j-1]/np.linalg.norm(curve_sliced_relative[breakpoints[j]][:2])
                 v2_all.append(min(100,100*positioner_w/positioner.joint_vel_limit[1]))
                 primitives.append('movel')
-
-            q_prev=positioner_js[breakpoints[-1]]
 
             ####DATA LOGGING
             if save_weld_record:
                 clean_weld_record()
-            rob_stamps,rob_js_exe,_,_=ws.weld_segment_dual(primitives,robot_weld,positioner,q1_all,q2_all,v1_all,v2_all,cond_all=[200],arc=True)
+            rob_stamps,rob_js_exe,_,_=ws.weld_segment_dual(primitives,robot_weld,positioner,q1_all,q2_all,v1_all,v2_all,cond_all=[weld_job],arc=arc_on)
             if save_weld_record:
                 Path(data_dir).mkdir(exist_ok=True)
                 layer_data_dir=data_dir+'layer_'+str(layer)+'_'+str(x)+'/'
@@ -249,6 +276,9 @@ while True:
             
             all_curve_relative.append(curve_sliced_relative)
 
+    ## move R1 back to home
+    ws.jog_single(robot_weld,q1,v=7)
+
     #### scanning
     if True:
         if len(all_curve_relative) ==0:
@@ -260,15 +290,7 @@ while True:
         all_profile_height=[]
         all_last_curve_relative=[]
         section_count=0
-        for x in range(0,num_sections,layer_width_num):
-            curve_sliced_relative=np.loadtxt(curve_data_dir+'curve_sliced_relative/slice'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
-            positioner_js=np.loadtxt(curve_data_dir+'curve_sliced_js/D500B_js'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
-            ## reverse the welding path
-            curve_sliced_relative=curve_sliced_relative[::-1]
-            positioner_js=positioner_js[::-1]
-        
-        # for curve_sliced_relative in all_curve_relative:    
-        
+        for x in range(0,num_sections,layer_width_num): 
             ### scanning path module
             spg = ScanPathGen(robot_scan,positioner,scan_stand_off_d,Rz_angle,Ry_angle,bounds_theta)
             
@@ -277,19 +299,46 @@ while True:
                 q_out2=np.loadtxt(curve_data_dir+'curve_scan_js/D500B_js'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
                 scan_p=np.loadtxt(curve_data_dir+'curve_scan_relative/slice'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
             except:
+                curve_sliced_relative=np.loadtxt(curve_data_dir+'curve_sliced_relative/slice'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
+                positioner_js=np.loadtxt(curve_data_dir+'curve_sliced_js/D500B_js'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
+                ## reverse the welding path
+                curve_sliced_relative=curve_sliced_relative[::-1]
+                positioner_js=positioner_js[::-1]
                 # generate scan path
                 scan_p,scan_R,q_out1,q_out2=spg.gen_scan_path([curve_sliced_relative],[0],all_scan_angle,\
                                     solve_js_method=1,q_init_table=positioner_js[0],R_path=mti_Rpath,scan_path_dir=None)
+            
+            ## get breakpoints
+            lam_relative=calc_lam_cs(scan_p)
+            scan_waypoint_distance=10 ## mm
+            breakpoints=[0]
+            for path_i in range(0,len(lam_relative)):
+                if (lam_relative[path_i]-lam_relative[breakpoints[-1]])>=scan_waypoint_distance:
+                    breakpoints.append(path_i)
+            if breakpoints[-1]!=len(lam_relative)-1:
+                breakpoints.append(len(lam_relative)-1)
+            
+            ###find which end to start depending on how close to the current positioner pose
+            q_prev=robot_client.getJointAnglesDB(positioner.pulse2deg)
+            if np.linalg.norm(q_prev-q_out2[0])>np.linalg.norm(q_prev-q_out2[-1]):
+                breakpoints=breakpoints[::-1]
+
             # generate motion program
-            q_bp1,q_bp2,s1_all,s2_all=spg.gen_motion_program(q_out1,q_out2,scan_p,scan_speed,init_sync_move=0)
+            q_bp1,q_bp2,s1_all,s2_all=spg.gen_motion_program(q_out1,q_out2,scan_p,scan_speed,breakpoints=breakpoints,init_sync_move=0)
             #######################################
 
             ######## scanning motion #########
             ### execute motion ###
             # input("Press Enter and move to scanning startint point")
 
-            ## move to start
-            to_start_speed=7
+            ## move to mid point and start 
+            
+            waypoint_pose=robot_scan.fwd(q_bp1[0][0])
+            waypoint_pose.p[-1]+=50
+            q1=robot_scan.inv(waypoint_pose.p,waypoint_pose.R,q_bp1[0][0])[0]
+            q2=q_bp2[0][0]
+            ws.jog_dual(robot_weld,positioner,q1,q2,v=to_start_speed)
+            
             mp = MotionProgram(ROBOT_CHOICE='RB2',ROBOT_CHOICE2='ST1',pulse2deg=robot_scan.pulse2deg,pulse2deg_2=positioner.pulse2deg)
             target2=['MOVJ',np.degrees(q_bp2[0][0]),to_start_speed]
             mp.MoveJ(np.degrees(q_bp1[0][0]), to_start_speed, 0, target2=target2)
@@ -336,16 +385,9 @@ while True:
             q_out_exe=joint_recording
 
             # input("Press Enter to Move Home")
-            # move robot to home
-            q2=np.zeros(6)
-            q2[0]=90
-            q3=[-15,180]
-            mp=MotionProgram(ROBOT_CHOICE='RB2',pulse2deg=robot_scan.pulse2deg)
-            mp.MoveJ(q2,5,0)
-            robot_client.execute_motion_program(mp)
-            mp=MotionProgram(ROBOT_CHOICE='ST1',pulse2deg=positioner.pulse2deg)
-            mp.MoveJ(q3,10,0)
-            robot_client.execute_motion_program(mp)
+            # mp=MotionProgram(ROBOT_CHOICE='ST1',pulse2deg=positioner.pulse2deg)
+            # mp.MoveJ(q3,10,0)
+            # robot_client.execute_motion_program(mp)
             #####################
             # exit()
 
@@ -386,6 +428,9 @@ while True:
 
             section_count+=layer_width_num
 
+    # move robot to home
+    ws.jog_single(robot_scan,q2,v=7)
+    
     ## increase layer count
     layer_count+=1
 
