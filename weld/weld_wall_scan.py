@@ -106,10 +106,12 @@ weld_z_height=[0,6,8] # two base layer height to first top layer
 weld_z_height=np.append(weld_z_height,np.arange(weld_z_height[-1],final_height,1)+1)
 # job_number=[115,115]
 job_number=[215,215]
-job_number=np.append(job_number,np.ones(len(weld_z_height)-2)*206)
+job_number=np.append(job_number,np.ones(len(weld_z_height)-2)*206) # 160 ipm
+# job_number=np.append(job_number,np.ones(len(weld_z_height)-2)*212) # 220 ipm
 print(weld_z_height)
 print(job_number)
 
+ipm_mode=160
 weld_velocity=[5,5]
 weld_v=18
 for i in range(len(weld_z_height)-2):
@@ -139,7 +141,7 @@ mti_client = RRN.ConnectService("rr+tcp://192.168.55.10:60830/?service=MTI2D")
 mti_client.setExposureTime("25")
 ###################################
 forward_flag = True
-base_layer = False
+base_layer = True
 profile_height=None
 Transz0_H=None
 curve_sliced_relative=None
@@ -150,7 +152,7 @@ for i in range(0,len(weld_z_height)):
     print("Layer:",i)
     #### welding
     weld_st = time.time()
-    if i>=999999 and True:
+    if i>=0 and True:
         weld_plan_st = time.time()
         if i>=2:
             base_layer=False
@@ -183,11 +185,11 @@ for i in range(0,len(weld_z_height)):
                 last_mean_h=np.mean(profile_height[:,1])
             if profile_height is None:
                 if i!=0:
-                    data_dir='../data/wall_weld_test/moveL_weld_scan_2023_06_13_15_08_08/'
+                    data_dir='../data/wall_weld_test/weld_scan_2023_07_05_16_58_36/'
                     print("Using data:",data_dir)
-                    last_profile_height=np.load(data_dir+'layer_35/scans/height_profile.npy')
+                    last_profile_height=np.load(data_dir+'layer_2/scans/height_profile.npy')
                     last_mean_h=np.mean(last_profile_height[:,1])
-                    profile_height=np.load(data_dir+'layer_36/scans/height_profile.npy')
+                    profile_height=np.load(data_dir+'layer_3/scans/height_profile.npy')
 
             if (profile_height is not None) and (i>2):
                 mean_h = np.mean(profile_height[:,1])
@@ -208,11 +210,11 @@ for i in range(0,len(weld_z_height)):
         else: # start correction from 2nd top layer
             
             if profile_height is None:
-                data_dir='../data/wall_weld_test/weld_scan_2023_06_16_11_33_46/'
+                data_dir='../data/wall_weld_test/weld_scan_2023_07_05_16_58_36/'
                 print("Using data:",data_dir)
-                last_profile_height=np.load(data_dir+'layer_5/scans/height_profile.npy')
+                last_profile_height=np.load(data_dir+'layer_2/scans/height_profile.npy')
                 last_mean_h=np.mean(last_profile_height[:,1])
-                profile_height=np.load(data_dir+'layer_6/scans/height_profile.npy')
+                profile_height=np.load(data_dir+'layer_3/scans/height_profile.npy')
                 
 
             ## parameters
@@ -233,20 +235,21 @@ for i in range(0,len(weld_z_height)):
             ## parameters
             noise_h_thres = 3
             num_l=40
-            input_dh=1.7
+            # input_dh=1.1624881529394444
+            input_dh=1.4018280504260527
             
-            # min_v=5
-            # max_v=30
-            # h_std_thres=0.48
+            # min_v=10
+            # max_v=75
+            # h_std_thres=0.5
 
             min_v=-1
             max_v=1000
             h_std_thres=-1
 
-            nominal_v=18
+            nominal_v=weld_v
             curve_sliced_relative,path_T_S1,this_weld_v,all_dh,last_mean_h=\
                 strategy_3(profile_height,input_dh,curve_sliced_relative,R_S1TCP,num_l,noise_h_thres=noise_h_thres,\
-                           min_v=min_v,max_v=max_v,h_std_thres=h_std_thres,nominal_v=nominal_v)
+                           min_v=min_v,max_v=max_v,h_std_thres=h_std_thres,nominal_v=nominal_v,ipm_mode=ipm_mode)
             
             h_largest = np.max(profile_height[:,1])
 
@@ -287,16 +290,16 @@ for i in range(0,len(weld_z_height)):
         print("Weld to start time:",time.time()-weld_motion_st)
         
         weld_motion_weld_st = time.time()
-        input("Press Enter and start welding.")
+        # input("Press Enter and start welding.")
         mp=MotionProgram(ROBOT_CHOICE='RB1',pulse2deg=robot_weld.pulse2deg)
         mp.MoveL(np.degrees(path_q[1]), 10, 0)
-        # mp.setArc(select, int(this_job_number))
+        mp.setArc(select, int(this_job_number))
         for bpi in range(len(this_weld_v)):
             if bpi!=len(this_weld_v)-1:
                 mp.MoveL(np.degrees(path_q[bpi+2]), this_weld_v[bpi])
             else:
                 mp.MoveL(np.degrees(path_q[bpi+2]), this_weld_v[bpi],0)
-        # mp.setArc(False)
+        mp.setArc(False)
         mp.MoveL(np.degrees(path_q[-1]), 10, 0)
         clean_weld_record()
         rob_stamps,rob_js_exe,_,_= robot_client.execute_motion_program(mp)
@@ -329,13 +332,13 @@ for i in range(0,len(weld_z_height)):
     if True:
         scan_st = time.time()
         if curve_sliced_relative is None:
-            data_dir='../data/wall_weld_test/moveL_weld_scan_2023_06_13_15_08_08/'
-            last_profile_height=np.load('../data/wall_weld_test/moveL_weld_scan_2023_06_13_15_08_08/layer_36/scans/height_profile.npy')
+            data_dir='../data/wall_weld_test/weld_scan_2023_07_05_16_58_36/'
+            last_profile_height=np.load('../data/wall_weld_test/weld_scan_2023_07_05_16_58_36/layer_2/scans/height_profile.npy')
             last_mean_h=np.mean(last_profile_height[:,1])
             h_largest=np.max(last_profile_height[:,1])
             layer_data_dir=data_dir+'layer_'+str(i)+'/'
-            curve_sliced_relative=[np.array([ 3.30445152e+01,  1.72700000e+00,  3.31751393e+01,  1.55554573e-04,
-       -6.31394918e-20, -9.99881509e-01]), np.array([-3.19477829e+01,  1.72700000e+00,  3.31751393e+01,  1.55554573e-04,
+            curve_sliced_relative=[np.array([-3.19454496e+01,  1.72700000e+00,  9.42842998e+00,  1.55554573e-04,
+       -6.31394918e-20, -9.99881509e-01]), np.array([ 3.30468485e+01,  1.72700000e+00,  9.42842998e+00,  1.55554573e-04,
        -6.31394918e-20, -9.99881509e-01])]
 
         scan_plan_st = time.time()
@@ -392,7 +395,7 @@ for i in range(0,len(weld_z_height)):
 
         print("Scan to home time:",time.time()-scan_motion_st)
 
-        input("Press Enter to start moving and scanning")
+        # input("Press Enter to start moving and scanning")
 
         scan_motion_scan_st = time.time()
 
@@ -490,10 +493,10 @@ for i in range(0,len(weld_z_height)):
     except:
         curve_x_start=43
         curve_x_end=-41
-    Transz0_H=np.array([[ 9.99974559e-01, -7.29664987e-06, -7.13309345e-03, -1.06461758e-02],
-                        [-7.29664987e-06,  9.99997907e-01, -2.04583032e-03, -3.05341146e-03],
-                        [ 7.13309345e-03,  2.04583032e-03,  9.99972466e-01,  1.49246365e+00],
-                        [ 0.00000000e+00,  0.00000000e+00,  0.00000000e+00,  1.00000000e+00]])
+    # Transz0_H=np.array([[ 9.99974559e-01, -7.29664987e-06, -7.13309345e-03, -1.06461758e-02],
+    #                     [-7.29664987e-06,  9.99997907e-01, -2.04583032e-03, -3.05341146e-03],
+    #                     [ 7.13309345e-03,  2.04583032e-03,  9.99972466e-01,  1.49246365e+00],
+    #                     [ 0.00000000e+00,  0.00000000e+00,  0.00000000e+00,  1.00000000e+00]])
     z_height_start=h_largest-3
     crop_extend=10
     crop_min=(curve_x_end-crop_extend,-30,-10)

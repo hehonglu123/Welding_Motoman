@@ -21,13 +21,13 @@ q3=[-15,180]
 
 robot_client=MotionProgramExecClient()
 mp = MotionProgram(ROBOT_CHOICE='RB1', pulse2deg=robot_weld.pulse2deg)
-mp.MoveJ(q1,2,0)
+mp.MoveJ(q1,5,0)
 robot_client.execute_motion_program(mp)
 
 mp = MotionProgram(ROBOT_CHOICE='RB2', pulse2deg=robot_scan.pulse2deg)
-mp.MoveJ(q2,2,0)
+mp.MoveJ(q2,5,0)
 robot_client.execute_motion_program(mp)
 
 mp = MotionProgram(ROBOT_CHOICE='ST1', pulse2deg=positioner.pulse2deg)
-mp.MoveJ(q3,2,0)
+mp.MoveJ(q3,5,0)
 robot_client.execute_motion_program(mp)

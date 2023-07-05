@@ -89,7 +89,7 @@ line_resolution = slicing_meta['line_resolution']
 total_layer = slicing_meta['num_layers']
 
 weld_mode=160
-des_dh = 1.4
+des_dh = 1.5
 des_v = round(dh2v_loglog(des_dh,weld_mode),1)
 print("The Desired speed (according to desired h",des_dh,"will be",\
       des_v,"mm/sec")
@@ -101,7 +101,7 @@ des_job=215
 
 # 2. Scanning parameters
 ### scan parameters
-scan_speed=10 # scanning speed (mm/sec)
+scan_speed=5 # scanning speed (mm/sec)
 scan_stand_off_d = 95 ## mm
 Rz_angle = np.radians(0) # point direction w.r.t welds
 Ry_angle = np.radians(0) # rotate in y a bit
@@ -114,37 +114,40 @@ mti_Rpath = np.array([[ -1.,0.,0.],
 
 # 3. Motion Param
 to_start_speed=3
-to_home_speed=7
+to_home_speed=5
 
 # ## rr drivers and all other drivers
-# robot_client=MotionProgramExecClient()
+robot_client=MotionProgramExecClient()
 ws=WeldSend(robot_client)
-# # weld state logging
-# sub = RRN.SubscribeService('rr+tcp://192.168.55.10:60823?service=welder')
-# obj = sub.GetDefaultClientWait(3)  # connect, timeout=30s
-# welder_state_sub = sub.SubscribeWire("welder_state")
-# welder_state_sub.WireValueChanged += wire_cb
-# # MTI connect to RR
-# mti_client = RRN.ConnectService("rr+tcp://192.168.55.10:60830/?service=MTI2D")
-# mti_client.setExposureTime("25")
+# weld state logging
+sub = RRN.SubscribeService('rr+tcp://192.168.55.10:60823?service=welder')
+obj = sub.GetDefaultClientWait(3)  # connect, timeout=30s
+welder_state_sub = sub.SubscribeWire("welder_state")
+welder_state_sub.WireValueChanged += wire_cb
+# MTI connect to RR
+mti_client = RRN.ConnectService("rr+tcp://192.168.55.10:60830/?service=MTI2D")
+mti_client.setExposureTime("25")
 ###################################
-start_feedback=2
+start_feedback=999
 ### preplanned v,height for first few layer
 planned_v=np.ones(start_feedback)*5
 planned_layer=np.arange(start_feedback)*layer_height_num
 planned_job=np.ones(start_feedback)*200
+planned_job=planned_job.astype(int)
 
 print_min_dh = 0.5 # mm
-arc_on=False
+arc_on=True
 save_weld_record=True
 save_output_points=True
 
 all_profile_height=None
 curve_sliced_relative=None
 all_last_curve_relative=None
+
 layer=0
 last_layer=-1
 layer_count=0
+
 mean_h=0
 mean_layer_dh=None
 while True:
@@ -153,6 +156,8 @@ while True:
     if layer_count!=0 and layer_count<start_feedback:
         last_layer=layer
         layer+=layer_height_num
+    elif layer_count==0:
+        pass
     else:
         mean_layer_dh=[]
         for profile_height in all_profile_height:
@@ -225,17 +230,24 @@ while True:
                     strategy_4(all_profile_height,des_dh,curve_sliced_relative,all_last_curve_relative,breakpoints)
                 weld_job=des_job
 
-            ####################
-            print("dh:",all_dh)
-            print("Nominal V:",des_v)
-            print("Corrected V:",this_weld_v)
-            print(len(curve_sliced_relative))
+                ####################
+                print("dh:",all_dh)
+                print("Nominal V:",des_v)
+                print("Corrected V:",this_weld_v)
+                print(len(curve_sliced_relative))
+
+                seg_c=0
+                for profile_height in all_profile_height:
+                    plt.plot(profile_height[:,0],profile_height[:,1],'-o',label='Seg '+str(seg_c))
+                    seg_c+=1
+                plt.show()
 
             ## use vel=1 and times the desired speed
             s1_all,s2_all=calc_individual_speed(1,lam1,lam2,lam_relative,breakpoints)
             s1_all=np.multiply(s1_all,this_weld_v)
             s2_all=np.multiply(s2_all,this_weld_v)
 
+            input("Weld Move to Start")
             ###move to intermidieate waypoint for collision avoidance if multiple section
             # if num_sections!=num_sections_prev:
             waypoint_pose=robot_weld.fwd(curve_sliced_js[breakpoints[0]])
@@ -260,6 +272,7 @@ while True:
                 v2_all.append(min(100,100*positioner_w/positioner.joint_vel_limit[1]))
                 primitives.append('movel')
 
+            input("Start Weld")
             ####DATA LOGGING
             if save_weld_record:
                 clean_weld_record()
@@ -277,7 +290,8 @@ while True:
             all_curve_relative.append(curve_sliced_relative)
 
     ## move R1 back to home
-    ws.jog_single(robot_weld,q1,v=7)
+    input("Weld Move to Home")
+    ws.jog_single(robot_weld,np.array([np.radians(20),0,0,0,0,0]),v=to_home_speed)
 
     #### scanning
     if True:
@@ -293,20 +307,22 @@ while True:
         for x in range(0,num_sections,layer_width_num): 
             ### scanning path module
             spg = ScanPathGen(robot_scan,positioner,scan_stand_off_d,Rz_angle,Ry_angle,bounds_theta)
-            
-            try:
-                q_out1=np.loadtxt(curve_data_dir+'curve_scan_js/MA1440_js'+str(layer)+'_'+str(x)+'.csv',delimiter=',').reshape((-1,6))
-                q_out2=np.loadtxt(curve_data_dir+'curve_scan_js/D500B_js'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
-                scan_p=np.loadtxt(curve_data_dir+'curve_scan_relative/slice'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
-            except:
-                curve_sliced_relative=np.loadtxt(curve_data_dir+'curve_sliced_relative/slice'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
-                positioner_js=np.loadtxt(curve_data_dir+'curve_sliced_js/D500B_js'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
-                ## reverse the welding path
-                curve_sliced_relative=curve_sliced_relative[::-1]
-                positioner_js=positioner_js[::-1]
-                # generate scan path
-                scan_p,scan_R,q_out1,q_out2=spg.gen_scan_path([curve_sliced_relative],[0],all_scan_angle,\
-                                    solve_js_method=1,q_init_table=positioner_js[0],R_path=mti_Rpath,scan_path_dir=None)
+            curve_sliced_relative=np.loadtxt(curve_data_dir+'curve_sliced_relative/slice'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
+            if len(curve_sliced_relative.shape)!=2:
+                continue
+            print("Scan Layer",layer,", Sec",x)
+            # try:
+            q_out1=np.loadtxt(curve_data_dir+'curve_scan_js/MA1440_js'+str(layer)+'_'+str(x)+'.csv',delimiter=',').reshape((-1,6))
+            q_out2=np.loadtxt(curve_data_dir+'curve_scan_js/D500B_js'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
+            scan_p=np.loadtxt(curve_data_dir+'curve_scan_relative/scan_T'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
+            # except:
+            #     positioner_js=np.loadtxt(curve_data_dir+'curve_sliced_js/D500B_js'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
+            #     ## reverse the welding path
+            #     curve_sliced_relative_reverse=curve_sliced_relative[::-1]
+            #     positioner_js=positioner_js[::-1]
+            #     # generate scan path
+            #     scan_p,scan_R,q_out1,q_out2=spg.gen_scan_path([curve_sliced_relative_reverse],[0],all_scan_angle,\
+            #                         solve_js_method=1,q_init_table=positioner_js[0],R_path=mti_Rpath,scan_path_dir=None)
             
             ## get breakpoints
             lam_relative=calc_lam_cs(scan_p)
@@ -320,43 +336,53 @@ while True:
             
             ###find which end to start depending on how close to the current positioner pose
             q_prev=robot_client.getJointAnglesDB(positioner.pulse2deg)
+            print('q prev:',np.degrees(q_prev))
+            print("q out 2 [0]",np.degrees(q_out2[0]))
+            print("q out 2 [-1]",np.degrees(q_out2[-1]))
             if np.linalg.norm(q_prev-q_out2[0])>np.linalg.norm(q_prev-q_out2[-1]):
                 breakpoints=breakpoints[::-1]
 
             # generate motion program
             q_bp1,q_bp2,s1_all,s2_all=spg.gen_motion_program(q_out1,q_out2,scan_p,scan_speed,breakpoints=breakpoints,init_sync_move=0)
+            v1_all=[1]
+            v2_all=[1]
+            primitives=['movej']
+            for j in range(1,len(breakpoints)):
+                v1_all.append(max(s1_all[j-1],0.1))
+                positioner_w=scan_speed/np.linalg.norm(scan_p[breakpoints[j]][:2])
+                v2_all.append(min(100,100*positioner_w/positioner.joint_vel_limit[1]))
+                primitives.append('movel')
             #######################################
 
             ######## scanning motion #########
             ### execute motion ###
-            # input("Press Enter and move to scanning startint point")
 
+            input("Scan Move to Start")
             ## move to mid point and start 
-            
             waypoint_pose=robot_scan.fwd(q_bp1[0][0])
             waypoint_pose.p[-1]+=50
             q1=robot_scan.inv(waypoint_pose.p,waypoint_pose.R,q_bp1[0][0])[0]
             q2=q_bp2[0][0]
-            ws.jog_dual(robot_weld,positioner,q1,q2,v=to_start_speed)
+            ws.jog_dual(robot_scan,positioner,np.zeros(6),q2,v=to_start_speed)
+            ws.jog_dual(robot_scan,positioner,q1,q2,v=to_start_speed)
             
+            input("Start Scan")
             mp = MotionProgram(ROBOT_CHOICE='RB2',ROBOT_CHOICE2='ST1',pulse2deg=robot_scan.pulse2deg,pulse2deg_2=positioner.pulse2deg)
             target2=['MOVJ',np.degrees(q_bp2[0][0]),to_start_speed]
             mp.MoveJ(np.degrees(q_bp1[0][0]), to_start_speed, 0, target2=target2)
             robot_client.execute_motion_program(mp)
 
-            input("Press Enter to start moving and scanning")
-
             ## motion start
             mp = MotionProgram(ROBOT_CHOICE='RB2',ROBOT_CHOICE2='ST1',pulse2deg=robot_scan.pulse2deg,pulse2deg_2=positioner.pulse2deg)
             # calibration motion
-            target2=['MOVJ',np.degrees(q_bp2[1][0]),s2_all[0]]
+            target2=['MOVJ',np.degrees(q_bp2[1][0]),v2_all[0]]
             mp.MoveL(np.degrees(q_bp1[1][0]), scan_speed, 0, target2=target2)
             # routine motion
             for path_i in range(2,len(q_bp1)-1):
-                target2=['MOVJ',np.degrees(q_bp2[path_i][0]),s2_all[path_i]]
-                mp.MoveL(np.degrees(q_bp1[path_i][0]), s1_all[path_i], target2=target2)
-            target2=['MOVJ',np.degrees(q_bp2[-1][0]),s2_all[-1]]
-            mp.MoveL(np.degrees(q_bp1[-1][0]), s1_all[-1], 0, target2=target2)
+                target2=['MOVJ',np.degrees(q_bp2[path_i][0]),v2_all[path_i]]
+                mp.MoveL(np.degrees(q_bp1[path_i][0]), v1_all[path_i], target2=target2)
+            target2=['MOVJ',np.degrees(q_bp2[-1][0]),v2_all[-1]]
+            mp.MoveL(np.degrees(q_bp1[-1][0]), v1_all[-1], 0, target2=target2)
 
             robot_client.execute_motion_program_nonblocking(mp)
             ###streaming
@@ -383,11 +409,6 @@ while True:
             
             mti_recording=np.array(mti_recording)
             q_out_exe=joint_recording
-
-            # input("Press Enter to Move Home")
-            # mp=MotionProgram(ROBOT_CHOICE='ST1',pulse2deg=positioner.pulse2deg)
-            # mp.MoveJ(q3,10,0)
-            # robot_client.execute_motion_program(mp)
             #####################
             # exit()
 
@@ -413,23 +434,28 @@ while True:
             pcd = scan_process.pcd_register_mti(mti_recording,q_out_exe,robot_stamps)
             pcd = scan_process.pcd_noise_remove(pcd,nb_neighbors=40,std_ratio=1.5,\
                                                 min_bound=crop_min,max_bound=crop_max,cluster_based_outlier_remove=True,cluster_neighbor=1,min_points=100)
-            profile_height = scan_process.pcd2dh(pcd,curve_sliced_relative)
+            # profile_height = scan_process.pcd2dh(pcd,curve_sliced_relative)
+            # all_profile_height.extend(profile_height)
 
-            all_profile_height.extend(profile_height)
+            all_profile_height.extend(np.array([[0,1],[1,1]]))
             all_last_curve_relative.extend(curve_sliced_relative)
             
             if save_output_points:
                 o3d.io.write_point_cloud(out_scan_dir+'processed_pcd.pcd',pcd)
-                np.save(out_scan_dir+'height_profile.npy',profile_height)
+                # np.save(out_scan_dir+'height_profile.npy',profile_height)
             # visualize_pcd([pcd])
             # plt.scatter(profile_height[:,0],profile_height[:,1])
             # plt.show()
             # exit()
 
             section_count+=layer_width_num
+    
 
+    input("Scan Move to Home")
     # move robot to home
-    ws.jog_single(robot_scan,q2,v=7)
+    
+    ws.jog_dual(robot_scan,positioner,np.array([0,0,0,0,0,0]),[0,q_prev[1]],v=to_home_speed)
+    ws.jog_single(robot_scan,np.array([np.pi/2,0,0,0,0,0]),v=to_home_speed)
     
     ## increase layer count
     layer_count+=1
