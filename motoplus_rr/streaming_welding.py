@@ -1,22 +1,36 @@
-import asyncio
-from motoplus_rr_driver_command_client import MotoPlusRRDriverCommandClient, StreamingMotionTarget
 import numpy as np
-import traceback
-import time, sys
+import traceback, time, sys
 from RobotRaconteur.Client import *
-import time
 sys.path.append('../toolbox/')
 from robot_def import *
+from lambda_calc import *
 import matplotlib.pyplot as plt
-from motoplus_rr_driver_feedback import MotoPlusRRDriverFeedbackClient
 
 # Adjust the connection URL to the driver
-# fronius_client = RRN.ConnectService('rr+tcp://localhost:60823?service=welder')
+fronius_client = RRN.ConnectService('rr+tcp://192.168.55.10:60823?service=welder')
 
-# # Set the job number to use for this weld
-# fronius_client.job_number = 215
-# fronius_client.prepare_welder()
+# Set the job number to use for this weld
+fronius_client.job_number = 215
+fronius_client.prepare_welder()
 
+###MOTOPLUS RR CONNECTION
+
+RR_robot_sub = RRN.SubscribeService('rr+tcp://localhost:59945?service=robot')
+RR_robot_state = RR_robot_sub.SubscribeWire('robot_state')
+RR_robot = RR_robot_sub.GetDefaultClientWait(1)
+robot_const = RRN.GetConstants("com.robotraconteur.robotics.robot", RR_robot)
+halt_mode = robot_const["RobotCommandMode"]["halt"]
+position_mode = robot_const["RobotCommandMode"]["position_command"]
+RobotJointCommand = RRN.GetStructureType("com.robotraconteur.robotics.robot.RobotJointCommand",RR_robot)
+RR_robot.reset_errors()
+RR_robot.enable()
+RR_robot.command_mode = halt_mode
+time.sleep(0.1)
+RR_robot.command_mode = position_mode
+command_seqno = 0
+# rate = RRN.CreateRate(125)
+
+##########KINEMATICS 
 robot=robot_obj('MA2010_A0',def_path='../config/MA2010_A0_robot_default_config.yml',tool_file_path='../config/torch.csv',\
 	pulse2deg_file_path='../config/MA2010_A0_pulse2deg_real.csv',d=15)
 
@@ -37,102 +51,140 @@ for i in range(0,1):
         p1=p_end+np.array([0,0,i*base_layer_height])
         p2=p_start+np.array([0,0,i*base_layer_height])
 
-    v=10
-    num_points=np.ceil(250*np.linalg.norm(p1-p2)/v)
+    v=20
+    num_points=np.ceil(125*np.linalg.norm(p1-p2)/v)
     q_all=np.zeros((int(num_points),6))
     for j in range(int(num_points)):
         q_all[j]=robot.inv(p1*(num_points-j)/num_points+p2*j/num_points,R,q_seed)[0]
         
-async def amain():
-    try:
-        c = MotoPlusRRDriverCommandClient()
-        c.start('192.168.1.31')        
-        # c.start('127.0.0.1')
-        await c.wait_ready(10)
-        info = await c.get_controller_info()   
-        print(info)
-        f = MotoPlusRRDriverFeedbackClient(info)
-        f.start('192.168.1.31')
-
-        # try:
-        #     c.disable()
-        # except:
-        #     pass
-
-        await c.enable()
-        await c.motion_streaming_clear_error()
-        #info = await c.get_controller_info()
-        state = await c.read_controller_state()
-
-        rob1_pos = np.multiply(state.group_state[0].command_position, info.control_groups[0].pulse_to_radians)
-        # print(state.group_state[0].command_position,info.control_groups[0].pulse_to_radians)
-        print(rob1_pos)
-
-        await c.start_motion_streaming()
-        await asyncio.sleep(0.1)
-
-        t1 = time.perf_counter()   
-
-        ###JOG TO starting pose first
-        num_points_jogging=np.linalg.norm(state.group_state[0].command_position-q_all[0])/0.001
-        print(int(num_points_jogging))
-        print(num_points_jogging/250)
-        for j in range(int(num_points_jogging)):
-            print(j)
-
-            rob1_target = (rob1_pos*(num_points_jogging-j))/num_points_jogging+np.multiply(q_all[0],info.control_groups[0].pulse_to_radians)*j/num_points_jogging
-            print(rob1_target)
-            
-            target = [
-                StreamingMotionTarget(0, rob1_target,max_pulse_error=[1000,1000,1000,1000,1000,1000])
-            ]
-            await c.update_motion_streaming_pulse_target(target)
-            await asyncio.sleep(0.004)
 
 
-        # return
+res, robot_state, _ = RR_robot_state.TryGetInValue()
+rob1_pos=robot_state.joint_position[:6]
+init_joint_pos=robot_state.joint_position
+
+###JOG TO starting pose first
+num_points_jogging=np.linalg.norm(rob1_pos-q_all[0])/0.001
 
 
-        ###start welding
-        joint_recording=[]
-        timestamp=[]
-        
-        
+for j in range(int(num_points_jogging)):
 
-        # fronius_client.start_weld()
-        for j in range(int(num_points)):
-            #state = await c.read_controller_state()
-            state=None
-            while True:
-                res, state1 = await f.try_receive_state(5)
-                if res:
-                    state=state1
-            
-            if state:
-                print(state.group_state[0].feedback_position)
-                joint_recording.append(state.group_state[0].feedback_position)
-                timestamp.append(time.time())
+    rob1_target = (rob1_pos*(num_points_jogging-j))/num_points_jogging+q_all[0]*j/num_points_jogging
 
-            rob1_target = np.multiply(q_all[j],info.control_groups[0].pulse_to_radians)  ###modify units here
 
-            target = [
-                StreamingMotionTarget(0, rob1_target,max_pulse_error=[1000,1000,1000,1000,1000,1000])
-            ]
-            #await c.update_motion_streaming_pulse_target(target)
-            #await asyncio.sleep(0.004)
+    # Retreive the current robot state
+    res, robot_state, _ = RR_robot_state.TryGetInValue()
 
-        await c.stop_motion_streaming()
 
-        # fronius_client.stop_weld() 
-            
-    finally:
-        c.stop()
-        # fronius_client.stop_weld()
-        print("Program exit")
+    # Increment command_seqno
+    command_seqno += 1
 
-        # pose_all=robot.fwd(np.array(joint_recording))
-        # lam=calc_lam_cs(pose_all.p_all)
-        # speed=np.diff(lam)/np.diff(timestamp)
+    # Create Fill the RobotJointCommand structure
+    joint_cmd1 = RobotJointCommand()
+    joint_cmd1.seqno = command_seqno # Strictly increasing command_seqno
+    joint_cmd1.state_seqno = robot_state.seqno # Send current robot_state.seqno as failsafe
+    
+    # Generate a joint command, in this case a sin wave
+    cmd = np.zeros((14,))
+    cmd += init_joint_pos
+    cmd[:6]=rob1_target
+    
+    # Set the joint command
+    joint_cmd1.command = cmd
 
-if __name__ == "__main__":
-    asyncio.run(amain())
+    # Send the joint command to the robot
+    RR_robot.position_command.PokeOutValue(joint_cmd1)
+
+    # rate.Sleep()
+    time.sleep(0.008)
+
+###init point wait
+for i in range(125):
+    # Increment command_seqno
+    command_seqno += 1
+
+    # Create Fill the RobotJointCommand structure
+    joint_cmd1 = RobotJointCommand()
+    joint_cmd1.seqno = command_seqno # Strictly increasing command_seqno
+    joint_cmd1.state_seqno = robot_state.seqno # Send current robot_state.seqno as failsafe
+    
+    # Generate a joint command, in this case a sin wave
+    cmd = np.zeros((14,))
+    cmd += init_joint_pos
+    cmd[:6]=q_all[0]
+    
+    # Set the joint command
+    joint_cmd1.command = cmd
+
+    # Send the joint command to the robot
+    RR_robot.position_command.PokeOutValue(joint_cmd1)
+
+    # rate.Sleep()
+    time.sleep(0.008)
+
+
+# ###start welding
+joint_recording=[]
+timestamp_recording=[]
+timestamp_cmd=[]
+
+fronius_client.start_weld()
+for j in range(int(num_points)):
+    
+    # Retreive the current robot state
+    res, robot_state, _ = RR_robot_state.TryGetInValue()
+
+    # Increment command_seqno
+    command_seqno += 1
+
+    # Create Fill the RobotJointCommand structure
+    joint_cmd1 = RobotJointCommand()
+    joint_cmd1.seqno = command_seqno # Strictly increasing command_seqno
+    joint_cmd1.state_seqno = robot_state.seqno # Send current robot_state.seqno as failsafe
+    
+    # Generate a joint command, in this case a sin wave
+    cmd = np.zeros((14,))
+    cmd += init_joint_pos
+    cmd[:6]=q_all[j]
+    
+    # Set the joint command
+    joint_cmd1.command = cmd
+
+    # Send the joint command to the robot
+    RR_robot.position_command.PokeOutValue(joint_cmd1)
+    
+    # rate.Sleep()
+    time.sleep(0.008)
+    
+
+    joint_recording.append(robot_state.joint_position[:6])
+    timestamp_recording.append(float(robot_state.ts['microseconds'])/1e6)
+    timestamp_cmd.append(time.time())
+
+fronius_client.stop_weld()
+fronius_client.release_welder()
+
+curve_exe=robot.fwd(np.array(joint_recording)).p_all
+timestamp_recording=np.array(timestamp_recording)
+joint_recording=np.array(joint_recording)
+timestamp_cmd=np.array(timestamp_cmd)
+
+timestamp_cmd-=timestamp_cmd[0]
+timestamp_recording-=timestamp_recording[0]
+lam=calc_lam_cs(curve_exe)
+speed=np.gradient(lam)/np.gradient(timestamp_recording)
+speed_desired=np.gradient(calc_lam_js(q_all,robot))/np.gradient(timestamp_cmd)
+
+plt.plot(lam,speed,label='v_exe')
+plt.plot(lam,speed_desired,label='v_cmd')
+plt.legend()
+plt.show()
+
+for i in range(6):
+    plt.figure(i)
+    plt.title('JOINT %i'%i)
+    plt.plot(timestamp_cmd,q_all[:,i],label='cmd')
+    plt.plot(timestamp_recording,joint_recording[:,i],label='exe')
+    plt.legend()
+    
+plt.show()
