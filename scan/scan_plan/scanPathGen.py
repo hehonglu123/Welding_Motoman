@@ -361,19 +361,20 @@ class ScanPathGen():
 
         return scan_p,scan_R,q_out1,q_out2
 
-    def gen_motion_program(self,q_out1,q_out2,scan_p,scan_speed,init_sync_move = 50):
+    def gen_motion_program(self,q_out1,q_out2,scan_p,scan_speed,breakpoints=None,init_sync_move = 50):
         
         lam1=calc_lam_js(q_out1,self.robot)
         lam2=calc_lam_js(q_out2,self.positioner)
         lam_relative=calc_lam_cs(scan_p)
 
-        waypoint_distance=10 ## mm
-        breakpoints=[0]
-        for path_i in range(0,len(lam_relative)):
-            if (lam_relative[path_i]-lam_relative[breakpoints[-1]])>=waypoint_distance:
-                breakpoints.append(path_i)
-        if breakpoints[-1]!=len(lam_relative)-1:
-            breakpoints.append(len(lam_relative)-1)
+        if breakpoints is None:
+            waypoint_distance=10 ## mm
+            breakpoints=[0]
+            for path_i in range(0,len(lam_relative)):
+                if (lam_relative[path_i]-lam_relative[breakpoints[-1]])>=waypoint_distance:
+                    breakpoints.append(path_i)
+            if breakpoints[-1]!=len(lam_relative)-1:
+                breakpoints.append(len(lam_relative)-1)
 
         primitives=[]
         q_bp1=[]
