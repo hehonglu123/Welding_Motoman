@@ -27,7 +27,7 @@ scan_points=scan_points.T
 pcd = o3d.geometry.PointCloud()
 pcd.points=o3d.utility.Vector3dVector(scan_points)
 
-d=75
+d=95
 width=0.5
 height=0.5
 bbox_mesh = o3d.geometry.TriangleMesh.create_box(width=width, height=height, depth=d)

@@ -112,8 +112,8 @@ for i in range(0,slicing_meta['num_layers']):
         q_out2=np.array(q_out2)
         Path(scan_data_dir).mkdir(exist_ok=True)
         Path(scan_p_data_dir).mkdir(exist_ok=True)
-        np.savetxt(scan_data_dir+'D500B_js'+str(i)+'_'+str(x)+'.csv',q_out1,delimiter=',')
-        np.savetxt(scan_data_dir+'MA1440_js'+str(i)+'_'+str(x)+'.csv',q_out2,delimiter=',')
+        np.savetxt(scan_data_dir+'MA1440_js'+str(i)+'_'+str(x)+'.csv',q_out1,delimiter=',')
+        np.savetxt(scan_data_dir+'D500B_js'+str(i)+'_'+str(x)+'.csv',q_out2,delimiter=',')
         np.savetxt(scan_p_data_dir+'scan_T'+str(i)+'_'+str(x)+'.csv',curve_scan_relative,delimiter=',')
 
         

@@ -390,25 +390,19 @@ class ScanPathGen():
             q_bp2.append([q_out2[bp]])
             p_bp1.append(scan_p[bp])
             speed_bp.append(scan_speed) ## mm/sec
-        
-        primitives.append('movel')
-        q_bp1.append([q_out1[-1]])
-        q_bp2.append([q_out2[-1]])
-        p_bp1.append(scan_p[-1])
-        speed_bp.append(scan_speed) ## mm/sec
         #################################
 
         ####### add extension for time sync ####
         # move 50 mm
-        init_T = self.robot.fwd(q_bp1[0][0])
-        init_x_dir = -init_T.R[:,0]
-        init_T_align = deepcopy(init_T)
-        init_T_align.p = init_T_align.p+init_x_dir*init_sync_move 
-        init_q_align = self.robot.inv(init_T_align.p,init_T_align.R,zero_config)[0]
-        q_bp1.insert(0,[init_q_align])
-        q_bp2.insert(0,[q_out2[0]])
-        p_bp1.insert(0,init_T_align.p)
-        speed_bp.insert(0,scan_speed) ## mm/sec
+        # init_T = self.robot.fwd(q_bp1[breakpoints[0]][0])
+        # init_x_dir = -init_T.R[:,0]
+        # init_T_align = deepcopy(init_T)
+        # init_T_align.p = init_T_align.p+init_x_dir*init_sync_move 
+        # init_q_align = self.robot.inv(init_T_align.p,init_T_align.R,zero_config)[0]
+        # q_bp1.insert(0,[init_q_align])
+        # q_bp2.insert(0,[q_out2[breakpoints[0]]])
+        # p_bp1.insert(0,init_T_align.p)
+        # speed_bp.insert(0,scan_speed) ## mm/sec
         ########################################
 
         vd_relative=scan_speed
