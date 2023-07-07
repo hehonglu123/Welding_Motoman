@@ -100,20 +100,20 @@ R_S1TCP = np.matmul(T_S1TCP_R1Base[:3,:3],path_R)
 
 build_height_profile=False
 plot_correction=True
-# show_layer = [12]
-show_layer = [12,29,30]
+show_layer = []
+# show_layer = [12,29,30]
 
 x_lower = -99999
 x_upper = 999999
 
 # datasets=['baseline','full_test']
-datasets=['full_test']
+datasets=['baseline']
 datasets_h_mean={}
 datasets_h_std={}
 for dataset in datasets:
 
     if dataset=='baseline':
-        data_dir = '../data/wall_weld_test/baseline_weld_scan_2023_06_06_15_28_31/'
+        data_dir = '../data/wall_weld_test/moveL_100_baseline_weld_scan_2023_07_07_15_20_56/'
     elif dataset=='full_test':
         data_dir = '../data/wall_weld_test/moveL_weld_scan_2023_06_13_15_08_08/'
 
@@ -170,7 +170,7 @@ for dataset in datasets:
 
         h_std_thres=0.48
         h_std = np.std(profile_height[:,1])
-        if i>2 and h_std>h_std_thres:
+        if i>2 and h_std>h_std_thres and dataset != "baseline":
             all_correction_layer.append(i)
 
         if (plot_correction and (i in show_layer)):
@@ -429,7 +429,7 @@ plt.show()
 
 for dataset in datasets:
     plt.plot(np.arange(len(datasets_h_std[dataset])),datasets_h_std[dataset],'-o',label=dataset)
-plt.axhline(y = 0.48, color = 'r', linestyle = '-')
+# plt.axhline(y = 0.48, color = 'r', linestyle = '-')
 plt.legend()
 plt.xlabel('Layer')
 plt.ylabel('Height STD (mm)')
