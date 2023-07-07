@@ -24,35 +24,42 @@ v_all=[]
 cond_all=[]
 primitives=[]
 
-# for i in range(0,2):
+for i in range(0,2):
+	if i%2==0:
+		p1=p_start+np.array([0,0,i*base_layer_height])
+		p2=p_end+np.array([0,0,i*base_layer_height])
+	else:
+		p1=p_end+np.array([0,0,i*base_layer_height])
+		p2=p_start+np.array([0,0,i*base_layer_height])
+
+	
+	q_init=robot.inv(p1,R,q_seed)[0]
+	q_end=robot.inv(p2,R,q_seed)[0]
+
+	p_mid1=p1+5*(p2-p1)/np.linalg.norm(p2-p1)
+	# p_mid2=p2-5*(p2-p1)/np.linalg.norm(p2-p1)
+	q_mid1=robot.inv(p_mid1,R,q_seed)[0]
+	# q_mid2=robot.inv(p_mid2,R,q_seed)[0]
+
+	q_all.extend([q_init,q_mid1,q_end])
+	v_all.extend([1,20,5])
+	primitives.extend(['movej','movel'])
+	cond_all.extend([0,220])
+
+# for i in range(2,3):
 # 	if i%2==0:
-# 		p1=p_start+np.array([0,0,i*base_layer_height])
-# 		p2=p_end+np.array([0,0,i*base_layer_height])
+# 		p1=p_start+np.array([0,0,2*base_layer_height+i*layer_height])
+# 		p2=p_end+np.array([0,0,2*base_layer_height+i*layer_height])
 # 	else:
-# 		p1=p_end+np.array([0,0,i*base_layer_height])
-# 		p2=p_start+np.array([0,0,i*base_layer_height])
+# 		p1=p_end+np.array([0,0,2*base_layer_height+i*layer_height])
+# 		p2=p_start+np.array([0,0,2*base_layer_height+i*layer_height])
 
 # 	q_init=robot.inv(p1,R,q_seed)[0]
 # 	q_end=robot.inv(p2,R,q_seed)[0]
 # 	q_all.extend([q_init,q_end])
-# 	v_all.extend([1,5])
+# 	v_all.extend([1,15])
 # 	primitives.extend(['movej','movel'])
-# 	cond_all.extend([0,220])
-
-for i in range(2,3):
-	if i%2==0:
-		p1=p_start+np.array([0,0,2*base_layer_height+i*layer_height])
-		p2=p_end+np.array([0,0,2*base_layer_height+i*layer_height])
-	else:
-		p1=p_end+np.array([0,0,2*base_layer_height+i*layer_height])
-		p2=p_start+np.array([0,0,2*base_layer_height+i*layer_height])
-
-	q_init=robot.inv(p1,R,q_seed)[0]
-	q_end=robot.inv(p2,R,q_seed)[0]
-	q_all.extend([q_init,q_end])
-	v_all.extend([1,15])
-	primitives.extend(['movej','movel'])
-	cond_all.extend([0,210])
+# 	cond_all.extend([0,210])
 
 
-ws.weld_segment_single(primitives,robot,q_all,v_all,cond_all,arc=True)
+ws.weld_segment_single(primitives,robot,q_all,v_all,cond_all,arc=True,wait=0.5)

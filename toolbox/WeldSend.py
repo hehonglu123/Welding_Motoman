@@ -5,8 +5,6 @@ from robot_def import *
 from pandas import read_csv
 from dx200_motion_program_exec_client import *
 
-# from lambda_calc import *
-
 class WeldSend(object):
 	def __init__(self,client) -> None:
 		self.client=client
@@ -23,11 +21,12 @@ class WeldSend(object):
 		mp.MoveJ(np.degrees(q1),v,None,target2=['MOVJ',np.degrees(q2),10])
 		self.client.execute_motion_program(mp)
 
-	def weld_segment_single(self,primitives,robot,q_all,v_all,cond_all,arc=False):
+	def weld_segment_single(self,primitives,robot,q_all,v_all,cond_all,arc=False,wait=0):
 		###single arm weld segment 
 		#q_all: list of joint angles (N x 6)
 		#v_all: list of segment speed (N x 1)
 		#cond_all: list of job number (N x 1) or (1,), 0 refers to off
+		#wait: wait time after motion, before arcof
 		q_all=np.degrees(q_all)
 		arcof=True
 		
@@ -57,6 +56,9 @@ class WeldSend(object):
 						mp.changeArc(cond_all[i])
 
 			mp.primitive_call(primitives[i],q_all[i],v_all[i])
+		
+		if wait:
+			mp.setWaitTime(wait)
 			
 		if arc and not arcof:
 			mp.setArc(False)

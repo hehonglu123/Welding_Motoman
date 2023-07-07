@@ -5,13 +5,14 @@ sys.path.append('../toolbox/')
 from robot_def import *
 from lambda_calc import *
 import matplotlib.pyplot as plt
+from StreamingSend import *
 
 # Adjust the connection URL to the driver
 fronius_client = RRN.ConnectService('rr+tcp://192.168.55.10:60823?service=welder')
 
 # Set the job number to use for this weld
-fronius_client.job_number = 215
-fronius_client.prepare_welder()
+# fronius_client.job_number = 200
+# fronius_client.prepare_welder()
 
 ###MOTOPLUS RR CONNECTION
 
@@ -27,7 +28,7 @@ RR_robot.enable()
 RR_robot.command_mode = halt_mode
 time.sleep(0.1)
 RR_robot.command_mode = position_mode
-command_seqno = 0
+SS=StreamingSend(RR_robot,RR_robot_state,RobotJointCommand,streaming_rate=125.)
 # rate = RRN.CreateRate(125)
 
 ##########KINEMATICS 
@@ -51,11 +52,16 @@ for i in range(0,1):
         p1=p_end+np.array([0,0,i*base_layer_height])
         p2=p_start+np.array([0,0,i*base_layer_height])
 
-    v=20
-    num_points=np.ceil(125*np.linalg.norm(p1-p2)/v)
-    q_all=np.zeros((int(num_points),6))
-    for j in range(int(num_points)):
-        q_all[j]=robot.inv(p1*(num_points-j)/num_points+p2*j/num_points,R,q_seed)[0]
+    v1=20
+    v2=10
+    p_mid1=p1+5*(p2-p1)/np.linalg.norm(p2-p1)
+    num_points1=np.ceil(125*np.linalg.norm(p1-p_mid1)/v1)
+    num_points2=np.ceil(125*np.linalg.norm(p2-p_mid1)/v2)
+    q_all=np.zeros((int(num_points1+num_points2),6))
+    for j in range(num_points1):
+        q_all.append(robot.inv(p1*(num_points1-j)/num_points1+p_mid1*j/num_points1,R,q_seed)[0])
+    for j in range(num_points2):
+        q_all.append(robot.inv(p_mid1*(num_points2-j)/num_points2+p2*j/num_points2,R,q_seed)[0])
         
 
 
@@ -64,127 +70,48 @@ rob1_pos=robot_state.joint_position[:6]
 init_joint_pos=robot_state.joint_position
 
 ###JOG TO starting pose first
-num_points_jogging=np.linalg.norm(rob1_pos-q_all[0])/0.001
-
-
-for j in range(int(num_points_jogging)):
-
-    rob1_target = (rob1_pos*(num_points_jogging-j))/num_points_jogging+q_all[0]*j/num_points_jogging
-
-
-    # Retreive the current robot state
-    res, robot_state, _ = RR_robot_state.TryGetInValue()
-
-
-    # Increment command_seqno
-    command_seqno += 1
-
-    # Create Fill the RobotJointCommand structure
-    joint_cmd1 = RobotJointCommand()
-    joint_cmd1.seqno = command_seqno # Strictly increasing command_seqno
-    joint_cmd1.state_seqno = robot_state.seqno # Send current robot_state.seqno as failsafe
-    
-    # Generate a joint command, in this case a sin wave
-    cmd = np.zeros((14,))
-    cmd += init_joint_pos
-    cmd[:6]=rob1_target
-    
-    # Set the joint command
-    joint_cmd1.command = cmd
-
-    # Send the joint command to the robot
-    RR_robot.position_command.PokeOutValue(joint_cmd1)
-
-    # rate.Sleep()
-    time.sleep(0.008)
-
-###init point wait
-for i in range(125):
-    # Increment command_seqno
-    command_seqno += 1
-
-    # Create Fill the RobotJointCommand structure
-    joint_cmd1 = RobotJointCommand()
-    joint_cmd1.seqno = command_seqno # Strictly increasing command_seqno
-    joint_cmd1.state_seqno = robot_state.seqno # Send current robot_state.seqno as failsafe
-    
-    # Generate a joint command, in this case a sin wave
-    cmd = np.zeros((14,))
-    cmd += init_joint_pos
-    cmd[:6]=q_all[0]
-    
-    # Set the joint command
-    joint_cmd1.command = cmd
-
-    # Send the joint command to the robot
-    RR_robot.position_command.PokeOutValue(joint_cmd1)
-
-    # rate.Sleep()
-    time.sleep(0.008)
+SS.jog2q(np.hsatck((q_all[0],[np.pi/2,0,0,0,0,0,np.radians(15),-np.pi])))
 
 
 # ###start welding
 joint_recording=[]
 timestamp_recording=[]
-timestamp_cmd=[]
 
-fronius_client.start_weld()
-for j in range(int(num_points)):
+# fronius_client.start_weld()
+
+curve_js_all=np.hstack((q_all,0.5*np.pi*np.ones((len(q_all),1)),np.zeros((len(q_all),5)),np.radians(15)*np.ones((len(q_all),1)),-np.pi*np.ones((len(q_all),1))))
+timestamp_recording,joint_recording=SS.traj_streaming(curve_js_all[:int(len(curve_js_all)/2)])
+# fronius_client.job_number = 220
+timestamp_recording,joint_recording=SS.traj_streaming(curve_js_all[int(len(curve_js_all)/2):])
+
+
+# fronius_client.stop_weld()
+# fronius_client.release_welder()
+
+
+
+
+# curve_exe=robot.fwd(np.array(joint_recording)).p_all
+# timestamp_recording=np.array(timestamp_recording)
+# joint_recording=np.array(joint_recording)
+# timestamp_cmd=np.array(timestamp_cmd)
+
+# timestamp_cmd-=timestamp_cmd[0]
+# timestamp_recording-=timestamp_recording[0]
+# lam=calc_lam_cs(curve_exe)
+# speed=np.gradient(lam)/np.gradient(timestamp_recording)
+# speed_desired=np.gradient(calc_lam_js(q_all,robot))/np.gradient(timestamp_cmd)
+
+# plt.plot(lam,speed,label='v_exe')
+# plt.plot(lam,speed_desired,label='v_cmd')
+# plt.legend()
+# plt.show()
+
+# for i in range(6):
+#     plt.figure(i)
+#     plt.title('JOINT %i'%i)
+#     plt.plot(timestamp_cmd,q_all[:,i],label='cmd')
+#     plt.plot(timestamp_recording,joint_recording[:,i],label='exe')
+#     plt.legend()
     
-    # Retreive the current robot state
-    res, robot_state, _ = RR_robot_state.TryGetInValue()
-
-    # Increment command_seqno
-    command_seqno += 1
-
-    # Create Fill the RobotJointCommand structure
-    joint_cmd1 = RobotJointCommand()
-    joint_cmd1.seqno = command_seqno # Strictly increasing command_seqno
-    joint_cmd1.state_seqno = robot_state.seqno # Send current robot_state.seqno as failsafe
-    
-    # Generate a joint command, in this case a sin wave
-    cmd = np.zeros((14,))
-    cmd += init_joint_pos
-    cmd[:6]=q_all[j]
-    
-    # Set the joint command
-    joint_cmd1.command = cmd
-
-    # Send the joint command to the robot
-    RR_robot.position_command.PokeOutValue(joint_cmd1)
-    
-    # rate.Sleep()
-    time.sleep(0.008)
-    
-
-    joint_recording.append(robot_state.joint_position[:6])
-    timestamp_recording.append(float(robot_state.ts['microseconds'])/1e6)
-    timestamp_cmd.append(time.time())
-
-fronius_client.stop_weld()
-fronius_client.release_welder()
-
-curve_exe=robot.fwd(np.array(joint_recording)).p_all
-timestamp_recording=np.array(timestamp_recording)
-joint_recording=np.array(joint_recording)
-timestamp_cmd=np.array(timestamp_cmd)
-
-timestamp_cmd-=timestamp_cmd[0]
-timestamp_recording-=timestamp_recording[0]
-lam=calc_lam_cs(curve_exe)
-speed=np.gradient(lam)/np.gradient(timestamp_recording)
-speed_desired=np.gradient(calc_lam_js(q_all,robot))/np.gradient(timestamp_cmd)
-
-plt.plot(lam,speed,label='v_exe')
-plt.plot(lam,speed_desired,label='v_cmd')
-plt.legend()
-plt.show()
-
-for i in range(6):
-    plt.figure(i)
-    plt.title('JOINT %i'%i)
-    plt.plot(timestamp_cmd,q_all[:,i],label='cmd')
-    plt.plot(timestamp_recording,joint_recording[:,i],label='exe')
-    plt.legend()
-    
-plt.show()
+# plt.show()

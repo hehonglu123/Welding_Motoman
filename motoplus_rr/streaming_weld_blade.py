@@ -6,65 +6,8 @@ from robot_def import *
 from lambda_calc import *
 from multi_robot import *
 from dx200_motion_program_exec_client import *
-from WeldSend import *
+from StreamingSend import *
 
-def get_breapoints(lam,vd,streaming_rate=125.):
-	lam_diff=np.diff(lam)
-	displacement=vd/streaming_rate
-	breakpoints=[0]
-	for i in range(1,len(lam)):
-		if np.sum(lam_diff[breakpoints[-1]:i])>displacement:
-			breakpoints.append(i)
-	
-	return np.array(breakpoints)
-
-def position_cmd(RR_robot,RR_robot_state,command_seqno,qd):
-	res, robot_state, _ = RR_robot_state.TryGetInValue()
-
-	# Increment command_seqno
-	command_seqno += 1
-
-	# Create Fill the RobotJointCommand structure
-	joint_cmd1 = RobotJointCommand()
-	joint_cmd1.seqno = command_seqno # Strictly increasing command_seqno
-	joint_cmd1.state_seqno = robot_state.seqno # Send current robot_state.seqno as failsafe
-	
-	
-	# Set the joint command
-	joint_cmd1.command = qd
-
-	# Send the joint command to the robot
-	RR_robot.position_command.PokeOutValue(joint_cmd1)
-
-	# rate.Sleep()
-	time.sleep(0.008)
-
-	return command_seqno
-
-def jog2q(RR_robot,RR_robot_state,command_seqno,qd):
-
-	###JOG TO starting pose first
-	res, robot_state, _ = RR_robot_state.TryGetInValue()
-	q_cur=robot_state.joint_position
-	num_points_jogging=np.linalg.norm(q_cur-qd)/0.002
-
-
-	for j in range(int(num_points_jogging)):
-		q_target = (q_cur*(num_points_jogging-j))/num_points_jogging+qd*j/num_points_jogging
-		command_seqno=position_cmd(RR_robot,RR_robot_state,command_seqno,q_target)
-		
-	###init point wait
-	for i in range(20):
-		command_seqno=position_cmd(RR_robot,RR_robot_state,command_seqno,qd)
-
-	return command_seqno
-
-def traj_streaming(RR_robot,RR_robot_state,command_seqno,curve_js):
-	
-	for i in range(len(curve_js)):
-		command_seqno=position_cmd(RR_robot,RR_robot_state,command_seqno,curve_js[i])
-
-	return command_seqno
 
 def extend_simple(curve_sliced_js,positioner_js,curve_sliced_relative,lam_relative,d=10):
 	pose0=robot.fwd(curve_sliced_js[0])
@@ -115,44 +58,44 @@ RR_robot.enable()
 RR_robot.command_mode = halt_mode
 time.sleep(0.1)
 RR_robot.command_mode = position_mode
-command_seqno = 0
 streaming_rate=125.
 point_distance=0.04		###STREAMING POINT INTERPOLATED DISTANCE
+SS=StreamingSend(RR_robot,RR_robot_state,RobotJointCommand,streaming_rate)
 
 ###########################################base layer welding############################################
-# num_baselayer=2
-# q_prev=np.array([-3.791547245558870571e-01,7.167996965635117235e-01,2.745092098742105691e-01,2.111291009755724701e-01,-7.843516348888318612e-01,-5.300740197588397207e-01])
-# for base_layer in range(num_baselayer):
-# 	num_sections=len(glob.glob(data_dir+'curve_sliced_relative/baselayer'+str(base_layer)+'_*.csv'))
-# 	for x in range(num_sections):
-# 		curve_sliced_js=np.loadtxt(data_dir+'curve_sliced_js/MA2010_base_js'+str(base_layer)+'_'+str(x)+'.csv',delimiter=',')
-# 		positioner_js=np.loadtxt(data_dir+'curve_sliced_js/D500B_base_js'+str(base_layer)+'_'+str(x)+'.csv',delimiter=',')
-# 		curve_sliced_relative=np.loadtxt(data_dir+'curve_sliced_relative/baselayer'+str(base_layer)+'_'+str(x)+'.csv',delimiter=',')
+num_baselayer=2
+q_prev=np.array([-3.791547245558870571e-01,7.167996965635117235e-01,2.745092098742105691e-01,2.111291009755724701e-01,-7.843516348888318612e-01,-5.300740197588397207e-01])
+for base_layer in range(num_baselayer):
+	num_sections=len(glob.glob(data_dir+'curve_sliced_relative/baselayer'+str(base_layer)+'_*.csv'))
+	for x in range(num_sections):
+		curve_sliced_js=np.loadtxt(data_dir+'curve_sliced_js/MA2010_base_js'+str(base_layer)+'_'+str(x)+'.csv',delimiter=',')
+		positioner_js=np.loadtxt(data_dir+'curve_sliced_js/D500B_base_js'+str(base_layer)+'_'+str(x)+'.csv',delimiter=',')
+		curve_sliced_relative=np.loadtxt(data_dir+'curve_sliced_relative/baselayer'+str(base_layer)+'_'+str(x)+'.csv',delimiter=',')
 
-# 		lam_relative=calc_lam_cs(curve_sliced_relative)
-
-
-# 		lam_relative_dense=np.linspace(0,lam_relative[-1],num=int(lam_relative[-1]/point_distance))
-# 		curve_sliced_js_dense=interp1d(lam_relative,curve_sliced_js,axis=0)(lam_relative_dense)
-# 		positioner_js_dense=interp1d(lam_relative,positioner_js,axis=0)(lam_relative_dense)
+		lam_relative=calc_lam_cs(curve_sliced_relative)
 
 
-# 		breakpoints=get_breapoints(lam_relative_dense,vd_relative,streaming_rate)
+		lam_relative_dense=np.linspace(0,lam_relative[-1],num=int(lam_relative[-1]/point_distance))
+		curve_sliced_js_dense=interp1d(lam_relative,curve_sliced_js,axis=0)(lam_relative_dense)
+		positioner_js_dense=interp1d(lam_relative,positioner_js,axis=0)(lam_relative_dense)
 
-# 		###find which end to start
-# 		if np.linalg.norm(q_prev-curve_sliced_js[0])>np.linalg.norm(q_prev-curve_sliced_js[-1]):
-# 			breakpoints=np.flip(breakpoints)
 
-# 		curve_js_all=np.hstack((curve_sliced_js_dense[breakpoints],0.5*np.pi*np.ones((len(breakpoints),1)),np.zeros((len(breakpoints),5)),positioner_js_dense[breakpoints]))
-# 		command_seqno = jog2q(RR_robot,RR_robot_state,command_seqno,curve_js_all[0])
+		breakpoints=SS.get_breapoints(lam_relative_dense,vd_relative)
+
+		###find which end to start
+		if np.linalg.norm(q_prev-curve_sliced_js[0])>np.linalg.norm(q_prev-curve_sliced_js[-1]):
+			breakpoints=np.flip(breakpoints)
+
+		curve_js_all=np.hstack((curve_sliced_js_dense[breakpoints],0.5*np.pi*np.ones((len(breakpoints),1)),np.zeros((len(breakpoints),5)),positioner_js_dense[breakpoints]))
+		SS.jog2q(curve_js_all[0])
 		
-# 		##########WELDING#######
-# 		fronius_client.start_weld()
-# 		command_seqno = traj_streaming(RR_robot,RR_robot_state,command_seqno,curve_js_all)
-# 		time.sleep(0.2)
-# 		fronius_client.stop_weld()
+		##########WELDING#######
+		fronius_client.start_weld()
+		SS.traj_streaming(curve_js_all)
+		time.sleep(0.2)
+		fronius_client.stop_weld()
 
-# 		q_prev=curve_sliced_js_dense[breakpoints[-1]]
+		q_prev=curve_sliced_js_dense[breakpoints[-1]]
 
 ###########################################layer welding############################################
 res, robot_state, _ = RR_robot_state.TryGetInValue()
@@ -205,15 +148,15 @@ for layer in range(num_layer_start,num_layer_end,layer_height_num):
 			waypoint_pose.p[-1]+=30
 			waypoint_q=robot.inv(waypoint_pose.p,waypoint_pose.R,curve_sliced_js_dense[breakpoints[0]])[0]
 
-			command_seqno = jog2q(RR_robot,RR_robot_state,command_seqno,np.hstack((waypoint_q,np.pi/2,[0]*5,positioner_js_dense[breakpoints[0]])))
+			SS.jog2q(np.hstack((waypoint_q,np.pi/2,[0]*5,positioner_js_dense[breakpoints[0]])))
 
 
 		curve_js_all=np.hstack((curve_sliced_js_dense[breakpoints],0.5*np.pi*np.ones((len(breakpoints),1)),np.zeros((len(breakpoints),5)),positioner_js_dense[breakpoints]))
-		command_seqno = jog2q(RR_robot,RR_robot_state,command_seqno,curve_js_all[0])
+		SS.jog2q(curve_js_all[0])
 
 		##########WELDING#######
 		fronius_client.start_weld()
-		command_seqno = traj_streaming(RR_robot,RR_robot_state,command_seqno,curve_js_all)
+		SS.traj_streaming(curve_js_all)
 		time.sleep(0.44)
 		fronius_client.stop_weld()
 
