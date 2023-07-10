@@ -51,10 +51,10 @@ T_to_base = Transform(np.eye(3),[0,0,-380])
 positioner.base_H = np.matmul(positioner.base_H,H_from_RT(T_to_base.R,T_to_base.p))
 
 #### data directory
-# dataset='cup/'
-# sliced_alg='circular_slice_shifted/'
-dataset='blade0.1/'
-sliced_alg='auto_slice/'
+dataset='cup/'
+sliced_alg='circular_slice_shifted/'
+# dataset='blade0.1/'
+# sliced_alg='auto_slice/'
 curve_data_dir = '../data/'+dataset+sliced_alg
 scan_data_dir = '../data/'+dataset+sliced_alg+'curve_scan_js/'
 scan_p_data_dir = '../data/'+dataset+sliced_alg+'curve_scan_relative/'

@@ -50,8 +50,8 @@ class redundancy_resolution_scanner(object):
         lower_limit=np.hstack((self.robot.lower_limit,self.positioner.lower_limit))
 
         for i in range(len(self.scan_p)):
-            if i%100==0:
-                print(i)
+            # if i%100==0:
+            #     print(i)
             # print("==================")
             # print(i,'/',len(self.scan_p))
             # print(np.degrees(np.append(q_all1[-1],q_all2[-1])))
