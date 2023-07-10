@@ -8,8 +8,8 @@ import matplotlib.pyplot as plt
 from StreamingSend import *
 
 ####Adjust the connection URL to the driver
-fronius_client = RRN.ConnectService('rr+tcp://192.168.55.10:60823?service=welder')
-fronius_client.job_number = 220
+fronius_client = RRN.ConnectService('rr+tcp://192.168.55.21:60823?service=welder')
+fronius_client.job_number = 200
 fronius_client.prepare_welder()
 
 ###MOTOPLUS RR CONNECTION
@@ -36,8 +36,8 @@ robot=robot_obj('MA2010_A0',def_path='../config/MA2010_A0_robot_default_config.y
 R=np.array([[-0.7071, 0.7071, -0.    ],
             [ 0.7071, 0.7071,  0.    ],
             [0.,      0.,     -1.    ]])
-p_start=np.array([1660,-860,-260])
-p_end=np.array([1660,-760,-260])
+p_start=np.array([1645,-860,-260])
+p_end=np.array([1645,-760,-260])
 q_seed=np.radians([-35.4291,56.6333,40.5194,4.5177,-52.2505,-11.6546])
 base_layer_height=2
 layer_height=1.0
@@ -79,7 +79,7 @@ fronius_client.start_weld()
 
 curve_js_all=np.hstack((q_all,0.5*np.pi*np.ones((len(q_all),1)),np.zeros((len(q_all),5)),np.radians(-15)*np.ones((len(q_all),1)),np.pi*np.ones((len(q_all),1))))
 timestamp_recording,joint_recording=SS.traj_streaming(curve_js_all[:int(len(curve_js_all)/2)])
-fronius_client.job_number = 200
+# fronius_client.job_number = 200
 timestamp_recording,joint_recording=SS.traj_streaming(curve_js_all[int(len(curve_js_all)/2):])
 
 
