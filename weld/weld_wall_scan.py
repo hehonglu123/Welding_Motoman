@@ -101,19 +101,21 @@ T_to_base = Transform(np.eye(3),[0,0,-380])
 positioner.base_H = np.matmul(positioner.base_H,H_from_RT(T_to_base.R,T_to_base.p))
 
 final_height=50
-final_h_std_thres=0.48
+# final_h_std_thres=0.48
+final_h_std_thres=999999999
 weld_z_height=[0,6,8] # two base layer height to first top layer
 weld_z_height=np.append(weld_z_height,np.arange(weld_z_height[-1],final_height,1)+1)
 # job_number=[115,115]
 job_number=[215,215]
-job_number=np.append(job_number,np.ones(len(weld_z_height)-2)*206) # 160 ipm
+job_number=np.append(job_number,np.ones(len(weld_z_height)-2)*200) # 100 ipm
+# job_number=np.append(job_number,np.ones(len(weld_z_height)-2)*206) # 160 ipm
 # job_number=np.append(job_number,np.ones(len(weld_z_height)-2)*212) # 220 ipm
 print(weld_z_height)
 print(job_number)
 
 ipm_mode=160
 weld_velocity=[5,5]
-weld_v=18
+weld_v=5
 for i in range(len(weld_z_height)-2):
     weld_velocity.append(weld_v)
     # if weld_v==weld_velocity[-2]:
@@ -122,6 +124,9 @@ for i in range(len(weld_z_height)-2):
 print(weld_velocity)
 # exit()
 save_weld_record=True
+
+# start_correction_layer=3
+start_correction_layer=99999999
 
 # exit()
 
@@ -180,7 +185,7 @@ for i in range(0,len(weld_z_height)):
         #### Correction ####
         # TODO: Add fitering if near threshold
         h_largest=this_z_height
-        if (i<=2):
+        if (i<start_correction_layer):
             if (last_mean_h == 0) and (profile_height is not None):
                 last_mean_h=np.mean(profile_height[:,1])
             if profile_height is None:
@@ -387,7 +392,7 @@ for i in range(0,len(weld_z_height)):
         # input("Press Enter and move to scanning startint point")
 
         ## move to start
-        to_start_speed=3
+        to_start_speed=7
         mp = MotionProgram(ROBOT_CHOICE='RB2',ROBOT_CHOICE2='ST1',pulse2deg=robot_scan.pulse2deg,pulse2deg_2=positioner.pulse2deg)
         target2=['MOVJ',np.degrees(q_bp2[0][0]),to_start_speed]
         mp.MoveJ(np.degrees(q_bp1[0][0]), to_start_speed, 0, target2=target2)
@@ -445,11 +450,11 @@ for i in range(0,len(weld_z_height)):
         q2=np.zeros(6)
         q2[0]=90
         q3=[-15,180]
-        mp=MotionProgram(ROBOT_CHOICE='RB2',pulse2deg=robot_scan.pulse2deg)
-        mp.MoveJ(q2,5,0)
-        robot_client.execute_motion_program(mp)
-        mp=MotionProgram(ROBOT_CHOICE='ST1',pulse2deg=positioner.pulse2deg)
-        mp.MoveJ(q3,10,0)
+        ## move to home
+        to_home_speed=7
+        mp = MotionProgram(ROBOT_CHOICE='RB2',ROBOT_CHOICE2='ST1',pulse2deg=robot_scan.pulse2deg,pulse2deg_2=positioner.pulse2deg)
+        target2=['MOVJ',q3,to_home_speed]
+        mp.MoveJ(q2, to_home_speed, 0, target2=target2)
         robot_client.execute_motion_program(mp)
         #####################
         # exit()
