@@ -130,6 +130,7 @@ mti_client.setExposureTime("25")
 ###################################
 start_feedback=999
 ### preplanned v,height for first few layer
+## 300 260 250 240 ... 100
 planned_v=np.ones(start_feedback)*5
 planned_layer=np.arange(start_feedback)*layer_height_num
 planned_job=np.ones(start_feedback)*200
@@ -147,6 +148,13 @@ all_last_curve_relative=None
 layer=0
 last_layer=-1
 layer_count=0
+
+print("Planned V (next 10):",planned_v[:10])
+print("Planned Layer (next 10):",planned_layer[:10])
+print("Planned Job (next 10):",planned_job[:10])
+print("Start Layer:",layer)
+print("Last Layer:",last_layer)
+print("Layer Count:",layer_count)
 
 mean_h=0
 mean_layer_dh=None
@@ -434,7 +442,10 @@ while True:
             pcd = scan_process.pcd_register_mti(mti_recording,q_out_exe,robot_stamps)
             pcd = scan_process.pcd_noise_remove(pcd,nb_neighbors=40,std_ratio=1.5,\
                                                 min_bound=crop_min,max_bound=crop_max,cluster_based_outlier_remove=True,cluster_neighbor=1,min_points=100)
-            # profile_height = scan_process.pcd2dh(pcd,curve_sliced_relative)
+            visualize_pcd([pcd])
+            profile_height = scan_process.pcd2dh(pcd,curve_sliced_relative)
+            plt.scatter(profile_height[:,0],profile_height[:,1])
+            plt.show()
             # all_profile_height.extend(profile_height)
 
             all_profile_height.extend(np.array([[0,1],[1,1]]))
@@ -443,14 +454,10 @@ while True:
             if save_output_points:
                 o3d.io.write_point_cloud(out_scan_dir+'processed_pcd.pcd',pcd)
                 # np.save(out_scan_dir+'height_profile.npy',profile_height)
-            # visualize_pcd([pcd])
-            # plt.scatter(profile_height[:,0],profile_height[:,1])
-            # plt.show()
             # exit()
 
             section_count+=layer_width_num
     
-
     input("Scan Move to Home")
     # move robot to home
     
