@@ -48,6 +48,7 @@ test_robot_q = np.loadtxt(test_data_dir+'robot_q_align.csv',delimiter=',')
 
 all_error_norm=[]
 all_qdiff_norm=[]
+all_qdiff_ave=[]
 for test_q in test_robot_q:
     # testq_i = np.random.randint(0,len(test_robot_q))
     # test_q=test_robot_q[testq_i]
@@ -136,6 +137,7 @@ for test_q in test_robot_q:
     # print("Cartesian R differences:",R_norm)
 
     all_qdiff_norm.append(np.linalg.norm(np.degrees(q_sol-test_q)))
+    all_qdiff_ave.append(np.mean(np.fabs(np.degrees(q_sol-test_q))))
     all_error_norm.append(error_fb)
 
 plt.plot(all_error_norm,'.')
@@ -144,4 +146,8 @@ plt.show()
 
 plt.plot(all_qdiff_norm,'.')
 plt.title("Euclidean Norm Error of QP Joint Angle Solution (Deg.)")
+plt.show()
+
+plt.plot(all_qdiff_ave,'.')
+plt.title("Ave Error of QP Joint Angle Solution (Deg.)")
 plt.show()
