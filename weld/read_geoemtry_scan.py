@@ -56,8 +56,8 @@ formatted_time = current_time.strftime('%Y_%m_%d_%H_%M_%S.%f')[:-7]
 data_dir=curve_data_dir+'weld_scan_'+'2023_07_10_16_59_28'+'/'
 
 
-layer=0
-x=40
+layer=200
+x=0
 layer_data_dir=data_dir+'layer_'+str(layer)+'_'+str(x)+'/'
 out_scan_dir = layer_data_dir+'scans/'
 curve_sliced_relative=np.loadtxt(curve_data_dir+'curve_sliced_relative/slice'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
@@ -77,8 +77,8 @@ print(crop_max)
 scan_process = ScanProcess(robot_scan,positioner)
 pcd = scan_process.pcd_register_mti(mti_recording,q_out_exe,robot_stamps)
 # visualize_pcd([pcd])
-pcd = scan_process.pcd_noise_remove(pcd,nb_neighbors=20,std_ratio=1.5,\
-                                    min_bound=crop_min,max_bound=crop_max,outlier_remove=False,cluster_based_outlier_remove=False,cluster_neighbor=1,min_points=25)
+pcd = scan_process.pcd_noise_remove(pcd,nb_neighbors=40,std_ratio=1.5,\
+                                    min_bound=crop_min,max_bound=crop_max,outlier_remove=True,cluster_based_outlier_remove=False,cluster_neighbor=1,min_points=25)
 visualize_pcd([pcd])
 profile_height = scan_process.pcd2dh(pcd,curve_sliced_relative)
 plt.scatter(profile_height[:,0],profile_height[:,1])

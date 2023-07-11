@@ -351,7 +351,7 @@ def strategy_3(profile_height,input_dh,curve_sliced_relative,R_S1TCP,num_l,noise
     
     return curve_sliced_relative_correct,path_T_S1,this_weld_v,all_dh,mean_h
 
-def strategy_4(profile_height,des_dh,curve_sliced_relative,last_curve_sliced_relative,breakpoints):
+def strategy_4(profile_height,des_dh,curve_sliced_relative,last_curve_sliced_relative,breakpoints,ipm_mode=160):
 
     mean_dh = np.mean(profile_height[:,1])
     all_dh=[]
@@ -364,5 +364,5 @@ def strategy_4(profile_height,des_dh,curve_sliced_relative,last_curve_sliced_rel
             this_dh.append(profile_height[cor_last_p_id,1])
         seg_dh = des_dh-(np.mean(this_dh)-mean_dh)
         all_dh.append(seg_dh)
-        weld_v.append(dh2v_loglog(seg_dh,mode=160))
+        weld_v.append(dh2v_loglog(seg_dh,mode=ipm_mode))
     return weld_v,all_dh
