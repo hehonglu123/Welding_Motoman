@@ -80,8 +80,13 @@ curve_data_dir = '../data/'+dataset+sliced_alg
 
 current_time = datetime.datetime.now()
 formatted_time = current_time.strftime('%Y_%m_%d_%H_%M_%S.%f')[:-7]
-# data_dir=curve_data_dir+'weld_scan_'+formatted_time+'/'
-data_dir=curve_data_dir+'weld_scan_'+'2023_07_10_16_59_28'+'/'
+
+data_date = input("Use old data directory? (Enter or put time e.g. 2023_07_11_16_25_30): ")
+if data_date == '':
+    data_dir=curve_data_dir+'weld_scan_'+formatted_time+'/'
+else:
+    data_dir=curve_data_dir+'weld_scan_'+data_date+'/'
+print("Use data directory:",data_dir)
 
 #### welding spec, goal
 with open(curve_data_dir+'slicing.yml', 'r') as file:
@@ -98,7 +103,7 @@ des_dw = 4
 waypoint_distance=1.625 	###waypoint separation (calculate from 40moveL/95mm, where we did the test)
 layer_height_num=int(des_dh/line_resolution) # preplanned
 layer_width_num=int(des_dw/line_resolution) # preplanned
-des_job=215
+des_job=206
 
 # 2. Scanning parameters
 ### scan parameters
@@ -115,7 +120,7 @@ mti_Rpath = np.array([[ -1.,0.,0.],
 
 # 3. Motion Param
 to_start_speed=3
-to_home_speed=5
+to_home_speed=7
 
 # ## rr drivers and all other drivers
 robot_client=MotionProgramExecClient()
@@ -129,12 +134,14 @@ welder_state_sub.WireValueChanged += wire_cb
 mti_client = RRN.ConnectService("rr+tcp://192.168.55.10:60830/?service=MTI2D")
 mti_client.setExposureTime("25")
 ###################################
-start_feedback=999
+start_feedback=2
 ### preplanned v,height for first few layer
+planned_layer=999
 ## 300 260 250 240 ... 100
-planned_v=np.ones(start_feedback)*5
-planned_layer=np.arange(start_feedback)*layer_height_num
-planned_job=np.ones(start_feedback)*215
+planned_v=np.ones(planned_layer)*5
+# planned_job=np.ones(planned_layer)*215
+planned_job=np.array([220,216,216,215,215,214,214,213,213,212,212])
+planned_job=np.append(planned_job,np.ones(planned_layer)*200)
 planned_job=planned_job.astype(int)
 
 print_min_dh = 0.5 # mm
@@ -146,39 +153,46 @@ all_profile_height=None
 curve_sliced_relative=None
 all_last_curve_relative=None
 
-layer=200
-last_layer=170
+layer=15
+last_layer=-1
 layer_count=2
 
-manual=True
+manual_dh=False
+correction=True
 
-print("Planned V (next 10):",planned_v[:10])
-print("Planned Layer (next 10):",planned_layer[:10])
-print("Planned Job (next 10):",planned_job[:10])
+print("Planned V (first 10):",planned_v[:10])
+print("Planned Job (first 10):",planned_job[:10])
 print("Start Layer:",layer)
 print("Last Layer:",last_layer)
 print("Layer Count:",layer_count)
 
-mean_h=0
 mean_layer_dh=None
 while True:
     print("Layer Count:",layer_count)
     ####### Decide which layer to print #######
-    if not manual:
-        if layer_count!=0 and layer_count<start_feedback:
-            last_layer=layer
-            layer+=layer_height_num
-        elif layer_count==0:
+    if not manual_dh:
+        # if layer_count!=0 and layer_count<start_feedback:
+        #     last_layer=layer
+        #     layer+=layer_height_num
+        if layer_count==0:
             pass
         else:
-            mean_layer_dh=[]
-            for profile_height in all_profile_height:
-                mean_layer_dh.extend(profile_height[:,1])
-            mean_layer_dh=np.mean(mean_layer_dh)
-
+            if all_profile_height is None:
+                last_num_sections=len(glob.glob(curve_data_dir+'curve_sliced_relative/slice'+str(layer)+'_*.csv'))
+                all_profile_height=[]
+                for x in range(last_num_sections):
+                    this_sec_dh = np.load(data_dir+'layer_'+str(layer)+'_'+str(x)+'/scans/height_profile.npy')
+                    all_profile_height.extend(this_sec_dh)
+                all_profile_height=np.array(all_profile_height)
+            mean_layer_dh=np.mean(all_profile_height[:,1])
             dlayer = int(round(mean_layer_dh/line_resolution)) # find the "delta layer" using dh
             last_layer = layer # update last layer
             layer = layer+dlayer # update layer
+
+            print("Last Mean dh:",mean_layer_dh)
+            print("Last Mean dlayer:",dlayer)
+            print("Last Layer:",last_layer)
+            print("This Layer:",layer)
     
     # if achieve total layer
     if layer>=total_layer:
@@ -195,7 +209,7 @@ while True:
     all_curve_relative=[]
     num_sections=len(glob.glob(curve_data_dir+'curve_sliced_relative/slice'+str(layer)+'_*.csv'))
     #### welding
-    if layer>=1 and True:
+    if layer>=0 and True:
         for x in range(0,num_sections,layer_width_num):
             print("Print Layer",layer,"Sec.",x)
 
@@ -222,24 +236,28 @@ while True:
                 breakpoints=np.linspace(len(curve_sliced_js)-1,0,num=num_points_layer).astype(int)
 
             #### Correction ####
-            if (layer_count<start_feedback): # no correction
+            if not correction or (layer_count<start_feedback): # no correction
                 this_weld_v=np.ones(len(breakpoints)-1)*planned_v[layer_count]
                 weld_job=planned_job[layer_count]
             else: # start correction after "start_feedback"
-                if all_profile_height is None:
+                if all_profile_height is None or all_last_curve_relative is None:
                     last_num_sections=len(glob.glob(curve_data_dir+'curve_sliced_relative/slice'+str(last_layer)+'_*.csv'))
                     all_profile_height=[]
                     all_last_curve_relative=[]
                     for x in range(0,last_num_sections,layer_width_num):
                         all_last_curve_relative.extend(np.loadtxt(curve_data_dir+'curve_sliced_relative/slice'+str(last_layer)+'_'+str(x)+'.csv',delimiter=','))
-                        layer_data_dir=data_dir+'layer_'+str(layer)+'_'+str(x)+'/'
+                        layer_data_dir=data_dir+'layer_'+str(last_layer)+'_'+str(x)+'/'
                         out_scan_dir = layer_data_dir+'scans/'
                         all_profile_height.extend(np.load(out_scan_dir+'height_profile.npy'))
+                    all_profile_height=np.array(all_profile_height)
+                    all_last_curve_relative=np.array(all_last_curve_relative)
 
                 ## parameters
+                min_v=5
+                max_v=30
                 #### correction strategy
                 this_weld_v,all_dh=\
-                    strategy_4(all_profile_height,des_dh,curve_sliced_relative,all_last_curve_relative,breakpoints)
+                    strategy_4(all_profile_height,des_dh,curve_sliced_relative,all_last_curve_relative,breakpoints,max_v=max_v,min_v=min_v,ipm_mode=weld_mode)
                 weld_job=des_job
 
                 ####################
@@ -248,11 +266,24 @@ while True:
                 print("Corrected V:",this_weld_v)
                 print(len(curve_sliced_relative))
 
-                seg_c=0
-                for profile_height in all_profile_height:
-                    plt.plot(profile_height[:,0],profile_height[:,1],'-o',label='Seg '+str(seg_c))
-                    seg_c+=1
+                fig, ax1 = plt.subplots()
+                ax2 = ax1.twinx()
+                ax1.scatter(all_profile_height[:,0],all_profile_height[:,1],c='blue',label='Height Layer '+str(layer))
+                for bp_i in range(len(breakpoints)-1):
+                    ax2.plot([lam_relative[breakpoints[bp_i]],lam_relative[breakpoints[bp_i+1]]],[this_weld_v[bp_i],this_weld_v[bp_i]],'-o')
+                ax1.set_xlabel('X-axis (Lambda) (mm)')
+                ax1.set_ylabel('Height (mm)', color='g')
+                ax2.set_ylabel('Speed (mm/sec)', color='b')
+                ax1.legend(loc=0)
+                ax2.legend(loc=0)
+                plt.title("Height and Speed, 40 MoveL")
+                plt.legend()
                 plt.show()
+
+                # plt.scatter(all_profile_height[:,0],all_profile_height[:,1],c='blue')
+                # for bp_i in range(len(breakpoints)-1):
+                #     plt.plot([lam_relative[breakpoints[bp_i]],lam_relative[breakpoints[bp_i+1]]],[this_weld_v[bp_i],this_weld_v[bp_i]],'-o')
+                # plt.show()
 
             ## use vel=1 and times the desired speed
             s1_all,s2_all=calc_individual_speed(1,lam1,lam2,lam_relative,breakpoints)
@@ -375,7 +406,8 @@ while True:
             waypoint_pose.p[-1]+=50
             q1=robot_scan.inv(waypoint_pose.p,waypoint_pose.R,q_bp1[0][0])[0]
             q2=q_bp2[0][0]
-            ws.jog_dual(robot_scan,positioner,np.zeros(6),q2,v=to_start_speed)
+            if x==0:
+                ws.jog_dual(robot_scan,positioner,np.zeros(6),q2,v=to_start_speed)
             ws.jog_dual(robot_scan,positioner,q1,q2,v=to_start_speed)
             
             input("Start Scan")
@@ -448,7 +480,7 @@ while True:
             scan_process = ScanProcess(robot_scan,positioner)
             pcd = scan_process.pcd_register_mti(mti_recording,q_out_exe,robot_stamps)
             pcd = scan_process.pcd_noise_remove(pcd,nb_neighbors=40,std_ratio=1.5,\
-                                                min_bound=crop_min,max_bound=crop_max,cluster_based_outlier_remove=True,cluster_neighbor=1,min_points=100)
+                                                min_bound=crop_min,max_bound=crop_max,cluster_based_outlier_remove=False,cluster_neighbor=1,min_points=25)
             visualize_pcd([pcd])
             profile_height = scan_process.pcd2dh(pcd,curve_sliced_relative)
             plt.scatter(profile_height[:,0],profile_height[:,1])
@@ -464,7 +496,9 @@ while True:
             # exit()
 
             section_count+=layer_width_num
-    
+        all_profile_height=np.array(all_profile_height)
+        all_last_curve_relative=np.array(all_last_curve_relative)
+
     input("Scan Move to Home")
     # move robot to home
     

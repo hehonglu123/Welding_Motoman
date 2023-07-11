@@ -351,7 +351,7 @@ def strategy_3(profile_height,input_dh,curve_sliced_relative,R_S1TCP,num_l,noise
     
     return curve_sliced_relative_correct,path_T_S1,this_weld_v,all_dh,mean_h
 
-def strategy_4(profile_height,des_dh,curve_sliced_relative,last_curve_sliced_relative,breakpoints,ipm_mode=160):
+def strategy_4(profile_height,des_dh,curve_sliced_relative,last_curve_sliced_relative,breakpoints,max_v=1000,min_v=1,ipm_mode=160):
 
     mean_dh = np.mean(profile_height[:,1])
     all_dh=[]
@@ -359,10 +359,13 @@ def strategy_4(profile_height,des_dh,curve_sliced_relative,last_curve_sliced_rel
     for bp_i in range(1,len(breakpoints)):
         this_dh=[]
         for curve_i in np.arange(breakpoints[bp_i-1],breakpoints[bp_i],int(np.sign(breakpoints[bp_i]-breakpoints[bp_i-1]))).astype(int):
-            this_p = deepcopy(curve_sliced_relative[curve_i])
+            this_p = deepcopy(curve_sliced_relative[curve_i][:3])
             cor_last_p_id = np.argmin(np.linalg.norm(last_curve_sliced_relative[:,:3]-this_p,2,1))
             this_dh.append(profile_height[cor_last_p_id,1])
         seg_dh = des_dh-(np.mean(this_dh)-mean_dh)
+        seg_dh = max(0.1,seg_dh)
         all_dh.append(seg_dh)
-        weld_v.append(dh2v_loglog(seg_dh,mode=ipm_mode))
+        this_v = dh2v_loglog(seg_dh,mode=ipm_mode)
+        this_v = min(max_v,max(min_v,this_v))
+        weld_v.append(this_v)
     return weld_v,all_dh
