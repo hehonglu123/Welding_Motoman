@@ -43,7 +43,7 @@ def display_inlier_outlier(cloud, ind):
     show_pcd_list=[inlier_cloud, outlier_cloud, points_frame]
     o3d.visualization.draw_geometries(show_pcd_list,width=960,height=540)
 
-def visualize_pcd(show_pcd_list,point_show_normal=False):
+def visualize_pcd(show_pcd_list,point_show_normal=False,origin_size=20):
 
     show_pcd_list_legacy=[]
     for obj in show_pcd_list:
@@ -52,7 +52,7 @@ def visualize_pcd(show_pcd_list,point_show_normal=False):
         else:
             show_pcd_list_legacy.append(obj)
 
-    points_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=20,origin=[0,0,0])
+    points_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=origin_size,origin=[0,0,0])
     show_pcd_list_legacy.append(points_frame)
     o3d.visualization.draw_geometries(show_pcd_list_legacy,width=960,height=540,point_show_normal=point_show_normal)
 
