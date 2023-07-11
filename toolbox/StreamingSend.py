@@ -19,7 +19,7 @@ class StreamingSend(object):
 		
 		return np.array(breakpoints)
 
-	def position_cmd(self,qd,start_time):
+	def position_cmd(self,qd,start_time=None):
 		###streaming points at every 8ms
 		res, robot_state, _ = self.RR_robot_state.TryGetInValue()
 
@@ -38,10 +38,9 @@ class StreamingSend(object):
 		# Send the joint command to the robot
 		self.RR_robot.position_command.PokeOutValue(joint_cmd1)
 
-		# rate.Sleep()
-		# time.sleep(0.008)
-		while time.time()-start_time<1/self.streaming_rate-0.0002:
-			continue
+		if start_time:
+			while time.time()-start_time<1/self.streaming_rate-0.0005:
+				continue
 		
 		return float(robot_state.ts['microseconds'])/1e6, robot_state.joint_position
 
@@ -69,10 +68,40 @@ class StreamingSend(object):
 			ts,js=self.position_cmd(curve_js[i],time.time())
 			timestamp_recording.append(ts)
 			joint_recording.append(js)
-		
-		return np.array(timestamp_recording), np.array(joint_recording)
+		timestamp_recording=np.array(timestamp_recording)
+		timestamp_recording-=timestamp_recording[0]
+		return timestamp_recording, np.array(joint_recording)
 
-	def traj_tracking(self,lam,curve_js,vd,ctrl_joints):
+	def traj_tracking_js(self,curve_js,ctrl_joints):
+		###joint space trajectory tracking with exact number of points at streaming_rate
+		###curve_js: Nxn, 2d joint space trajectory
+		###ctrl_joints: joints to be controlled, array of 0 and 1
+
+		joint_recording=[]
+		timestamp_recording=[]
+		res, robot_state, _ = self.RR_robot_state.TryGetInValue()
+		q_cur=np.take(robot_state.joint_position,ctrl_joints.nonzero()[0])
+		q_static=np.take(robot_state.joint_position,(~ctrl_joints.astype(bool)).astype(int).nonzero()[0])
+		for i in range(len(curve_js)):
+			now=time.time()
+			curve_js_cmd=np.zeros(len(robot_state.joint_position))
+			np.put(curve_js_cmd,(~ctrl_joints.astype(bool)).astype(int).nonzero()[0],q_static)
+			if len(joint_recording)==0:
+				curve_js_cmd[ctrl_joints.nonzero()[0]]=curve_js[i]
+			else:
+				curve_js_cmd[ctrl_joints.nonzero()[0]]=curve_js[i]+(curve_js[i]-q_cur)*0.1
+
+			ts,js=self.position_cmd(curve_js_cmd,now)
+			timestamp_recording.append(ts)
+			joint_recording.append(js)
+			q_cur=np.take(js,ctrl_joints.nonzero()[0])
+
+		timestamp_recording=np.array(timestamp_recording)
+		timestamp_recording-=timestamp_recording[0]
+		return timestamp_recording, np.array(joint_recording)
+
+	def traj_tracking_lam(self,lam,curve_js,vd,ctrl_joints):
+		####trajectory tracking with vd and lam parameters, curve_js may or may not be exact num_points at streaming_rate
 		###lam: curve length parameter
 		###curve_js: joint space trajectory
 		###vd: desired velocity
@@ -98,7 +127,7 @@ class StreamingSend(object):
 			###interpolate next desired joint position
 			qd_next=curve_js[lam_next_idx]*(lam_next-lam[lam_next_idx])/(lam[lam_next_idx+1]-lam[lam_next_idx])+curve_js[lam_next_idx+1]*(lam[lam_next_idx+1]-lam_next)/(lam[lam_next_idx+1]-lam[lam_next_idx])
 
-			curve_js_cmd=np.ones(len(robot_state.joint_position))
+			curve_js_cmd=np.zeros(len(robot_state.joint_position))
 			np.put(curve_js_cmd,(~ctrl_joints.astype(bool)).astype(int).nonzero()[0],q_static)
 			if len(joint_recording)==0:
 				np.put(curve_js_cmd,ctrl_joints.nonzero()[0],qd_next)
@@ -111,4 +140,6 @@ class StreamingSend(object):
 			joint_recording.append(js)
 			q_cur=np.take(js,ctrl_joints.nonzero()[0])
 
-		return np.array(timestamp_recording), np.array(joint_recording)
+		timestamp_recording=np.array(timestamp_recording)
+		timestamp_recording-=timestamp_recording[0]
+		return timestamp_recording, np.array(joint_recording)
