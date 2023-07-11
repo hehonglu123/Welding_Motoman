@@ -181,10 +181,12 @@ class ScanProcess():
                          crop_path_flag=False,curve_relative=None,\
                          outlier_remove=True,nb_neighbors=40,std_ratio=0.5,cluster_based_outlier_remove=True,cluster_neighbor=0.75,min_points=50*4):
 
+        # visualize_pcd([pcd_combined])
         ## crop point clouds
         if crop_flag:
             bbox = o3d.geometry.AxisAlignedBoundingBox(min_bound=min_bound,max_bound=max_bound)
             pcd_combined=pcd_combined.crop(bbox)
+        # visualize_pcd([pcd_combined])
 
         #### processing
         ## voxel down sample
@@ -223,39 +225,43 @@ class ScanProcess():
 
         # create the cropping polygon
         poly_num=12
-        radius_scale=0.8
+        radius_scale=1
         radius=np.mean(np.linalg.norm(np.diff(curve_relative[:,:3],axis=0),axis=1))*radius_scale
+        # print(radius)
         bounding_polygon=[]
-        for n in poly_num:
-            ang=n/(np.pi*2)
+        for n in range(poly_num):
+            ang=(n/poly_num)*(np.pi*2)
             bounding_polygon.append(np.array([radius*np.cos(ang),radius*np.sin(ang),0]))
         bounding_polygon = np.array(bounding_polygon).astype("float64")
         crop_poly = o3d.visualization.SelectionPolygonVolume()
         crop_poly.bounding_polygon = o3d.utility.Vector3dVector(bounding_polygon)
         crop_poly.orthogonal_axis = 'z'
-        crop_poly.axis_max=3
-        crop_poly.axis_min=-1.5
+        crop_poly.axis_max=30
+        crop_poly.axis_min=-15
         
         # loop through curve to get dh
         curve_i=0
         dh=[]
         for curve_wp in curve_relative:
-            if curve_wp==curve_relative[-1]:
-                curve_R = direction2R(curve_wp[3:],curve_wp[:3]-curve_relative[curve_i-1][:3])
+            if np.all(curve_wp==curve_relative[-1]):
+                curve_R = direction2R(-1*curve_wp[3:],curve_wp[:3]-curve_relative[curve_i-1][:3])
             else:
-                curve_R = direction2R(curve_wp[3:],curve_relative[curve_i+1][:3]-curve_wp[:3])
+                curve_R = direction2R(-1*curve_wp[3:],curve_relative[curve_i+1][:3]-curve_wp[:3])
 
             sp_lamx=deepcopy(scanned_points)
             ## transform the scanned points to waypoints
             sp_lamx.transform(H_from_RT(curve_R,curve_wp[:3]))
+            # visualize_pcd([sp_lamx])
             ## crop the scanned points around the waypoints
             sp_lamx = crop_poly.crop_point_cloud(sp_lamx)
+            # visualize_pcd([sp_lamx],origin_size=10)
             ## dh is simply the z height after transform. Average over an radius
             this_dh = np.mean(np.asarray(sp_lamx.points)[:,2])
             dh.append(this_dh)
 
             curve_i+=1
-        lam = calc_lam_cs(curve_relative[:][:3])
+        curve_relative=np.array(curve_relative)
+        lam = calc_lam_cs(curve_relative[:,:3])
         profile_height = np.array([lam,dh]).T   
         
         return profile_height
