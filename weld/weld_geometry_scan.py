@@ -80,7 +80,8 @@ curve_data_dir = '../data/'+dataset+sliced_alg
 
 current_time = datetime.datetime.now()
 formatted_time = current_time.strftime('%Y_%m_%d_%H_%M_%S.%f')[:-7]
-data_dir=curve_data_dir+'../weld_scan_'+formatted_time+'/'
+# data_dir=curve_data_dir+'weld_scan_'+formatted_time+'/'
+data_dir=curve_data_dir+'weld_scan_'+'2023_07_10_16_59_28'+'/'
 
 #### welding spec, goal
 with open(curve_data_dir+'slicing.yml', 'r') as file:
@@ -133,7 +134,7 @@ start_feedback=999
 ## 300 260 250 240 ... 100
 planned_v=np.ones(start_feedback)*5
 planned_layer=np.arange(start_feedback)*layer_height_num
-planned_job=np.ones(start_feedback)*200
+planned_job=np.ones(start_feedback)*215
 planned_job=planned_job.astype(int)
 
 print_min_dh = 0.5 # mm
@@ -145,9 +146,11 @@ all_profile_height=None
 curve_sliced_relative=None
 all_last_curve_relative=None
 
-layer=0
-last_layer=-1
-layer_count=0
+layer=200
+last_layer=170
+layer_count=2
+
+manual=True
 
 print("Planned V (next 10):",planned_v[:10])
 print("Planned Layer (next 10):",planned_layer[:10])
@@ -161,20 +164,21 @@ mean_layer_dh=None
 while True:
     print("Layer Count:",layer_count)
     ####### Decide which layer to print #######
-    if layer_count!=0 and layer_count<start_feedback:
-        last_layer=layer
-        layer+=layer_height_num
-    elif layer_count==0:
-        pass
-    else:
-        mean_layer_dh=[]
-        for profile_height in all_profile_height:
-            mean_layer_dh.extend(profile_height[:,1])
-        mean_layer_dh=np.mean(mean_layer_dh)
+    if not manual:
+        if layer_count!=0 and layer_count<start_feedback:
+            last_layer=layer
+            layer+=layer_height_num
+        elif layer_count==0:
+            pass
+        else:
+            mean_layer_dh=[]
+            for profile_height in all_profile_height:
+                mean_layer_dh.extend(profile_height[:,1])
+            mean_layer_dh=np.mean(mean_layer_dh)
 
-        dlayer = int(round(mean_layer_dh/line_resolution)) # find the "delta layer" using dh
-        last_layer = layer # update last layer
-        layer = layer+dlayer # update layer
+            dlayer = int(round(mean_layer_dh/line_resolution)) # find the "delta layer" using dh
+            last_layer = layer # update last layer
+            layer = layer+dlayer # update layer
     
     # if achieve total layer
     if layer>=total_layer:
@@ -191,7 +195,7 @@ while True:
     all_curve_relative=[]
     num_sections=len(glob.glob(curve_data_dir+'curve_sliced_relative/slice'+str(layer)+'_*.csv'))
     #### welding
-    if layer>=0 and True:
+    if layer>=1 and True:
         for x in range(0,num_sections,layer_width_num):
             print("Print Layer",layer,"Sec.",x)
 
@@ -316,7 +320,7 @@ while True:
             ### scanning path module
             spg = ScanPathGen(robot_scan,positioner,scan_stand_off_d,Rz_angle,Ry_angle,bounds_theta)
             curve_sliced_relative=np.loadtxt(curve_data_dir+'curve_sliced_relative/slice'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
-            if len(curve_sliced_relative.shape)!=2:
+            if layer==0 and x==0:
                 continue
             print("Scan Layer",layer,", Sec",x)
             # try:
@@ -422,7 +426,7 @@ while True:
 
             print("Total exe len:",len(q_out_exe))
             if save_output_points:
-                layer_data_dir=data_dir+'layer_'+str(layer)+'_'+str(section_count)+'/'
+                layer_data_dir=data_dir+'layer_'+str(layer)+'_'+str(x)+'/'
                 out_scan_dir = layer_data_dir+'scans/'
                 Path(out_scan_dir).mkdir(exist_ok=True)
                 ## save traj
@@ -435,9 +439,12 @@ while True:
             ########################
 
             #### scanning process: processing point cloud and get h
+            curve_sliced_relative=np.array(curve_sliced_relative)
             crop_extend=10
-            crop_min=tuple(np.min(curve_sliced_relative[:][:3],axis=0)-crop_extend)
-            crop_max=tuple(np.max(curve_sliced_relative[:][:3],axis=0)+crop_extend)
+            crop_min=tuple(np.min(curve_sliced_relative[:,:3],axis=0)-crop_extend)
+            crop_max=tuple(np.max(curve_sliced_relative[:,:3],axis=0)+crop_extend)
+            print(crop_min)
+            print(crop_max)
             scan_process = ScanProcess(robot_scan,positioner)
             pcd = scan_process.pcd_register_mti(mti_recording,q_out_exe,robot_stamps)
             pcd = scan_process.pcd_noise_remove(pcd,nb_neighbors=40,std_ratio=1.5,\
@@ -446,14 +453,14 @@ while True:
             profile_height = scan_process.pcd2dh(pcd,curve_sliced_relative)
             plt.scatter(profile_height[:,0],profile_height[:,1])
             plt.show()
-            # all_profile_height.extend(profile_height)
+            all_profile_height.extend(profile_height)
 
-            all_profile_height.extend(np.array([[0,1],[1,1]]))
+            # all_profile_height.extend(np.array([[0,1],[1,1]]))
             all_last_curve_relative.extend(curve_sliced_relative)
             
             if save_output_points:
                 o3d.io.write_point_cloud(out_scan_dir+'processed_pcd.pcd',pcd)
-                # np.save(out_scan_dir+'height_profile.npy',profile_height)
+                np.save(out_scan_dir+'height_profile.npy',profile_height)
             # exit()
 
             section_count+=layer_width_num
