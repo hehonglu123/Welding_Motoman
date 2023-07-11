@@ -106,8 +106,8 @@ show_layer = []
 x_lower = -99999
 x_upper = 999999
 
-# datasets=['baseline','full_test']
-datasets=['baseline']
+datasets=['baseline','full_test']
+# datasets=['baseline']
 datasets_h_mean={}
 datasets_h_std={}
 for dataset in datasets:
@@ -435,4 +435,15 @@ plt.legend()
 plt.xlabel('Layer')
 plt.ylabel('Height STD (mm)')
 plt.title("Height STD")
+plt.show()
+
+datasets_dh_mean={}
+for dataset in datasets:
+    datasets_dh_mean[dataset] = np.diff(datasets_h_mean[dataset])
+    datasets_dh_mean[dataset] = np.append(datasets_h_mean[dataset][0],datasets_dh_mean[dataset])
+    plt.plot(np.arange(len(datasets_dh_mean[dataset])),datasets_h_std[dataset]/datasets_dh_mean[dataset]*100,'-o',label=dataset)
+plt.legend()
+plt.xlabel('Layer')
+plt.ylabel('Height STD/Mean dh (%)')
+plt.title("Height STD/Mean dh (%)")
 plt.show()
