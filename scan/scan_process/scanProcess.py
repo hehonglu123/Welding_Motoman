@@ -251,10 +251,10 @@ class ScanProcess():
             sp_lamx=deepcopy(scanned_points)
             ## transform the scanned points to waypoints
             sp_lamx.transform(np.linalg.inv(H_from_RT(curve_R,curve_wp[:3])))
-            visualize_pcd([sp_lamx])
+            # visualize_pcd([sp_lamx])
             ## crop the scanned points around the waypoints
             sp_lamx = crop_poly.crop_point_cloud(sp_lamx)
-            visualize_pcd([sp_lamx],origin_size=10)
+            # visualize_pcd([sp_lamx],origin_size=10)
             ## dh is simply the z height after transform. Average over an radius
             this_dh = np.mean(np.asarray(sp_lamx.points)[:,2])
             dh.append(this_dh)
