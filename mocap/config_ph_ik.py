@@ -44,6 +44,32 @@ with open(PH_data_dir+'calib_PH_q.pickle','rb') as file:
 ph_param_lin=PH_Param()
 ph_param_lin.fit(PH_q,method='linear')
 
+## nominal
+ph_q_nom = []
+for j in range(6):
+    ph_q_nom = np.append(ph_q_nom,origin_P[:,j])
+for j in range(6):
+    ph_q_nom = np.append(ph_q_nom,origin_H[:,j])
+
+ph_q = []
+for q in PH_q.keys():
+    ph_q.append(np.append(PH_q[q]['P'][:,:-1].T.flatten(),PH_q[q]['H'].T.flatten())-ph_q_nom)
+
+ph_q=np.array(ph_q).T
+print(ph_q.shape)
+print("SVD")
+U,S,V = np.linalg.svd(ph_q)
+print(S)
+for i in range(len(S)):
+    print(S[i],U[:,i])
+    print("============")
+    # input("")
+
+print(U[:,0]*S[0]*V[0,0])
+
+
+exit()
+
 test_robot_q = np.loadtxt(test_data_dir+'robot_q_align.csv',delimiter=',')
 
 all_error_norm=[]
