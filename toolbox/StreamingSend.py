@@ -61,13 +61,19 @@ class StreamingSend(object):
 			self.position_cmd(qd,time.time())
 
 
-	def traj_streaming(self,curve_js):
+	def traj_streaming(self,curve_js,ctrl_joints):
 		joint_recording=[]
 		timestamp_recording=[]
+		res, robot_state, _ = self.RR_robot_state.TryGetInValue()
+		q_static=np.take(robot_state.joint_position,(~ctrl_joints.astype(bool)).astype(int).nonzero()[0])
 		for i in range(len(curve_js)):
-			ts,js=self.position_cmd(curve_js[i],time.time())
+			now=time.time()
+			curve_js_cmd=np.zeros(len(robot_state.joint_position))
+			np.put(curve_js_cmd,(~ctrl_joints.astype(bool)).astype(int).nonzero()[0],q_static)
+			curve_js_cmd[ctrl_joints.nonzero()[0]]=curve_js[i]
+			ts,js=self.position_cmd(curve_js_cmd,time.time())
 			timestamp_recording.append(ts)
-			joint_recording.append(js)
+			joint_recording.append(js[ctrl_joints.nonzero()[0]])
 		timestamp_recording=np.array(timestamp_recording)
 		timestamp_recording-=timestamp_recording[0]
 		return timestamp_recording, np.array(joint_recording)
@@ -93,8 +99,8 @@ class StreamingSend(object):
 
 			ts,js=self.position_cmd(curve_js_cmd,now)
 			timestamp_recording.append(ts)
-			joint_recording.append(js)
-			q_cur=np.take(js,ctrl_joints.nonzero()[0])
+			joint_recording.append(js[ctrl_joints.nonzero()[0]])
+			q_cur=js[ctrl_joints.nonzero()[0]]
 
 		timestamp_recording=np.array(timestamp_recording)
 		timestamp_recording-=timestamp_recording[0]
@@ -137,8 +143,8 @@ class StreamingSend(object):
 			# print(curve_js_cmd)
 			ts,js=self.position_cmd(curve_js_cmd,now)
 			timestamp_recording.append(ts)
-			joint_recording.append(js)
-			q_cur=np.take(js,ctrl_joints.nonzero()[0])
+			joint_recording.append(js[ctrl_joints.nonzero()[0]])
+			q_cur=js[ctrl_joints.nonzero()[0]]
 
 		timestamp_recording=np.array(timestamp_recording)
 		timestamp_recording-=timestamp_recording[0]
