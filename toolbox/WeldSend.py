@@ -15,12 +15,31 @@ class WeldSend(object):
 
 	def jog_single(self,robot,q,v=1):
 		mp=MotionProgram(ROBOT_CHOICE=self.ROBOT_CHOICE_MAP[robot.robot_name],pulse2deg=robot.pulse2deg, tool_num=self.ROBOT_TOOL_MAP[robot.robot_name])
-		mp.MoveJ(np.degrees(q),v,None)
+		
+		if len(np.array(q).shape)==1:
+			mp.MoveJ(np.degrees(q),v,0)
+		else:
+			for q_wp in q:
+				mp.MoveJ(np.degrees(q_wp),v,0)
+
 		self.client.execute_motion_program(mp)
 	
 	def jog_dual(self,robot1,robot2,q1,q2,v=1):
 		mp=MotionProgram(ROBOT_CHOICE=self.ROBOT_CHOICE_MAP[robot1.robot_name],ROBOT_CHOICE2=self.ROBOT_CHOICE_MAP[robot2.robot_name],pulse2deg=robot1.pulse2deg,pulse2deg_2=robot2.pulse2deg, tool_num=self.ROBOT_TOOL_MAP[robot1.robot_name])
-		mp.MoveJ(np.degrees(q1),v,None,target2=['MOVJ',np.degrees(q2),10])
+		
+		if len(np.array(q1).shape)==1 and len(np.array(q2).shape)==1:
+			mp.MoveJ(np.degrees(q1),v,0,target2=['MOVJ',np.degrees(q2),10])
+		elif len(np.array(q1).shape)==2 and len(np.array(q2).shape)==1:
+			for q1_wp in q1:
+				mp.MoveJ(np.degrees(q1_wp),v,0,target2=['MOVJ',np.degrees(q2),10])
+		elif len(np.array(q1).shape)==1 and len(np.array(q2).shape)==2:
+			for q2_wp in q2:
+				mp.MoveJ(np.degrees(q1),v,0,target2=['MOVJ',np.degrees(q2_wp),10])
+		else:
+			wp_length = min(len(q1),len(q2))
+			for wp_i in range(wp_length):
+				mp.MoveJ(np.degrees(q1[wp_i]),v,0,target2=['MOVJ',np.degrees(q2[wp_i]),10])
+
 		self.client.execute_motion_program(mp)
 
 	def weld_segment_single(self,primitives,robot,q_all,v_all,cond_all,arc=False):
