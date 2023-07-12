@@ -119,8 +119,11 @@ mti_Rpath = np.array([[ -1.,0.,0.],
                         [0.,0.,-1.]])
 
 # 3. Motion Param
-to_start_speed=3
-to_home_speed=7
+to_start_speed=7
+to_home_speed=10
+R1_home = np.radians([10,0,0,0,0,0])
+R2_mid = np.radians([0,0,0,0,0,0])
+R2_home = np.radians([60,0,0,0,0,0])
 
 # ## rr drivers and all other drivers
 robot_client=MotionProgramExecClient()
@@ -334,7 +337,7 @@ while True:
 
     ## move R1 back to home
     input("Weld Move to Home")
-    ws.jog_single(robot_weld,np.array([np.radians(20),0,0,0,0,0]),v=to_home_speed)
+    ws.jog_single(robot_weld,R1_home,v=to_home_speed)
 
     #### scanning
     if True:
@@ -407,8 +410,9 @@ while True:
             q1=robot_scan.inv(waypoint_pose.p,waypoint_pose.R,q_bp1[0][0])[0]
             q2=q_bp2[0][0]
             if x==0:
-                ws.jog_dual(robot_scan,positioner,np.zeros(6),q2,v=to_start_speed)
-            ws.jog_dual(robot_scan,positioner,q1,q2,v=to_start_speed)
+                ws.jog_dual(robot_scan,positioner,[R2_mid,q1],q2,v=to_start_speed)
+            else:
+                ws.jog_dual(robot_scan,positioner,q1,q2,v=to_start_speed)
             
             input("Start Scan")
             mp = MotionProgram(ROBOT_CHOICE='RB2',ROBOT_CHOICE2='ST1',pulse2deg=robot_scan.pulse2deg,pulse2deg_2=positioner.pulse2deg)
@@ -501,9 +505,7 @@ while True:
 
     input("Scan Move to Home")
     # move robot to home
-    
-    ws.jog_dual(robot_scan,positioner,np.array([0,0,0,0,0,0]),[0,q_prev[1]],v=to_home_speed)
-    ws.jog_single(robot_scan,np.array([np.pi/2,0,0,0,0,0]),v=to_home_speed)
+    ws.jog_dual(robot_scan,positioner,[R2_mid,R2_home],[0,q_prev[1]],v=to_home_speed)
     
     ## increase layer count
     layer_count+=1
