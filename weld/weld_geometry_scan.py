@@ -108,7 +108,7 @@ layer_height_num=int(des_dh/line_resolution) # preplanned
 layer_width_num=int(des_dw/line_resolution) # preplanned
 
 weld_min_v=5
-weld_max_v=30
+weld_max_v=100
 
 # 2. Scanning parameters
 ### scan parameters
@@ -127,8 +127,8 @@ mti_Rpath = np.array([[ -1.,0.,0.],
 to_start_speed=7
 to_home_speed=10
 R1_home = np.radians([10,0,0,0,0,0])
-R2_mid = np.radians([0,0,0,0,0,0])
-R2_home = np.radians([60,0,0,0,0,0])
+R2_mid = np.radians([6,20,-10,0,0,0])
+R2_home = np.radians([70,10,-5,0,0,0])
 
 # ## rr drivers and all other drivers
 robot_client=MotionProgramExecClient()
@@ -161,9 +161,14 @@ all_profile_height=None
 curve_sliced_relative=None
 all_last_curve_relative=None
 
-layer=0
+layer=516
 last_layer=-1
-layer_count=0
+layer_count=15
+
+try:
+    layer_count=len(glob.glob(data_dir+'layer_*_0'))+1
+except:
+    pass
 
 manual_dh=False
 correction=True
@@ -192,6 +197,9 @@ while True:
                     this_sec_dh = np.load(data_dir+'layer_'+str(layer)+'_'+str(x)+'/scans/height_profile.npy')
                     all_profile_height.extend(this_sec_dh)
                 all_profile_height=np.array(all_profile_height)
+            # plt.scatter(all_profile_height[:,0],all_profile_height[:,1])
+            # plt.show()
+            # print(all_profile_height[:,1])
             mean_layer_dh=np.mean(all_profile_height[:,1])
             dlayer = int(round(mean_layer_dh/line_resolution)) # find the "delta layer" using dh
             last_layer = layer # update last layer
@@ -201,15 +209,16 @@ while True:
             print("Last Mean dlayer:",dlayer)
             print("Last Layer:",last_layer)
             print("This Layer:",layer)
-    
+
     # if achieve total layer
     if layer>=total_layer:
+        print("More than total layer")
         break
     # if close to total layer
     if layer+layer_height_num>=total_layer:
         dlayer = total_layer-layer
         des_dh = dlayer*line_resolution
-        if des_dh<print_min_dh: # to close to the total layer
+        if des_dh<print_min_dh: # too close to the total layer
             break
 
     print("Print Layer:",layer)
@@ -217,7 +226,7 @@ while True:
     all_curve_relative=[]
     num_sections=len(glob.glob(curve_data_dir+'curve_sliced_relative/slice'+str(layer)+'_*.csv'))
     #### welding
-    if layer>=0 and True:
+    if layer>=456 and True:
         for x in range(0,num_sections,layer_width_num):
             print("Print Layer",layer,"Sec.",x)
 
@@ -513,3 +522,4 @@ while True:
     layer_count+=1
 
 print("Welding End!!")
+exit()

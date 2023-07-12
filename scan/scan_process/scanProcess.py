@@ -257,9 +257,20 @@ class ScanProcess():
             # visualize_pcd([sp_lamx],origin_size=10)
             ## dh is simply the z height after transform. Average over an radius
             this_dh = np.mean(np.asarray(sp_lamx.points)[:,2])
+
             dh.append(this_dh)
 
             curve_i+=1
+
+        for curve_i in range(len(dh)):
+            if np.isnan(dh[curve_i]):
+                if curve_i==0:
+                    dh[curve_i]=np.nanmean(dh[curve_i:curve_i+2])
+                elif curve_i!=len(dh)-1:
+                    dh[curve_i]=np.nanmean(dh[curve_i-2:curve_i])
+                else:
+                    dh[curve_i]=np.nanmean(dh[curve_i-1:curve_i+1])
+
         curve_relative=np.array(curve_relative)
         lam = calc_lam_cs(curve_relative[:,:3])
         profile_height = np.array([lam,dh]).T   
