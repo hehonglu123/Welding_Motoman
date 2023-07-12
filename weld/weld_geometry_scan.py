@@ -94,7 +94,10 @@ with open(curve_data_dir+'slicing.yml', 'r') as file:
 line_resolution = slicing_meta['line_resolution']
 total_layer = slicing_meta['num_layers']
 
+## weldind parameters
 weld_mode=160
+des_job=206
+
 des_dh = 1.5
 des_v = round(dh2v_loglog(des_dh,weld_mode),1)
 print("The Desired speed (according to desired h",des_dh,"will be",\
@@ -103,7 +106,9 @@ des_dw = 4
 waypoint_distance=1.625 	###waypoint separation (calculate from 40moveL/95mm, where we did the test)
 layer_height_num=int(des_dh/line_resolution) # preplanned
 layer_width_num=int(des_dw/line_resolution) # preplanned
-des_job=206
+
+weld_min_v=5
+weld_max_v=30
 
 # 2. Scanning parameters
 ### scan parameters
@@ -118,7 +123,7 @@ mti_Rpath = np.array([[ -1.,0.,0.],
                         [ 0.,1.,0.],
                         [0.,0.,-1.]])
 
-# 3. Motion Param
+# 3. Motion Parameters
 to_start_speed=7
 to_home_speed=10
 R1_home = np.radians([10,0,0,0,0,0])
@@ -156,9 +161,9 @@ all_profile_height=None
 curve_sliced_relative=None
 all_last_curve_relative=None
 
-layer=15
+layer=0
 last_layer=-1
-layer_count=2
+layer_count=0
 
 manual_dh=False
 correction=True
@@ -255,12 +260,9 @@ while True:
                     all_profile_height=np.array(all_profile_height)
                     all_last_curve_relative=np.array(all_last_curve_relative)
 
-                ## parameters
-                min_v=5
-                max_v=30
                 #### correction strategy
                 this_weld_v,all_dh=\
-                    strategy_4(all_profile_height,des_dh,curve_sliced_relative,all_last_curve_relative,breakpoints,max_v=max_v,min_v=min_v,ipm_mode=weld_mode)
+                    strategy_4(all_profile_height,des_dh,curve_sliced_relative,all_last_curve_relative,breakpoints,max_v=weld_max_v,min_v=weld_min_v,ipm_mode=weld_mode)
                 weld_job=des_job
 
                 ####################
