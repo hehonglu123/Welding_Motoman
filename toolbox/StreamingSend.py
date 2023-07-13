@@ -2,14 +2,15 @@ import numpy as np
 import time
 
 class StreamingSend(object):
-	def __init__(self,RR_robot,RR_robot_state,RobotJointCommand,streaming_rate=125.):
+	def __init__(self,robot,RR_robot,RR_robot_state,RobotJointCommand,streaming_rate=125.):
+		self.robot=robot
 		self.RR_robot=RR_robot
 		self.RR_robot_state=RR_robot_state
 		self.RobotJointCommand=RobotJointCommand
 		self.streaming_rate=streaming_rate
 		self.command_seqno=0
 
-	def get_breapoints(self,lam,vd):
+	def get_breakpoints(self,lam,vd):
 		lam_diff=np.diff(lam)
 		displacement=vd/self.streaming_rate
 		breakpoints=[0]
@@ -149,3 +150,17 @@ class StreamingSend(object):
 		timestamp_recording=np.array(timestamp_recording)
 		timestamp_recording-=timestamp_recording[0]
 		return timestamp_recording, np.array(joint_recording)
+	
+
+	def add_extension_egm_js(self,curve_cmd_js,extension_start=50,extension_end=50):
+		#################add extension#########################
+		init_extension_js=np.linspace(curve_cmd_js[0]-extension_start*(curve_cmd_js[1]-curve_cmd_js[0]),curve_cmd_js[0],num=extension_start,endpoint=False)
+		end_extension_js=np.linspace(curve_cmd_js[-1],curve_cmd_js[-1]+extension_end*(curve_cmd_js[-1]-curve_cmd_js[-2]),num=extension_end+1)[1:]
+
+		###cap extension within joint limits
+		for i in range(len(curve_cmd_js[0])):
+			init_extension_js[:,i]=np.clip(init_extension_js[:,i],self.robot.lower_limit[i]+0.01,self.robot.upper_limit[i]-0.01)
+			end_extension_js[:,i]=np.clip(end_extension_js[:,i],self.robot.lower_limit[i]+0.01,self.robot.upper_limit[i]-0.01)
+
+		curve_cmd_js_ext=np.vstack((init_extension_js,curve_cmd_js,end_extension_js))
+		return curve_cmd_js_ext

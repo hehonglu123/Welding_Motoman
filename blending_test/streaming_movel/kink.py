@@ -51,7 +51,7 @@ def main():
 	q_mid=robot.inv(p_mid, R, qseed)[0]
 	q_end=robot.inv(p_end, R, qseed)[0]
 
-	vd_all=[50,100,200,400]
+	vd_all=[50,100,200,400,800]
 	for vd in vd_all:
 		client=MotionProgramExecClient()
 		mp=MotionProgram(ROBOT_CHOICE='RB1',pulse2deg=robot.pulse2deg, tool_num=12)
