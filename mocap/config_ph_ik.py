@@ -67,6 +67,10 @@ for i in range(len(S)):
 
 print(U[:,0]*S[0]*V[0,0])
 
+plt.plot(np.log10(S),'-o')
+plt.xlabel('Singular Value Index')
+plt.ylabel('Singular Value (log 10 scale)')
+plt.show()
 
 exit()
 

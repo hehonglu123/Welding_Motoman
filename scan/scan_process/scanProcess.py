@@ -210,7 +210,7 @@ class ScanProcess():
         
         return pcd_combined
 
-    def pcd2dh(self,scanned_points,curve_relative):
+    def pcd2dh(self,scanned_points,curve_relative,drawing=False):
 
         ##### cross section parameters
         # resolution_z=0.1
@@ -238,9 +238,15 @@ class ScanProcess():
         crop_poly.orthogonal_axis = 'z'
         crop_poly.axis_max=30
         crop_poly.axis_min=-15
+
+        if drawing:
+            scanned_points_draw = deepcopy(scanned_points)
+            scanned_points_draw.paint_uniform_color([0.3,0.3,0.3])
+            path_points = o3d.geometry.PointCloud()
         
         # loop through curve to get dh
         curve_i=0
+        total_curve_i = len(curve_relative)
         dh=[]
         for curve_wp in curve_relative:
             if np.all(curve_wp==curve_relative[-1]):
@@ -260,6 +266,13 @@ class ScanProcess():
 
             dh.append(this_dh)
 
+            if drawing:
+                ## paint pcd for visualization
+                color_dist = plt.get_cmap("rainbow")(float(curve_i)/total_curve_i)
+                sp_lamx.paint_uniform_color(color_dist[:3])
+                sp_lamx.transform(H_from_RT(curve_R,curve_wp[:3]))
+                path_points = path_points+sp_lamx
+
             curve_i+=1
 
         for curve_i in range(len(dh)):
@@ -274,6 +287,10 @@ class ScanProcess():
         curve_relative=np.array(curve_relative)
         lam = calc_lam_cs(curve_relative[:,:3])
         profile_height = np.array([lam,dh]).T   
+
+        if drawing:
+            path_points.transform(H_from_RT(np.eye(3),[0,0,0.0001]))
+            visualize_pcd([scanned_points_draw,path_points])
         
         return profile_height
     

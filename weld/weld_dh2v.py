@@ -60,5 +60,6 @@ if __name__=='__main__':
     print(loglog_v)
     print(quad_v)
 
-    print(v2dh_loglog(18,220))
+    # print(v2dh_loglog(18,160))
+    print(dh2v_loglog(1.5,160))
     # print(v2dh_loglog(75,220))
