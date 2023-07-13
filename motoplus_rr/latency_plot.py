@@ -8,6 +8,9 @@ import matplotlib.pyplot as plt
 from StreamingSend import *
 
 
+robot=robot_obj('MA2010_A0',def_path='../config/MA2010_A0_robot_default_config.yml',tool_file_path='../config/torch.csv',\
+		pulse2deg_file_path='../config/MA2010_A0_pulse2deg_real.csv',d=15)
+
 RR_robot_sub = RRN.SubscribeService('rr+tcp://localhost:59945?service=robot')
 RR_robot_state = RR_robot_sub.SubscribeWire('robot_state')
 RR_robot = RR_robot_sub.GetDefaultClientWait(1)
@@ -21,7 +24,7 @@ RR_robot.command_mode = halt_mode
 time.sleep(0.1)
 RR_robot.command_mode = position_mode
 streaming_rate=125.
-SS=StreamingSend(RR_robot,RR_robot_state,RobotJointCommand,streaming_rate=streaming_rate)
+SS=StreamingSend(robot,RR_robot,RR_robot_state,RobotJointCommand,streaming_rate=streaming_rate)
 
 SS.jog2q(np.hstack((np.zeros(6),[np.pi/2,0,0,0,0,0,np.radians(-15),np.pi])))
 
@@ -29,14 +32,13 @@ total_time=20
 num_points=int(total_time*streaming_rate)
 timestamp_cmd=np.linspace(0,total_time,num_points)
 q6=np.sin(np.linspace(0,4*np.pi,num_points))
-curve_js_all=np.hstack((np.zeros((num_points,5)),q6.reshape((num_points,-1)),0.5*np.pi*np.ones((num_points,1)),np.zeros((num_points,5)),np.radians(-15)*np.ones((num_points,1)),np.pi*np.ones((num_points,1))))
 
-# timestamp_recording,joint_recording=SS.traj_streaming(curve_js_all)
-timestamp_recording,joint_recording=SS.traj_tracking_js(q6.reshape((len(q6),-1)),ctrl_joints=np.array([0,0,0,0,0,1,0,0,0,0,0,0,0,0]))
+timestamp_recording,joint_recording=SS.traj_streaming(q6.reshape((-1,1)),ctrl_joints=np.array([0,0,0,0,0,1,0,0,0,0,0,0,0,0]))
+# timestamp_recording,joint_recording=SS.traj_tracking_js(q6.reshape((len(q6),-1)),ctrl_joints=np.array([0,0,0,0,0,1,0,0,0,0,0,0,0,0]))
 
 plt.title('JOINT6 LATENCY PLOT')
-plt.plot(timestamp_cmd,q6,label='cmd')
-plt.plot(timestamp_recording,joint_recording[:,5],label='exe')
+plt.plot(timestamp_recording,q6,label='cmd')
+plt.plot(timestamp_recording,joint_recording,label='exe')
 plt.xlabel('time (s)')
 plt.ylabel('joint6 (rad)')
 plt.legend()

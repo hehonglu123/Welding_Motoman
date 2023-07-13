@@ -66,7 +66,7 @@ def main():
 	q_mid=robot.inv(p_mid, R, qseed)[0]
 	q_end=robot.inv(p_end, R, qseed)[0]
 
-	vd_all=[50,100,200,400]
+	vd_all=[50,100,200,400,800]
 	for vd in vd_all:
 		SS.jog2q(np.hstack((q_start,[np.pi/2,0,0,0,0,0,np.radians(-15),np.pi])))
 		lam_totoal=np.linalg.norm(p_start-p_mid)+np.linalg.norm(p_mid-p_end)

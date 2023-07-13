@@ -17,7 +17,7 @@ p_end=np.array([1648,-900+displacement,-100])
 curve=np.vstack((np.linspace(p_start,p_mid,1000),np.linspace(p_mid,p_end,1000)))
 curve_normal=np.array([[0,0,-1]]*2000)
 
-vd=200
+vd=400
 data_movel=np.loadtxt('movel_test/joint_recording_%i.csv'%vd,delimiter=',')
 curve_exe_js_movel=data_movel[:,1:]
 timestamp_movel=data_movel[:,0]
@@ -63,7 +63,7 @@ ax2.plot(lam_movel, error_movel, 'b-',label='MoveL Error')
 ax1.plot(lam_streaming, speed_streaming, 'g-', label='Streaming Speed')
 ax2.plot(lam_streaming, error_streaming, 'y-',label='Streaming Error')
 # ax2.plot(lam_movel, np.degrees(angle_error_movel), 'y-',label='Normal Error')
-ax2.axis(ymin=0,ymax=5)
+ax2.axis(ymin=0,ymax=8)
 ax1.axis(ymin=0,ymax=1.5*vd)
 
 ax1.set_xlabel('lambda (mm)')

@@ -80,7 +80,7 @@ for base_layer in range(num_baselayer):
 		positioner_js_dense=interp1d(lam_relative,positioner_js,axis=0)(lam_relative_dense)
 
 
-		breakpoints=SS.get_breapoints(lam_relative_dense,vd_relative)
+		breakpoints=SS.get_breakpoints(lam_relative_dense,vd_relative)
 
 		###find which end to start
 		if np.linalg.norm(q_prev-curve_sliced_js[0])>np.linalg.norm(q_prev-curve_sliced_js[-1]):
