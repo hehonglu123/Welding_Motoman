@@ -53,11 +53,12 @@ curve_data_dir = '../data/'+dataset+sliced_alg
 current_time = datetime.datetime.now()
 formatted_time = current_time.strftime('%Y_%m_%d_%H_%M_%S.%f')[:-7]
 # data_dir=curve_data_dir+'weld_scan_'+formatted_time+'/'
-data_dir=curve_data_dir+'weld_scan_'+'2023_07_10_16_59_28'+'/'
+data_dir=curve_data_dir+'weld_scan_'+'2023_07_11_16_25_30'+'/'
 
 
-layer=200
+layer=367
 x=0
+
 layer_data_dir=data_dir+'layer_'+str(layer)+'_'+str(x)+'/'
 out_scan_dir = layer_data_dir+'scans/'
 curve_sliced_relative=np.loadtxt(curve_data_dir+'curve_sliced_relative/slice'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
@@ -80,6 +81,14 @@ pcd = scan_process.pcd_register_mti(mti_recording,q_out_exe,robot_stamps)
 pcd = scan_process.pcd_noise_remove(pcd,nb_neighbors=40,std_ratio=1.5,\
                                     min_bound=crop_min,max_bound=crop_max,outlier_remove=True,cluster_based_outlier_remove=False,cluster_neighbor=1,min_points=25)
 visualize_pcd([pcd])
-profile_height = scan_process.pcd2dh(pcd,curve_sliced_relative)
-plt.scatter(profile_height[:,0],profile_height[:,1])
+profile_height = scan_process.pcd2dh(pcd,curve_sliced_relative,drawing=True)
+
+curve_i=0
+total_curve_i = len(profile_height)
+for curve_i in range(total_curve_i):
+    color_dist = plt.get_cmap("rainbow")(float(curve_i)/total_curve_i)
+    plt.scatter(profile_height[curve_i,0],profile_height[curve_i,1],c=color_dist)
+plt.xlabel('Lambda')
+plt.ylabel('dh to Layer N (mm)')
+plt.title("Height Profile")
 plt.show()
