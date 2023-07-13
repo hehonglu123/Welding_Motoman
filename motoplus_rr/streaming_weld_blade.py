@@ -100,9 +100,11 @@ for base_layer in range(num_baselayer):
 ###########################################layer welding############################################
 res, robot_state, _ = RR_robot_state.TryGetInValue()
 q_prev=robot_state.joint_position[:6]
+timestamp_robot=[]
+joint_recording=[]
 
-num_layer_start=int(43*layer_height_num)
-num_layer_end=int(51*layer_height_num)
+num_layer_start=int(0*layer_height_num)
+num_layer_end=int(10*layer_height_num)
 num_sections=1
 for layer in range(num_layer_start,num_layer_end,layer_height_num):
 	num_sections_prev=num_sections
@@ -156,9 +158,12 @@ for layer in range(num_layer_start,num_layer_end,layer_height_num):
 
 		##########WELDING#######
 		fronius_client.start_weld()
-		SS.traj_streaming(curve_js_all)
+		ts,js=SS.traj_streaming(curve_js_all)
+		timestamp_robot.extend(ts)
+		joint_recording.extend(js)
 		time.sleep(0.44)
 		fronius_client.stop_weld()
 
 		q_prev=curve_sliced_js_dense[breakpoints[-1]]
 	
+np.savetxt('recorded_data/joint_recording.csv',np.hstack((timestamp_robot.reshape(-1, 1),joint_recording)),delimiter=',')

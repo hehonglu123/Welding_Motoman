@@ -17,7 +17,7 @@ p_end=np.array([1648,-900+displacement,-100])
 curve=np.vstack((np.linspace(p_start,p_mid,1000),np.linspace(p_mid,p_end,1000)))
 curve_normal=np.array([[0,0,-1]]*2000)
 
-vd=100
+vd=200
 data_movel=np.loadtxt('movel_test/joint_recording_%i.csv'%vd,delimiter=',')
 curve_exe_js_movel=data_movel[:,1:]
 timestamp_movel=data_movel[:,0]
