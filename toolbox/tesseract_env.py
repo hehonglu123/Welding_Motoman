@@ -14,7 +14,6 @@ from qpsolvers import solve_qp
 from scipy.optimize import fminbound
 
 from gazebo_model_resource_locator import GazeboModelResourceLocator
-from robots_def import *
 
 #convert 4x4 H matrix to 3x3 H matrix and inverse for mapping obj to robot frame
 def H42H3(H):
@@ -92,11 +91,14 @@ class Tess_Env(object):
 	def viewer_joints_update(self,robot_name,joints):
 		self.viewer.update_joint_positions(self.robot_jointname[robot_name], np.array(joints))
 
-	def viewer_trajectory(self,robot_name,curve_js):
+	def viewer_trajectory(self,robot_names,curve_js):
 		trajectory_json = dict()
 		trajectory_json["use_time"] = True
 		trajectory_json["loop_time"] = 20
-		trajectory_json["joint_names"] = self.robot_jointname[robot_name]
+		joint_names=[]
+		for robot_name in robot_names:
+			joint_names.extend(self.robot_jointname[robot_name])
+		trajectory_json["joint_names"] = joint_names
 		trajectory2 = np.hstack((curve_js,np.linspace(0,10,num=len(curve_js))[np.newaxis].T))
 		trajectory_json["trajectory"] = trajectory2.tolist()
 		self.viewer.trajectory_json=json.dumps(trajectory_json)
