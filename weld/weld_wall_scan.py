@@ -12,6 +12,7 @@ from scan_continuous import *
 from scanPathGen import *
 from scanProcess import *
 from weldCorrectionStrategy import *
+from weldRRSensor import *
 from dx200_motion_program_exec_client import *
 
 from general_robotics_toolbox import *
@@ -20,29 +21,6 @@ import matplotlib.pyplot as plt
 import time
 import datetime
 import numpy as np
-
-weld_timestamp=[]
-weld_voltage=[]
-weld_current=[]
-weld_feedrate=[]
-weld_energy=[]
-
-def clean_weld_record():
-    global weld_timestamp, weld_voltage, weld_current, weld_feedrate, weld_energy
-    weld_timestamp=[]
-    weld_voltage=[]
-    weld_current=[]
-    weld_feedrate=[]
-    weld_energy=[]
-
-def wire_cb(sub, value, ts):
-    global weld_timestamp, weld_voltage, weld_current, weld_feedrate, weld_energy
-
-    weld_timestamp.append(value.ts['microseconds'][0])
-    weld_voltage.append(value.welding_voltage)
-    weld_current.append(value.welding_current)
-    weld_feedrate.append(value.wire_speed)
-    weld_energy.append(value.welding_energy)
 
 def robot_weld_path_gen(all_layer_z,forward_flag,base_layer):
     R=np.array([[-0.7071, 0.7071, -0.    ],
@@ -81,10 +59,10 @@ zero_config=np.zeros(6)
 # 0. robots. Note use "(robot)_pose_mocapcalib.csv"
 config_dir='../config/'
 robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',d=15,tool_file_path=config_dir+'torch.csv',\
-	pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',\
+    pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',\
     base_marker_config_file=config_dir+'MA2010_marker_config.yaml',tool_marker_config_file=config_dir+'weldgun_marker_config.yaml')
 robot_scan=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.yml',tool_file_path=config_dir+'mti.csv',\
-	base_transformation_file=config_dir+'MA1440_pose.csv',pulse2deg_file_path=config_dir+'MA1440_A0_pulse2deg_real.csv',\
+    base_transformation_file=config_dir+'MA1440_pose.csv',pulse2deg_file_path=config_dir+'MA1440_A0_pulse2deg_real.csv',\
     base_marker_config_file=config_dir+'MA1440_marker_config.yaml')
 positioner=positioner_obj('D500B',def_path=config_dir+'D500B_robot_default_config.yml',tool_file_path=config_dir+'positioner_tcp.csv',\
     base_transformation_file=config_dir+'D500B_pose.csv',pulse2deg_file_path=config_dir+'D500B_pulse2deg_real.csv',\
@@ -137,10 +115,11 @@ data_dir='../data/wall_weld_test/weld_scan_'+formatted_time+'/'
 ## rr drivers and all other drivers
 robot_client=MotionProgramExecClient()
 # weld state logging
-sub = RRN.SubscribeService('rr+tcp://192.168.55.10:60823?service=welder')
-obj = sub.GetDefaultClientWait(3)  # connect, timeout=30s
-welder_state_sub = sub.SubscribeWire("welder_state")
-welder_state_sub.WireValueChanged += wire_cb
+weld_ser = RRN.SubscribeService('rr+tcp://192.168.55.10:60823?service=welder')
+cam_ser=RRN.ConnectService('rr+tcp://192.168.55.10:60827/?service=camera')
+mic_ser = RRN.ConnectService('rr+tcp://192.168.55.20:60828?service=microphone')
+## RR sensor objects
+rr_sensors = WeldRRSensor(weld_service=weld_ser,cam_service=cam_ser,microphone_service=mic_ser)
 # MTI connect to RR
 mti_client = RRN.ConnectService("rr+tcp://192.168.55.10:60830/?service=MTI2D")
 mti_client.setExposureTime("25")
@@ -306,18 +285,18 @@ for i in range(0,len(weld_z_height)):
                 mp.MoveL(np.degrees(path_q[bpi+2]), this_weld_v[bpi],0)
         mp.setArc(False)
         mp.MoveL(np.degrees(path_q[-1]), 10, 0)
-        clean_weld_record()
+
+        rr_sensors.start_all_sensors()
         rob_stamps,rob_js_exe,_,_= robot_client.execute_motion_program(mp)
+        rr_sensors.stop_all_sensors()
 
         if save_weld_record:
             Path(data_dir).mkdir(exist_ok=True)
             layer_data_dir=data_dir+'layer_'+str(i)+'/'
             Path(layer_data_dir).mkdir(exist_ok=True)
-            np.savetxt(layer_data_dir + 'welding.csv',
-                        np.array([weld_timestamp, weld_voltage, weld_current, weld_feedrate, weld_energy]).T, delimiter=',',
-                        header='timestamp,voltage,current,feedrate,energy', comments='')
             np.savetxt(layer_data_dir + 'weld_js_exe.csv',rob_js_exe,delimiter=',')
             np.savetxt(layer_data_dir + 'weld_robot_stamps.csv',rob_stamps,delimiter=',')
+            rr_sensors.save_all_sensors()
         
         print("Weld actual weld time:",time.time()-weld_motion_weld_st)
         weld_to_home_st = time.time()
