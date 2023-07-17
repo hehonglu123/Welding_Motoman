@@ -12,7 +12,7 @@ joint_reading=[0]*14
 def robot_state_cb(sub, value, ts):
 	global timestamp,joint_reading
 	joint_reading=value.joint_position
-	timestamp=value.ts['microseconds']/1e6
+	timestamp=value.ts['microseconds'][0]/1e6
 
 
 robot=robot_obj('MA2010_A0',def_path='../config/MA2010_A0_robot_default_config.yml',tool_file_path='../config/torch.csv',\
@@ -35,31 +35,35 @@ streaming_rate=125.
 SS=StreamingSend(robot,RR_robot,RR_robot_state,RobotJointCommand,streaming_rate=streaming_rate)
 
 q_start=np.hstack((np.zeros(6),[np.pi/2,0,0,0,0,0,np.radians(-15),np.pi]))
-q_end=np.hstack((np.zeros(5),np.radians([1]),[np.pi/2,0,0,0,0,0,np.radians(-15),np.pi]))
+q_end=np.hstack((np.zeros(5),np.radians([5]),[np.pi/2,0,0,0,0,0,np.radians(-15),np.pi]))
 
 latency=[]
-# while True:
-# 	try:
-# 		SS.jog2q(q_start)
-# 		now=time.time()
-# 		while np.linalg.norm(joint_reading[5]-q_end[5])>0.00001:	###reached end
-# 			if np.linalg.norm(joint_reading[5]-q_start[5])>0.00001:	###start moving
-# 				latency.append(time.time()-now)
-# 				print('latency: ',latency[-1])
-# 			SS.position_cmd(q_end)
-# 	except:
-# 		break
-# print('average all latency: ',np.mean(latency))
-
 while True:
 	try:
 		SS.jog2q(q_start)
-		now=copy.deepcopy(timestamp)
-		while np.linalg.norm(joint_reading[5]-q_end[5])>0.00001:	###reached end
-			if np.linalg.norm(joint_reading[5]-q_start[5])>0.00001:	###start moving
-				latency.append(timestamp-now)
+		time.sleep(1)
+		now=time.time()
+		while np.linalg.norm(joint_reading[5]-q_end[5])>0.001:	###reached end
+			if np.linalg.norm(joint_reading[5]-q_start[5])>0.001:	###start moving
+				latency.append(time.time()-now)
 				print('latency: ',latency[-1])
+				break
 			SS.position_cmd(q_end)
 	except:
 		break
-print('average controller latency: ',np.mean(latency))
+print('average all latency: ',np.mean(latency))
+
+# while True:
+# 	try:
+# 		SS.jog2q(q_start)
+# 		time.sleep(1)
+# 		now=copy.deepcopy(timestamp)
+# 		while np.linalg.norm(joint_reading[5]-q_end[5])>0.001:	###before reached end
+# 			if np.linalg.norm(joint_reading[5]-q_start[5])>0.001:	###if start moving, record latency, then break & loop
+# 				latency.append(timestamp-now)
+# 				print('latency: ',latency[-1])
+# 				break
+# 			SS.position_cmd(q_end)
+# 	except:
+# 		break
+# print('average controller latency: ',np.mean(latency))
