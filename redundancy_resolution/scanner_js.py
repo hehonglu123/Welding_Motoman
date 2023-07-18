@@ -51,10 +51,10 @@ T_to_base = Transform(np.eye(3),[0,0,-380])
 positioner.base_H = np.matmul(positioner.base_H,H_from_RT(T_to_base.R,T_to_base.p))
 
 #### data directory
-dataset='cup/'
-sliced_alg='circular_slice_shifted/'
-# dataset='blade0.1/'
-# sliced_alg='auto_slice/'
+# dataset='cup/'
+# sliced_alg='circular_slice_shifted/'
+dataset='blade0.1/'
+sliced_alg='auto_slice/'
 curve_data_dir = '../data/'+dataset+sliced_alg
 scan_data_dir = '../data/'+dataset+sliced_alg+'curve_scan_js/'
 scan_p_data_dir = '../data/'+dataset+sliced_alg+'curve_scan_relative/'
@@ -73,7 +73,7 @@ bounds_theta = np.radians(1) ## circular motion at start and end
 extension = 10 ## extension before and after (mm)
 all_scan_angle = np.radians([0]) ## scan angle
 q_init_table=np.radians([-15,200]) ## init table
-R1_w=0.5 ## regularization weight for two robots (R1)
+R1_w=0.01 ## regularization weight for two robots (R1)
 R2_w=0.01 ## regularization weight for two robots (R2)
 mti_Rpath = np.array([[ -1.,0.,0.],   
                     [ 0.,1.,0.],
@@ -96,6 +96,7 @@ for i in range(0,slicing_meta['num_layers']):
         ### scanning path module
         spg = ScanPathGen(robot_scan,positioner,scan_stand_off_d,Rz_angle,Ry_angle,bounds_theta,extension)
         # generate scan path
+        print("q init table:",np.degrees(positioner_weld_js[0]))
         scan_p,scan_R,q_out1,q_out2=spg.gen_scan_path([curve_sliced_relative],[0],all_scan_angle,\
                             solve_js_method=1,q_init_table=positioner_weld_js[0],R_path=mti_Rpath,R1_w=R1_w,R2_w=R2_w,scan_path_dir=None)
         

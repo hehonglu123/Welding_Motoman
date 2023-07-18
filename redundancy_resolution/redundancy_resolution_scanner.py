@@ -57,7 +57,7 @@ class redundancy_resolution_scanner(object):
             # print(np.degrees(np.append(q_all1[-1],q_all2[-1])))
             try:
                 error_fb=999
-                while error_fb>0.001:
+                while error_fb>0.002:
                     
                     # print(error_fb)
                     poset1_1=self.robot.fwd(q_all1[-1])
@@ -87,8 +87,15 @@ class redundancy_resolution_scanner(object):
                     J_all_p=np.hstack((J1p,-J2p+hat(dpt1t2_t2)@J2R))
                     J_all_R=np.hstack((J1R,-J2R))
 
-                    # J_all = np.dot(np.transpose(J_all_p),J_all_p)+np.dot(np.transpose(J_all_R),J_all_R)
-                    # u,s,v=np.linalg.svd(J_all)
+                    if i==0:
+                        J_all = np.vstack((J_all_R,J_all_p))
+                        u,s,v=np.linalg.svd(J_all)
+                        u1,s1,v1=np.linalg.svd(J1)
+                        if np.min(s)<0.01:
+                            print(np.min(s))
+                            print(u[:,-1])
+                            print(np.min(s1))
+                            return [],[],[],[]
 
                     H=np.dot(np.transpose(J_all_p),J_all_p)+Kq+Kw*np.dot(np.transpose(J_all_R),J_all_R)
                     H=(H+np.transpose(H))/2
