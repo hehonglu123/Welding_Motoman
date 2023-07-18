@@ -288,11 +288,31 @@ class ScanPathGen():
             #         continue
             # exit()
 
-            pose_R2_table=T_S1Base_R2Base*self.positioner.fwd(q_init_table)
-            q_init_robot = self.robot.inv(np.matmul(pose_R2_table.R,scan_p[0])+pose_R2_table.p,np.matmul(pose_R2_table.R,scan_R[0]),zero_config)[0]
-            # print(np.degrees(q_init_robot))
+            # searching and qp
+            q_init_table_origin = np.array(deepcopy(q_init_table))
+            search_r = np.radians(3)
+            search_dir = np.array([])
+            if np.fabs(self.positioner.upper_limit[0]-q_init_table_origin[0])>np.fabs(self.positioner.lower_limit[0]-q_init_table_origin[0]):
+                search_dir=np.append(search_dir,self.positioner.upper_limit[0]-q_init_table_origin[0])
+            else:
+                search_dir=np.append(search_dir,self.positioner.lower_limit[0]-q_init_table_origin[0])
+            if np.fabs(self.positioner.upper_limit[1]-q_init_table_origin[1])>np.fabs(self.positioner.lower_limit[1]-q_init_table_origin[1]):
+                search_dir=np.append(search_dir,self.positioner.upper_limit[1]-q_init_table_origin[1])
+            else:
+                search_dir=np.append(search_dir,self.positioner.lower_limit[1]-q_init_table_origin[1])
+            search_dir=search_dir/np.linalg.norm(search_dir)
             
-            q_out1, q_out2, j_out1, j_out2=rrs.arm_table_stepwise_opt(q_init_robot,q_init_table,w1=R1_w,w2=R2_w)
+            for test_i in range(999999):
+                dq_table = test_i*search_r*search_dir
+                q_init_table=q_init_table_origin+dq_table
+                
+                pose_R2_table=T_S1Base_R2Base*self.positioner.fwd(q_init_table)
+                q_init_robot = self.robot.inv(np.matmul(pose_R2_table.R,scan_p[0])+pose_R2_table.p,np.matmul(pose_R2_table.R,scan_R[0]),zero_config)[0]
+                # print(np.degrees(q_init_robot))
+                q_out1, q_out2, j_out1, j_out2=rrs.arm_table_stepwise_opt(q_init_robot,q_init_table,w1=R1_w,w2=R2_w)
+            
+                if len(q_out1)!=0:
+                    break
             # q_out1, q_out2, j_out1, j_out2=rrs.arm_table_stepwise_opt_Rz(q_init_robot,q_init_table,w2=0.03)
             # q_out1, q_out2, j_out1, j_out2=rrs.arm_table_stepwise_opt_Rz(q_init_robot,q_init_table,w2=5)
 
