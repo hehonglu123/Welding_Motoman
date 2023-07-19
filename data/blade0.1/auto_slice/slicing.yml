@@ -1,5 +1,5 @@
 num_layers: 758
-num_baselayers: 0
+num_baselayers: 2
 line_resolution: 0.1
 baselayer_thickness: 0
 point_distance: 0.5

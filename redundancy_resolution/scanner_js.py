@@ -79,6 +79,47 @@ mti_Rpath = np.array([[ -1.,0.,0.],
                     [ 0.,1.,0.],
                     [0.,0.,-1.]])
 
+## baselayer
+for i in range(0,slicing_meta['num_baselayers']):
+    num_sections=len(glob.glob(curve_data_dir+'curve_sliced_relative/baselayer'+str(i)+'_*.csv'))
+
+    for x in range(num_sections):
+        print('Base',i,',',x)
+        curve_sliced_relative = np.loadtxt(curve_data_dir+'curve_sliced_relative/baselayer'+str(i)+'_'+str(x)+'.csv',delimiter=',').reshape((-1,6))
+        positioner_weld_js = np.loadtxt(curve_data_dir+'curve_sliced_js/D500B_base_js'+str(i)+'_'+str(x)+'.csv',delimiter=',')
+
+        curve_sliced_relative=curve_sliced_relative[::-1]
+        positioner_weld_js=positioner_weld_js[::-1]
+
+        if len(curve_sliced_relative)<2:
+            continue
+
+        ### scanning path module
+        spg = ScanPathGen(robot_scan,positioner,scan_stand_off_d,Rz_angle,Ry_angle,bounds_theta,extension)
+        # generate scan path
+        print("q init table:",np.degrees(positioner_weld_js[0]))
+        scan_p,scan_R,q_out1,q_out2=spg.gen_scan_path([curve_sliced_relative],[0],all_scan_angle,\
+                            solve_js_method=1,q_init_table=positioner_weld_js[0],R_path=mti_Rpath,R1_w=R1_w,R2_w=R2_w,scan_path_dir=None)
+        
+        curve_scan_relative=[]
+        for path_i in range(len(scan_p)):
+            this_T = np.append(scan_p[path_i],R2q(scan_R[path_i]))
+            curve_scan_relative.append(this_T)
+        
+        # if i%10==1:
+        #     plt.plot(np.degrees(np.hstack((q_out1,q_out2))),'-o')
+        #     plt.legend(['J1','J2','J3','J4','J5','J6','P1','P2'])
+        #     plt.show()
+        q_out1=np.array(q_out1)
+        q_out2=np.array(q_out2)
+        Path(scan_data_dir).mkdir(exist_ok=True)
+        Path(scan_p_data_dir).mkdir(exist_ok=True)
+        np.savetxt(scan_data_dir+'MA1440_base_js'+str(i)+'_'+str(x)+'.csv',q_out1,delimiter=',')
+        np.savetxt(scan_data_dir+'D500B_base_js'+str(i)+'_'+str(x)+'.csv',q_out2,delimiter=',')
+        np.savetxt(scan_p_data_dir+'scan_base_T'+str(i)+'_'+str(x)+'.csv',curve_scan_relative,delimiter=',')
+
+exit()
+
 for i in range(0,slicing_meta['num_layers']):
     num_sections=len(glob.glob(curve_data_dir+'curve_sliced_relative/slice'+str(i)+'_*.csv'))
     
