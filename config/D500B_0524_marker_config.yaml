@@ -1,0 +1,50 @@
+H:
+- x: 0.0
+  y: -1.0
+  z: -6.437450399132683e-19
+- x: -1.6661138072492088e-18
+  y: -0.0002973566966656268
+  z: -0.9999999557894965
+P:
+- x: 0.0
+  y: 0.0
+  z: 0.0
+- x: -0.09806383131990515
+  y: -4.547473508864641e-13
+  z: -8.526512829121202e-14
+- x: -42.28864959253872
+  y: -81.13268550260705
+  z: 179.88156065695907
+base_markers:
+- marker1_rigid2
+- marker2_rigid2
+- marker3_rigid2
+- marker4_rigid2
+- marker5_rigid2
+calib_base_basemarker_pose:
+  orientation:
+    w: 0.10057022098952569
+    x: 0.08068557097463297
+    y: 0.7025040546110606
+    z: 0.6999025093122866
+  position:
+    x: -1021.6781010166375
+    y: 163.73938996947044
+    z: 1112.576900994365
+calib_tool_flange_pose:
+  orientation:
+    w: -0.008236496035981436
+    x: -0.011285217007510225
+    y: 0.709636132506304
+    z: 0.7044298144255665
+  position:
+    x: 0
+    y: 0
+    z: 0
+calibration_markers:
+- marker1_rigid4
+- marker2_rigid4
+- marker3_rigid4
+- marker4_rigid4
+- marker5_rigid4
+- marker6_rigid4
