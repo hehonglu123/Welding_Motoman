@@ -37,8 +37,8 @@ layer_width_num=int(4/slicing_meta['line_resolution'])
 
 robot=robot_obj('MA2010_A0',def_path='../../config/MA2010_A0_robot_default_config.yml',tool_file_path='../../config/torch.csv',\
 	pulse2deg_file_path='../../config/MA2010_A0_pulse2deg_real.csv',d=15)
-robot2=robot_obj('MA1440_A0',def_path='../config/MA1440_A0_robot_default_config.yml',tool_file_path='../config/flir.csv',\
-		pulse2deg_file_path='../config/MA1440_A0_pulse2deg_real.csv',base_transformation_file='../config/MA1440_pose.csv')
+robot2=robot_obj('MA1440_A0',def_path='../../config/MA1440_A0_robot_default_config.yml',tool_file_path='../../config/flir.csv',\
+		pulse2deg_file_path='../../config/MA1440_A0_pulse2deg_real.csv',base_transformation_file='../../config/MA1440_pose.csv')
 positioner=positioner_obj('D500B',def_path='../../config/D500B_robot_default_config.yml',tool_file_path='../../config/positioner_tcp.csv',\
 	pulse2deg_file_path='../../config/D500B_pulse2deg_real.csv',base_transformation_file='../../config/D500B_pose.csv')
 
@@ -46,10 +46,10 @@ positioner=positioner_obj('D500B',def_path='../../config/D500B_robot_default_con
 fronius_client = RRN.ConnectService('rr+tcp://192.168.55.21:60823?service=welder')
 fronius_client.job_number = 200
 fronius_client.prepare_welder()
-vd_relative=15
+vd_relative=50
 ########################################################RR STREAMING########################################################
 
-RR_robot_sub = RRN.SubscribeService('rr+tcp://192.168.55.10:59945?service=robot')
+RR_robot_sub = RRN.SubscribeService('rr+tcp://localhost:59945?service=robot')
 RR_robot_state = RR_robot_sub.SubscribeWire('robot_state')
 RR_robot = RR_robot_sub.GetDefaultClientWait(1)
 robot_const = RRN.GetConstants("com.robotraconteur.robotics.robot", RR_robot)
@@ -66,42 +66,42 @@ point_distance=0.04		###STREAMING POINT INTERPOLATED DISTANCE
 SS=StreamingSend(RR_robot,RR_robot_state,RobotJointCommand,streaming_rate)
 
 ###########################################base layer welding############################################
-num_baselayer=2
-q_prev=np.array([-3.791547245558870571e-01,7.167996965635117235e-01,2.745092098742105691e-01,2.111291009755724701e-01,-7.843516348888318612e-01,-5.300740197588397207e-01])
-for base_layer in range(num_baselayer):
-	num_sections=len(glob.glob(data_dir+'curve_sliced_relative/baselayer'+str(base_layer)+'_*.csv'))
-	for x in range(num_sections):
-		rob1_js=np.loadtxt(data_dir+'curve_sliced_js/MA2010_base_js'+str(base_layer)+'_'+str(x)+'.csv',delimiter=',')
-		rob2_js=np.loadtxt(data_dir+'curve_sliced_js/MA1440_base_js'+str(base_layer)+'_'+str(x)+'.csv',delimiter=',')
-		positioner_js=np.loadtxt(data_dir+'curve_sliced_js/D500B_base_js'+str(base_layer)+'_'+str(x)+'.csv',delimiter=',')
+# num_baselayer=2
+# q_prev=np.array([-3.791547245558870571e-01,7.167996965635117235e-01,2.745092098742105691e-01,2.111291009755724701e-01,-7.843516348888318612e-01,-5.300740197588397207e-01])
+# for base_layer in range(num_baselayer):
+# 	num_sections=len(glob.glob(data_dir+'curve_sliced_relative/baselayer'+str(base_layer)+'_*.csv'))
+# 	for x in range(num_sections):
+# 		rob1_js=np.loadtxt(data_dir+'curve_sliced_js/MA2010_base_js'+str(base_layer)+'_'+str(x)+'.csv',delimiter=',')
+# 		rob2_js=np.loadtxt(data_dir+'curve_sliced_js/MA1440_base_js'+str(base_layer)+'_'+str(x)+'.csv',delimiter=',')
+# 		positioner_js=np.loadtxt(data_dir+'curve_sliced_js/D500B_base_js'+str(base_layer)+'_'+str(x)+'.csv',delimiter=',')
 
-		curve_sliced_relative=np.loadtxt(data_dir+'curve_sliced_relative/baselayer'+str(base_layer)+'_'+str(x)+'.csv',delimiter=',')
+# 		curve_sliced_relative=np.loadtxt(data_dir+'curve_sliced_relative/baselayer'+str(base_layer)+'_'+str(x)+'.csv',delimiter=',')
 
-		lam_relative=calc_lam_cs(curve_sliced_relative)
-
-
-		lam_relative_dense=np.linspace(0,lam_relative[-1],num=int(lam_relative[-1]/point_distance))
-		rob1_js_dense=interp1d(lam_relative,rob1_js,axis=0)(lam_relative_dense)
-		rob2_js_dense=interp1d(lam_relative,rob2_js,axis=0)(lam_relative_dense)
-		positioner_js_dense=interp1d(lam_relative,positioner_js,axis=0)(lam_relative_dense)
+# 		lam_relative=calc_lam_cs(curve_sliced_relative)
 
 
-		breakpoints=SS.get_breakpoints(lam_relative_dense,vd_relative)
+# 		lam_relative_dense=np.linspace(0,lam_relative[-1],num=int(lam_relative[-1]/point_distance))
+# 		rob1_js_dense=interp1d(lam_relative,rob1_js,axis=0)(lam_relative_dense)
+# 		rob2_js_dense=interp1d(lam_relative,rob2_js,axis=0)(lam_relative_dense)
+# 		positioner_js_dense=interp1d(lam_relative,positioner_js,axis=0)(lam_relative_dense)
 
-		###find which end to start
-		if np.linalg.norm(q_prev-rob1_js[0])>np.linalg.norm(q_prev-rob1_js[-1]):
-			breakpoints=np.flip(breakpoints)
 
-		curve_js_all=np.hstack((rob1_js_dense[breakpoints],rob2_js_dense[breakpoints],positioner_js_dense[breakpoints]))
-		SS.jog2q(curve_js_all[0])
+# 		breakpoints=SS.get_breakpoints(lam_relative_dense,vd_relative)
+
+# 		###find which end to start
+# 		if np.linalg.norm(q_prev-rob1_js[0])>np.linalg.norm(q_prev-rob1_js[-1]):
+# 			breakpoints=np.flip(breakpoints)
+
+# 		curve_js_all=np.hstack((rob1_js_dense[breakpoints],rob2_js_dense[breakpoints],positioner_js_dense[breakpoints]))
+# 		SS.jog2q(curve_js_all[0])
 		
-		##########WELDING#######
-		fronius_client.start_weld()
-		SS.traj_streaming(curve_js_all,ctrl_joints=np.ones(14))
-		time.sleep(0.2)
-		fronius_client.stop_weld()
+# 		##########WELDING#######
+# 		fronius_client.start_weld()
+# 		SS.traj_streaming(curve_js_all,ctrl_joints=np.ones(14))
+# 		time.sleep(0.2)
+# 		fronius_client.stop_weld()
 
-		q_prev=rob1_js_dense[breakpoints[-1]]
+# 		q_prev=rob1_js_dense[breakpoints[-1]]
 
 ###########################################layer welding############################################
 res, robot_state, _ = RR_robot_state.TryGetInValue()

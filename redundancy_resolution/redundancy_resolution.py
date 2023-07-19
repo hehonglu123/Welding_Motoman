@@ -273,8 +273,9 @@ class redundancy_resolution(object):
 				for j in range(len(rob1_curve_js[i][x])):
 					p=self.robot.fwd(rob1_curve_js[i][x][j]).p
 					p_in_base_frame=np.dot(H2010_1440[:3,:3],p)+H2010_1440[:3,3]
-					v_z=H2010_1440[:3,:3]@self.positioner.base_H[:3,0]	###pointing toward positioner's X in 1440's base frame
-					v_z=VectorPlaneProjection(v_z,np.array([0,0,1]))	###project on gravity plane
+					v_z=H2010_1440[:3,:3]@np.array([0,-0.96592582628,-0.2588190451]) ###pointing toward positioner's X with 15deg tiltd angle looking down
+					# v_z=H2010_1440[:3,:3]@self.positioner.base_H[:3,0]	###pointing toward positioner's X on horizontal plane in 1440's base frame
+					# v_z=VectorPlaneProjection(v_z,np.array([0,0,1]))	###project on gravity plane
 					v_y=VectorPlaneProjection(np.array([-1,0,0]),v_z)	###FLIR's Y pointing toward 1440's -X in 1440's base frame, projected on v_z's plane
 					v_x=np.cross(v_y,v_z)
 					p_in_base_frame=p_in_base_frame-measure_distance*v_z			###back project measure_distance-mm away from torch
