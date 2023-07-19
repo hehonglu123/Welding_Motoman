@@ -383,5 +383,6 @@ data/wall_weld_test/scan_cont_newdx*
 data/wall_weld_test/full_test_mti*
 data/wall_weld_test/top_layer_test*
 data/cup/circular_slice_shifted/weld_scan*
+data/blade0.1/auto_slice/weld_scan*
 
 mocap/ge_testbed/data/*
