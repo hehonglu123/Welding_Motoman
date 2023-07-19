@@ -24,15 +24,15 @@ def main():
     c1.setf_param("ext_optics_temperature", RR.VarValue(293.15,"double"))
     c1.setf_param("ext_optics_transmission", RR.VarValue(0.99,"double"))
 
-    c1.setf_param("current_case", RR.VarValue(2,"int32"))
-    # c1.setf_param("ir_format", RR.VarValue("temperature_linear_100mK","string"))
-    c1.setf_param("ir_format", RR.VarValue("radiometric","string"))
+    # c1.setf_param("current_case", RR.VarValue(2,"int32"))
+    c1.setf_param("current_case", RR.VarValue(1,"int32"))
+    c1.setf_param("ir_format", RR.VarValue("temperature_linear_100mK","string"))
+    # c1.setf_param("ir_format", RR.VarValue("temperature_linear_10mK","string"))
+    # c1.setf_param("ir_format", RR.VarValue("radiometric","string"))
 
-    c1.setf_param("object_emissivity", RR.VarValue(0.9,"double"))
-    
-    
-    
-    
+    c1.setf_param("object_emissivity", RR.VarValue(0.13,"double"))
+    # c1.setf_param("scale_limit_low", RR.VarValue(293.15,"double"))
+    # c1.setf_param("scale_limit_upper", RR.VarValue(5000,"double"))
     c1.setf_param("scale_limit_low", RR.VarValue(293.15,"double"))
     c1.setf_param("scale_limit_upper", RR.VarValue(5000,"double"))
 
