@@ -56,7 +56,7 @@ def visualize_pcd(show_pcd_list,point_show_normal=False,origin_size=20):
     show_pcd_list_legacy.append(points_frame)
     o3d.visualization.draw_geometries(show_pcd_list_legacy,width=960,height=540,point_show_normal=point_show_normal)
 
-def visualize_frames(all_R,all_p,size=20):
+def visualize_frames(all_R,all_p,size=20,visualize=True,frame_obj=False):
 
     all_points_frame = []
     for i in range(len(all_R)):
@@ -65,4 +65,8 @@ def visualize_frames(all_R,all_p,size=20):
         points_frame = points_frame.translate(all_p[i])
         
         all_points_frame.append(points_frame)
-    o3d.visualization.draw_geometries(all_points_frame,width=960,height=540)
+            
+    if visualize:
+        o3d.visualization.draw_geometries(all_points_frame,width=960,height=540)
+    if frame_obj:
+        return all_points_frame

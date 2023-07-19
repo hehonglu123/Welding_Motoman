@@ -152,6 +152,9 @@ class ScanProcess():
                 robt_T = self.robot.fwd(rob_js_exe[scan_i],world=True) # T_world^r2tool
                 T_origin = self.positioner.fwd(static_positioner_q,world=True).inv() # T_tabletool^world
             else:
+                # print(np.degrees(rob_js_exe[scan_i][:6]))
+                # print(np.degrees(self.robot.robot.joint_lower_limit))
+                # print("===============")
                 robt_T = self.robot.fwd(rob_js_exe[scan_i][:6],world=True) # T_world^r2tool
                 T_origin = self.positioner.fwd(rob_js_exe[scan_i][6:],world=True).inv() # T_tabletool^world
                 # T_origin = turn_table.fwd(np.radians([-30,0]),world=True).inv()
@@ -227,7 +230,7 @@ class ScanProcess():
         poly_num=12
         radius_scale=0.8
         radius=np.mean(np.linalg.norm(np.diff(curve_relative[:,:3],axis=0),axis=1))*radius_scale
-        # print(radius)
+        print("height neighbor radius:",radius)
         bounding_polygon=[]
         for n in range(poly_num):
             ang=(n/poly_num)*(np.pi*2)
@@ -243,6 +246,8 @@ class ScanProcess():
             scanned_points_draw = deepcopy(scanned_points)
             scanned_points_draw.paint_uniform_color([0.3,0.3,0.3])
             path_points = o3d.geometry.PointCloud()
+            curve_R = []
+            curve_p = []
         
         # loop through curve to get dh
         curve_i=0
@@ -250,13 +255,13 @@ class ScanProcess():
         dh=[]
         for curve_wp in curve_relative:
             if np.all(curve_wp==curve_relative[-1]):
-                curve_R = direction2R(-1*curve_wp[3:],curve_wp[:3]-curve_relative[curve_i-1][:3])
+                wp_R = direction2R(-1*curve_wp[3:],curve_wp[:3]-curve_relative[curve_i-1][:3])
             else:
-                curve_R = direction2R(-1*curve_wp[3:],curve_relative[curve_i+1][:3]-curve_wp[:3])
+                wp_R = direction2R(-1*curve_wp[3:],curve_relative[curve_i+1][:3]-curve_wp[:3])
 
             sp_lamx=deepcopy(scanned_points)
             ## transform the scanned points to waypoints
-            sp_lamx.transform(np.linalg.inv(H_from_RT(curve_R,curve_wp[:3])))
+            sp_lamx.transform(np.linalg.inv(H_from_RT(wp_R,curve_wp[:3])))
             # visualize_pcd([sp_lamx])
             ## crop the scanned points around the waypoints
             sp_lamx = crop_poly.crop_point_cloud(sp_lamx)
@@ -270,8 +275,10 @@ class ScanProcess():
                 ## paint pcd for visualization
                 color_dist = plt.get_cmap("rainbow")(float(curve_i)/total_curve_i)
                 sp_lamx.paint_uniform_color(color_dist[:3])
-                sp_lamx.transform(H_from_RT(curve_R,curve_wp[:3]))
+                sp_lamx.transform(H_from_RT(wp_R,curve_wp[:3]))
                 path_points = path_points+sp_lamx
+                curve_R.append(wp_R)
+                curve_p.append(curve_wp[:3])
 
             curve_i+=1
 
@@ -290,7 +297,11 @@ class ScanProcess():
 
         if drawing:
             path_points.transform(H_from_RT(np.eye(3),[0,0,0.0001]))
-            visualize_pcd([scanned_points_draw,path_points])
+            path_viz_frames = visualize_frames(curve_R,curve_p,size=1,visualize=False,frame_obj=True)
+            draw_obj = []
+            draw_obj.extend(path_viz_frames)
+            draw_obj.extend([scanned_points_draw,path_points])
+            visualize_pcd(draw_obj)
         
         return profile_height
     

@@ -92,13 +92,14 @@ def to_frame(curve_p,curve_R,mocap_stamps,target_frame,markers_id):
 
 config_dir='../config/'
 
-robot_type='R1'
-# robot_type='R2'
+# robot_type='R1'
+robot_type='R2'
 # robot_type='S1'
 
 # all_datasets=['train_data','valid_data_1','valid_data_2']
-dataset_date='0516'
-all_datasets=['test'+dataset_date+'_R1_aftercalib/train_data']
+dataset_date='0524'
+# all_datasets=['test'+dataset_date+'_R1_aftercalib/train_data']
+all_datasets=['test'+dataset_date+'_'+robot_type+'/train_data']
 
 if robot_type=='R1':
     base_marker_config_file=config_dir+'MA2010_marker_config.yaml'
@@ -138,7 +139,7 @@ elif robot_type=='R2':
 
     jN=6
 
-    output_base_marker_config_file = config_dir+'MA1440_marker_config.yaml'
+    output_base_marker_config_file = config_dir+'MA1440_'+dataset_date+'_marker_config.yaml'
 
 elif robot_type=='S1':
     base_marker_config_file=config_dir+'D500B_marker_config.yaml'
@@ -154,7 +155,7 @@ elif robot_type=='S1':
 
     jN=2
 
-    output_base_marker_config_file = config_dir+'D500B_marker_config.yaml'
+    output_base_marker_config_file = config_dir+'D500B_'+dataset_date+'_marker_config.yaml'
 
 H_act = deepcopy(H_nom)
 axis_p = deepcopy(H_nom)
@@ -205,10 +206,28 @@ for dataset in all_datasets:
 
         # get P
         # joint 1 is the closest point on H1 to H2
+        # joint 2 is the closest point on H2 to H1
         ab_coefficient = np.matmul(np.linalg.pinv(np.array([H[:,0],-H[:,1]]).T),
                                             -(H_point[:,0]-H_point[:,1]))
         j1_center = H_point[:,0]+ab_coefficient[0]*H[:,0]
         j2_center = H_point[:,1]+ab_coefficient[1]*H[:,1]
+        
+        # joint 3 is the closest point on H3 to H4
+        ab_coefficient = np.matmul(np.linalg.pinv(np.array([H[:,2],-H[:,3]]).T),
+                                            -(H_point[:,2]-H_point[:,3]))
+        j3_center = H_point[:,2]+ab_coefficient[0]*H[:,2]
+        
+        # joint 4 is the closest point on H4 to H5
+        # joint 5 is the closest point on H5 to H4
+        ab_coefficient = np.matmul(np.linalg.pinv(np.array([H[:,3],-H[:,4]]).T),
+                                            -(H_point[:,3]-H_point[:,4]))
+        j4_center = H_point[:,3]+ab_coefficient[0]*H[:,3]
+        j5_center = H_point[:,4]+ab_coefficient[1]*H[:,4]
+
+        # joint 6 is the closest point on H6 to H5
+        ab_coefficient = np.matmul(np.linalg.pinv(np.array([H[:,4],-H[:,5]]).T),
+                                            -(H_point[:,4]-H_point[:,5]))
+        j6_center = H_point[:,5]+ab_coefficient[1]*H[:,5]
 
         ###### get robot base frame and convert to base frame from basemarker frame
         T_base_basemarker = Transform(R.T,j1_center)
@@ -219,20 +238,23 @@ for dataset in all_datasets:
         tcp_base = np.matmul(T_basemarker_base.R,tcp)+T_basemarker_base.p
         j1_center = np.matmul(T_basemarker_base.R,j1_center)+T_basemarker_base.p
         j2_center = np.matmul(T_basemarker_base.R,j2_center)+T_basemarker_base.p
+        j3_center = np.matmul(T_basemarker_base.R,j3_center)+T_basemarker_base.p
+        j4_center = np.matmul(T_basemarker_base.R,j4_center)+T_basemarker_base.p
+        j5_center = np.matmul(T_basemarker_base.R,j5_center)+T_basemarker_base.p
+        j6_center = np.matmul(T_basemarker_base.R,j6_center)+T_basemarker_base.p
         #######################################
     
-        k=(j2_center[1]-H_point[1,2])/H[1,2]
-        j3_center = H_point[:,2]+k*H[:,2]
-
-        # p5
-        k=(j3_center[1]-H_point[1,4])/H[1,4]
-        j5_center = H_point[:,4]+k*H[:,4]
-        # p4
-        k=(j5_center[0]-H_point[0,3])/H[0,3]
-        j4_center = H_point[:,3]+k*H[:,3]
-        # p6
-        k=(j5_center[0]-H_point[0,5])/H[0,5]
-        j6_center = H_point[:,5]+k*H[:,5]
+        # k=(j2_center[1]-H_point[1,2])/H[1,2]
+        # j3_center = H_point[:,2]+k*H[:,2]
+        # # p5
+        # k=(j3_center[1]-H_point[1,4])/H[1,4]
+        # j5_center = H_point[:,4]+k*H[:,4]
+        # # p4
+        # k=(j5_center[0]-H_point[0,3])/H[0,3]
+        # j4_center = H_point[:,3]+k*H[:,3]
+        # # p6
+        # k=(j5_center[0]-H_point[0,5])/H[0,5]
+        # j6_center = H_point[:,5]+k*H[:,5]
 
         P=np.zeros((3,7))
         P[:,0]=np.array([0,0,0])
@@ -241,7 +263,8 @@ for dataset in all_datasets:
         P[:,3]=j4_center-j3_center
         P[:,4]=j5_center-j4_center
         P[:,5]=j6_center-j5_center
-        P[:,6]=tcp_base-j6_center
+        # P[:,6]=tcp_base-j6_center
+        P[:,6] = np.linalg.norm(robot.robot.P[:,5]+robot.robot.P[:,6])*(-1*H[:,5])
 
     else:
         # rotate R
