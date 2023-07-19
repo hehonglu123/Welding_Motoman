@@ -34,8 +34,8 @@ with open(data_dir+'slicing.yml', 'r') as file:
 	slicing_meta = yaml.safe_load(file)
 recorded_dir='recorded_data/cup_ER316L/'
 
-waypoint_distance=5 	###waypoint separation
-layer_height_num=int(1.5/slicing_meta['line_resolution'])
+waypoint_distance=7 	###waypoint separation
+layer_height_num=int(1.7/slicing_meta['line_resolution'])
 layer_width_num=int(4/slicing_meta['line_resolution'])
 
 
@@ -55,7 +55,7 @@ fronius_client.prepare_welder()
 vd_relative=5
 ########################################################RR STREAMING########################################################
 
-RR_robot_sub = RRN.SubscribeService('rr+tcp://192.168.55.10:59945?service=robot')
+RR_robot_sub = RRN.SubscribeService('rr+tcp://192.168.55.15:59945?service=robot')
 RR_robot_state = RR_robot_sub.SubscribeWire('robot_state')
 RR_robot = RR_robot_sub.GetDefaultClientWait(1)
 robot_const = RRN.GetConstants("com.robotraconteur.robotics.robot", RR_robot)
@@ -150,10 +150,10 @@ for layer in range(num_layer_start,num_layer_end,layer_height_num):
 		ts,js=SS.traj_streaming(curve_js_all,ctrl_joints=np.array([1,1,1,1,1,1,0,0,0,0,0,0,1,1]))
 		timestamp_robot.extend(ts)
 		joint_recording.extend(js)
-		time.sleep(0.1)
+		time.sleep(0.2)
 		fronius_client.stop_weld()
 
-		q_prev=curve_sliced_js_dense[breakpoints[-1]]
+		q_prev=positioner_js_dense[breakpoints[-1]]
 		
 		if logging:
 			np.savetxt(local_recorded_dir +'welder_info.csv',

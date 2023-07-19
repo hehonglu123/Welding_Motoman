@@ -8,7 +8,8 @@ from StreamingSend import *
 
 ########################################################RR STREAMING########################################################
 
-RR_robot_sub = RRN.SubscribeService('rr+tcp://192.168.55.10:59945?service=robot')
+# RR_robot_sub = RRN.SubscribeService('rr+tcp://192.168.55.10:59945?service=robot')
+RR_robot_sub = RRN.SubscribeService('rr+tcp://192.168.55.15:59945?service=robot')
 RR_robot_state = RR_robot_sub.SubscribeWire('robot_state')
 RR_robot = RR_robot_sub.GetDefaultClientWait(1)
 robot_const = RRN.GetConstants("com.robotraconteur.robotics.robot", RR_robot)
@@ -28,5 +29,5 @@ SS=StreamingSend(RR_robot,RR_robot_state,RobotJointCommand,streaming_rate)
 while True:
     
     SS.jog2q(np.hstack((np.zeros(6),[np.pi/2,0,0,0,0,0,np.radians(-15),np.pi])))
-    SS.jog2q(np.hstack(([-3.791547245558870571e-01,7.167996965635117235e-01,2.745092098742105691e-01,2.111291009755724701e-01,-7.843516348888318612e-01,-5.300740197588397207e-01],[np.pi/2,0,0,0,0,0,np.radians(-15),np.pi])))
+    SS.jog2q(np.hstack((-0.5*np.ones(6),[np.pi/2,0,0,0,0,0,np.radians(-15),np.pi])))
     

@@ -18,7 +18,7 @@ def robot_state_cb(sub, value, ts):
 robot=robot_obj('MA2010_A0',def_path='../config/MA2010_A0_robot_default_config.yml',tool_file_path='../config/torch.csv',\
 		pulse2deg_file_path='../config/MA2010_A0_pulse2deg_real.csv',d=15)
 
-RR_robot_sub = RRN.SubscribeService('rr+tcp://localhost:59945?service=robot')
+RR_robot_sub = RRN.SubscribeService('rr+tcp://192.168.55.15:59945?service=robot')
 RR_robot_state = RR_robot_sub.SubscribeWire('robot_state')
 RR_robot_state.WireValueChanged += robot_state_cb		###CALLBACK HANDLER
 RR_robot = RR_robot_sub.GetDefaultClientWait(1)
@@ -32,7 +32,7 @@ RR_robot.command_mode = halt_mode
 time.sleep(0.1)
 RR_robot.command_mode = position_mode
 streaming_rate=125.
-SS=StreamingSend(robot,RR_robot,RR_robot_state,RobotJointCommand,streaming_rate=streaming_rate)
+SS=StreamingSend(RR_robot,RR_robot_state,RobotJointCommand,streaming_rate=streaming_rate)
 
 q_start=np.hstack((np.zeros(6),[np.pi/2,0,0,0,0,0,np.radians(-15),np.pi]))
 q_end=np.hstack((np.zeros(5),np.radians([5]),[np.pi/2,0,0,0,0,0,np.radians(-15),np.pi]))
@@ -51,7 +51,7 @@ while True:
 			SS.position_cmd(q_end)
 	except:
 		break
-print('average all latency: ',np.mean(latency))
+print('average,std,min,max all latency: ',np.mean(latency),np.std(latency),np.min(latency),np.max(latency))
 
 # while True:
 # 	try:
@@ -66,4 +66,4 @@ print('average all latency: ',np.mean(latency))
 # 			SS.position_cmd(q_end)
 # 	except:
 # 		break
-# print('average controller latency: ',np.mean(latency))
+# print('average,std,min,max controller latency: ',np.mean(latency),np.std(latency),np.min(latency),np.max(latency))
