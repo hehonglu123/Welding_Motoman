@@ -13,6 +13,7 @@ from scanPathGen import *
 from scanProcess import *
 from weldCorrectionStrategy import *
 from WeldSend import *
+from weldRRSensor import *
 from dx200_motion_program_exec_client import *
 
 from general_robotics_toolbox import *
@@ -24,29 +25,6 @@ import numpy as np
 import glob
 import yaml
 from math import ceil,floor
-
-weld_timestamp=[]
-weld_voltage=[]
-weld_current=[]
-weld_feedrate=[]
-weld_energy=[]
-
-def clean_weld_record():
-    global weld_timestamp, weld_voltage, weld_current, weld_feedrate, weld_energy
-    weld_timestamp=[]
-    weld_voltage=[]
-    weld_current=[]
-    weld_feedrate=[]
-    weld_energy=[]
-
-def wire_cb(sub, value, ts):
-    global weld_timestamp, weld_voltage, weld_current, weld_feedrate, weld_energy
-
-    weld_timestamp.append(value.ts['microseconds'][0])
-    weld_voltage.append(value.welding_voltage)
-    weld_current.append(value.welding_current)
-    weld_feedrate.append(value.wire_speed)
-    weld_energy.append(value.welding_energy)
 
 zero_config=np.zeros(6)
 # 0. robots.
@@ -74,8 +52,10 @@ positioner.base_H = np.matmul(positioner.base_H,H_from_RT(T_to_base.R,T_to_base.
 # exit()
 
 #### data directory
-dataset='cup/'
-sliced_alg='circular_slice_shifted/'
+# dataset='cup/'
+# sliced_alg='circular_slice_shifted/'
+dataset='blade0.1/'
+sliced_alg='auto_slice/'
 curve_data_dir = '../data/'+dataset+sliced_alg
 
 current_time = datetime.datetime.now()
@@ -93,12 +73,13 @@ with open(curve_data_dir+'slicing.yml', 'r') as file:
     slicing_meta = yaml.safe_load(file)
 line_resolution = slicing_meta['line_resolution']
 total_layer = slicing_meta['num_layers']
+total_baselayer = slicing_meta['num_baselayers']
 
 ## weldind parameters
-weld_mode=160
-des_job=206
+weld_mode=100
+des_job=200
 
-des_dh = 1.5
+des_dh = 2.3420716473455623
 des_v = round(dh2v_loglog(des_dh,weld_mode),1)
 print("The Desired speed (according to desired h",des_dh,"will be",\
       des_v,"mm/sec")
@@ -107,8 +88,8 @@ waypoint_distance=1.625 	###waypoint separation (calculate from 40moveL/95mm, wh
 layer_height_num=int(des_dh/line_resolution) # preplanned
 layer_width_num=int(des_dw/line_resolution) # preplanned
 
-weld_min_v=5
-weld_max_v=100
+weld_min_v=2
+weld_max_v=20
 
 # 2. Scanning parameters
 ### scan parameters
@@ -134,21 +115,21 @@ R2_home = np.radians([70,10,-5,0,0,0])
 robot_client=MotionProgramExecClient()
 ws=WeldSend(robot_client)
 # weld state logging
-sub = RRN.SubscribeService('rr+tcp://192.168.55.10:60823?service=welder')
-obj = sub.GetDefaultClientWait(3)  # connect, timeout=30s
-welder_state_sub = sub.SubscribeWire("welder_state")
-welder_state_sub.WireValueChanged += wire_cb
+weld_ser = RRN.SubscribeService('rr+tcp://192.168.55.10:60823?service=welder')
+## RR sensor objects
+rr_sensors = WeldRRSensor(weld_service=weld_ser)
 # MTI connect to RR
 mti_client = RRN.ConnectService("rr+tcp://192.168.55.10:60830/?service=MTI2D")
 mti_client.setExposureTime("25")
 ###################################
-start_feedback=2
+start_feedback=3
 ### preplanned v,height for first few layer
 planned_layer=999
 ## 300 260 250 240 ... 100
-planned_v=np.ones(planned_layer)*5
+# planned_v=np.ones(planned_layer)*8
+planned_v=np.array([8,8,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5])
 # planned_job=np.ones(planned_layer)*215
-planned_job=np.array([220,216,216,215,215,214,214,213,213,212,212])
+planned_job=np.array([218,218,200,200,200,200,200,200,200,200,200,200,200,200,200])
 planned_job=np.append(planned_job,np.ones(planned_layer)*200)
 planned_job=planned_job.astype(int)
 
@@ -161,14 +142,18 @@ all_profile_height=None
 curve_sliced_relative=None
 all_last_curve_relative=None
 
-layer=516
-last_layer=-1
-layer_count=15
+## forward/backward, baselayer/regular layers
+forward = True
+baselayer = False
 
-try:
-    layer_count=len(glob.glob(data_dir+'layer_*_0'))+1
-except:
-    pass
+layer=10
+last_layer=-1
+layer_count=4
+
+# try:
+#     layer_count=len(glob.glob(data_dir+'layer_*_0'))+1
+# except:
+#     pass
 
 manual_dh=False
 correction=True
@@ -182,13 +167,22 @@ print("Layer Count:",layer_count)
 mean_layer_dh=None
 while True:
     print("Layer Count:",layer_count)
+
+    ####### forward/backward, baselayer/regular layers #####
+    baselayer=True if layer_count<total_baselayer else False
+    forward=True if layer_count%2==0 else False
+
     ####### Decide which layer to print #######
-    if not manual_dh:
+    if baselayer:
+        layer = layer_count
+    if not manual_dh and not baselayer:
         # if layer_count!=0 and layer_count<start_feedback:
         #     last_layer=layer
         #     layer+=layer_height_num
-        if layer_count==0:
+        if layer_count<total_baselayer:
             pass
+        if layer_count==total_baselayer:
+            layer=0
         else:
             if all_profile_height is None:
                 last_num_sections=len(glob.glob(curve_data_dir+'curve_sliced_relative/slice'+str(layer)+'_*.csv'))
@@ -202,6 +196,7 @@ while True:
             # print(all_profile_height[:,1])
             mean_layer_dh=np.mean(all_profile_height[:,1])
             dlayer = int(round(mean_layer_dh/line_resolution)) # find the "delta layer" using dh
+            dlayer = max(10,dlayer)
             last_layer = layer # update last layer
             layer = layer+dlayer # update layer
 
@@ -221,22 +216,32 @@ while True:
         if des_dh<print_min_dh: # too close to the total layer
             break
 
-    print("Print Layer:",layer)
+    print("Print Layer:",layer,"Foward",forward,"Baselayer",baselayer)
     ####################DETERMINE CURVE ORDER##############################################
     all_curve_relative=[]
-    num_sections=len(glob.glob(curve_data_dir+'curve_sliced_relative/slice'+str(layer)+'_*.csv'))
+    if not baselayer:
+        num_sections=len(glob.glob(curve_data_dir+'curve_sliced_relative/slice'+str(layer)+'_*.csv'))
+    else:
+        num_sections=len(glob.glob(curve_data_dir+'curve_sliced_relative/baselayer'+str(layer)+'_*.csv'))
     #### welding
-    if layer>=456 and True:
+    if layer>=21 and True:
         for x in range(0,num_sections,layer_width_num):
             print("Print Layer",layer,"Sec.",x)
 
             # 1. The curve path in "positioner tcp frame"
             # Load nominal path given the layer
-            curve_sliced_js=np.loadtxt(curve_data_dir+'curve_sliced_js/MA2010_js'+str(layer)+'_'+str(x)+'.csv',delimiter=',').reshape((-1,6))
-            if len(curve_sliced_js)<2:
-                continue
-            positioner_js=np.loadtxt(curve_data_dir+'curve_sliced_js/D500B_js'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
-            curve_sliced_relative=np.loadtxt(curve_data_dir+'curve_sliced_relative/slice'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
+            if not baselayer:
+                curve_sliced_js=np.loadtxt(curve_data_dir+'curve_sliced_js/MA2010_js'+str(layer)+'_'+str(x)+'.csv',delimiter=',').reshape((-1,6))
+                if len(curve_sliced_js)<2:
+                    continue
+                positioner_js=np.loadtxt(curve_data_dir+'curve_sliced_js/D500B_js'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
+                curve_sliced_relative=np.loadtxt(curve_data_dir+'curve_sliced_relative/slice'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
+            else: # baselayer
+                curve_sliced_js=np.loadtxt(curve_data_dir+'curve_sliced_js/MA2010_base_js'+str(layer)+'_'+str(x)+'.csv',delimiter=',').reshape((-1,6))
+                if len(curve_sliced_js)<2:
+                    continue
+                positioner_js=np.loadtxt(curve_data_dir+'curve_sliced_js/D500B_base_js'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
+                curve_sliced_relative=np.loadtxt(curve_data_dir+'curve_sliced_relative/baselayer'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
 
             #### convert to R1 and S1 motion
             lam1=calc_lam_js(curve_sliced_js,robot_weld)
@@ -246,8 +251,14 @@ while True:
             num_points_layer=max(2,int(lam_relative[-1]/waypoint_distance))
 
             ###find which end to start depending on how close to joint limit
-            q_prev=robot_client.getJointAnglesDB(positioner.pulse2deg)
-            if positioner.upper_limit[1]-q_prev[1]>q_prev[1]-positioner.lower_limit[1]:
+            # q_prev=robot_client.getJointAnglesDB(positioner.pulse2deg)
+            # if positioner.upper_limit[1]-q_prev[1]>q_prev[1]-positioner.lower_limit[1]:
+            #     breakpoints=np.linspace(0,len(curve_sliced_js)-1,num=num_points_layer).astype(int)
+            # else:
+            #     breakpoints=np.linspace(len(curve_sliced_js)-1,0,num=num_points_layer).astype(int)
+            
+            ## using forward/backward techniqu
+            if forward:
                 breakpoints=np.linspace(0,len(curve_sliced_js)-1,num=num_points_layer).astype(int)
             else:
                 breakpoints=np.linspace(len(curve_sliced_js)-1,0,num=num_points_layer).astype(int)
@@ -331,18 +342,20 @@ while True:
 
             input("Start Weld")
             ####DATA LOGGING
-            if save_weld_record:
-                clean_weld_record()
+            rr_sensors.start_all_sensors()
             rob_stamps,rob_js_exe,_,_=ws.weld_segment_dual(primitives,robot_weld,positioner,q1_all,q2_all,v1_all,v2_all,cond_all=[weld_job],arc=arc_on)
+            rr_sensors.stop_all_sensors()
+
             if save_weld_record:
                 Path(data_dir).mkdir(exist_ok=True)
-                layer_data_dir=data_dir+'layer_'+str(layer)+'_'+str(x)+'/'
+                if not baselayer:
+                    layer_data_dir=data_dir+'layer_'+str(layer)+'_'+str(x)+'/'
+                else:
+                    layer_data_dir=data_dir+'baselayer_'+str(layer)+'_'+str(x)+'/'
                 Path(layer_data_dir).mkdir(exist_ok=True)
-                np.savetxt(layer_data_dir + 'welding.csv',
-                            np.array([weld_timestamp, weld_voltage, weld_current, weld_feedrate, weld_energy]).T, delimiter=',',
-                            header='timestamp,voltage,current,feedrate,energy', comments='')
                 np.savetxt(layer_data_dir + 'weld_js_exe.csv',rob_js_exe,delimiter=',')
                 np.savetxt(layer_data_dir + 'weld_robot_stamps.csv',rob_stamps,delimiter=',')
+                rr_sensors.save_all_sensors(layer_data_dir)
             
             all_curve_relative.append(curve_sliced_relative)
 
@@ -353,10 +366,16 @@ while True:
     #### scanning
     if True:
         if len(all_curve_relative) ==0:
-            num_sections=len(glob.glob(curve_data_dir+'curve_sliced_relative/slice'+str(layer)+'_*.csv'))
-            all_curve_relative=[]
-            for x in range(0,num_sections,layer_width_num):
-                all_curve_relative.append(np.loadtxt(curve_data_dir+'curve_sliced_relative/slice'+str(layer)+'_'+str(x)+'.csv',delimiter=','))
+            if not baselayer:
+                num_sections=len(glob.glob(curve_data_dir+'curve_sliced_relative/slice'+str(layer)+'_*.csv'))
+                all_curve_relative=[]
+                for x in range(0,num_sections,layer_width_num):
+                    all_curve_relative.append(np.loadtxt(curve_data_dir+'curve_sliced_relative/slice'+str(layer)+'_'+str(x)+'.csv',delimiter=','))
+            else:
+                num_sections=len(glob.glob(curve_data_dir+'curve_sliced_relative/baselayer'+str(layer)+'_*.csv'))
+                all_curve_relative=[]
+                for x in range(0,num_sections,layer_width_num):
+                    all_curve_relative.append(np.loadtxt(curve_data_dir+'curve_sliced_relative/baselayer'+str(layer)+'_'+str(x)+'.csv',delimiter=','))
 
         all_profile_height=[]
         all_last_curve_relative=[]
@@ -364,14 +383,23 @@ while True:
         for x in range(0,num_sections,layer_width_num): 
             ### scanning path module
             spg = ScanPathGen(robot_scan,positioner,scan_stand_off_d,Rz_angle,Ry_angle,bounds_theta)
-            curve_sliced_relative=np.loadtxt(curve_data_dir+'curve_sliced_relative/slice'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
-            if layer==0 and x==0:
-                continue
+
+            if not baselayer:
+                curve_sliced_relative=np.loadtxt(curve_data_dir+'curve_sliced_relative/slice'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
+            else:
+                curve_sliced_relative=np.loadtxt(curve_data_dir+'curve_sliced_relative/baselayer'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
+            # if len(curve_sliced_relative)<2:
+            #     continue
             print("Scan Layer",layer,", Sec",x)
             # try:
-            q_out1=np.loadtxt(curve_data_dir+'curve_scan_js/MA1440_js'+str(layer)+'_'+str(x)+'.csv',delimiter=',').reshape((-1,6))
-            q_out2=np.loadtxt(curve_data_dir+'curve_scan_js/D500B_js'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
-            scan_p=np.loadtxt(curve_data_dir+'curve_scan_relative/scan_T'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
+            if not baselayer:
+                q_out1=np.loadtxt(curve_data_dir+'curve_scan_js/MA1440_js'+str(layer)+'_'+str(x)+'.csv',delimiter=',').reshape((-1,6))
+                q_out2=np.loadtxt(curve_data_dir+'curve_scan_js/D500B_js'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
+                scan_p=np.loadtxt(curve_data_dir+'curve_scan_relative/scan_T'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
+            else:
+                q_out1=np.loadtxt(curve_data_dir+'curve_scan_js/MA1440_base_js'+str(layer)+'_'+str(x)+'.csv',delimiter=',').reshape((-1,6))
+                q_out2=np.loadtxt(curve_data_dir+'curve_scan_js/D500B_base_js'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
+                scan_p=np.loadtxt(curve_data_dir+'curve_scan_relative/scan_base_T'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
             # except:
             #     positioner_js=np.loadtxt(curve_data_dir+'curve_sliced_js/D500B_js'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
             #     ## reverse the welding path
@@ -473,7 +501,10 @@ while True:
 
             print("Total exe len:",len(q_out_exe))
             if save_output_points:
-                layer_data_dir=data_dir+'layer_'+str(layer)+'_'+str(x)+'/'
+                if not baselayer:
+                    layer_data_dir=data_dir+'layer_'+str(layer)+'_'+str(x)+'/'
+                else:
+                    layer_data_dir=data_dir+'baselayer_'+str(layer)+'_'+str(x)+'/'
                 out_scan_dir = layer_data_dir+'scans/'
                 Path(out_scan_dir).mkdir(exist_ok=True)
                 ## save traj
@@ -497,7 +528,7 @@ while True:
             pcd = scan_process.pcd_noise_remove(pcd,nb_neighbors=40,std_ratio=1.5,\
                                                 min_bound=crop_min,max_bound=crop_max,cluster_based_outlier_remove=False,cluster_neighbor=1,min_points=25)
             visualize_pcd([pcd])
-            profile_height = scan_process.pcd2dh(pcd,curve_sliced_relative)
+            profile_height = scan_process.pcd2dh(pcd,curve_sliced_relative,drawing=True)
             plt.scatter(profile_height[:,0],profile_height[:,1])
             plt.show()
             all_profile_height.extend(profile_height)

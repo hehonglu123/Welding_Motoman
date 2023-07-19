@@ -93,13 +93,13 @@ print(job_number)
 
 ipm_mode=160
 weld_velocity=[5,5]
-weld_v=5
+weld_v=2
 for i in range(len(weld_z_height)-2):
     weld_velocity.append(weld_v)
-    # if weld_v==weld_velocity[-2]:
-    #     weld_v+=2
+    if weld_v==weld_velocity[-2]:
+        weld_v+=2
 
-print(weld_velocity)
+# print(weld_velocity)
 # exit()
 save_weld_record=True
 
@@ -120,23 +120,34 @@ cam_ser=RRN.ConnectService('rr+tcp://192.168.55.10:60827/?service=camera')
 mic_ser = RRN.ConnectService('rr+tcp://192.168.55.20:60828?service=microphone')
 ## RR sensor objects
 rr_sensors = WeldRRSensor(weld_service=weld_ser,cam_service=cam_ser,microphone_service=mic_ser)
+
+### test sensor (camera, microphone)
+# print("Test 3 Sec.")
+# rr_sensors.test_all_sensors()
+# print(len(rr_sensors.ir_recording))
+# exit()
+###############
+
 # MTI connect to RR
 mti_client = RRN.ConnectService("rr+tcp://192.168.55.10:60830/?service=MTI2D")
 mti_client.setExposureTime("25")
 ###################################
-forward_flag = True
+forward_flag = False
 base_layer = True
 profile_height=None
-Transz0_H=None
+Transz0_H=np.array([[ 9.99998969e-01,  5.10084448e-06, -1.43610455e-03, -3.19743204e-03],
+ [ 5.10084448e-06,  9.99974769e-01,  7.10362975e-03,  1.58159609e-02],
+ [ 1.43610455e-03, -7.10362975e-03,  9.99973738e-01,  2.22640342e+00],
+ [ 0.00000000e+00,  0.00000000e+00,  0.00000000e+00,  1.00000000e+00]])
 curve_sliced_relative=None
 last_mean_h = 0
 
-for i in range(0,len(weld_z_height)):
+for i in range(17,len(weld_z_height)):
     cycle_st = time.time()
     print("Layer:",i)
     #### welding
     weld_st = time.time()
-    if i>=0 and True:
+    if i>=18 and True:
         weld_plan_st = time.time()
         if i>=2:
             base_layer=False
@@ -296,7 +307,7 @@ for i in range(0,len(weld_z_height)):
             Path(layer_data_dir).mkdir(exist_ok=True)
             np.savetxt(layer_data_dir + 'weld_js_exe.csv',rob_js_exe,delimiter=',')
             np.savetxt(layer_data_dir + 'weld_robot_stamps.csv',rob_stamps,delimiter=',')
-            rr_sensors.save_all_sensors()
+            rr_sensors.save_all_sensors(layer_data_dir)
         
         print("Weld actual weld time:",time.time()-weld_motion_weld_st)
         weld_to_home_st = time.time()
@@ -316,14 +327,15 @@ for i in range(0,len(weld_z_height)):
     if True:
         scan_st = time.time()
         if curve_sliced_relative is None:
-            data_dir='../data/wall_weld_test/weld_scan_2023_07_05_16_58_36/'
-            last_profile_height=np.load('../data/wall_weld_test/weld_scan_2023_07_05_16_58_36/layer_2/scans/height_profile.npy')
+            data_dir='../data/wall_weld_test/weld_scan_2023_07_17_16_30_34/'
+            last_profile_height=np.load('../data/wall_weld_test/weld_scan_2023_07_17_16_30_34/layer_16/scans/height_profile.npy')
             last_mean_h=np.mean(last_profile_height[:,1])
             h_largest=np.max(last_profile_height[:,1])
             layer_data_dir=data_dir+'layer_'+str(i)+'/'
-            curve_sliced_relative=[np.array([-3.19454496e+01,  1.72700000e+00,  9.42842998e+00,  1.55554573e-04,
-       -6.31394918e-20, -9.99881509e-01]), np.array([ 3.30468485e+01,  1.72700000e+00,  9.42842998e+00,  1.55554573e-04,
+            curve_sliced_relative=[np.array([-3.19476273e+01,  1.72700000e+00,  3.95881084e+01,  1.55554573e-04,
+       -6.31394918e-20, -9.99881509e-01]), np.array([ 3.30446707e+01,  1.72700000e+00,  3.95881084e+01,  1.55554573e-04,
        -6.31394918e-20, -9.99881509e-01])]
+            input("Start Scanning")
 
         scan_plan_st = time.time()
         # 2. Scanning parameters
@@ -503,8 +515,8 @@ for i in range(0,len(weld_z_height)):
         o3d.io.write_point_cloud(out_scan_dir+'processed_pcd.pcd',pcd)
         np.save(out_scan_dir+'height_profile.npy',profile_height)
     # visualize_pcd([pcd])
-    # plt.scatter(profile_height[:,0],profile_height[:,1])
-    # plt.show()
+    plt.scatter(profile_height[:,0],profile_height[:,1])
+    plt.show()
     # exit()
 
     if np.mean(profile_height[:,1])>final_height and np.std(profile_height[:,1])<final_h_std_thres:

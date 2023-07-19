@@ -46,22 +46,31 @@ T_to_base = Transform(np.eye(3),[0,0,-380])
 positioner.base_H = np.matmul(positioner.base_H,H_from_RT(T_to_base.R,T_to_base.p))
 
 #### data directory
-dataset='cup/'
-sliced_alg='circular_slice_shifted/'
+# dataset='cup/'
+# sliced_alg='circular_slice_shifted/'
+dataset='blade0.1/'
+sliced_alg='auto_slice/'
 curve_data_dir = '../data/'+dataset+sliced_alg
 
 current_time = datetime.datetime.now()
 formatted_time = current_time.strftime('%Y_%m_%d_%H_%M_%S.%f')[:-7]
 # data_dir=curve_data_dir+'weld_scan_'+formatted_time+'/'
-data_dir=curve_data_dir+'weld_scan_'+'2023_07_11_16_25_30'+'/'
+data_dir=curve_data_dir+'weld_scan_'+'2023_07_19_11_41_30'+'/'
 
-
-layer=367
+baselayer=True
+layer=1
 x=0
 
-layer_data_dir=data_dir+'layer_'+str(layer)+'_'+str(x)+'/'
+if not baselayer:
+    layer_data_dir=data_dir+'layer_'+str(layer)+'_'+str(x)+'/'
+else:
+    layer_data_dir=data_dir+'baselayer_'+str(layer)+'_'+str(x)+'/'
 out_scan_dir = layer_data_dir+'scans/'
-curve_sliced_relative=np.loadtxt(curve_data_dir+'curve_sliced_relative/slice'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
+
+if not baselayer:
+    curve_sliced_relative=np.loadtxt(curve_data_dir+'curve_sliced_relative/slice'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
+else:
+    curve_sliced_relative=np.loadtxt(curve_data_dir+'curve_sliced_relative/baselayer'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
 
 with open(out_scan_dir+'mti_scans.pickle', 'rb') as file:
     mti_recording=pickle.load(file)
