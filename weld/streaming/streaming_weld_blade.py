@@ -70,8 +70,8 @@ positioner=positioner_obj('D500B',def_path='../../config/D500B_robot_default_con
 
 ########################################################RR FLIR########################################################
 flir=RRN.ConnectService('rr+tcp://192.168.55.10:60827/?service=camera')
-flir.setf_param("focus_pos", RR.VarValue(int(1400),"int32"))
-flir.setf_param("object_distance", RR.VarValue(0.3,"double"))
+flir.setf_param("focus_pos", RR.VarValue(int(2000),"int32"))
+flir.setf_param("object_distance", RR.VarValue(0.4,"double"))
 flir.setf_param("reflected_temperature", RR.VarValue(291.15,"double"))
 flir.setf_param("atmospheric_temperature", RR.VarValue(293.15,"double"))
 flir.setf_param("relative_humidity", RR.VarValue(50,"double"))
@@ -98,10 +98,10 @@ except: pass
 fronius_client = RRN.ConnectService('rr+tcp://192.168.55.21:60823?service=welder')
 fronius_client.job_number = 200
 fronius_client.prepare_welder()
-vd_relative=50
+vd_relative=5
 ########################################################RR STREAMING########################################################
 
-RR_robot_sub = RRN.SubscribeService('rr+tcp://localhost:59945?service=robot')
+RR_robot_sub = RRN.SubscribeService('rr+tcp://192.168.55.15:59945?service=robot')
 RR_robot_state = RR_robot_sub.SubscribeWire('robot_state')
 RR_robot = RR_robot_sub.GetDefaultClientWait(1)
 robot_const = RRN.GetConstants("com.robotraconteur.robotics.robot", RR_robot)
@@ -160,8 +160,8 @@ res, robot_state, _ = RR_robot_state.TryGetInValue()
 q_prev=robot_state.joint_position[:6]
 
 
-num_layer_start=int(0*layer_height_num)
-num_layer_end=int(10*layer_height_num)
+num_layer_start=int(13*layer_height_num)
+num_layer_end=int(23*layer_height_num)
 num_sections=1
 for layer in range(num_layer_start,num_layer_end,layer_height_num):
 	num_sections_prev=num_sections
@@ -221,16 +221,15 @@ for layer in range(num_layer_start,num_layer_end,layer_height_num):
 		fronius_client.start_weld()
 		robot_ts,robot_js=SS.traj_streaming(curve_js_all,ctrl_joints=np.ones(14))
 
-		time.sleep(0.1)
+		time.sleep(0.12)
 		fronius_client.stop_weld()
 
 		local_recorded_dir='recorded_data/blade_recording/'
 		os.makedirs(local_recorded_dir,exist_ok=True)
-		np.savetxt(local_recorded_dir+'slice_%i_%i_joint.csv'%(layer,x),np.hstack((robot_ts,robot_js)),delimiter=',')
+		np.savetxt(local_recorded_dir+'slice_%i_%i_joint.csv'%(layer,x),np.hstack((robot_ts.reshape((-1,1)),robot_js)),delimiter=',')
 		np.savetxt(local_recorded_dir+'slice_%i_%i_flir_ts.csv'%(layer,x),flir_ts,delimiter=',')
 		with open(local_recorded_dir+'slice_%i_%i_flir.pickle'%(layer,x), 'wb') as file:
 			pickle.dump(flir_logging, file)
 	
 		q_prev=rob1_js_dense[breakpoints[-1]]
 	
-# np.savetxt('recorded_data/joint_recording.csv',np.hstack((timestamp_robot.reshape(-1, 1),joint_recording)),delimiter=',')

@@ -25,36 +25,34 @@ def main():
 	###################################################################
 	curve_sliced=[]
 	curve_sliced_js=[]
+	curve_sliced_js_base=[]
 	for i in range(slicing_meta['num_layers']):
 		num_sections=len(glob.glob(data_dir+'curve_sliced_js/MA2010_js'+str(i)+'_*.csv'))
 		curve_sliced_js_ith_layer=[]
 		for x in range(num_sections):
 			curve_sliced_js_ith_layer.append(np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(i)+'_'+str(x)+'.csv',delimiter=',').reshape((-1,6)))
 		curve_sliced_js.append(curve_sliced_js_ith_layer)
-	# for i in range(slicing_meta['num_layers']):
-	# 	num_sections=len(glob.glob(data_dir+'curve_sliced_relative/slice'+str(i)+'_*.csv'))
-	# 	curve_sliced_relative_ith_layer=[]
-	# 	curve_sliced_ith_layer=[]
-	# 	for x in range(num_sections):
-	# 		curve_sliced_relative_ith_layer.append(np.loadtxt(data_dir+'curve_sliced_relative/slice'+str(i)+'_'+str(x)+'.csv',delimiter=',').reshape((-1,6)))
-	# 		curve_sliced_ith_layer.append(np.loadtxt(data_dir+'curve_sliced/slice'+str(i)+'_'+str(x)+'.csv',delimiter=',').reshape((-1,6)))
-	# 	curve_sliced_relative.append(curve_sliced_relative_ith_layer)
-	# 	curve_sliced.append(curve_sliced_ith_layer)
+
+	for i in range(slicing_meta['num_baselayers']):
+		num_sections=len(glob.glob(data_dir+'curve_sliced_js/MA2010_base_js'+str(i)+'_*.csv'))
+		curve_sliced_js_base_ith_layer=[]
+		for x in range(num_sections):
+			curve_sliced_js_base_ith_layer.append(np.loadtxt(data_dir+'curve_sliced_js/MA2010_base_js'+str(i)+'_'+str(x)+'.csv',delimiter=',').reshape((-1,6)))
+		curve_sliced_js_base.append(curve_sliced_js_base_ith_layer)
 
 
 
 	rr=redundancy_resolution(robot,positioner,None)
+	distance=400
+	rob2_curve_js_base=rr.rob2_flir_resolution(curve_sliced_js_base,robot2,measure_distance=distance)
+	for i in range(slicing_meta['num_baselayers']):
+		for x in range(len(rob2_curve_js_base[i])):
+			np.savetxt(data_dir+'curve_sliced_js/MA1440_base_js'+str(i)+'_'+str(x)+'.csv',rob2_curve_js_base[i][x],delimiter=',')
 
-	rob2_curve_js=rr.rob2_flir_resolution(curve_sliced_js,robot2,measure_distance=500)
-
+	rob2_curve_js=rr.rob2_flir_resolution(curve_sliced_js,robot2,measure_distance=distance)
 	for i in range(slicing_meta['num_layers']):
 		for x in range(len(rob2_curve_js[i])):
 			np.savetxt(data_dir+'curve_sliced_js/MA1440_js'+str(i)+'_'+str(x)+'.csv',rob2_curve_js[i][x],delimiter=',')
-
-	# for i in range(slicing_meta['num_baselayers']):
-	# 	for x in range(len(positioner_js_base[i])):
-	# 		np.savetxt(data_dir+'curve_sliced_js/D500B_base_js'+str(i)+'_'+str(x)+'.csv',positioner_js_base[i][x],delimiter=',')
-	# 		np.savetxt(data_dir+'curve_sliced_js/MA2010_base_js'+str(i)+'_'+str(x)+'.csv',curve_sliced_js_base[i][x],delimiter=',')
 
 
 if __name__ == '__main__':

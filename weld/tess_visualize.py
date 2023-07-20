@@ -10,8 +10,8 @@ robot2=robot_obj('MA1440_A0',def_path='../config/MA1440_A0_robot_default_config.
 positioner=positioner_obj('D500B',def_path='../config/D500B_robot_default_config.yml',tool_file_path='../config/positioner_tcp.csv',\
 	pulse2deg_file_path='../config/D500B_pulse2deg_real.csv',base_transformation_file='../config/D500B_pose.csv')
 
-dataset='cup/'
-sliced_alg='circular_slice_shifted/'
+dataset='blade0.1/'
+sliced_alg='auto_slice/'
 data_dir='../data/'+dataset+sliced_alg
 with open(data_dir+'slicing.yml', 'r') as file:
 	slicing_meta = yaml.safe_load(file)
