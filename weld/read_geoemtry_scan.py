@@ -31,6 +31,7 @@ robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_co
 robot_scan=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.yml',tool_file_path=config_dir+'mti.csv',\
 	base_transformation_file=config_dir+'MA1440_pose.csv',pulse2deg_file_path=config_dir+'MA1440_A0_pulse2deg_real.csv',\
     base_marker_config_file=config_dir+'MA1440_0524_marker_config.yaml')
+
 positioner=positioner_obj('D500B',def_path=config_dir+'D500B_robot_default_config.yml',tool_file_path=config_dir+'positioner_tcp.csv',\
     base_transformation_file=config_dir+'D500B_pose.csv',pulse2deg_file_path=config_dir+'D500B_pulse2deg_real.csv',\
     base_marker_config_file=config_dir+'D500B_0524_marker_config.yaml',tool_marker_config_file=config_dir+'positioner_tcp_marker_config.yaml')
@@ -65,6 +66,10 @@ formatted_time = current_time.strftime('%Y_%m_%d_%H_%M_%S.%f')[:-7]
 # data_dir=curve_data_dir+'weld_scan_'+formatted_time+'/'
 # data_dir=curve_data_dir+'weld_scan_'+'2023_07_11_16_25_30'+'/'
 data_dir=curve_data_dir+'weld_scan_'+'2023_07_19_11_41_30'+'/'
+
+# baselayer=False
+# layer=367
+# x=0
 
 baselayer=True
 layer=1
