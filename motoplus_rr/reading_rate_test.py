@@ -9,7 +9,7 @@ def my_handler(sub, value, ts):
 	now=time.time()
 
 
-RR_robot_sub = RRN.SubscribeService('rr+tcp://localhost:59945?service=robot')
+RR_robot_sub = RRN.SubscribeService('rr+tcp://192.168.55.15:59945?service=robot')
 RR_robot_state = RR_robot_sub.SubscribeWire('robot_state')
 
 

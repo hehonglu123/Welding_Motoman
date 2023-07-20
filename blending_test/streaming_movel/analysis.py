@@ -17,7 +17,7 @@ p_end=np.array([1648,-900+displacement,-100])
 curve=np.vstack((np.linspace(p_start,p_mid,1000),np.linspace(p_mid,p_end,1000)))
 curve_normal=np.array([[0,0,-1]]*2000)
 
-vd=400
+vd=50
 data_movel=np.loadtxt('movel_test/joint_recording_%i.csv'%vd,delimiter=',')
 curve_exe_js_movel=data_movel[:,1:]
 timestamp_movel=data_movel[:,0]
@@ -29,7 +29,7 @@ speed_movel=np.gradient(lam_movel)/np.gradient(timestamp_movel)
 error_movel,angle_error_movel=calc_all_error_w_normal(curve_exe_movel,curve[:,:3],curve_exe_R_movel[:,:,-1],curve_normal)
 
 
-data_streaming=np.loadtxt('streaming_test/joint_recording_%i.csv'%vd,delimiter=',')
+data_streaming=np.loadtxt('streaming_test/wofronius/joint_recording_%i.csv'%vd,delimiter=',')
 curve_exe_js_streaming=data_streaming[:,1:]
 timestamp_streaming=data_streaming[:,0]
 pose_all=robot.fwd(curve_exe_js_streaming)
@@ -37,6 +37,7 @@ curve_exe_streaming=pose_all.p_all
 curve_exe_R_streaming=pose_all.R_all
 lam_streaming=calc_lam_cs(curve_exe_streaming)
 speed_streaming=np.gradient(lam_streaming)/np.gradient(timestamp_streaming)
+print(timestamp_streaming)
 error_streaming,angle_error_streaming=calc_all_error_w_normal(curve_exe_streaming,curve[:,:3],curve_exe_R_streaming[:,:,-1],curve_normal)
 
 
