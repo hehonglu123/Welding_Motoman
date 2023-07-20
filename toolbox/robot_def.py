@@ -31,6 +31,7 @@ class robot_obj(object):
 		self.robot_name=robot_name
 		with open(def_path, 'r') as f:
 			self.robot = rr_rox.load_robot_info_yaml_to_robot(f)
+   
 
 		self.def_path=def_path
 		#define robot without tool
@@ -132,10 +133,10 @@ class robot_obj(object):
 						self.calib_H[0,i] = marker_data['H'][i]['x']
 						self.calib_H[1,i] = marker_data['H'][i]['y']
 						self.calib_H[2,i] = marker_data['H'][i]['z']
-				if 'zero_config' in marker_data.keys():
-					self.calib_zero_config = np.array(marker_data['zero_config'])
-					self.robot.joint_upper_limit = self.robot.joint_upper_limit-self.calib_zero_config
-					self.robot.joint_lower_limit = self.robot.joint_lower_limit-self.calib_zero_config
+				# if 'zero_config' in marker_data.keys():
+				# 	self.calib_zero_config = np.array(marker_data['zero_config'])
+				# 	self.robot.joint_upper_limit = self.robot.joint_upper_limit-self.calib_zero_config
+				# 	self.robot.joint_lower_limit = self.robot.joint_lower_limit-self.calib_zero_config
 		self.tool_marker_config_file=tool_marker_config_file
 		self.T_tool_toolmarker = None # T^tool_toolmarker
 		if len(tool_marker_config_file)>0:
@@ -356,10 +357,10 @@ class positioner_obj(object):
 						self.calib_H[1,i] = marker_data['H'][i]['y']
 						self.calib_H[2,i] = marker_data['H'][i]['z']
 				self.calib_zero_config=np.zeros(self.robot.H.shape[1])
-				if 'zero_config' in marker_data.keys():
-					self.calib_zero_config = np.array(marker_data['zero_config'])
-					self.robot.joint_upper_limit = self.robot.joint_upper_limit-self.calib_zero_config
-					self.robot.joint_lower_limit = self.robot.joint_lower_limit-self.calib_zero_config
+				# if 'zero_config' in marker_data.keys():
+				# 	self.calib_zero_config = np.array(marker_data['zero_config'])
+				# 	self.robot.joint_upper_limit = self.robot.joint_upper_limit-self.calib_zero_config
+				# 	self.robot.joint_lower_limit = self.robot.joint_lower_limit-self.calib_zero_config
 		self.tool_marker_config_file=tool_marker_config_file
 		self.T_tool_toolmarker = None # T^tool_toolmarker
 		if len(tool_marker_config_file)>0:
