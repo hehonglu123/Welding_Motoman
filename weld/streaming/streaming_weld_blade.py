@@ -1,4 +1,4 @@
-import sys, glob
+import sys, glob, pickle, os
 from RobotRaconteur.Client import *
 from scipy.interpolate import interp1d
 sys.path.append('../../toolbox/')
@@ -24,6 +24,32 @@ def extend_simple(rob1_js,positioner_js,curve_sliced_relative,lam_relative,d=10)
 
 	return q_start, q_end
 
+def new_frame(pipe_ep):
+	global flir_logging, flir_ts, image_consts
+	#Loop to get the newest frame
+	while (pipe_ep.Available > 0):
+		#Receive the packet
+		rr_img=pipe_ep.ReceivePacket()
+		if rr_img.image_info.encoding == image_consts["ImageEncoding"]["mono8"]:
+			# Simple uint8 image
+			mat = rr_img.data.reshape([rr_img.image_info.height, rr_img.image_info.width], order='C')
+		elif rr_img.image_info.encoding == image_consts["ImageEncoding"]["mono16"]:
+			data_u16 = np.array(rr_img.data.view(np.uint16))
+			mat = data_u16.reshape([rr_img.image_info.height, rr_img.image_info.width], order='C')
+		
+		ir_format = rr_img.image_info.extended["ir_format"].data
+
+		if ir_format == "temperature_linear_10mK":
+			display_mat = (mat * 0.01) - 273.15    
+		elif ir_format == "temperature_linear_100mK":
+			display_mat = (mat * 0.1) - 273.15    
+		else:
+			display_mat = mat
+
+		#Convert the packet to an image and set the global variable
+		flir_logging.append(display_mat)
+		flir_ts.append(time.time())
+	
 ############################################################WELDING PARAMETERS########################################################
 dataset='blade0.1/'
 sliced_alg='auto_slice/'
@@ -42,6 +68,32 @@ robot2=robot_obj('MA1440_A0',def_path='../../config/MA1440_A0_robot_default_conf
 positioner=positioner_obj('D500B',def_path='../../config/D500B_robot_default_config.yml',tool_file_path='../../config/positioner_tcp.csv',\
 	pulse2deg_file_path='../../config/D500B_pulse2deg_real.csv',base_transformation_file='../../config/D500B_pose.csv')
 
+########################################################RR FLIR########################################################
+flir=RRN.ConnectService('rr+tcp://192.168.55.10:60827/?service=camera')
+flir.setf_param("focus_pos", RR.VarValue(int(1400),"int32"))
+flir.setf_param("object_distance", RR.VarValue(0.3,"double"))
+flir.setf_param("reflected_temperature", RR.VarValue(291.15,"double"))
+flir.setf_param("atmospheric_temperature", RR.VarValue(293.15,"double"))
+flir.setf_param("relative_humidity", RR.VarValue(50,"double"))
+flir.setf_param("ext_optics_temperature", RR.VarValue(293.15,"double"))
+flir.setf_param("ext_optics_transmission", RR.VarValue(0.99,"double"))
+flir.setf_param("current_case", RR.VarValue(2,"int32"))
+# flir.setf_param("ir_format", RR.VarValue("temperature_linear_100mK","string"))
+flir.setf_param("ir_format", RR.VarValue("radiometric","string"))
+flir.setf_param("object_emissivity", RR.VarValue(0.13,"double"))
+flir.setf_param("scale_limit_low", RR.VarValue(293.15,"double"))
+flir.setf_param("scale_limit_upper", RR.VarValue(5000,"double"))
+global image_consts
+image_consts = RRN.GetConstants('com.robotraconteur.image', flir)
+p=flir.frame_stream.Connect(-1)
+#Set the callback for when a new pipe packet is received to the
+#new_frame function
+flir_logging=[]
+flir_ts=[]
+p.PacketReceivedEvent+=new_frame
+try:
+	flir.start_streaming()
+except: pass
 ########################################################RR FRONIUS########################################################
 fronius_client = RRN.ConnectService('rr+tcp://192.168.55.21:60823?service=welder')
 fronius_client.job_number = 200
@@ -106,8 +158,7 @@ SS=StreamingSend(RR_robot,RR_robot_state,RobotJointCommand,streaming_rate)
 ###########################################layer welding############################################
 res, robot_state, _ = RR_robot_state.TryGetInValue()
 q_prev=robot_state.joint_position[:6]
-timestamp_robot=[]
-joint_recording=[]
+
 
 num_layer_start=int(0*layer_height_num)
 num_layer_end=int(10*layer_height_num)
@@ -164,14 +215,22 @@ for layer in range(num_layer_start,num_layer_end,layer_height_num):
 		curve_js_all=np.hstack((rob1_js_dense[breakpoints],rob2_js_dense[breakpoints],positioner_js_dense[breakpoints]))
 		SS.jog2q(curve_js_all[0])
 		
+		flir_logging=[]
+		flir_ts=[]
 		##########WELDING#######
 		fronius_client.start_weld()
-		ts,js=SS.traj_streaming(curve_js_all,ctrl_joints=np.ones(14))
-		timestamp_robot.extend(ts)
-		joint_recording.extend(js)
-		time.sleep(0.44)
+		robot_ts,robot_js=SS.traj_streaming(curve_js_all,ctrl_joints=np.ones(14))
+
+		time.sleep(0.1)
 		fronius_client.stop_weld()
 
+		local_recorded_dir='recorded_data/blade_recording/'
+		os.makedirs(local_recorded_dir,exist_ok=True)
+		np.savetxt(local_recorded_dir+'slice_%i_%i_joint.csv'%(layer,x),np.hstack((robot_ts,robot_js)),delimiter=',')
+		np.savetxt(local_recorded_dir+'slice_%i_%i_flir_ts.csv'%(layer,x),flir_ts,delimiter=',')
+		with open(local_recorded_dir+'slice_%i_%i_flir.pickle'%(layer,x), 'wb') as file:
+			pickle.dump(flir_logging, file)
+	
 		q_prev=rob1_js_dense[breakpoints[-1]]
 	
 # np.savetxt('recorded_data/joint_recording.csv',np.hstack((timestamp_robot.reshape(-1, 1),joint_recording)),delimiter=',')
