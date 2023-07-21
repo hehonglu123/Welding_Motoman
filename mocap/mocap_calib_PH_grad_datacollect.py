@@ -205,36 +205,72 @@ class CalibRobotPH:
         print("mocap align num:",len(mocap_T_align))
         print("mocap raw num:",len(mocap_T_raw))
 
-def calib_S1():
+def calib_R2():
+
+    dataset_date = '0627'
 
     config_dir='../config/'
-    turn_table=positioner_obj('D500B',def_path=config_dir+'D500B_robot_default_config.yml',tool_file_path=config_dir+'positioner_tcp.csv'\
-        ,pulse2deg_file_path=config_dir+'D500B_pulse2deg_real.csv',\
-        base_marker_config_file=config_dir+'D500B_marker_config.yaml',tool_marker_config_file=config_dir+'positioner_tcp_marker_config.yaml')
+    robot_weld=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.yml',tool_file_path=config_dir+'mti.csv',\
+	pulse2deg_file_path=config_dir+'MA1440_A0_pulse2deg_real.csv',\
+    base_marker_config_file=config_dir+'MA1440_'+dataset_date+'_marker_config.yaml',tool_marker_config_file=config_dir+'mti_'+dataset_date+'_marker_config.yaml')
 
     mocap_url = 'rr+tcp://localhost:59823?service=optitrack_mocap'
     mocap_cli = RRN.ConnectService(mocap_url)
 
-    calib_obj = CalibRobotPH(mocap_cli,turn_table)
+    calib_obj = CalibRobotPH(mocap_cli,robot_weld)
 
     # calibration
-    ## zero config
-    start_p = np.array([[0,180],
-                        [0,180]])
-    q1_1=start_p[0] + np.array([-60,0])
-    q1_2=start_p[0] + np.array([45,0])
-    q2_1=start_p[1] + np.array([0,-120])
-    q2_2=start_p[1] + np.array([0,120])
+    q2_up=50
+    q2_low=-55
+    q3_up_sample = np.array([[-55,-40],[0,10],[50,60]]) #[[q2 q3]]
+    q3_low_sample = np.array([[-55,-70],[0,-60],[50,0]]) #[[q2 q3]]
+    d_angle = 5 # 5 degree
+    # add 7 points (at least 6 is needed)
+    # dq_sample = [[0,0,0,0,0,0],\
+    #       [-1,0,0,0,0,0],[1,0,0,0,0,0],\
+    #       [0,-1,-1,0,0,0],[0,-1,1,0,0,0],\
+    #       [0,1,1,0,0,0],[0,1,-1,0,0,0]]
+    # dq_sample = [[0,0,0,0,0,0],\
+    #       [-9,0,0,-9,-9,9],[-6,0,0,-6,-6,6],\
+    #       [-3,0,0,-3,-3,3],[4,0,0,4,4,-4],\
+    #       [8,0,0,8,8,-8],[12,0,0,12,12,-12]]
+    # dq_sample = [[0,0,0,0,0,0],\
+    #       [-3,0,0,-3,-3,3],[-2,0,0,-2,-2,2],\
+    #       [-1,0,0,-1,-1,1],[1,0,0,1,1,-1],\
+    #       [2,0,0,2,2,-2],[3,0,0,3,3,-3]]
+    dq_sample = [[0,0,0,0,0,0],\
+          [1,0,0,-0,-0,0],[0,1,0,0,0,0],\
+          [0,0,1,0,0,0],[0,0,0,1,0,0],\
+          [0,0,0,0,1,0],[0,0,0,0,0,1]]
+    scale=1
+    dq_sample = np.array(dq_sample)*scale
 
-    q_paths = [[q1_1,q1_2],[q2_1,q2_2]]
-    
+    target_q_zero = np.array([1,0,0,1,1,1])
+
+    # speed
+    rob_speed=1
+    waittime=0.5 # stop 0.5 sec for sync
+
+    q_paths = []
+    for q2 in np.append(np.arange(q2_low,q2_up,d_angle),q2_up):
+        q3_low = np.interp(q2,q3_low_sample[:,0],q3_low_sample[:,1])
+        q3_up = np.interp(q2,q3_up_sample[:,0],q3_up_sample[:,1])
+        for q3 in np.append(np.arange(q3_low,q3_up,d_angle),q3_up):
+            target_q = deepcopy(target_q_zero)
+            target_q[1]=q2
+            target_q[2]=q3
+            for dq in dq_sample:
+                q_paths.append(target_q+dq)
+    print("total pose:",len(q_paths))
+    print("Data Base:",dataset_date)
+
+    # exit()
+
     # collecting raw data
-    raw_data_dir='PH_raw_data/train_data'
-    # raw_data_dir='PH_raw_data/valid_data_1'
-    # raw_data_dir='PH_raw_data/valid_data_2'
+    raw_data_dir='PH_grad_data/train_data'
     #####################
 
-    calib_obj.run_datacollect(config_dir+'D500B_robot_default_config.yaml','192.168.1.31','ST1',turn_table.pulse2deg,q_paths,rob_speed=3,waittime=0.5,repeat_N=1\
+    calib_obj.run_datacollect_sync(config_dir+'MA2010_marker_config.yaml','192.168.1.31','RB1',robot_weld.pulse2deg,q_paths,rob_speed=rob_speed,waittime=waittime\
                         ,raw_data_dir=raw_data_dir) # save calib config to file
     print("Collect PH data done")
 
@@ -259,10 +295,10 @@ def calib_R1():
     q3_low_sample = np.array([[-55,-70],[0,-50],[50,0]]) #[[q2 q3]]
     d_angle = 5 # 5 degree
     # add 7 points (at least 6 is needed)
-    dq_sample = [[0,0,0,0,0,0],\
-          [-1,0,0,0,0,0],[1,0,0,0,0,0],\
-          [0,-1,-1,0,0,0],[0,-1,1,0,0,0],\
-          [0,1,1,0,0,0],[0,1,-1,0,0,0]]
+    # dq_sample = [[0,0,0,0,0,0],\
+    #       [-1,0,0,0,0,0],[1,0,0,0,0,0],\
+    #       [0,-1,-1,0,0,0],[0,-1,1,0,0,0],\
+    #       [0,1,1,0,0,0],[0,1,-1,0,0,0]]
     # dq_sample = [[0,0,0,0,0,0],\
     #       [-9,0,0,-9,-9,9],[-6,0,0,-6,-6,6],\
     #       [-3,0,0,-3,-3,3],[4,0,0,4,4,-4],\
@@ -271,8 +307,14 @@ def calib_R1():
     #       [-3,0,0,-3,-3,3],[-2,0,0,-2,-2,2],\
     #       [-1,0,0,-1,-1,1],[1,0,0,1,1,-1],\
     #       [2,0,0,2,2,-2],[3,0,0,3,3,-3]]
+    dq_sample = [[0,0,0,0,0,0],\
+          [1,0,0,-0,-0,0],[0,1,0,0,0,0],\
+          [0,0,1,0,0,0],[0,0,0,1,0,0],\
+          [0,0,0,0,1,0],[0,0,0,0,0,1]]
     scale=1
     dq_sample = np.array(dq_sample)*scale
+
+    target_q_zero = np.array([1,0,0,1,1,1])
 
     # speed
     rob_speed=5
@@ -283,7 +325,7 @@ def calib_R1():
         q3_low = np.interp(q2,q3_low_sample[:,0],q3_low_sample[:,1])
         q3_up = np.interp(q2,q3_up_sample[:,0],q3_up_sample[:,1])
         for q3 in np.append(np.arange(q3_low,q3_up,d_angle),q3_up):
-            target_q = np.zeros(6)
+            target_q = deepcopy(target_q_zero)
             target_q[1]=q2
             target_q[2]=q3
             for dq in dq_sample:
