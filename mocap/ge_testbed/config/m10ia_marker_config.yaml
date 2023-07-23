@@ -40,11 +40,11 @@ P:
   y: -9.319922649529643
   z: -33.6848016805061
 base_markers:
-- marker1
-- marker2
-- marker3
-- marker4
-- marker5
+- rigid1_marker1
+- rigid1_marker2
+- rigid1_marker3
+- rigid1_marker4
+- rigid1_marker5
 calib_base_basemarker_pose:
   orientation:
     w: -0.48953488109692483
@@ -66,14 +66,14 @@ calib_tool_flange_pose:
     y: 0
     z: 0
 calibration_markers:
-- marker16
-- marker17
-- marker18
-- marker19
-- marker20
-- marker21
-- marker22
-- marker23
+- rigid3_marker8
+- rigid3_marker9
+- rigid3_marker10
+- rigid3_marker11
+- rigid3_marker12
+- rigid3_marker13
+- rigid3_marker14
+- rigid3_marker15
 zero_config:
 - -2.0963204280432496e-06
 - 2.666590057763375e-07
