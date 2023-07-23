@@ -116,10 +116,11 @@ for dataset in datasets:
         data_dir = '../data/wall_weld_test/baseline_weld_scan_2023_06_06_15_28_31/'
     elif dataset=='full_test':
         data_dir = '../data/wall_weld_test/moveL_220_weld_scan_2023_07_05_17_58_09/'
-
+    print('data_dir',data_dir)
     forward_flag=False
     all_profile_height=[]
     all_correction_layer=[]
+
     all_h_mean=[]
     all_h_std=[]
     for i in range(0,9999999):
@@ -392,8 +393,8 @@ for dataset in datasets:
 
     i=0
     m_size=12
-    print('profile_height',profile_height)
-    print('all_profile_height',all_profile_height)
+    # print('profile_height',profile_height)
+    # print('all_profile_height',all_profile_height)
     for profile_height in all_profile_height:
         if i in all_correction_layer:
             if i==all_correction_layer[0]:
