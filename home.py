@@ -22,7 +22,9 @@ q3=[-15,180]
 robot_client=MotionProgramExecClient()
 mp = MotionProgram(ROBOT_CHOICE='RB1', pulse2deg=robot_weld.pulse2deg)
 mp.MoveJ(q1,5,0)
-robot_client.execute_motion_program(mp)
+robot_stamps,curve_exe, job_line,job_step = robot_client.execute_motion_program(mp)
+
+print("Test read joints:",np.degrees(curve_exe[-1]))
 
 mp = MotionProgram(ROBOT_CHOICE='RB2', pulse2deg=robot_scan.pulse2deg)
 mp.MoveJ(q2,5,0)
