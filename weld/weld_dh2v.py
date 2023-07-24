@@ -94,7 +94,7 @@ if __name__=='__main__':
     # print(v2dh_loglog(75,220))
 
     print(v2dh_loglog(5,100))
-    print(v2dh_loglog(6,100))
-    print(v2dh_loglog(10,100))
+    # print(v2dh_loglog(6,100))
+    # print(v2dh_loglog(10,100))
     # print(dh2v_loglog(5,100))
     # print(v2dh_quadratic(5,100))

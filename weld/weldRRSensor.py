@@ -188,14 +188,19 @@ class WeldRRSensor(object):
     
     def save_mic_file(self,filedir):
 
-        first_channel = np.concatenate(self.audio_recording)
+        print("Mic length:",len(self.audio_recording))
 
-        first_channel_int16=(first_channel*32767).astype(np.int16)
-        with wave.open(filedir+'mic_recording.wav', 'wb') as wav_file:
-            # Set the WAV file parameters
-            wav_file.setnchannels(self.mic_channels)
-            wav_file.setsampwidth(2)  # 2 bytes per sample (16-bit)
-            wav_file.setframerate(self.mic_samplerate)
+        try:
+            first_channel = np.concatenate(self.audio_recording)
 
-            # Write the audio data to the WAV file
-            wav_file.writeframes(first_channel_int16.tobytes())
+            first_channel_int16=(first_channel*32767).astype(np.int16)
+            with wave.open(filedir+'mic_recording.wav', 'wb') as wav_file:
+                # Set the WAV file parameters
+                wav_file.setnchannels(self.mic_channels)
+                wav_file.setsampwidth(2)  # 2 bytes per sample (16-bit)
+                wav_file.setframerate(self.mic_samplerate)
+
+                # Write the audio data to the WAV file
+                wav_file.writeframes(first_channel_int16.tobytes())
+        except:
+            print("Mic has no recording!!!")
