@@ -91,8 +91,8 @@ primitives=[]
 # q_prev=np.array([-3.791544713877046391e-01,7.156749523014762637e-01,2.756772964158371586e-01,2.106493295914119712e-01,-7.865937103692784982e-01,-5.293956242391706368e-01])
 q_prev=client.getJointAnglesMH(robot.pulse2deg)
 
-num_layer_start=int(50*layer_height_num)
-num_layer_end=int(51*layer_height_num)
+num_layer_start=int(1*layer_height_num)
+num_layer_end=int(2*layer_height_num)
 num_sections=1
 for layer in range(num_layer_start,num_layer_end,layer_height_num):
 	num_sections_prev=num_sections
@@ -159,5 +159,5 @@ for layer in range(num_layer_start,num_layer_end,layer_height_num):
 	
 
 
-timestamp_robot,joint_recording,job_line,_=ws.weld_segment_tri(primitives,robot,positioner,robot2,q1_all,positioner_all,q2_all,v1_all,10*np.ones(len(v1_all)),cond_all,arc=True)
+timestamp_robot,joint_recording,job_line,_=ws.weld_segment_tri(primitives,robot,positioner,robot2,q1_all,positioner_all,q2_all,v1_all,10*np.ones(len(v1_all)),cond_all,arc=False)
 np.savetxt('joint_recording.csv',np.hstack((timestamp_robot.reshape(-1, 1),job_line.reshape(-1, 1),joint_recording)),delimiter=',')

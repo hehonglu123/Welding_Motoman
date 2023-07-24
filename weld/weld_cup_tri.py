@@ -54,8 +54,8 @@ client=MotionProgramExecClient()
 ws=WeldSend(client)
 
 ###########################################layer welding############################################
-num_layer_start=int(0*layer_height_num)	###modify layer num here
-num_layer_end=int(1*layer_height_num)
+num_layer_start=int(30*layer_height_num)	###modify layer num here
+num_layer_end=int(31*layer_height_num)
 q_prev=client.getJointAnglesDB(positioner.pulse2deg)
 # q_prev=np.array([9.53E-02,-2.71E+00])	###for motosim tests only
 
@@ -121,5 +121,5 @@ for layer in range(num_layer_start,num_layer_end,layer_height_num):
 	
 
 		###robot1=robot2 speed tests
-		timestamp_robot,joint_recording,job_line,_=ws.weld_segment_tri(primitives,robot,positioner,robot2,q1_all,positioner_all,q2_all,v1_all,v1_all,cond_all=[200],arc=True)
+		timestamp_robot,joint_recording,job_line,_=ws.weld_segment_tri(primitives,robot,positioner,robot2,q1_all,positioner_all,q2_all,v1_all,v1_all,cond_all=[200],arc=False)
 		np.savetxt('joint_recording.csv',np.hstack((timestamp_robot.reshape(-1, 1),job_line.reshape(-1, 1),joint_recording)),delimiter=',')
