@@ -144,6 +144,13 @@ class ScanProcess():
     
     def pcd_register_mti(self,all_scan_points,rob_js_exe,rob_stamps,voxel_size=0.05,static_positioner_q=np.radians([-60,180])):
 
+        use_calib=True
+        if use_calib:
+            origin_P = deepcopy(self.robot.robot.P)
+            origin_H = deepcopy(self.robot.robot.H)
+            self.robot.robot.P=deepcopy(self.robot.calib_P)
+            self.robot.robot.H=deepcopy(self.robot.calib_H)
+
         pcd_combined = None
         scan_N = len(rob_stamps) ## total scans
         for scan_i in range(scan_N):
@@ -177,6 +184,10 @@ class ScanProcess():
                 pcd_combined=deepcopy(pcd)
             else:
                 pcd_combined+=pcd
+        
+        if use_calib:
+            self.robot.robot.P=deepcopy(origin_P)
+            self.robot.robot.H=deepcopy(origin_H)
         
         return pcd_combined
     
@@ -213,7 +224,7 @@ class ScanProcess():
         
         return pcd_combined
 
-    def pcd2dh(self,scanned_points,curve_relative,drawing=False):
+    def pcd2dh(self,scanned_points,curve_relative,robot_weld=None,q_weld=None,drawing=False):
 
         ##### cross section parameters
         # resolution_z=0.1
@@ -226,9 +237,38 @@ class ScanProcess():
         # width_thres=0.8 # prune width that is too close
         ###################################
 
+        if robot_weld is not None:
+            origin_P = deepcopy(robot_weld.robot.P)
+            origin_H = deepcopy(robot_weld.robot.H)
+            origin_flange = deepcopy(robot_weld.robot.T_flange)
+            origin_R_tool = deepcopy(robot_weld.robot.R_tool)
+            origin_p_tool = deepcopy(robot_weld.robot.p_tool)
+
+            robot_weld.robot.P=deepcopy(robot_weld.calib_P)
+            robot_weld.robot.H=deepcopy(robot_weld.calib_H)
+            robot_weld.robot.T_flange = deepcopy(robot_weld.T_tool_flange)
+            robot_weld.robot.R_tool = deepcopy(robot_weld.T_tool_toolmarker.R)
+            robot_weld.robot.p_tool = deepcopy(robot_weld.T_tool_toolmarker.p)
+            curve_relative = []
+            for q in q_weld:
+                Table_home_T = self.positioner.fwd(q[-2:])
+                T_S1TCP_R1Base = np.matmul(self.positioner.base_H,H_from_RT(Table_home_T.R,Table_home_T.p))
+                T_R1Base_S1TCP = np.linalg.inv(T_S1TCP_R1Base)
+                robot_T = robot_weld.fwd(q[:6])
+                T_R1TCP_S1TCP = np.matmul(T_R1Base_S1TCP,H_from_RT(robot_T.R,robot_T.p))
+                curve_relative.append(np.append(T_R1TCP_S1TCP[:3,-1],T_R1TCP_S1TCP[:3,2]))
+            
+            robot_weld.robot.P=deepcopy(origin_P)
+            robot_weld.robot.H=deepcopy(origin_H)
+            robot_weld.robot.T_flange = deepcopy(origin_flange)
+            robot_weld.robot.R_tool = deepcopy(origin_R_tool)
+            robot_weld.robot.p_tool = deepcopy(origin_p_tool)
+        
+        curve_relative=np.array(curve_relative)
+
         # create the cropping polygon
         poly_num=12
-        radius_scale=0.8
+        radius_scale=0.55
         radius=np.mean(np.linalg.norm(np.diff(curve_relative[:,:3],axis=0),axis=1))*radius_scale
         print("height neighbor radius:",radius)
         bounding_polygon=[]
