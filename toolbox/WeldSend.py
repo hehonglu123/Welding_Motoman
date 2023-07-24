@@ -122,7 +122,7 @@ class WeldSend(object):
 		arcof=True
 
 		mp=MotionProgram(ROBOT_CHOICE=self.ROBOT_CHOICE_MAP[robot1.robot_name],ROBOT_CHOICE2=self.ROBOT_CHOICE_MAP[positioner.robot_name],
-		   ROBOT_CHOICE2=self.ROBOT_CHOICE_MAP[robot2.robot_name],pulse2deg=robot1.pulse2deg,pulse2deg_2=positioner.pulse2deg,pulse2deg_3=robot2.pulse2deg, 
+		   ROBOT_CHOICE3=self.ROBOT_CHOICE_MAP[robot2.robot_name],pulse2deg=robot1.pulse2deg,pulse2deg_2=positioner.pulse2deg,pulse2deg_3=robot2.pulse2deg, 
 		   tool_num=self.ROBOT_TOOL_MAP[robot1.robot_name])
 		
 		mp.primitive_call_tri(primitives[0],q1_all[0],v1_all[0],target2=['MOVJ',positioner_all[0],None],target3=['MOVJ',q2_all[0],v2_all[0]])
