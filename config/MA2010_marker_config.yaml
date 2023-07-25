@@ -66,11 +66,7 @@ calib_tool_flange_pose:
     y: 0
     z: 0
 calibration_markers:
-- marker1_rigid3
-- marker2_rigid3
-- marker3_rigid3
-- marker4_rigid3
-- marker5_rigid3
+- marker1_rigid0
 zero_config:
 - -2.0963204280432496e-06
 - 2.666590057763375e-07

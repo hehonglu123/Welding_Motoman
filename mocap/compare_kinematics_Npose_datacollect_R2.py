@@ -14,7 +14,7 @@ import time
 import pickle
 from MocapPoseListener import *
 
-dataset_date = '0627'
+dataset_date = '0725'
 
 config_dir='../config/'
 # robot_scan=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.yml',tool_file_path=config_dir+'mti.csv',\
@@ -28,16 +28,14 @@ test_qs = []
 sample_q = np.radians([[37,35,-2,19,-53,-2],[-34,40,0,-15,-49,44],\
                        [0,-50,-50,0,-22,0],[0,0,0,0,0,0],\
                        [0,45,20,0,22,0],[37,35,-2,19,-53,-2],[0,0,0,0,0,0]])
-# sample_N = [369,238,193,203,264,233] # len(sample_q)-1
-sample_N = [2,2,2,2,2,2] # len(sample_q)-1
+sample_N = [369,238,193,203,264,233] # len(sample_q)-1
+# sample_N = [2,2,2,2,2,2] # len(sample_q)-1
 for i in range(len(sample_N)):
-    print(i)
     start_T = robot_scan.fwd(sample_q[i])
     end_T = robot_scan.fwd(sample_q[i+1])
     k,dtheta = R2rot(np.matmul(start_T.R.T,end_T.R))
     dp_vector = end_T.p-start_T.p
     for n in range(sample_N[i]):
-        print(n)
         this_R=np.matmul(start_T.R,rot(k,dtheta/sample_N[i]*n))
         this_p=start_T.p+dp_vector/sample_N[i]*n
         if n==0:
@@ -68,7 +66,7 @@ data_dir = 'kinematic_raw_data/'
 
 repeats_N = 1
 rob_speed = 1
-waitTime = 0.5
+waitTime = 0.75
 
 robot_client = MotionProgramExecClient()
 mp=MotionProgram(ROBOT_CHOICE='RB2',pulse2deg=robot_scan.pulse2deg)
@@ -88,7 +86,8 @@ robot_q_align=[]
 mocap_T_align=[]
 
 robot_q_raw=[]
-mocap_T_raw=[]
+tool_T_raw=[]
+base_T_raw=[]
 
 joint_recording=[]
 robot_stamps=[]
@@ -137,10 +136,12 @@ while True:
                 base_rigid_p=mocap_curve_p[robot_scan.base_rigid_id]
                 mocap_p=mocap_curve_p[robot_scan.tool_rigid_id]
                 for k in range(start_i,end_i):
+                    tool_T_raw.append(np.append(mocap_p[k],mocap_R[k]))
+                    base_T_raw.append(np.append(base_rigid_p[k],base_rigid_R[k]))
+
                     T_mocap_basemarker = Transform(q2R(base_rigid_R[k]),base_rigid_p[k]).inv()
                     T_marker_mocap = Transform(q2R(mocap_R[k]),mocap_p[k])
                     T_marker_basemarker = T_mocap_basemarker*T_marker_mocap
-                    mocap_T_raw.append(np.append(T_marker_basemarker.p,R2q(T_marker_basemarker.R)))
                     T_marker_base = T_basemarker_base*T_marker_basemarker
                     this_mocap_ori.append(R2rpy(T_marker_base.R))
                     this_mocap_p.append(T_marker_base.p)
@@ -160,20 +161,23 @@ while True:
 
                 print("Q align num:",len(robot_q_align))
                 print("mocap align num:",len(mocap_T_align))
-                print("mocap raw num:",len(mocap_T_raw))
+                print("mocap tool raw num:",len(tool_T_raw))
+                print("mocap base raw num:",len(base_T_raw))
                 print("=========================")
 
 robot_client.servoMH(False)
 
-exit()
-
 np.savetxt(data_dir+'robot_q_align.csv',robot_q_align,delimiter=',')
 np.savetxt(data_dir+'mocap_T_align.csv',mocap_T_align,delimiter=',')
-np.savetxt(data_dir+'mocap_T_raw.csv',mocap_T_raw,delimiter=',')
+np.savetxt(data_dir+'mocap_tool_T_raw.csv',tool_T_raw,delimiter=',')
+np.savetxt(data_dir+'mocap_base_T_raw.csv',base_T_raw,delimiter=',')
 
 print("Q align num:",len(robot_q_align))
 print("mocap align num:",len(mocap_T_align))
-print("mocap raw num:",len(mocap_T_raw))
+print("Tool T raw num:",len(tool_T_raw))
+print("Base T raw num:",len(base_T_raw))
+
+exit()
 
 robot_scan.robot.P = robot_scan.calib_P
 robot_scan.robot.H = robot_scan.calib_H
