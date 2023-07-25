@@ -462,13 +462,19 @@ class positioner_obj(object):
 
 	###find a continous trajectory given Cartesion tool normal trajectory
 	def find_curve_js(self,normals,q_seed=None):
-		q_inits=self.inv(normals[0])
+		if normals[0][2]==1:# in case normal is already up, infinite solutions
+			q_inits=[self.inv(normals[0],q_seed)]
+		else:
+			q_inits=self.inv(normals[0])
 		curve_js_all=[]
 		for q_init in q_inits:
 			curve_js=np.zeros((len(normals),2))
 			curve_js[0]=q_init
 			for i in range(1,len(normals)):
-				q_all=np.array(self.inv(normals[i]))
+				if normals[i][2]==1:# in case normal is already up, infinite solutions
+					q_all=[np.array(self.inv(normals[i],curve_js[i-1]))]
+				else:
+					q_all=np.array(self.inv(normals[i]))
 				if len(q_all)==0:
 					#if no solution
 					print('no solution available')
