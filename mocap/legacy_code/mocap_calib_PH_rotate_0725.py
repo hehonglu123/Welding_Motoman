@@ -93,11 +93,11 @@ def to_frame(curve_p,curve_R,mocap_stamps,target_frame,markers_id):
 config_dir='../config/'
 
 # robot_type='R1'
-# robot_type='R2'
-robot_type='S1'
+robot_type='R2'
+# robot_type='S1'
 
 # all_datasets=['train_data','valid_data_1','valid_data_2']
-dataset_date='0725'
+dataset_date='0524'
 # all_datasets=['test'+dataset_date+'_R1_aftercalib/train_data']
 all_datasets=['test'+dataset_date+'_'+robot_type+'/train_data']
 
@@ -356,10 +356,20 @@ base_marker_data['calib_base_basemarker_pose']['orientation']['x'] = float(quat[
 base_marker_data['calib_base_basemarker_pose']['orientation']['y'] = float(quat[2])
 base_marker_data['calib_base_basemarker_pose']['orientation']['z'] = float(quat[3])
 
+base_marker_data['calib_tool_flange_pose'] = {}
+base_marker_data['calib_tool_flange_pose']['position'] = {}
+base_marker_data['calib_tool_flange_pose']['position']['x'] = 0
+base_marker_data['calib_tool_flange_pose']['position']['y'] = 0
+base_marker_data['calib_tool_flange_pose']['position']['z'] = 0
+quat = R2q(R_tool_base)
+base_marker_data['calib_tool_flange_pose']['orientation'] = {}
+base_marker_data['calib_tool_flange_pose']['orientation']['w'] = float(quat[0])
+base_marker_data['calib_tool_flange_pose']['orientation']['x'] = float(quat[1])
+base_marker_data['calib_tool_flange_pose']['orientation']['y'] = float(quat[2])
+base_marker_data['calib_tool_flange_pose']['orientation']['z'] = float(quat[3])
+
 with open(output_base_marker_config_file,'w') as file:
     yaml.safe_dump(base_marker_data,file)
-
-exit()
 
 # calibrate tool
 if robot_type!='S1':
@@ -410,7 +420,7 @@ else:
     T_toolmarker_base = Transform(R_tool_base,tcp_base)
     T_tool_toolmarker = T_toolmarker_base.inv()*T_tool_base
     # beacuse our positoiner always at 180 the second axis
-    T_tool_toolmarker = T_tool_toolmarker*Transform(rot([0,0,1],0),[0,0,0])
+    T_tool_toolmarker = T_tool_toolmarker*Transform(rot([0,0,1],np.pi),[0,0,0])
 
 with open(tool_marker_config_file,'r') as file:
     tool_marker_data = yaml.safe_load(file)

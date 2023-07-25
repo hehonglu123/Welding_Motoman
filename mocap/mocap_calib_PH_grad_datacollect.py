@@ -106,13 +106,13 @@ class CalibRobotPH:
             with open(raw_data_dir+'_robot_timestamps_cont.pickle', 'wb') as handle:
                 pickle.dump(all_robot_stamp, handle, protocol=pickle.HIGHEST_PROTOCOL)
     
-    def run_datacollect_sync(self,base_marker_config_file,rob_IP=None,ROBOT_CHOICE=None,rob_p2d=None,paths=[],rob_speed=3,waittime=1,
+    def run_datacollect_sync(self,rob_IP=None,ROBOT_CHOICE=None,rob_p2d=None,paths=[],rob_speed=3,waittime=1,
                   raw_data_dir='',split_motion=2):
         
         input("Press Enter and the robot will start moving.")
         robot_client = MotionProgramExecClient()
 
-        mp=MotionProgram(ROBOT_CHOICE='RB1',pulse2deg=self.robot.pulse2deg)
+        mp=MotionProgram(ROBOT_CHOICE=ROBOT_CHOICE,pulse2deg=self.robot.pulse2deg)
         for test_q in paths:
             # move robot
             mp.MoveJ(test_q,rob_speed,0)
@@ -128,7 +128,8 @@ class CalibRobotPH:
         mocap_T_align=[]
 
         robot_q_raw=[]
-        mocap_T_raw=[]
+        tool_T_raw=[]
+        base_T_raw=[]
         
         joint_recording=[]
         robot_stamps=[]
@@ -169,10 +170,12 @@ class CalibRobotPH:
                         base_rigid_p=mocap_curve_p[self.robot.base_rigid_id]
                         mocap_p=mocap_curve_p[self.robot.tool_rigid_id]
                         for k in range(start_i,end_i):
+                            tool_T_raw.append(np.append(mocap_p[k],mocap_R[k]))
+                            base_T_raw.append(np.append(base_rigid_p[k],base_rigid_R[k]))
+
                             T_mocap_basemarker = Transform(q2R(base_rigid_R[k]),base_rigid_p[k]).inv()
                             T_marker_mocap = Transform(q2R(mocap_R[k]),mocap_p[k])
                             T_marker_basemarker = T_mocap_basemarker*T_marker_mocap
-                            mocap_T_raw.append(np.append(T_marker_basemarker.p,R2q(T_marker_basemarker.R)))
                             T_marker_base = T_basemarker_base*T_marker_basemarker
                             this_mocap_ori.append(R2rpy(T_marker_base.R))
                             this_mocap_p.append(T_marker_base.p)
@@ -192,32 +195,35 @@ class CalibRobotPH:
 
                         print("Q align num:",len(robot_q_align))
                         print("mocap align num:",len(mocap_T_align))
-                        print("mocap raw num:",len(mocap_T_raw))
+                        print("mocap tool raw num:",len(tool_T_raw))
+                        print("mocap base raw num:",len(base_T_raw))
                         print("=========================")
                 
         robot_client.servoMH(False)
 
         np.savetxt(raw_data_dir+'_robot_q_align.csv',robot_q_align,delimiter=',')
         np.savetxt(raw_data_dir+'_mocap_T_align.csv',mocap_T_align,delimiter=',')
-        np.savetxt(raw_data_dir+'_mocap_T_raw.csv',mocap_T_raw,delimiter=',')
+        np.savetxt(raw_data_dir+'_tool_T_raw.csv',tool_T_raw,delimiter=',')
+        np.savetxt(raw_data_dir+'_base_T_raw.csv',base_T_raw,delimiter=',')
 
         print("Q align num:",len(robot_q_align))
         print("mocap align num:",len(mocap_T_align))
-        print("mocap raw num:",len(mocap_T_raw))
+        print("Tool T raw num:",len(tool_T_raw))
+        print("Base T raw num:",len(base_T_raw))
 
 def calib_R2():
 
-    dataset_date = '0627'
+    dataset_date = '0725'
 
     config_dir='../config/'
-    robot_weld=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.yml',tool_file_path=config_dir+'mti.csv',\
+    robot_scan=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.yml',tool_file_path=config_dir+'mti.csv',\
 	pulse2deg_file_path=config_dir+'MA1440_A0_pulse2deg_real.csv',\
     base_marker_config_file=config_dir+'MA1440_'+dataset_date+'_marker_config.yaml',tool_marker_config_file=config_dir+'mti_'+dataset_date+'_marker_config.yaml')
 
     mocap_url = 'rr+tcp://localhost:59823?service=optitrack_mocap'
     mocap_cli = RRN.ConnectService(mocap_url)
 
-    calib_obj = CalibRobotPH(mocap_cli,robot_weld)
+    calib_obj = CalibRobotPH(mocap_cli,robot_scan)
 
     # calibration
     q2_up=50
@@ -270,13 +276,13 @@ def calib_R2():
     raw_data_dir='PH_grad_data/train_data'
     #####################
 
-    calib_obj.run_datacollect_sync(config_dir+'MA2010_marker_config.yaml','192.168.1.31','RB1',robot_weld.pulse2deg,q_paths,rob_speed=rob_speed,waittime=waittime\
+    calib_obj.run_datacollect_sync('192.168.1.31','RB2',robot_scan.pulse2deg,q_paths,rob_speed=rob_speed,waittime=waittime\
                         ,raw_data_dir=raw_data_dir) # save calib config to file
     print("Collect PH data done")
 
 def calib_R1():
 
-    dataset_date = '0627'
+    dataset_date = '0725'
 
     config_dir='../config/'
     robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path=config_dir+'torch.csv',\
@@ -317,7 +323,7 @@ def calib_R1():
     target_q_zero = np.array([1,0,0,1,1,1])
 
     # speed
-    rob_speed=5
+    rob_speed=3
     waittime=0.5 # stop 0.5 sec for sync
 
     q_paths = []
@@ -339,12 +345,13 @@ def calib_R1():
     raw_data_dir='PH_grad_data/train_data'
     #####################
 
-    calib_obj.run_datacollect_sync(config_dir+'MA2010_marker_config.yaml','192.168.1.31','RB1',robot_weld.pulse2deg,q_paths,rob_speed=rob_speed,waittime=waittime\
+    calib_obj.run_datacollect_sync('192.168.1.31','RB1',robot_weld.pulse2deg,q_paths,rob_speed=rob_speed,waittime=waittime\
                         ,raw_data_dir=raw_data_dir) # save calib config to file
     print("Collect PH data done")
 
 
 if __name__=='__main__':
 
-    calib_R1()
+    # calib_R1()
+    calib_R2()
     # calib_S1()
