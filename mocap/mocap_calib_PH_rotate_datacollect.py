@@ -106,8 +106,8 @@ def calib_S1():
 
     # calibration
     ## zero config
-    start_p = np.array([[0,180],
-                        [0,180]])
+    start_p = np.array([[0,0],
+                        [0,0]])
     q1_1=start_p[0] + np.array([-60,0])
     q1_2=start_p[0] + np.array([45,0])
     q2_1=start_p[1] + np.array([0,-90])
