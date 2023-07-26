@@ -30,11 +30,24 @@ layer_width_num=int(4/slicing_meta['line_resolution'])
 
 
 robot=robot_obj('MA2010_A0',def_path='../config/MA2010_A0_robot_default_config.yml',tool_file_path='../config/torch.csv',\
-	pulse2deg_file_path='../config/MA2010_A0_pulse2deg_real.csv',d=15)
+	pulse2deg_file_path='../config/MA2010_A0_pulse2deg_real.csv',d=15,\
+    base_marker_config_file='../config/MA2010_marker_config.yaml',tool_marker_config_file='../config/weldgun_marker_config.yaml')
 robot2=robot_obj('MA1440_A0',def_path='../config/MA1440_A0_robot_default_config.yml',tool_file_path='../config/flir.csv',\
-	pulse2deg_file_path='../config/MA1440_A0_pulse2deg_real.csv',base_transformation_file='../config/MA1440_pose.csv')
+	pulse2deg_file_path='../config/MA1440_A0_pulse2deg_real.csv',base_transformation_file='../config/MA1440_pose.csv',\
+    base_marker_config_file='../config/MA1440_marker_config.yaml')
 positioner=positioner_obj('D500B',def_path='../config/D500B_robot_default_config.yml',tool_file_path='../config/positioner_tcp.csv',\
-	pulse2deg_file_path='../config/D500B_pulse2deg_real.csv',base_transformation_file='../config/D500B_pose_mocap.csv')
+	pulse2deg_file_path='../config/D500B_pulse2deg_real.csv',base_transformation_file='../config/D500B_pose_mocap.csv',\
+    base_marker_config_file='../config/D500B_marker_config.yaml',tool_marker_config_file='../config/positioner_tcp_marker_config.yaml')
+
+# Table_home_T = positioner.fwd(np.radians([-15,180]))
+# T_S1TCP_R1Base = np.linalg.inv(np.matmul(positioner.base_H,H_from_RT(Table_home_T.R,Table_home_T.p)))
+# T_R1Base_S1TCP = np.linalg.inv(T_S1TCP_R1Base)
+
+#### change base H to calibrated ones ####
+robot2.base_H = H_from_RT(robot2.T_base_basemarker.R,robot2.T_base_basemarker.p)
+positioner.base_H = H_from_RT(positioner.T_base_basemarker.R,positioner.T_base_basemarker.p)
+T_to_base = Transform(np.eye(3),[0,0,-380])
+positioner.base_H = np.matmul(positioner.base_H,H_from_RT(T_to_base.R,T_to_base.p))
 
 client=MotionProgramExecClient()
 ws=WeldSend(client)
