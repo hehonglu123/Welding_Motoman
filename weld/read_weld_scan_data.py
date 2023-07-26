@@ -106,16 +106,16 @@ show_layer = []
 x_lower = -99999
 x_upper = 999999
 
-# datasets=['baseline','full_test']
-datasets=['baseline']
+datasets=['baseline','correction']
+# datasets=['baseline']
 datasets_h_mean={}
 datasets_h_std={}
 for dataset in datasets:
 
     if dataset=='baseline':
-        data_dir = '../data/wall_weld_test/weld_scan_2023_07_17_16_30_34/'
-    elif dataset=='full_test':
-        data_dir = '../data/wall_weld_test/moveL_160_noconstraints_weld_scan_2023_07_05_18_59_53/'
+        data_dir = '../data/wall_weld_test/moveL_100_baseline_weld_scan_2023_07_07_15_20_56/'
+    elif dataset=='correction':
+        data_dir = '../data/wall_weld_test/moveL_100_weld_scan_2023_07_24_11_19_58/'
 
     forward_flag=False
     all_profile_height=[]
@@ -388,8 +388,8 @@ for dataset in datasets:
 
         forward_flag= not forward_flag
 
-        # all_h_mean.append(np.mean(profile_height[:,1]))
-        all_h_mean.append(np.mean(profile_height[75:-75,1]))
+        all_h_mean.append(np.mean(profile_height[:,1]))
+        # all_h_mean.append(np.mean(profile_height[75:-75,1]))
         # print(len(profile_height[75:-75,1]))
 
         all_h_std.append(np.std(profile_height[:,1]))
@@ -430,32 +430,6 @@ plt.xlabel('Layer')
 plt.ylabel('Mean Height (mm)')
 plt.title("Mean Height")
 plt.show()
-
-dh_layer = np.diff(datasets_h_mean['baseline'])[1:]
-print(dh_layer)
-
-import numpy as np
-from scipy.stats import linregress
-
-dh = np.array([2.54119577, 2.63233155, 2.15647274, 2.17356205, 1.77628251,
-               1.73323527, 1.65842571, 1.45041437, 1.34619314, 1.39976354,
-               1.33009482, 1.179677, 1.1187341, 1.14765677, 1.03861341,
-               1.0564831, 0.97336241, 0.96609317])
-
-v = np.array([4, 4, 6, 6, 8, 8, 10, 10, 12, 12, 14, 14, 16, 16, 18, 18, 20, 20])
-
-log_dh = np.log(dh)
-log_v = np.log(v)
-
-coefficients = np.polyfit(log_v, log_dh, 1)
-a = coefficients[0]  # Exponent
-b = coefficients[1]  # Intercept
-
-print(a,b)
-
-print(f"Coefficient 'a' of the fit (exponent): {a:f}")
-print(f"Coefficient 'b' of the fit (intercept): {b:f}")
-exit()
 
 for dataset in datasets:
     plt.plot(np.arange(len(datasets_h_std[dataset])),datasets_h_std[dataset],'-o',label=dataset)
