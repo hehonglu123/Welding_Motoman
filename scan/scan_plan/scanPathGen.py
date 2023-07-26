@@ -8,7 +8,6 @@ sys.path.append('../scan_tools/')
 from robot_def import *
 from multi_robot import *
 from scan_utils import *
-from scan_continuous import *
 from redundancy_resolution_scanner import *
 from dx200_motion_program_exec_client import *
 
@@ -242,6 +241,7 @@ class ScanPathGen():
         for i in range(len(scan_R)):
             scan_R[i] = np.matmul(scan_R[i],R_path)
         
+        # print(R_path)
         # visualize_frames(scan_R[::10],scan_p[::10],size=3)
         # print(scan_R[0])
 

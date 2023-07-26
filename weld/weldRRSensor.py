@@ -27,15 +27,15 @@ class WeldRRSensor(object):
             self.cam_ser=cam_service
             self.ir_image_consts = RRN.GetConstants('com.robotraconteur.image', self.cam_ser)
 
-            self.cam_ser.setf_param("focus_pos", RR.VarValue(int(1400),"int32"))
-            self.cam_ser.setf_param("object_distance", RR.VarValue(0.3,"double"))
+            self.cam_ser.setf_param("focus_pos", RR.VarValue(int(2000),"int32"))
+            self.cam_ser.setf_param("object_distance", RR.VarValue(0.4,"double"))
             self.cam_ser.setf_param("reflected_temperature", RR.VarValue(291.15,"double"))
             self.cam_ser.setf_param("atmospheric_temperature", RR.VarValue(293.15,"double"))
             self.cam_ser.setf_param("relative_humidity", RR.VarValue(50,"double"))
             self.cam_ser.setf_param("ext_optics_temperature", RR.VarValue(293.15,"double"))
             self.cam_ser.setf_param("ext_optics_transmission", RR.VarValue(0.99,"double"))
             self.cam_ser.setf_param("current_case", RR.VarValue(2,"int32"))
-            self.cam_ser.setf_param("ir_format", RR.VarValue("temperature_linear_100mK","string"))
+            self.cam_ser.setf_param("ir_format", RR.VarValue("radiometric","string"))
             self.cam_ser.setf_param("object_emissivity", RR.VarValue(0.13,"double"))
             self.cam_ser.setf_param("scale_limit_low", RR.VarValue(293.15,"double"))
             self.cam_ser.setf_param("scale_limit_upper", RR.VarValue(5000,"double"))
