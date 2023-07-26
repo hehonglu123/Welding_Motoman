@@ -3,10 +3,10 @@ import pickle
 import numpy as np
 
 # Load the IR recording data from the pickle file
-with open('recorded_data/slice_120_0_flir.pickle', 'rb') as file:
+with open('../../debug_data/weld_scan_job200_v52023_07_26_12_51_35/layer_60/ir_recording.pickle', 'rb') as file:
     ir_recording = pickle.load(file)
 
-ir_ts=np.loadtxt('recorded_data/slice_120_0_flir_ts.csv', delimiter=',')
+ir_ts=np.loadtxt('../../debug_data/weld_scan_job200_v52023_07_26_12_51_35/layer_60/ir_stamps.csv', delimiter=',')
 
 # Create a window to display the images
 cv2.namedWindow("IR Recording", cv2.WINDOW_NORMAL)
