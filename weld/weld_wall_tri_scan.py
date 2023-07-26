@@ -160,6 +160,7 @@ for layer in range(num_layer_start,num_layer_end,layer_height_num):
 		q_prev=positioner_js[breakpoints[-1]]
 	
 		###robot1=robot2 speed tests
+		ws.jog_tri(robot1,positioner,robot2,q1_all[0],positioner_all[0],q2_all[0])	#jog to starting positioner first
 		rr_sensors.start_all_sensors()
 		timestamp_robot,joint_recording,job_line,_=ws.weld_segment_tri(primitives,robot,positioner,robot2,q1_all,positioner_all,q2_all,v1_all,v1_all,cond_all=[feedrate_job],arc=True)
 		rr_sensors.stop_all_sensors()
