@@ -355,7 +355,7 @@ generated_src/
 generated_src
 {"mode":"full","isActive":false}
 data/wall_weld_test/
-data
+
 *.JBI
 
 .vscode/
