@@ -106,6 +106,9 @@ show_layer = []
 x_lower = -99999
 x_upper = 999999
 
+start_id=75
+end_id=-75
+
 datasets=['baseline','correction']
 # datasets=['baseline']
 datasets_h_mean={}
@@ -388,11 +391,11 @@ for dataset in datasets:
 
         forward_flag= not forward_flag
 
-        all_h_mean.append(np.mean(profile_height[:,1]))
+        all_h_mean.append(np.mean(profile_height[start_id:end_id,1]))
         # all_h_mean.append(np.mean(profile_height[75:-75,1]))
         # print(len(profile_height[75:-75,1]))
 
-        all_h_std.append(np.std(profile_height[:,1]))
+        all_h_std.append(np.std(profile_height[start_id:end_id,1]))
 
     i=0
     m_size=12
@@ -401,18 +404,18 @@ for dataset in datasets:
     for profile_height in all_profile_height:
         if i in all_correction_layer:
             if i==all_correction_layer[0]:
-                plt.scatter(profile_height[:,0],profile_height[:,1],s=3,c='tab:green',label='Corrected Layer')
+                plt.scatter(profile_height[start_id:end_id,0],profile_height[start_id:end_id,1],s=3,c='tab:green',label='Corrected Layer')
             else:
-                plt.scatter(profile_height[:,0],profile_height[:,1],s=3,c='tab:green')
+                plt.scatter(profile_height[start_id:end_id,0],profile_height[start_id:end_id,1],s=3,c='tab:green')
         else:
             if i==0:
-                plt.scatter(profile_height[:,0],profile_height[:,1],s=3,c='tab:blue',label='Forward (Right to Left)')
+                plt.scatter(profile_height[start_id:end_id,0],profile_height[start_id:end_id,1],s=3,c='tab:blue',label='Forward (Right to Left)')
             elif i==1:
-                plt.scatter(profile_height[:,0],profile_height[:,1],s=3,c='tab:orange',label='Backward (Left to Right)')
+                plt.scatter(profile_height[start_id:end_id,0],profile_height[start_id:end_id,1],s=3,c='tab:orange',label='Backward (Left to Right)')
             elif i%2==0:
-                plt.scatter(profile_height[:,0],profile_height[:,1],s=3,c='tab:blue')
+                plt.scatter(profile_height[start_id:end_id,0],profile_height[start_id:end_id,1],s=3,c='tab:blue')
             else:
-                plt.scatter(profile_height[:,0],profile_height[:,1],s=3,c='tab:orange')
+                plt.scatter(profile_height[start_id:end_id,0],profile_height[start_id:end_id,1],s=3,c='tab:orange')
         i+=1
     plt.xlabel('x-axis')
     plt.ylabel('z-axis')
