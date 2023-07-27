@@ -3,10 +3,15 @@ import pickle
 import numpy as np
 
 # Load the IR recording data from the pickle file
-with open('../../debug_data/weld_scan_job200_v52023_07_26_12_51_35/layer_60/ir_recording.pickle', 'rb') as file:
+with open('recorded_data/slice_240_0_flir.pickle', 'rb') as file:
     ir_recording = pickle.load(file)
 
-ir_ts=np.loadtxt('../../debug_data/weld_scan_job200_v52023_07_26_12_51_35/layer_60/ir_stamps.csv', delimiter=',')
+ir_ts=np.loadtxt('recorded_data/slice_240_0_flir_ts.csv', delimiter=',')
+
+
+result = cv2.VideoWriter('output.avi', 
+                         cv2.VideoWriter_fourcc(*'MJPG'),
+                         13, (320,240))
 
 # Create a window to display the images
 cv2.namedWindow("IR Recording", cv2.WINDOW_NORMAL)
@@ -34,11 +39,13 @@ for i in range(len(ir_recording)):
     # color_bar_image = cv2.resize(color_bar_bgr, (50, ir_bgr.shape[0]))
     # ir_bgr=np.hstack((ir_bgr, color_bar_image))
 
-    # Display the IR image
-    cv2.imshow("IR Recording", ir_bgr)
+    result.write(ir_bgr)
+    # # Display the IR image
+    # cv2.imshow("IR Recording", ir_bgr)
 
-    # Wait for a specific time (in milliseconds) before displaying the next frame
-    cv2.waitKey(int(1000*(ir_ts[i+1]-ir_ts[i])))
+    # # Wait for a specific time (in milliseconds) before displaying the next frame
+    # cv2.waitKey(int(1000*(ir_ts[i+1]-ir_ts[i])))
 
+result.release()
 # Close the window after the loop is completed
 cv2.destroyAllWindows()
