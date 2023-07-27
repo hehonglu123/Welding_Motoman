@@ -3,10 +3,10 @@ import pickle
 import numpy as np
 
 # Load the IR recording data from the pickle file
-with open('recorded_data/slice_240_0_flir.pickle', 'rb') as file:
+with open('../../FLIR/recorded_data/weld_scan_job205_v102023_07_27_12_16_49/layer_180/ir_recording.pickle', 'rb') as file:
     ir_recording = pickle.load(file)
 
-ir_ts=np.loadtxt('recorded_data/slice_240_0_flir_ts.csv', delimiter=',')
+ir_ts=np.loadtxt('../../FLIR/recorded_data/weld_scan_job205_v102023_07_27_12_16_49/layer_180/ir_stamps.csv', delimiter=',')
 
 
 result = cv2.VideoWriter('output.avi', 
@@ -39,7 +39,9 @@ for i in range(len(ir_recording)):
     # color_bar_image = cv2.resize(color_bar_bgr, (50, ir_bgr.shape[0]))
     # ir_bgr=np.hstack((ir_bgr, color_bar_image))
 
+    # Write the IR image to the video file
     result.write(ir_bgr)
+
     # # Display the IR image
     # cv2.imshow("IR Recording", ir_bgr)
 
