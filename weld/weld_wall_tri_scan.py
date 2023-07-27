@@ -24,8 +24,8 @@ data_dir='../data/'+dataset+sliced_alg
 with open(data_dir+'slicing.yml', 'r') as file:
 	slicing_meta = yaml.safe_load(file)
 recorded_dir='recorded_data/wall/'
-vd_relative=5
-feedrate_job=200
+vd_relative=15
+feedrate_job=205
 
 current_time = datetime.datetime.now()
 formatted_time = current_time.strftime('%Y_%m_%d_%H_%M_%S.%f')[:-7]
@@ -85,15 +85,18 @@ mti_client = RRN.ConnectService("rr+tcp://192.168.55.10:60830/?service=MTI2D")
 mti_client.setExposureTime("25")
 
 ###########################################layer welding############################################
-layer_count = 3
+layer_count = 22
 num_layer_start=int(layer_count*layer_height_num)	###modify layer num here
-num_layer_end=int((layer_count+2)*layer_height_num)
+num_layer_end=int((layer_count+10)*layer_height_num)
 # q_prev=client.getJointAnglesDB(positioner.pulse2deg)
 q_prev=np.array([-3.791544713877046391e-01,7.156749523014762637e-01,2.756772964158371586e-01,2.106493295914119712e-01,-7.865937103692784982e-01,-5.293956242391706368e-01])	###for motosim tests only
 
 ## for scanning ##
 h_largest=0
-Transz0_H=None
+Transz0_H=np.array([[ 9.99999340e-01, -1.74246690e-06,  1.14895353e-03,  1.40279850e-03],
+ [-1.74246690e-06,  9.99995400e-01,  3.03312933e-03,  3.70325619e-03],
+ [-1.14895353e-03, -3.03312933e-03,  9.99994740e-01,  1.22092938e+00],
+ [ 0.00000000e+00,  0.00000000e+00,  0.00000000e+00,  1.00000000e+00]])
 ##################
 
 if num_layer_start<=1*layer_height_num:
@@ -162,7 +165,7 @@ for layer in range(num_layer_start,num_layer_end,layer_height_num):
 		q_prev=positioner_js[breakpoints[-1]]
 	
 		###robot1=robot2 speed tests
-		ws.jog_tri(robot1,positioner,robot2,q1_all[0],positioner_all[0],q2_all[0])	#jog to starting positioner first
+		ws.jog_tri(robot,positioner,robot2,q1_all[0],positioner_all[0],q2_all[0],v=3)	#jog to starting positioner first
 		rr_sensors.start_all_sensors()
 		timestamp_robot,joint_recording,job_line,_=ws.weld_segment_tri(primitives,robot,positioner,robot2,q1_all,positioner_all,q2_all,v1_all,v1_all,cond_all=[feedrate_job],arc=True)
 		rr_sensors.stop_all_sensors()
@@ -175,7 +178,7 @@ for layer in range(num_layer_start,num_layer_end,layer_height_num):
 		rr_sensors.save_all_sensors(layer_data_dir)
 
 	######## scanning ##########
-	ws.jog_single(robot,np.zeros(6))
+	ws.jog_single(robot,np.array([-8.135922244967886741e-01,7.096733413840118354e-01,3.570605700073341549e-01,1.795958126158156976e-01,-8.661845429601626734e-01,-4.639865155930678053e-01]),v=3)
 	for x in range(0,num_sections,layer_width_num):
 		curve_sliced_relative=np.loadtxt(data_dir+'curve_sliced_relative/slice'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
 	# 	curve_sliced_relative=[np.array([  -3.19476273e+01,  1.72700000e+00,  4.25800473e+01,  1.55554573e-04,
@@ -205,7 +208,7 @@ for layer in range(num_layer_start,num_layer_end,layer_height_num):
 		# target2=['MOVJ',np.degrees(q_bp2[0][0]),to_start_speed]
 		# mp.MoveJ(np.degrees(q_bp1[0][0]), to_start_speed, 0, target2=target2)
 		# robot_client.execute_motion_program(mp)
-		ws.jog_dual(robot2_mti,positioner,q_bp1[0][0],q_bp2[0][0])
+		ws.jog_dual(robot2_mti,positioner,q_bp1[0][0],q_bp2[0][0],v=3)
 
 		scan_motion_scan_st = time.time()
 
@@ -256,7 +259,7 @@ for layer in range(num_layer_start,num_layer_end,layer_height_num):
 		# target2=['MOVJ',q3,to_home_speed]
 		# mp.MoveJ(q2, to_home_speed, 0, target2=target2)
 		# robot_client.execute_motion_program(mp)
-		ws.jog_dual(robot2_mti,positioner,q2,q3)
+		ws.jog_dual(robot2_mti,positioner,q2,q3,v=3)
 		#####################
 
 		print("Total exe len:",len(q_out_exe))
@@ -299,6 +302,9 @@ for layer in range(num_layer_start,num_layer_end,layer_height_num):
 			plt.scatter(profile_height[:,0],profile_height[:,1])
 			plt.show()
 			h_largest=np.max(profile_height[:,1])
+			h_mean=np.mean(profile_height[:,1])
+			print("H largest:",h_largest)
+			print("H mean:",h_mean)
 		except Exception as e:
 			print(e)
 			h_largest = curve_sliced_relative[0][2]+1.8
