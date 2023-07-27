@@ -60,9 +60,11 @@ positioner=positioner_obj('D500B',def_path='../config/D500B_robot_default_config
 # T_R1Base_S1TCP = np.linalg.inv(T_S1TCP_R1Base)
 
 #### change base H to calibrated ones ####
-robot2.base_H = H_from_RT(robot2.T_base_basemarker.R,robot2.T_base_basemarker.p)
-robot2_mti.base_H = H_from_RT(robot2_mti.T_base_basemarker.R,robot2_mti.T_base_basemarker.p)
-positioner.base_H = H_from_RT(positioner.T_base_basemarker.R,positioner.T_base_basemarker.p)
+robot_scan_base = robot.T_base_basemarker.inv()*robot2.T_base_basemarker
+robot2.base_H = H_from_RT(robot_scan_base.R,robot_scan_base.p)
+robot2_mti.base_H = H_from_RT(robot_scan_base.R,robot_scan_base.p)
+positioner_base = robot.T_base_basemarker.inv()*positioner.T_base_basemarker
+positioner.base_H = H_from_RT(positioner_base.R,positioner_base.p)
 T_to_base = Transform(np.eye(3),[0,0,-380])
 positioner.base_H = np.matmul(positioner.base_H,H_from_RT(T_to_base.R,T_to_base.p))
 
