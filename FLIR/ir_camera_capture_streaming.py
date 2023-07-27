@@ -16,7 +16,7 @@ def main():
 
     c1=RRN.ConnectService(url)
 
-    c1.setf_param("focus_pos", RR.VarValue(int(1400),"int32"))
+    c1.setf_param("focus_pos", RR.VarValue(int(1600),"int32"))
     c1.setf_param("object_distance", RR.VarValue(0.3,"double"))
     c1.setf_param("reflected_temperature", RR.VarValue(291.15,"double"))
     c1.setf_param("atmospheric_temperature", RR.VarValue(293.15,"double"))
