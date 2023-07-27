@@ -144,7 +144,7 @@ class ScanProcess():
     
     def pcd_register_mti(self,all_scan_points,rob_js_exe,rob_stamps,voxel_size=0.05,static_positioner_q=np.radians([-60,180])):
 
-        use_calib=True
+        use_calib=False
         if use_calib:
             origin_P = deepcopy(self.robot.robot.P)
             origin_H = deepcopy(self.robot.robot.H)
