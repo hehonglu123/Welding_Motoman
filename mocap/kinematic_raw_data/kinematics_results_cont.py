@@ -12,9 +12,6 @@ robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_co
 pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',\
 base_marker_config_file=config_dir+'MA2010_0504stretch_marker_config.yaml',tool_marker_config_file=config_dir+'weldgun_marker_config.yaml')
 
-print("P",robot_weld.calib_P[:,1:6].T)
-print("H",robot_weld.calib_H.T)
-
 nom_P = np.zeros(robot_weld.calib_P.shape)
 nom_H = np.zeros(robot_weld.calib_H.shape)
 T = Transform(np.eye(3),[0,0,0])
@@ -40,7 +37,7 @@ for j in range(6,0,-1):
         zero_P[:,i] = R@zero_P[:,i]
 print('P',np.round(zero_P[:,1:7],3).T)
 print('H',np.round(zero_H,3).T)
-exit()
+
 # data_dir='test0502_noanchor/'
 # data_dir='test0502_anchor/'
 # data_dir='test0504_nomove/nomove_concalib_'
