@@ -129,9 +129,8 @@ class WeldRRSensor(object):
             self.weld_energy.append(value.welding_energy)
     
     def save_weld_file(self,filedir):
-
         np.savetxt(filedir + 'welding.csv',
-                np.array([self.weld_timestamp, self.weld_voltage, self.weld_current, self.weld_feedrate, self.weld_energy]).T, delimiter=',',
+                np.array([(self.weld_timestamp-self.weld_timestamp[0])/1e6, self.weld_voltage, self.weld_current, self.weld_feedrate, self.weld_energy]).T, delimiter=',',
                 header='timestamp,voltage,current,feedrate,energy', comments='')
     
     def clean_ir_record(self):
@@ -170,7 +169,7 @@ class WeldRRSensor(object):
 
         with open(filedir+'ir_recording.pickle','wb') as file:
                 pickle.dump(np.array(self.ir_recording),file)
-        np.savetxt(filedir + "ir_stamps.csv",self.ir_timestamp,delimiter=',')
+        np.savetxt(filedir + "ir_stamps.csv",self.ir_timestamp-self.ir_timestamp[0],delimiter=',')
     
     def clean_mic_record(self):
 

@@ -246,6 +246,7 @@ for layer in range(num_layer_start,num_layer_end,layer_height_num):
 				robot_stamps.append(timestamp)
 				###MTI scans YZ point from tool frame
 				mti_recording.append(deepcopy(np.array([mti_client.lineProfile.X_data,mti_client.lineProfile.Z_data])))
+		robot_stamps=np.array(robot_stamps)-robot_stamps[0]
 		ws.client.servoMH(False)
 		mti_recording=np.array(mti_recording)
 		q_out_exe=joint_recording

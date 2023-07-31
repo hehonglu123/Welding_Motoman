@@ -26,17 +26,18 @@ def spectral_analysis_test(audio_signal, sample_rate):
     plt.title('Frequency Spectrum using FFT')
     plt.show()
 
-# Test 3: Spectrogram Test
+# Test 3: Spectrogram with Actual Time on X-axis
 def spectrogram_test(audio_signal, sample_rate):
-    _, _, Sxx = signal.spectrogram(audio_signal, sample_rate)
+    f, t, Sxx = signal.spectrogram(audio_signal, sample_rate)
     mean_freq = np.sum(Sxx * np.arange(Sxx.shape[0])[:, np.newaxis], axis=0) / np.sum(Sxx, axis=0)
     plt.figure()
-    plt.pcolormesh(Sxx)
-    plt.xlabel('Time')
+    plt.pcolormesh(t, f,np.log(Sxx))
+    plt.colorbar(label='Log Magnitude')
+    plt.xlabel('Time (s)')
     plt.ylabel('Frequency (Hz)')
-    plt.title('Spectrogram')
-    plt.colorbar(label='Power Spectral Density')
+    plt.title('Spectrogram Log')
     plt.show()
+
 # Test 4: Amplitude Envelope Test
 def amplitude_envelope_test(audio_signal):
     amplitude_envelope = np.abs(signal.hilbert(audio_signal))
@@ -55,6 +56,6 @@ samplerate = 44000
 channels = 1
 audio_data=np.frombuffer(wavfile.readframes(wavfile.getnframes()),dtype=np.int16)
 signal_plot_test(audio_data)
-# spectral_analysis_test(audio_data, samplerate)
+spectral_analysis_test(audio_data, samplerate)
 spectrogram_test(audio_data, samplerate)
-# amplitude_envelope_test(audio_data)
+amplitude_envelope_test(audio_data)
