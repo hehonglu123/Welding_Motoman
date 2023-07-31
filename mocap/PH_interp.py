@@ -3,6 +3,30 @@ from matplotlib import pyplot as plt
 from scipy.interpolate import LinearNDInterpolator,CloughTocher2DInterpolator,RBFInterpolator
 from copy import deepcopy
 
+class RBFFourierInterp(object):
+    def __init__(self,train_q,v,basis_function_num=3) -> None:
+        
+        ###### define basis function ######
+        basis_func=[]
+        basis_func.append(lambda q2,q3,a: np.sin(a*q2))
+        basis_func.append(lambda q2,q3,a: np.cos(a*q2))
+        basis_func.append(lambda q2,q3,a: np.sin(a*q3))
+        basis_func.append(lambda q2,q3,a: np.cos(a*q3))
+        basis_func.append(lambda q2,q3,a: np.sin(a*(q2+q3)))
+        basis_func.append(lambda q2,q3,a: np.cos(a*(q2+q3)))
+        ###################################
+        
+        diff_ph_q = []
+        basis_func_q2q3=[]
+        for q in PH_q.keys():
+            diff_ph_q.append(np.append(PH_q[q]['P'][:,:-1].T.flatten(),PH_q[q]['H'].T.flatten())-ph_q_nom)
+            this_basis = []
+            for a in range(1,basis_function_num+1):
+                for func in basis_func:
+                    this_basis.append(func(q[0],q[1],a))
+            this_basis.append(1) # constant function
+            basis_func_q2q3.append(this_basis)
+
 class PH_Param(object):
     def __init__(self) -> None:
         
@@ -30,6 +54,9 @@ class PH_Param(object):
             self._fit_interp(CloughTocher2DInterpolator)
             self.predict_func=self._predict_interp
         elif method=='RBF':
+            self._fit_interp(RBFInterpolator)
+            self.predict_func=self._predict_interp
+        elif method=='RBF-Fourier':
             self._fit_interp(RBFInterpolator)
             self.predict_func=self._predict_interp
         else:
@@ -169,11 +196,11 @@ class PH_Param(object):
 
 if __name__=='__main__':
 
-    PH_data_dir='PH_grad_data/test0516_R1/train_data_'
-    test_data_dir='kinematic_raw_data/test0516/'
+    PH_data_dir='PH_grad_data/test0725_R1/train_data_'
+    test_data_dir='kinematic_raw_data/test0725/'
 
     import pickle
-    with open(PH_data_dir+'calib_PH_q_torch.pickle','rb') as file:
+    with open(PH_data_dir+'calib_PH_q.pickle','rb') as file:
         PH_q=pickle.load(file)
 
     ph_param=PH_Param()
@@ -183,4 +210,5 @@ if __name__=='__main__':
                    [1082,0,200],[0,0,0],[0,0,0],[100,0,0]]).T
     nom_H=np.array([[0,0,1],[0,1,0],[0,-1,0],\
                    [-1,0,0],[0,-1,0],[-1,0,0]]).T
+    
     ph_param.compare_nominal(nom_P,nom_H)
