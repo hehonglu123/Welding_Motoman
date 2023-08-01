@@ -333,8 +333,8 @@ for i in range(17,len(weld_z_height)):
     if True:
         scan_st = time.time()
         if curve_sliced_relative is None:
-            data_dir='../data/wall_weld_test/weld_scan_2023_07_24_11_19_58/'
-            last_profile_height=np.load('../data/wall_weld_test/weld_scan_2023_07_24_11_19_58/layer_16/scans/height_profile.npy')
+            data_dir='../data/wall_weld_test/moveL_100_weld_scan_2023_07_24_11_19_58/'
+            last_profile_height=np.load('../data/wall_weld_test/moveL_100_weld_scan_2023_07_24_11_19_58/layer_16/scans/height_profile.npy')
             last_mean_h=np.mean(last_profile_height[:,1])
             h_largest=np.max(last_profile_height[:,1])
             layer_data_dir=data_dir+'layer_'+str(i)+'/'
