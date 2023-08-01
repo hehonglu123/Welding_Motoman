@@ -2,7 +2,7 @@ import numpy as np
 from general_robotics_toolbox import *
 import sys, glob, fnmatch
 from robot_def import *
-from pandas import read_csv
+from pandas import read_csv,DataFrame
 from dx200_motion_program_exec_client import *
 
 # from lambda_calc import *
@@ -189,6 +189,29 @@ class WeldSend(object):
 
 		return  curve_exe_pw[:,:3], curve_exe_pw[:,3:], timestamp
 
+	def save_weld_cmd(self,filename,breakpoints,primitives,q_bp,weld_v):
+
+		q_bp_new=[]
+		weld_v_new=[]
+		for i in range(len(primitives)):
+			if len(q_bp[i])==2:
+				q_bp_new.append([np.array(q_bp[i][0]),np.array(q_bp[i][1])])
+				weld_v_new.append([weld_v[i],weld_v[i]])
+			else:
+				q_bp_new.append([np.array(q_bp[i][0])])
+				weld_v_new.append([weld_v[i]])
+		df=DataFrame({'breakpoints':breakpoints,'primitives':primitives, 'q_bp':q_bp_new, 'weld_v':weld_v_new})
+		df.to_csv(filename,header=True,index=False)
+	
+	def load_weld_cmd(self,filename):
+		
+		data = read_csv(filename)
+		breakpoints=np.array(data['breakpoints'].tolist())
+		primitives=data['primitives'].tolist()
+		qs=data['q_bp'].tolist()
+		weld_v=data['weld_v'].tolist()
+
+		return breakpoints,primitives,qs,weld_v
 
 	# def extract_data_from_cmd(self,filename):
 	# 	data = read_csv(filename)

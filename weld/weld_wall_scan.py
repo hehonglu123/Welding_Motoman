@@ -13,6 +13,7 @@ from scanPathGen import *
 from scanProcess import *
 from weldCorrectionStrategy import *
 from weldRRSensor import *
+from WeldSend import *
 from dx200_motion_program_exec_client import *
 
 from general_robotics_toolbox import *
@@ -100,6 +101,9 @@ for i in range(len(weld_z_height)-2):
     # if weld_v==weld_velocity[-2]:
     #     weld_v+=2
 
+to_start_speed=8
+to_home_speed=10
+
 # print(weld_velocity)
 # exit()
 save_weld_record=True
@@ -113,8 +117,13 @@ current_time = datetime.datetime.now()
 formatted_time = current_time.strftime('%Y_%m_%d_%H_%M_%S.%f')[:-7]
 data_dir='../data/wall_weld_test/weld_scan_'+formatted_time+'/'
 
+### read cmd
+use_previous_cmd=False
+cmd_dir = ''
+
 ## rr drivers and all other drivers
 robot_client=MotionProgramExecClient()
+ws=WeldSend(robot_client)
 # weld state logging
 weld_ser = RRN.SubscribeService('rr+tcp://192.168.55.10:60823?service=welder')
 cam_ser=RRN.ConnectService('rr+tcp://192.168.55.10:60827/?service=camera')
@@ -263,6 +272,24 @@ for i in range(17,len(weld_z_height)):
             # add path collision avoidance
             path_T.insert(0,Transform(path_T[0].R,path_T[0].p+np.array([0,0,10])))
             path_T.append(Transform(path_T[-1].R,path_T[-1].p+np.array([0,0,10])))
+        
+        path_q = []
+        for tcp_T in path_T:
+            path_q.append(robot_weld.inv(tcp_T.p,tcp_T.R,zero_config)[0])
+
+        if use_previous_cmd:
+            cmd_layer_data_dir=cmd_dir+'layer_'+str(i)+'/'
+            breakpoints,primitives,q_bp,this_weld_v = ws.load_weld_cmd(cmd_layer_data_dir+'command1.csv')
+            path_q = []
+            for q in q_bp:
+                path_q.append(q[0])
+            start_T = robot_weld.fwd(path_q[0])
+            start_T.p = start_T.p+np.array([0,0,10])
+            path_q.insert(0,robot_weld.inv(start_T.p,start_T.R,path_q[0])[0])
+            end_T = robot_weld.fwd(path_q[-1])
+            end_T.p = end_T.p+np.array([0,0,10])
+            path_q.append(robot_weld.inv(end_T.p,end_T.R,path_q[-1])[0])
+        
         ####################
         print("dh:",all_dh)
         print("Nominal V:",weld_velocity[i])
@@ -276,41 +303,41 @@ for i in range(17,len(weld_z_height)):
 
         ######################################################
         ########### Do welding #############
-        weld_motion_st = time.time()
-        to_start_speed=8
-        path_q = []
-        for tcp_T in path_T:
-            path_q.append(robot_weld.inv(tcp_T.p,tcp_T.R,zero_config)[0])
         
         # input("Press Enter and move to weld starting point.")
-        mp = MotionProgram(ROBOT_CHOICE='RB1', pulse2deg=robot_weld.pulse2deg)
-        mp.MoveJ(np.degrees(path_q[0]), to_start_speed, 0)
-        
-        robot_client.execute_motion_program(mp)
-
-        print("Weld to start time:",time.time()-weld_motion_st)
+        ws.jog_single(robot_weld,path_q[0],to_start_speed)
         
         weld_motion_weld_st = time.time()
         # input("Press Enter and start welding.")
-        mp=MotionProgram(ROBOT_CHOICE='RB1',pulse2deg=robot_weld.pulse2deg)
-        mp.MoveL(np.degrees(path_q[1]), 10, 0)
-        mp.setArc(select, int(this_job_number))
-        for bpi in range(len(this_weld_v)):
-            if bpi!=len(this_weld_v)-1:
-                mp.MoveL(np.degrees(path_q[bpi+2]), this_weld_v[bpi])
-            else:
-                mp.MoveL(np.degrees(path_q[bpi+2]), this_weld_v[bpi],0)
-        mp.setArc(False)
-        mp.MoveL(np.degrees(path_q[-1]), 10, 0)
+        # mp=MotionProgram(ROBOT_CHOICE='RB1',pulse2deg=robot_weld.pulse2deg)
+        # mp.MoveL(np.degrees(path_q[1]), 10, 0)
+        # mp.setArc(select, int(this_job_number))
+        # for bpi in range(len(this_weld_v)):
+        #     if bpi!=len(this_weld_v)-1:
+        #         mp.MoveL(np.degrees(path_q[bpi+2]), this_weld_v[bpi])
+        #     else:
+        #         mp.MoveL(np.degrees(path_q[bpi+2]), this_weld_v[bpi],0)
+        # mp.setArc(False)
+        # mp.MoveL(np.degrees(path_q[-1]), 10, 0)
+
+        primitives=[]
+        for bpi in range(len(this_weld_v)+1):
+            primitives.append('movel')
 
         rr_sensors.start_all_sensors()
-        rob_stamps,rob_js_exe,_,_= robot_client.execute_motion_program(mp)
+        rob_stamps,rob_js_exe,_,_=ws.weld_segment_single(primitives,robot_weld,path_q[1:-1],np.append(10,this_weld_v),cond_all=int(this_job_number),arc=True)
         rr_sensors.stop_all_sensors()
 
         if save_weld_record:
             Path(data_dir).mkdir(exist_ok=True)
             layer_data_dir=data_dir+'layer_'+str(i)+'/'
             Path(layer_data_dir).mkdir(exist_ok=True)
+            # save cmd
+            q_bp=[]
+            for q in path_q[1:-1]:
+                q_bp.append([np.array(q)])
+            ws.save_weld_cmd(layer_data_dir+'command1.csv',np.arange(len(primitives)),primitives,q_bp,weld_v)
+            # save weld record
             np.savetxt(layer_data_dir + 'weld_js_exe.csv',rob_js_exe,delimiter=',')
             np.savetxt(layer_data_dir + 'weld_robot_stamps.csv',rob_stamps,delimiter=',')
             rr_sensors.save_all_sensors(layer_data_dir)
@@ -320,12 +347,9 @@ for i in range(17,len(weld_z_height)):
 
         # move home
         # input("Press Enter to Move Home")
-        mp=MotionProgram(ROBOT_CHOICE='RB1',pulse2deg=robot_weld.pulse2deg)
-        mp.MoveJ(np.zeros(6), to_start_speed, 0)
-        robot_client.execute_motion_program(mp)
+        ws.jog_single(robot_weld,np.zeros(6),to_home_speed)
 
         print("Weld to home time:",time.time()-weld_to_home_st)
-        print("Weld Motion Time:",time.time()-weld_motion_st)
         ######################################################
 
         print("Weld Time:",time.time()-weld_st)
@@ -368,16 +392,6 @@ for i in range(17,len(weld_z_height)):
                             solve_js_method=0,q_init_table=q_init_table,R_path=mti_Rpath,scan_path_dir=None)
         # generate motion program
         q_bp1,q_bp2,s1_all,s2_all=spg.gen_motion_program(q_out1,q_out2,scan_p,scan_speed,init_sync_move=0)
-
-        # print(np.degrees(q_out1[:10]))
-        # print(np.degrees(q_out1[-10:]))
-        # plt.plot(np.degrees(q_out1))
-        # plt.legend(['J1','J2','J3','J4','J5','J6'])
-        # plt.show()
-        # print(scan_p[0],scan_R[0])
-        # print(robot_scan.fwd(q_out1[0]))
-        # print(robot_scan.fwd(np.zeros(6)))
-        # exit()
         #######################################
 
         print("Scan plan time:",time.time()-scan_plan_st)
@@ -389,16 +403,9 @@ for i in range(17,len(weld_z_height)):
         # input("Press Enter and move to scanning startint point")
 
         ## move to start
-        to_start_speed=7
-        mp = MotionProgram(ROBOT_CHOICE='RB2',ROBOT_CHOICE2='ST1',pulse2deg=robot_scan.pulse2deg,pulse2deg_2=positioner.pulse2deg)
-        target2=['MOVJ',np.degrees(q_bp2[0][0]),to_start_speed]
-        mp.MoveJ(np.degrees(q_bp1[0][0]), to_start_speed, 0, target2=target2)
-        robot_client.execute_motion_program(mp)
-
-        # print("Scan to Start time:",time.time()-scan_motion_st)
+        ws.jog_dual(robot_scan,positioner,np.degrees(q_bp1[0][0]),np.degrees(q_bp2[0][0]),to_start_speed)
 
         # input("Press Enter to start moving and scanning")
-
         scan_motion_scan_st = time.time()
 
         ## motion start
@@ -413,9 +420,9 @@ for i in range(17,len(weld_z_height)):
         target2=['MOVJ',np.degrees(q_bp2[-1][0]),s2_all[-1]]
         mp.MoveL(np.degrees(q_bp1[-1][0]), s1_all[-1], 0, target2=target2)
 
-        robot_client.execute_motion_program_nonblocking(mp)
+        ws.client.execute_motion_program_nonblocking(mp)
         ###streaming
-        robot_client.StartStreaming()
+        ws.client.StartStreaming()
         start_time=time.time()
         state_flag=0
         joint_recording=[]
@@ -425,7 +432,7 @@ for i in range(17,len(weld_z_height)):
         while True:
             if state_flag & 0x08 == 0 and time.time()-start_time>1.:
                 break
-            res, data = robot_client.receive_from_robot(0.01)
+            res, data = ws.client.receive_from_robot(0.01)
             if res:
                 joint_angle=np.radians(np.divide(np.array(data[26:34]),r_pulse2deg))
                 state_flag=data[16]
@@ -434,7 +441,7 @@ for i in range(17,len(weld_z_height)):
                 robot_stamps.append(timestamp)
                 ###MTI scans YZ point from tool frame
                 mti_recording.append(deepcopy(np.array([mti_client.lineProfile.X_data,mti_client.lineProfile.Z_data])))
-        robot_client.servoMH(False)
+        ws.client.servoMH(False)
 
         print("Scan motion scan time:",time.time()-scan_motion_scan_st)
         
@@ -447,12 +454,7 @@ for i in range(17,len(weld_z_height)):
         q2=np.zeros(6)
         q2[0]=90
         q3=[-15,180]
-        ## move to home
-        to_home_speed=7
-        mp = MotionProgram(ROBOT_CHOICE='RB2',ROBOT_CHOICE2='ST1',pulse2deg=robot_scan.pulse2deg,pulse2deg_2=positioner.pulse2deg)
-        target2=['MOVJ',q3,to_home_speed]
-        mp.MoveJ(q2, to_home_speed, 0, target2=target2)
-        robot_client.execute_motion_program(mp)
+        ws.jog_dual(robot_scan,positioner,q2,q3,to_home_speed)
         #####################
         # exit()
 
