@@ -146,7 +146,10 @@ class CalibRobotPH:
                     if len(joint_recording)==0:
                         print("Start collect")
                         self.mpl_obj.run_pose_listener()
-                    joint_angle=np.radians(np.divide(np.array(data[20:26]),r_pulse2deg))
+                    if ROBOT_CHOICE=='RB1':
+                        joint_angle=np.radians(np.divide(np.array(data[20:26]),r_pulse2deg))
+                    elif ROBOT_CHOICE=='RB2':
+                        joint_angle=np.radians(np.divide(np.array(data[26:32]),r_pulse2deg))
                     joint_recording.append(joint_angle)
                     timestamp=data[0]+data[1]*1e-9
                     robot_stamps.append(timestamp)

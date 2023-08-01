@@ -157,6 +157,15 @@ class robot_obj(object):
 					# add d
 					T_d1_d2 = Transform(np.eye(3),p=[0,0,d-15])
 					self.T_tool_toolmarker = self.T_tool_toolmarker*T_d1_d2
+				if 'calib_toolmarker_flange_pose' in marker_data.keys():
+					p = [marker_data['calib_toolmarker_flange_pose']['position']['x'],
+						marker_data['calib_toolmarker_flange_pose']['position']['y'],
+						marker_data['calib_toolmarker_flange_pose']['position']['z']]
+					q = [marker_data['calib_toolmarker_flange_pose']['orientation']['w'],
+						marker_data['calib_toolmarker_flange_pose']['orientation']['x'],
+						marker_data['calib_toolmarker_flange_pose']['orientation']['y'],
+						marker_data['calib_toolmarker_flange_pose']['orientation']['z']]
+					self.T_toolmarker_flange = Transform(q2R(q),p)
 
 	def get_acc(self,q_all,direction=[]):
 		###get acceleration limit from q config, assume last 3 joints acc fixed direction is 3 length vector, 0 is -, 1 is +
