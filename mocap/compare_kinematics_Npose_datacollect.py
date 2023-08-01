@@ -14,7 +14,7 @@ import time
 import pickle
 from MocapPoseListener import *
 
-dataset_date = '0725'
+dataset_date = '0801'
 
 config_dir='../config/'
 # robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path=config_dir+'weldgun.csv',d=15,\
@@ -70,10 +70,16 @@ mpl_obj = MocapFrameListener(mocap_cli,all_ids,'world',use_quat=True)
 data_dir = 'kinematic_raw_data/'
 
 repeats_N = 1
-rob_speed = 5
+rob_speed = 3
 waitTime = 0.75
 
 robot_client = MotionProgramExecClient()
+
+mp=MotionProgram(ROBOT_CHOICE='RB1',pulse2deg=robot_weld.pulse2deg)
+start_q = test_qs[0]+np.array([1,1,1,1,1,1])
+mp.MoveJ(start_q,5,0)
+robot_client.execute_motion_program(mp)
+
 mp=MotionProgram(ROBOT_CHOICE='RB1',pulse2deg=robot_weld.pulse2deg)
 for N in range(repeats_N):
     for test_q in test_qs:
@@ -81,37 +87,12 @@ for N in range(repeats_N):
         mp.MoveJ(test_q,rob_speed,0)
         mp.setWaitTime(waitTime)
 
-# Run
-# mpl_obj.run_pose_listener()
-# robot_stamps,curve_exe, job_line,job_step = robot_client.execute_motion_program(mp)
-# mpl_obj.stop_pose_listener()
-# curve_p,curve_R,timestamps = mpl_obj.get_frames_traj()
-
-# for ids in all_ids:
-#     print(curve_R[ids][0])
-# save_curve_R = {}
-# save_curve_R[robot_weld.base_rigid_id]=curve_R[robot_weld.base_rigid_id]
-# save_curve_R[robot_weld.tool_rigid_id]=curve_R[robot_weld.tool_rigid_id]
-# print(save_curve_R[robot_weld.base_rigid_id][0])
-# print(save_curve_R[robot_weld.tool_rigid_id][0])
-
-# with open(data_dir+'mocap_p_cont.pickle', 'wb') as handle:
-#     pickle.dump(curve_p, handle, protocol=pickle.HIGHEST_PROTOCOL)
-# with open(data_dir+'mocap_quat_cont.pickle', 'wb') as handle:
-#     pickle.dump(save_curve_R, handle, protocol=pickle.HIGHEST_PROTOCOL)
-# with open(data_dir+'robot_q_cont.pickle', 'wb') as handle:
-#     pickle.dump(curve_exe, handle, protocol=pickle.HIGHEST_PROTOCOL)
-
-# with open(data_dir+'mocap_p_timestamps_cont.pickle', 'wb') as handle:
-#     pickle.dump(timestamps, handle, protocol=pickle.HIGHEST_PROTOCOL)
-# with open(data_dir+'robot_q_timestamps_cont.pickle', 'wb') as handle:
-#     pickle.dump(robot_stamps, handle, protocol=pickle.HIGHEST_PROTOCOL)
-
 robot_client.execute_motion_program_nonblocking(mp)
 ###streaming
 robot_client.StartStreaming()
 start_time=time.time()
 
+program_start=False
 state_flag=0
 robot_q_align=[]
 mocap_T_align=[]
@@ -131,15 +112,9 @@ while True:
     res, data = robot_client.receive_from_robot(0.01)
     if res:
         state_flag=data[16]
-
-        # print(data[18])
-        # if data[18]!=0 and data[18]%2==0:
-        #     print(time.time()-start_time)
-
-        # print(np.divide(np.array(data[20:26]),r_pulse2deg))
-        # print("================")
-        
-        if data[18]!=0 and data[18]%2==0: # when the robot stop
+        if data[18]==0:
+            program_start=True
+        if data[18]!=0 and data[18]%2==0 and program_start: # when the robot stop
             if len(joint_recording)==0:
                 mpl_obj.run_pose_listener()
             joint_angle=np.radians(np.divide(np.array(data[20:26]),r_pulse2deg))
@@ -186,6 +161,7 @@ while True:
                 joint_recording = joint_recording[start_i:end_i]
                 robot_stamps = robot_stamps[start_i:end_i]
                 robot_q_align.append(np.mean(joint_recording,axis=0))
+                print(np.degrees(np.mean(joint_recording,axis=0)))
                 joint_recording=[]
                 robot_stamps=[]
                 mpl_obj.clear_traj()

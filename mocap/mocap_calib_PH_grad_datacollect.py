@@ -113,6 +113,11 @@ class CalibRobotPH:
         robot_client = MotionProgramExecClient()
 
         mp=MotionProgram(ROBOT_CHOICE=ROBOT_CHOICE,pulse2deg=self.robot.pulse2deg)
+        start_q = paths[0]+np.array([1,1,1,1,1,1])
+        mp.MoveJ(start_q,1,0)
+        robot_client.execute_motion_program(mp)
+
+        mp=MotionProgram(ROBOT_CHOICE=ROBOT_CHOICE,pulse2deg=self.robot.pulse2deg)
         for test_q in paths:
             # move robot
             mp.MoveJ(test_q,rob_speed,0)
@@ -123,6 +128,7 @@ class CalibRobotPH:
         robot_client.StartStreaming()
         start_time=time.time()
 
+        program_start=False
         state_flag=0
         robot_q_align=[]
         mocap_T_align=[]
@@ -142,7 +148,9 @@ class CalibRobotPH:
             res, data = robot_client.receive_from_robot(0.01)
             if res:
                 state_flag=data[16]
-                if data[18]!=0 and data[18]%2==0: # when the robot stop
+                if data[18]==0:
+                    program_start=True
+                if data[18]!=0 and data[18]%2==0 and program_start: # when the robot stop
                     if len(joint_recording)==0:
                         print("Start collect")
                         self.mpl_obj.run_pose_listener()
@@ -192,6 +200,7 @@ class CalibRobotPH:
                         joint_recording = joint_recording[start_i:end_i]
                         robot_stamps = robot_stamps[start_i:end_i]
                         robot_q_align.append(np.mean(joint_recording,axis=0))
+                        print(np.degrees(np.mean(joint_recording,axis=0)))
                         joint_recording=[]
                         robot_stamps=[]
                         self.mpl_obj.clear_traj()
@@ -216,7 +225,8 @@ class CalibRobotPH:
 
 def calib_R2():
 
-    dataset_date = '0725'
+    dataset_date = '0801'
+    print("Dataset Date:",dataset_date)
 
     config_dir='../config/'
     robot_scan=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.yml',tool_file_path=config_dir+'mti.csv',\
@@ -257,19 +267,31 @@ def calib_R2():
     target_q_zero = np.array([1,0,0,1,1,1])
 
     # speed
-    rob_speed=1
-    waittime=0.5 # stop 0.5 sec for sync
+    rob_speed=0.2
+    waittime=0.75 # stop 0.5 sec for sync
 
     q_paths = []
+    forward=True
     for q2 in np.append(np.arange(q2_low,q2_up,d_angle),q2_up):
         q3_low = np.interp(q2,q3_low_sample[:,0],q3_low_sample[:,1])
         q3_up = np.interp(q2,q3_up_sample[:,0],q3_up_sample[:,1])
+        this_q_paths=[]
         for q3 in np.append(np.arange(q3_low,q3_up,d_angle),q3_up):
             target_q = deepcopy(target_q_zero)
             target_q[1]=q2
             target_q[2]=q3
+            q_path_pose=[]
             for dq in dq_sample:
-                q_paths.append(target_q+dq)
+                q_path_pose.append(target_q+dq)
+            if forward:
+                this_q_paths.extend(q_path_pose)
+            else:
+                this_q_paths.extend(q_path_pose[::-1])
+        if forward:
+            q_paths.extend(this_q_paths)
+        else:
+            q_paths.extend(this_q_paths[::-1])
+        forward = not forward
     print("total pose:",len(q_paths))
     print("Data Base:",dataset_date)
 
@@ -285,7 +307,8 @@ def calib_R2():
 
 def calib_R1():
 
-    dataset_date = '0725'
+    dataset_date = '0801'
+    print("Dataset Date:",dataset_date)
 
     config_dir='../config/'
     robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path=config_dir+'torch.csv',\
@@ -330,15 +353,27 @@ def calib_R1():
     waittime=0.5 # stop 0.5 sec for sync
 
     q_paths = []
+    forward=True
     for q2 in np.append(np.arange(q2_low,q2_up,d_angle),q2_up):
         q3_low = np.interp(q2,q3_low_sample[:,0],q3_low_sample[:,1])
         q3_up = np.interp(q2,q3_up_sample[:,0],q3_up_sample[:,1])
+        this_q_paths=[]
         for q3 in np.append(np.arange(q3_low,q3_up,d_angle),q3_up):
             target_q = deepcopy(target_q_zero)
             target_q[1]=q2
             target_q[2]=q3
+            q_path_pose=[]
             for dq in dq_sample:
-                q_paths.append(target_q+dq)
+                q_path_pose.append(target_q+dq)
+            if forward:
+                this_q_paths.extend(q_path_pose)
+            else:
+                this_q_paths.extend(q_path_pose[::-1])
+        if forward:
+            q_paths.extend(this_q_paths)
+        else:
+            q_paths.extend(this_q_paths[::-1])
+        forward = not forward
     print("total pose:",len(q_paths))
     print("Data Base:",dataset_date)
 
