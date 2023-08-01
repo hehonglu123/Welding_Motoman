@@ -197,3 +197,4 @@ except:
     np.savetxt(data_dir+'mocap_T_align.csv',mocap_T,delimiter=',')
 
 assert len(robot_q)==len(mocap_T), f"Need to have the same amount of robot_q and mocap_T"
+

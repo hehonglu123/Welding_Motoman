@@ -104,7 +104,7 @@ all_datasets=['test'+dataset_date+'_'+robot_type+'/train_data']
 if robot_type=='R1':
     base_marker_config_file=config_dir+'MA2010_marker_config.yaml'
     tool_marker_config_file=config_dir+'weldgun_marker_config.yaml'
-    robot=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path=config_dir+'torch.csv',\
+    robot=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path=config_dir+'torch.csv',d=15,\
     pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',\
     base_marker_config_file=base_marker_config_file,tool_marker_config_file=tool_marker_config_file)
 
@@ -157,7 +157,7 @@ elif robot_type=='S1':
     jN=2
 
     output_base_marker_config_file = config_dir+'D500B_'+dataset_date+'_marker_config.yaml'
-    output_tool_marker_config_file = tool_marker_config_file
+    output_tool_marker_config_file = config_dir+'positioner_tcp_'+dataset_date+'_marker_config.yaml'
 
 H_act = deepcopy(H_nom)
 axis_p = deepcopy(H_nom)
@@ -298,7 +298,7 @@ for dataset in all_datasets:
         H = np.matmul(T_basemarker_base.R,H)
         for i in range(jN):
             H_point[:,i] = np.matmul(T_basemarker_base.R,H_point[:,i])+T_basemarker_base.p
-        tcp_base = np.matmul(T_basemarker_base.R,tcp)+T_basemarker_base.p
+        # tcp_base = np.matmul(T_basemarker_base.R,tcp)+T_basemarker_base.pz
         j1_center = np.matmul(T_basemarker_base.R,j1_center)+T_basemarker_base.p
         j2_center = np.matmul(T_basemarker_base.R,j2_center)+T_basemarker_base.p
         #######################################
@@ -306,7 +306,7 @@ for dataset in all_datasets:
         P=np.zeros((3,3))
         P[:,0]=np.array([0,0,0])
         P[:,1]=j2_center-j1_center
-        P[:,2]=tcp_base-j2_center
+        P[:,2]=np.linalg.norm(robot.robot.P[:,2]+robot.robot.P[:,1])*(-1*H[:,1])
         
     print("P:",P.T)
     print("H:",H.T)
@@ -359,58 +359,58 @@ base_marker_data['calib_base_basemarker_pose']['orientation']['z'] = float(quat[
 with open(output_base_marker_config_file,'w') as file:
     yaml.safe_dump(base_marker_data,file)
 
-exit()
+# calibrate tool (using zero config pose)
+curve_p,curve_R,mocap_stamps = read_and_convert_frame(raw_data_dir+'_zero',robot.base_rigid_id,[robot.tool_rigid_id])
+# read q
+with open(raw_data_dir+'_zero_robot_q.pickle', 'rb') as handle:
+    robot_q = pickle.load(handle)
+    if "2010" in robot.robot_name:
+        robot_q = robot_q[:,:jN]
+    elif "1440" in robot.robot_name:
+        robot_q = robot_q[:,jN:2*jN]
+    elif "500" in robot.robot_name:
+        robot_q = robot_q[:,-2:]
+zero_config_q=np.mean(robot_q,axis=0)
 
-# calibrate tool
-if robot_type!='S1':
-    # Find T^tool_toolmarker
-    curve_p,curve_R,mocap_stamps = read_and_convert_frame(raw_data_dir+'_zero',robot.tool_rigid_id,robot.tool_markers_id)
+T_tool_flange = Transform(robot.robot.R_tool,robot.robot.p_tool)
 
-    # A: known tool maker position in tool frame, p^marker_tool
-    # B: capture tool marker position in rigid body frame (from motiv), p^marker_toolmarker
-    marker_B = {}
-    for marker_id in robot.tool_markers_id: # average across the captured
-        marker_B[marker_id] = np.mean(curve_p[marker_id],axis=0)
-    
-    # find center of A B
-    marker_A = deepcopy(robot.tool_markers)
-    center_A = []
-    center_B = []
-    A = []
-    B = []
-    for marker_id in robot.tool_markers_id:
-        center_A.append(marker_A[marker_id])
-        A.append(marker_A[marker_id])
-        center_B.append(marker_B[marker_id])
-        B.append(marker_B[marker_id])
-    center_A = np.mean(center_A,axis=0)
-    A = np.array(A)
-    center_B = np.mean(center_B,axis=0)
-    B = np.array(B)
+robot.robot.R_tool=np.eye(3)
+robot.robot.p_tool=np.zeros(3)
+print(robot.fwd(zero_config_q))
+robot.robot.P = deepcopy(P)
+robot.robot.H = deepcopy(H)
+T_flange_base = robot.fwd(zero_config_q)
+print(T_flange_base)
+T_base_flange = T_flange_base.inv()
 
-    A_centered = A-center_A
-    B_centered = B-center_B
-    H = np.matmul(A_centered.T,B_centered)
-    u,s,vT = np.linalg.svd(H)
-    R = np.matmul(vT.T,u.T)
-    if np.linalg.det(R)<0:
-        vT[2,:] *= -1
-        R = vT.T @ u.T
+toolid = robot.tool_rigid_id
+all_toolmarker_flange_p=[]
+all_toolmarker_flange_rpy=[]
+all_tool_toolmarker_p=[]
+all_tool_toolmarker_rpy=[]
+for i in range(len(curve_p[toolid])):
+    T_toolmarker_basemarker=Transform(curve_R[toolid][i],curve_p[toolid][i])
+    T_toolmarker_base=T_basemarker_base*T_toolmarker_basemarker
+    T_toolmarker_flange=T_base_flange*T_toolmarker_base
+    T_flange_toolmaker=T_toolmarker_flange.inv()
+    T_tool_toolmarker=T_flange_toolmaker*T_tool_flange
+    all_tool_toolmarker_p.append(T_tool_toolmarker.p)
+    all_tool_toolmarker_rpy.append(R2rpy(T_tool_toolmarker.R))
+    all_toolmarker_flange_p.append(T_toolmarker_flange.p)
+    all_toolmarker_flange_rpy.append(R2rpy(T_toolmarker_flange.R))
 
-    t = center_B-np.dot(R,center_A)
-    T_tool_toolmarker = Transform(R,t)
-    
-else:
-    # T^tool_base
-    tool_p = j2_center+180*-1*H[:,1] # 180 mm above j2_center
-    print(j2_center)
-    T_tool_base = Transform(np.eye(3),tool_p)
-
-    #T^tool_toolmarker
-    T_toolmarker_base = Transform(R_tool_base,tcp_base)
-    T_tool_toolmarker = T_toolmarker_base.inv()*T_tool_base
-    # beacuse our positoiner always at 180 the second axis
-    T_tool_toolmarker = T_tool_toolmarker*Transform(rot([0,0,1],0),[0,0,0])
+print("Check if rpy has singularity")
+print("tool toolmarker rpy max min:",\
+    np.degrees(np.max(all_tool_toolmarker_rpy,axis=0)),np.degrees(np.min(all_tool_toolmarker_rpy,axis=0)))
+print("toolmarker flange rpy max min:",\
+    np.degrees(np.max(all_toolmarker_flange_rpy,axis=0)),np.degrees(np.min(all_toolmarker_flange_rpy,axis=0)))
+print("==============================")
+tool_toolmarker_p = np.mean(all_tool_toolmarker_p,axis=0)
+tool_toolmarker_rpy=np.mean(all_tool_toolmarker_rpy,axis=0)
+T_tool_toolmarker=Transform(rpy2R(tool_toolmarker_rpy),tool_toolmarker_p)
+toolmarker_flange_p = np.mean(all_toolmarker_flange_p,axis=0)
+toolmarker_flange_rpy = np.mean(all_toolmarker_flange_rpy,axis=0)
+T_toolmarker_flange=Transform(rpy2R(toolmarker_flange_rpy),toolmarker_flange_p)
 
 with open(tool_marker_config_file,'r') as file:
     tool_marker_data = yaml.safe_load(file)
@@ -425,6 +425,18 @@ tool_marker_data['calib_tool_toolmarker_pose']['orientation']['w'] = float(quat[
 tool_marker_data['calib_tool_toolmarker_pose']['orientation']['x'] = float(quat[1])
 tool_marker_data['calib_tool_toolmarker_pose']['orientation']['y'] = float(quat[2])
 tool_marker_data['calib_tool_toolmarker_pose']['orientation']['z'] = float(quat[3])
+
+tool_marker_data['calib_toolmarker_flange_pose'] = {}
+tool_marker_data['calib_toolmarker_flange_pose']['position'] = {}
+tool_marker_data['calib_toolmarker_flange_pose']['position']['x'] = float(T_toolmarker_flange.p[0])
+tool_marker_data['calib_toolmarker_flange_pose']['position']['y'] = float(T_toolmarker_flange.p[1])
+tool_marker_data['calib_toolmarker_flange_pose']['position']['z'] = float(T_toolmarker_flange.p[2])
+quat = R2q(T_toolmarker_flange.R)
+tool_marker_data['calib_toolmarker_flange_pose']['orientation'] = {}
+tool_marker_data['calib_toolmarker_flange_pose']['orientation']['w'] = float(quat[0])
+tool_marker_data['calib_toolmarker_flange_pose']['orientation']['x'] = float(quat[1])
+tool_marker_data['calib_toolmarker_flange_pose']['orientation']['y'] = float(quat[2])
+tool_marker_data['calib_toolmarker_flange_pose']['orientation']['z'] = float(quat[3])
 
 with open(output_tool_marker_config_file,'w') as file:
     yaml.safe_dump(tool_marker_data,file)

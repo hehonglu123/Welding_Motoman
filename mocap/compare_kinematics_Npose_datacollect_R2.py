@@ -17,12 +17,9 @@ from MocapPoseListener import *
 dataset_date = '0725'
 
 config_dir='../config/'
-# robot_scan=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.yml',tool_file_path=config_dir+'mti.csv',\
-# pulse2deg_file_path=config_dir+'MA1440_A0_pulse2deg_real.csv',\
-# base_marker_config_file=config_dir+'MA1440_'+dataset_date+'_marker_config.yaml',tool_marker_config_file=config_dir+'mti_'+dataset_date+'_marker_config.yaml')
 robot_scan=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.yml',tool_file_path=config_dir+'mti.csv',\
 pulse2deg_file_path=config_dir+'MA1440_A0_pulse2deg_real.csv',\
-base_marker_config_file=config_dir+'MA1440_marker_config.yaml',tool_marker_config_file=config_dir+'mti_marker_config.yaml')
+base_marker_config_file=config_dir+'MA1440_'+dataset_date+'_marker_config.yaml',tool_marker_config_file=config_dir+'mti_'+dataset_date+'_marker_config.yaml')
 
 test_qs = []
 sample_q = np.radians([[37,35,-2,19,-53,-2],[-34,40,0,-15,-49,44],\
@@ -111,7 +108,7 @@ while True:
         if data[18]!=0 and data[18]%2==0: # when the robot stop
             if len(joint_recording)==0:
                 mpl_obj.run_pose_listener()
-            joint_angle=np.radians(np.divide(np.array(data[20:26]),r_pulse2deg))
+            joint_angle=np.radians(np.divide(np.array(data[26:32]),r_pulse2deg))
             joint_recording.append(joint_angle)
             timestamp=data[0]+data[1]*1e-9
             robot_stamps.append(timestamp)
