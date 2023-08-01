@@ -162,10 +162,12 @@
 |Linear Interp PH|0.2620|0.1374|1.2580|
 |Cubic Interp PH|0.2644|0.1386|1.1490|
 |RBF Interp PH|0.2631|0.1366|0.8348|
+|FBF Interp PH|0.2616|0.1355|0.8474|
 
 ### Testing Data (Orientation)
 ||Mean (deg)|Std (deg)|Max (deg)|
 |-|-|-|-|
+|Origin PH|0.0794|0.0342|0.1762|
 |CPA PH|0.0754|0.0333|0.1672|
 |Zero PH|0.0777|0.0271|0.1616|
 |One PH|0.4302|0.2314|0.8992|
@@ -173,10 +175,12 @@
 |Linear Interp PH|0.0752|0.0331|0.1635|
 |Cubic Interp PH|0.0754|0.0330|0.1632|
 |RBF Interp PH|0.0754|0.0330|0.1629|
+|FBF Interp PH|0.0750|0.0331|0.1642|
 
 ### Testing Data (Position) (Torch Extension)
 ||Mean (mm)|Std (mm)|Max (mm)|
 |-|-|-|-|
+|Origin PH|1.7297|0.2110|2.1997|
 |CPA PH|0.5069|0.2629|1.2805|
 |Zero PH|0.9776|0.6259|3.3324|
 |One PH|3.3194|2.6456|9.2988|
@@ -184,10 +188,12 @@
 |Linear Interp PH|0.3730|0.1972|1.3728|
 |Cubic Interp PH|0.3751|0.1981|1.2608|
 |RBF Interp PH|0.3743|0.1950|1.0415|
+|FBF Interp PH|0.3746|0.2088|1.3479|
 
 ### Testing Data (Orientation) (Torch Extension)
 ||Mean (deg)|Std (deg)|Max (deg)|
 |-|-|-|-|
+|Origin PH|0.0794|0.0342|0.1762|
 |CPA PH|0.0754|0.0333|0.1672|
 |Zero PH|0.0777|0.0271|0.1616|
 |One PH|0.4302|0.2314|0.8992|
@@ -195,6 +201,7 @@
 |Linear Interp PH|0.0752|0.0331|0.1635|
 |Cubic Interp PH|0.0754|0.0330|0.1632|
 |RBF Interp PH|0.0754|0.0330|0.1629|
+|FBF Interp PH|0.0750|0.0331|0.1642|
 
 **P Variation**
 ||Mean (mm)|Std (mm)|

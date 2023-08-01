@@ -1,10 +1,43 @@
+from typing import Any
 import numpy as np
 from matplotlib import pyplot as plt
 from scipy.interpolate import LinearNDInterpolator,CloughTocher2DInterpolator,RBFInterpolator
 from copy import deepcopy
 
-class RBFFourierInterp(object):
-    def __init__(self,train_q,v,basis_function_num=3) -> None:
+class RBFFourierInterpolator(object):
+    def __init__(self,train_q,value,basis_function_num=3) -> None:
+        
+        self.train_x = np.array(train_q)
+        self.train_y = np.array(value)
+        self.basis_function_num = basis_function_num
+        self.train()
+        
+    def __call__(self, q):
+        
+        return self.predict(q)
+    
+    def train(self):
+        
+        basis_func_q2q3=[]
+        for q in self.train_x:
+            this_basis = self.build_basis(q)
+            basis_func_q2q3.append(this_basis)
+        
+        basis_func_q2q3=np.array(basis_func_q2q3).T
+        
+        self.coeff_A = self.train_y@np.linalg.pinv(basis_func_q2q3)
+    
+    def predict(self,test_x):
+        
+        basis_func_q2q3=[]
+        for q in test_x:
+            this_basis = self.build_basis(q)
+            basis_func_q2q3.append(this_basis)
+        basis_func_q2q3=np.array(basis_func_q2q3).T
+        
+        return self.coeff_A@basis_func_q2q3
+    
+    def build_basis(self,q):
         
         ###### define basis function ######
         basis_func=[]
@@ -16,24 +49,23 @@ class RBFFourierInterp(object):
         basis_func.append(lambda q2,q3,a: np.cos(a*(q2+q3)))
         ###################################
         
-        diff_ph_q = []
-        basis_func_q2q3=[]
-        for q in PH_q.keys():
-            diff_ph_q.append(np.append(PH_q[q]['P'][:,:-1].T.flatten(),PH_q[q]['H'].T.flatten())-ph_q_nom)
-            this_basis = []
-            for a in range(1,basis_function_num+1):
-                for func in basis_func:
-                    this_basis.append(func(q[0],q[1],a))
-            this_basis.append(1) # constant function
-            basis_func_q2q3.append(this_basis)
+        this_basis = []
+        for a in range(1,self.basis_function_num+1):
+            for func in basis_func:
+                this_basis.append(func(q[0],q[1],a))
+        this_basis.append(1) # constant function
+        
+        return this_basis
 
 class PH_Param(object):
-    def __init__(self) -> None:
+    def __init__(self,nom_P,nom_H) -> None:
         
         self.method=None
         self.data=None
         self.train_q=None
         self.predict_func=None
+        self.nom_P = deepcopy(nom_P)
+        self.nom_H = deepcopy(nom_H)
 
     def fit(self,data,method='nearest'):
 
@@ -56,8 +88,8 @@ class PH_Param(object):
         elif method=='RBF':
             self._fit_interp(RBFInterpolator)
             self.predict_func=self._predict_interp
-        elif method=='RBF-Fourier':
-            self._fit_interp(RBFInterpolator)
+        elif method=='FBF':
+            self._fit_interp(RBFFourierInterpolator)
             self.predict_func=self._predict_interp
         else:
             print("Choose a method")
@@ -77,12 +109,14 @@ class PH_Param(object):
         for q in self.train_q:
             i=0
             for P in self.data[tuple(q)]['P']:
-                for qi in P:
+                diff_P = P-self.nom_P[round(i/7.)]
+                for qi in diff_P:
                     value_P[i].append(qi)
                     i+=1
             i=0
             for H in self.data[tuple(q)]['H']:
-                for qi in H:
+                diff_H = H-self.nom_H[round(i/7.)]
+                for qi in diff_H:
                     value_H[i].append(qi)
                     i+=1
         ## fitting function
@@ -99,8 +133,12 @@ class PH_Param(object):
         
         q2q3=np.array(q2q3)
         P,H = self.predict_func(q2q3)
+        opt_P=P+self.nom_P
+        opt_H=H+self.nom_H
+        for j in range(len(opt_H[0])):
+            opt_H[:,j]=opt_H[:,j]/np.linalg.norm(opt_H[:,j])
 
-        return P,H
+        return opt_P,opt_H
 
     def _predict_interp(self,q2q3):
 
@@ -117,8 +155,8 @@ class PH_Param(object):
             for i in range(len(opt_H)):
                 for j in range(len(opt_H[i])):
                     opt_H[i][j]=self.fit_H[i*len(opt_H[i])+j]([[q2q3[0],q2q3[1]]])
-            for j in range(len(opt_H[0])):
-                opt_H[:,j]=opt_H[:,j]/np.linalg.norm(opt_H[:,j])
+            # for j in range(len(opt_H[0])):
+            #     opt_H[:,j]=opt_H[:,j]/np.linalg.norm(opt_H[:,j])
             # print("P",opt_P.T)
             # print("H",opt_H.T)
         
@@ -130,7 +168,7 @@ class PH_Param(object):
         train_q_index = np.argmin(np.linalg.norm(self.train_q-q2q3,ord=2,axis=1))
         train_q_key = tuple(self.train_q[train_q_index])
 
-        return self.data[train_q_key]['P'],self.data[train_q_key]['H']
+        return self.data[train_q_key]['P']-self.nom_P,self.data[train_q_key]['H']-self.nom_H
 
     def compare_nominal(self,nom_P,nom_H):
 
