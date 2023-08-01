@@ -16,7 +16,9 @@ positioner=positioner_obj('D500B',def_path=config_dir+'D500B_robot_default_confi
 
 
 q1=np.array([0,0,0,0,0,0])
-q2=np.array([90,0,0,0,0,0])
+q2=np.array([45,0,0,0,0,0])
+# q2=np.array([0,37,-9,0,0,0])
+# q2_1=np.array([0,36,-8,0,0,0])
 q3=[-15,0]
 
 robot_client=MotionProgramExecClient()
