@@ -52,9 +52,14 @@ class redundancy_resolution_scanner(object):
         for i in range(len(self.scan_p)):
             # if i%100==0:
             #     print(i)
+            # print("==================")
+            # print(i,'/',len(self.scan_p))
+            # print(np.degrees(np.append(q_all1[-1],q_all2[-1])))
             try:
                 error_fb=999
-                while error_fb>0.001:
+                while error_fb>0.002:
+                    
+                    # print(error_fb)
                     poset1_1=self.robot.fwd(q_all1[-1])
                     poset2_2=self.positioner.fwd(q_all2[-1])
                     poset2_1=self.R2baseR_table*poset2_2
@@ -82,6 +87,16 @@ class redundancy_resolution_scanner(object):
                     J_all_p=np.hstack((J1p,-J2p+hat(dpt1t2_t2)@J2R))
                     J_all_R=np.hstack((J1R,-J2R))
 
+                    if i==0:
+                        J_all = np.vstack((J_all_R,J_all_p))
+                        u,s,v=np.linalg.svd(J_all)
+                        u1,s1,v1=np.linalg.svd(J1)
+                        if np.min(s)<0.01:
+                            print(np.min(s))
+                            print(u[:,-1])
+                            print(np.min(s1))
+                            return [],[],[],[]
+
                     H=np.dot(np.transpose(J_all_p),J_all_p)+Kq+Kw*np.dot(np.transpose(J_all_R),J_all_R)
                     H=(H+np.transpose(H))/2
 
@@ -99,6 +114,9 @@ class redundancy_resolution_scanner(object):
                     j_all2.append(self.positioner.jacobian(q_all2[-1]))
 
             except:
+                print("Error fb:",error_fb)
+                print("Min S:",np.min(s))
+                print("Joint:",np.degrees(np.append(q_all1[-1],q_all2[-1])))
                 traceback.print_exc()
                 q_out1.append(q_all1[-1])
                 q_out2.append(q_all2[-1])
@@ -213,6 +231,19 @@ class redundancy_resolution_scanner(object):
         j_out1=j_out1[1:]
         j_out2=j_out2[1:]
         return q_out1, q_out2, j_out1, j_out2
+
+    def arm_table_stepwise_opt_Rzup(self,q_table_seed):
+
+        pass
+        ####baseline redundancy resolution, with fixed orientation
+        positioner_js=self.positioner_resolution(curve_sliced_relative,q_seed=q_positioner_seed,smooth_filter=smooth_filter)		#solve for positioner first
+        
+        ###singularity js smoothing
+        positioner_js=self.introducing_tolerance2(positioner_js)
+        positioner_js=self.conditional_rolling_average(positioner_js)
+        if smooth_filter:
+            positioner_js=self.rolling_average(positioner_js)
+        positioner_js[0][0][:,1]=positioner_js[1][0][0,1]
 
 def main():
 
