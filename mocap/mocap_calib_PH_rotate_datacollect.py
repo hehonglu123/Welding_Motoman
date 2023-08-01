@@ -255,5 +255,5 @@ def calib_R1():
 if __name__=='__main__':
 
     # calib_R1()
-    calib_S1()
-    # calib_R2()
+    # calib_S1()
+    calib_R2()
