@@ -35,14 +35,17 @@ for i in range(len(ir_recording)):
     # Convert the IR image to BGR format with the inferno colormap
     ir_bgr = cv2.applyColorMap(ir_normalized.astype(np.uint8), cv2.COLORMAP_INFERNO)
 
+    # add bounding box
+    cv2.rectangle(ir_bgr, (165,130), (175,140), (0,255,0), thickness=1)
+
     # Write the IR image to the video file
-    # result.write(ir_bgr)
+    result.write(ir_bgr)
 
-    # Display the IR image
-    cv2.imshow("IR Recording", ir_bgr)
+    # # Display the IR image
+    # cv2.imshow("IR Recording", ir_bgr)
 
-    # Wait for a specific time (in milliseconds) before displaying the next frame
-    cv2.waitKey(int(1000*(ir_ts[i+1]-ir_ts[i])))
+    # # Wait for a specific time (in milliseconds) before displaying the next frame
+    # cv2.waitKey(int(1000*(ir_ts[i+1]-ir_ts[i])))
 
 result.release()
 # Close the window after the loop is completed
