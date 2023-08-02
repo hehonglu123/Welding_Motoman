@@ -17,11 +17,11 @@ Ry=np.array([0,1,0])
 Rz=np.array([0,0,1])
 
 
-ph_dataset_date='0725'
-test_dataset_date='0725'
+ph_dataset_date='0801'
+test_dataset_date='0801'
 config_dir='../config/'
 
-robot_type = 'R1'
+robot_type = 'R2'
 
 if robot_type == 'R1':
     robot=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',\
@@ -49,7 +49,7 @@ T_base_basemarker = robot.T_base_basemarker
 T_basemarker_base = T_base_basemarker.inv()
 
 #### using rigid body
-use_toolmaker=False
+use_toolmaker=True
 T_base_basemarker = robot.T_base_basemarker
 T_basemarker_base = T_base_basemarker.inv()
 
@@ -57,6 +57,10 @@ if use_toolmaker:
     robot.robot.R_tool = robot.T_toolmarker_flange.R
     robot.robot.p_tool = robot.T_toolmarker_flange.p
     robot.T_tool_toolmarker = Transform(np.eye(3),[0,0,0])
+    
+    # robot.robot.R_tool = np.eye(3)
+    # robot.robot.p_tool = np.zeros(3)
+    # robot.T_tool_toolmarker = robot.T_toolmarker_flange.inv()
 
 PH_data_dir='PH_grad_data/test'+ph_dataset_date+'_'+robot_type+'/train_data_'
 # test_data_dir='kinematic_raw_data/test'+test_dataset_date+'_aftercalib/'
@@ -78,7 +82,13 @@ for qkey in PH_q.keys():
     train_q.append(np.array(qkey))
     training_error.append(PH_q[qkey]['train_pos_error'])
 train_q=np.array(train_q)
-training_error=np.array(training_error)
+try:
+    training_error=np.array(training_error)
+except:
+    training_error_last=[]
+    for te in training_error:
+        training_error_last=te[-1]
+    training_error=training_error_last
 #####################
 
 #### using zero config PH ####
@@ -296,6 +306,7 @@ plt.plot(error_pos_near_norm,'-o',markersize=1,label='Nearest PH')
 plt.plot(error_pos_lin_norm,'-o',markersize=1,label='Linear Interp PH')
 plt.plot(error_pos_cub_norm,'-o',markersize=1,label='Cubic Interp PH')
 plt.plot(error_pos_rbf_norm,'-o',markersize=1,label='RBF Interp PH')
+plt.plot(error_pos_fbf_norm,'-o',markersize=1,label='FBF Interp PH')
 plt.legend()
 plt.title("Position Error using Optimized PH")
 # plt.xticks(np.arange(0,total_test_N,100),np.round(q1_all[::100]))
@@ -315,6 +326,7 @@ plt.plot(error_ori_near_norm,'-o',markersize=1,label='Nearest PH')
 plt.plot(error_ori_lin_norm,'-o',markersize=1,label='Linear Interp PH')
 plt.plot(error_ori_cub_norm,'-o',markersize=1,label='Cubic Interp PH')
 plt.plot(error_ori_rbf_norm,'-o',markersize=1,label='RBF Interp PH')
+plt.plot(error_ori_fbf_norm,'-o',markersize=1,label='FBF Interp PH')
 plt.legend()
 plt.title("Orientation Error using Optimized PH")
 # plt.xticks(np.arange(0,total_test_N,100),np.round(q1_all[::100]))
