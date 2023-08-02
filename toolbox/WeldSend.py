@@ -206,12 +206,20 @@ class WeldSend(object):
 	def load_weld_cmd(self,filename):
 		
 		data = read_csv(filename)
-		breakpoints=np.array(data['breakpoints'].tolist())
+		breakpoints=np.array(data['breakpoints'].tolist()).astype(int)
 		primitives=data['primitives'].tolist()
 		qs=data['q_bp'].tolist()
-		weld_v=data['weld_v'].tolist()
+		weld_v_str=np.array(data['weld_v'].tolist())
+		q_bp=[]
+		for q in qs:
+			endpoint=q[8:-3].split(',')
+			qarr = np.array(list(map(float, endpoint)))
+			q_bp.append([np.array(qarr)])
+		weld_v=[]
+		for v in weld_v_str:
+			weld_v.append(float(v[1:-1]))
 
-		return breakpoints,primitives,qs,weld_v
+		return breakpoints,primitives,q_bp,weld_v
 
 	# def extract_data_from_cmd(self,filename):
 	# 	data = read_csv(filename)

@@ -27,7 +27,7 @@ class WeldRRSensor(object):
             self.cam_ser=cam_service
             self.ir_image_consts = RRN.GetConstants('com.robotraconteur.image', self.cam_ser)
 
-            self.cam_ser.setf_param("focus_pos", RR.VarValue(int(1400),"int32"))
+            self.cam_ser.setf_param("focus_pos", RR.VarValue(int(907),"int32"))
             self.cam_ser.setf_param("object_distance", RR.VarValue(0.3,"double"))
             self.cam_ser.setf_param("reflected_temperature", RR.VarValue(291.15,"double"))
             self.cam_ser.setf_param("atmospheric_temperature", RR.VarValue(293.15,"double"))
@@ -35,7 +35,7 @@ class WeldRRSensor(object):
             self.cam_ser.setf_param("ext_optics_temperature", RR.VarValue(293.15,"double"))
             self.cam_ser.setf_param("ext_optics_transmission", RR.VarValue(0.99,"double"))
             self.cam_ser.setf_param("current_case", RR.VarValue(2,"int32"))
-            self.cam_ser.setf_param("ir_format", RR.VarValue("temperature_linear_100mK","string"))
+            self.cam_ser.setf_param("ir_format", RR.VarValue("radiometric","string"))
             self.cam_ser.setf_param("object_emissivity", RR.VarValue(0.13,"double"))
             self.cam_ser.setf_param("scale_limit_low", RR.VarValue(293.15,"double"))
             self.cam_ser.setf_param("scale_limit_upper", RR.VarValue(5000,"double"))
@@ -129,9 +129,8 @@ class WeldRRSensor(object):
             self.weld_energy.append(value.welding_energy)
     
     def save_weld_file(self,filedir):
-
         np.savetxt(filedir + 'welding.csv',
-                np.array([self.weld_timestamp, self.weld_voltage, self.weld_current, self.weld_feedrate, self.weld_energy]).T, delimiter=',',
+                np.array([(np.array(self.weld_timestamp)-self.weld_timestamp[0])/1e6, self.weld_voltage, self.weld_current, self.weld_feedrate, self.weld_energy]).T, delimiter=',',
                 header='timestamp,voltage,current,feedrate,energy', comments='')
     
     def clean_ir_record(self):
@@ -170,7 +169,7 @@ class WeldRRSensor(object):
 
         with open(filedir+'ir_recording.pickle','wb') as file:
                 pickle.dump(np.array(self.ir_recording),file)
-        np.savetxt(filedir + "ir_stamps.csv",self.ir_timestamp,delimiter=',')
+        np.savetxt(filedir + "ir_stamps.csv",np.array(self.ir_timestamp)-self.ir_timestamp[0],delimiter=',')
     
     def clean_mic_record(self):
 
