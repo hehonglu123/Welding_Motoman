@@ -106,11 +106,16 @@ show_layer = []
 x_lower = -99999
 x_upper = 999999
 
+# start_id=0
+# end_id=-1
+
 start_id=75
 end_id=-75
 
 datasets=['baseline','correction']
 # datasets=['baseline']
+
+datasets=['baseline','correction','repeat 1','repeat 2']
 datasets_h_mean={}
 datasets_h_std={}
 for dataset in datasets:
@@ -118,7 +123,11 @@ for dataset in datasets:
     if dataset=='baseline':
         data_dir = '../data/wall_weld_test/moveL_100_baseline_weld_scan_2023_07_07_15_20_56/'
     elif dataset=='correction':
-        data_dir = '../data/wall_weld_test/moveL_100_weld_scan_2023_07_24_11_19_58/'
+        data_dir = '../data/wall_weld_test/moveL_100_weld_scan_2023_08_02_15_17_25/'
+    elif dataset=='repeat 1':
+        data_dir = '../data/wall_weld_test/moveL_100_repeat_weld_scan_2023_08_02_16_03_50/'
+    elif dataset=='repeat 2':
+        data_dir = '../data/wall_weld_test/moveL_100_repeat_weld_scan_2023_08_02_17_07_02/'
 
     forward_flag=False
     all_profile_height=[]
@@ -421,6 +430,7 @@ for dataset in datasets:
     plt.ylabel('z-axis')
     plt.legend()
     plt.title("Height Profile")
+    plt.tight_layout()
     plt.show()
 
     datasets_h_mean[dataset]=np.array(all_h_mean)
@@ -432,6 +442,7 @@ plt.legend()
 plt.xlabel('Layer')
 plt.ylabel('Mean Height (mm)')
 plt.title("Mean Height")
+plt.tight_layout()
 plt.show()
 
 for dataset in datasets:
@@ -441,6 +452,7 @@ plt.legend()
 plt.xlabel('Layer')
 plt.ylabel('Height STD (mm)')
 plt.title("Height STD")
+plt.tight_layout()
 plt.show()
 
 datasets_dh_mean={}
@@ -452,4 +464,5 @@ plt.legend()
 plt.xlabel('Layer')
 plt.ylabel('Height STD/Mean dh (%)')
 plt.title("Height STD/Mean dh (%)")
+plt.tight_layout()
 plt.show()
