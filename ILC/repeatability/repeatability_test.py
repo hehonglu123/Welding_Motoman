@@ -1,4 +1,4 @@
-import sys, time
+import sys, time, os
 import numpy as np
 import matplotlib.pyplot as plt
 from dx200_motion_program_exec_client import *
@@ -12,77 +12,107 @@ from scan_utils import *
 from scanPathGen import *
 from scanProcess import *
 
-robot=robot_obj('MA2010_A0',def_path='../config/MA2010_A0_robot_default_config.yml',tool_file_path='../config/torch.csv',\
-	pulse2deg_file_path='../config/MA2010_A0_pulse2deg_real.csv',d=15,\
-    base_marker_config_file='../config/MA2010_marker_config.yaml',tool_marker_config_file='../config/weldgun_marker_config.yaml')
-robot2_mti=robot_obj('MA1440_A0',def_path='../config/MA1440_A0_robot_default_config.yml',tool_file_path='../config/mti.csv',\
-	pulse2deg_file_path='../config/MA1440_A0_pulse2deg_real.csv',base_transformation_file='../config/MA1440_pose.csv',\
-    base_marker_config_file='../config/MA1440_marker_config.yaml')
-positioner=positioner_obj('D500B',def_path='../config/D500B_robot_default_config.yml',tool_file_path='../config/positioner_tcp.csv',\
-	pulse2deg_file_path='../config/D500B_pulse2deg_real.csv',base_transformation_file='../config/D500B_pose.csv',\
-    base_marker_config_file='../config/D500B_marker_config.yaml',tool_marker_config_file='../config/positioner_tcp_marker_config.yaml')
+
+# MTI connect to RR
+mti_client = RRN.ConnectService("rr+tcp://192.168.55.10:60830/?service=MTI2D")
+mti_client.setExposureTime("25")
+
+robot=robot_obj('MA2010_A0',def_path='../../config/MA2010_A0_robot_default_config.yml',tool_file_path='../../config/torch.csv',\
+	pulse2deg_file_path='../../config/MA2010_A0_pulse2deg_real.csv',d=15,\
+    base_marker_config_file='../../config/MA2010_marker_config.yaml',tool_marker_config_file='../../config/weldgun_marker_config.yaml')
+robot2_mti=robot_obj('MA1440_A0',def_path='../../config/MA1440_A0_robot_default_config.yml',tool_file_path='../../config/mti.csv',\
+	pulse2deg_file_path='../../config/MA1440_A0_pulse2deg_real.csv',base_transformation_file='../../config/MA1440_pose.csv',\
+    base_marker_config_file='../../config/MA1440_marker_config.yaml')
+positioner=positioner_obj('D500B',def_path='../../config/D500B_robot_default_config.yml',tool_file_path='../../config/positioner_tcp.csv',\
+	pulse2deg_file_path='../../config/D500B_pulse2deg_real.csv',base_transformation_file='../../config/D500B_pose.csv',\
+    base_marker_config_file='../../config/D500B_marker_config.yaml',tool_marker_config_file='../../config/positioner_tcp_marker_config.yaml')
 
 #### change base H to calibrated ones ####
-robot_scan_base = robot.T_base_basemarker.inv()*robot2.T_base_basemarker
-robot2.base_H = H_from_RT(robot_scan_base.R,robot_scan_base.p)
-robot2_mti.base_H = H_from_RT(robot_scan_base.R,robot_scan_base.p)
-positioner_base = robot.T_base_basemarker.inv()*positioner.T_base_basemarker
-positioner.base_H = H_from_RT(positioner_base.R,positioner_base.p)
-T_to_base = Transform(np.eye(3),[0,0,-380])
-positioner.base_H = np.matmul(positioner.base_H,H_from_RT(T_to_base.R,T_to_base.p))
+# robot_scan_base = robot.T_base_basemarker.inv()*robot2_mti.T_base_basemarker
+# robot2_mti.base_H = H_from_RT(robot_scan_base.R,robot_scan_base.p)
+# positioner_base = robot.T_base_basemarker.inv()*positioner.T_base_basemarker
+# positioner.base_H = H_from_RT(positioner_base.R,positioner_base.p)
+# T_to_base = Transform(np.eye(3),[0,0,-380])
+# positioner.base_H = np.matmul(positioner.base_H,H_from_RT(T_to_base.R,T_to_base.p))
 
 positioner_pose=positioner.fwd(np.radians([-15,0]))
-H_positioner_pose=H_from_RT(positioner_pose.R,positioner_pose.T)
+H_positioner_pose=H_from_RT(positioner_pose.R,positioner_pose.p)
 
 
 
 R=np.array([[-0.7071, 0.7071, -0.    ],
             [ 0.7071, 0.7071,  0.    ],
             [0.,      0.,     -1.    ]])
-x_start=1630
-x_end=1700
+x_start=1610
+x_end=1690
 x_all=np.linspace(x_start,x_end,5)
-y_start=-780
-y_end=-840
+y_start=-750
+y_end=-880
 z=-260
 
 q_seed=np.radians([-35.4291,56.6333,40.5194,4.5177,-52.2505,-11.6546])
 
 client=MotionProgramExecClient()
 ws=WeldSend(client)
+ws.jog_single(positioner,np.radians([-15,0]),v=3)
 
-###base layers welding
-for x in x_all:
-    p1=np.array([x,y_start,z])
-    p2=np.array([x,y_end,z])
-    q_init=robot.inv(p1,R,q_seed)[0]
-    q_end=robot.inv(p2,R,q_seed)[0]
-    q_all=[q_init,q_end]
-    v_all=[1,15]
-    cond_all=[0,215]
-    primitives=['movej','movel']
-    ws.weld_segment_single(primitives,robot,q_all,v_all,cond_all,arc=False)
 
-###first layers welding
-for x in x_all:
-    p1=np.array([x,y_start,z+2])
-    p2=np.array([x,y_end,z+2])
-    q_init=robot.inv(p1,R,q_seed)[0]
-    q_end=robot.inv(p2,R,q_seed)[0]
-    q_all=[q_init,q_end]
-    v_all=[1,15]
-    cond_all=[0,215]
-    primitives=['movej','movel']
-    ws.weld_segment_single(primitives,robot,q_all,v_all,cond_all,arc=False)
+# ###base layers welding
+# for x in x_all:
+#     p1=np.array([x,y_start,z])
+#     p2=np.array([x,y_end,z])
+#     q_init=robot.inv(p1,R,q_seed)[0]
+#     q_end=robot.inv(p2,R,q_seed)[0]
+#     q_all=[q_init,q_end]
+#     v_all=[1,5]
+#     cond_all=[0,215]
+#     primitives=['movej','movel']
+#     ws.weld_segment_single(primitives,robot,q_all,v_all,cond_all,arc=True)
+
+###base layers welding2
+# for x in x_all:
+#     p2=np.array([x,y_start,z+2])
+#     p1=np.array([x,y_end,z+2])
+#     q_init=robot.inv(p1,R,q_seed)[0]
+#     q_end=robot.inv(p2,R,q_seed)[0]
+#     q_all=[q_init,q_end]
+#     v_all=[1,5]
+#     cond_all=[0,215]
+#     primitives=['movej','movel']
+#     ws.weld_segment_single(primitives,robot,q_all,v_all,cond_all,arc=True)
+
+# ###first layers welding
+# for x in x_all:
+#     p1_pre=np.array([x,y_start-20,z+30])
+#     p1=np.array([x,y_start-20,z+4])
+#     p2=np.array([x,y_end+20,z+4])
+#     q_pre=robot.inv(p1_pre,R,q_seed)[0]
+#     q_init=robot.inv(p1,R,q_seed)[0]
+#     q_end=robot.inv(p2,R,q_seed)[0]
+#     q_all=[q_pre,q_init,q_end]
+#     v_all=[1,1,10]
+#     cond_all=[0,0,205]
+#     primitives=['movej','movej','movel']
+#     ws.weld_segment_single(primitives,robot,q_all,v_all,cond_all,arc=False)
 
 
 ######## scanning ##########
-for x in x_all:
-    ws.jog_single(robot,np.array([-8.135922244967886741e-01,7.096733413840118354e-01,3.570605700073341549e-01,1.795958126158156976e-01,-8.661845429601626734e-01,-4.639865155930678053e-01]),v=3)
-    p1_relative=(H_positioner_pose.T@positioner.base_H.T@np.array([x,y_start,z+2,1]))[:3]
-    p2_relative=(H_positioner_pose.T@positioner.base_H.T@np.array([x,y_end,z+2,1]))[:3]
+ws.jog_single(robot,np.array([-8.135922244967886741e-01,7.096733413840118354e-01,3.570605700073341549e-01,1.795958126158156976e-01,-8.661845429601626734e-01,-4.639865155930678053e-01]),v=3)
 
-    curve_sliced_relative=np.linspace(p1_relative,p2_relative,100)
+## for scanning ##
+h_largest=0
+Transz0_H=np.array([[ 9.99999340e-01, -1.74246690e-06,  1.14895353e-03,  1.40279850e-03],
+ [-1.74246690e-06,  9.99995400e-01,  3.03312933e-03,  3.70325619e-03],
+ [-1.14895353e-03, -3.03312933e-03,  9.99994740e-01,  1.22092938e+00],
+ [ 0.00000000e+00,  0.00000000e+00,  0.00000000e+00,  1.00000000e+00]])
+recorded_dir='recorded_data/'
+for x in x_all:
+    H_positioner_pose_inv=H_inv(H_positioner_pose)
+    H_positioner_inv=H_inv(positioner.base_H)
+    p1_relative=(H_positioner_pose_inv@H_positioner_inv@np.array([x,y_start-20,z+4,1]))[:3]
+    p2_relative=(H_positioner_pose_inv@H_positioner_inv@np.array([x,y_end+20,z+4,1]))[:3]
+
+    curve_sliced_relative=np.linspace(np.append(p1_relative,[0,0,-1]),np.append(p2_relative,[0,0,-1]),100)
 
     scan_speed=10 # scanning speed (mm/sec)
     scan_stand_off_d = 95 ## mm
@@ -90,38 +120,46 @@ for x in x_all:
     Ry_angle = np.radians(0) # rotate in y a bit
     bounds_theta = np.radians(1) ## circular motion at start and end
     all_scan_angle = np.radians([0]) ## scan angle
-    q_init_table=np.radians([-15,20]) ## init table
+    q_init_table=np.radians([-15,0]) ## init table
     save_output_points = True
     ### scanning path module
     spg = ScanPathGen(robot2_mti,positioner,scan_stand_off_d,Rz_angle,Ry_angle,bounds_theta)
     mti_Rpath = np.array([[ -1.,0.,0.],   
                 [ 0.,1.,0.],
                 [0.,0.,-1.]])
-    # mti_Rpath = np.eye(3)
-    scan_p,scan_R,q_out1,q_out2=spg.gen_scan_path([curve_sliced_relative],[0],all_scan_angle,\
-                        solve_js_method=0,q_init_table=q_init_table,R_path=mti_Rpath,scan_path_dir=None)
-    q_bp1,q_bp2,s1_all,s2_all=spg.gen_motion_program(q_out1,q_out2,scan_p,scan_speed,init_sync_move=0)
+    
+    ###unmodified
+    # scan_p,scan_R,q_out1,q_out2=spg.gen_scan_path([curve_sliced_relative],[0],all_scan_angle,\
+    #                     solve_js_method=0,q_init_table=q_init_table,R_path=mti_Rpath,scan_path_dir=None)
+    # q_bp1,q_bp2,s1_all,s2_all=spg.gen_motion_program(q_out1,q_out2,scan_p,scan_speed,init_sync_move=0)
 
-    # to_start_speed=7
-    # mp = MotionProgram(ROBOT_CHOICE='RB2',ROBOT_CHOICE2='ST1',pulse2deg=robot2.pulse2deg,pulse2deg_2=positioner.pulse2deg)
-    # target2=['MOVJ',np.degrees(q_bp2[0][0]),to_start_speed]
-    # mp.MoveJ(np.degrees(q_bp1[0][0]), to_start_speed, 0, target2=target2)
-    # robot_client.execute_motion_program(mp)
-    ws.jog_dual(robot2_mti,positioner,q_bp1[0][0],q_bp2[0][0],v=3)
+    ###modified
+    H_robot2_inv=H_inv(robot2_mti.base_H)
+    p_bp_init=(H_robot2_inv@np.array([x,y_start-20,z+4+scan_stand_off_d,1]))[:3]
+    p_bp_end=(H_robot2_inv@np.array([x,y_end+20,z+4+scan_stand_off_d,1]))[:3]
+    q_bp_init=robot2_mti.inv(p_bp_init,mti_Rpath,np.zeros(6))[0]
+    q_bp_end=robot2_mti.inv(p_bp_end,mti_Rpath,np.zeros(6))[0]
+    ws.jog_single(robot2_mti,q_bp_init,v=3)
 
     scan_motion_scan_st = time.time()
 
-    ## motion start
-    mp = MotionProgram(ROBOT_CHOICE='RB2',ROBOT_CHOICE2='ST1',pulse2deg=robot2_mti.pulse2deg,pulse2deg_2=positioner.pulse2deg)
-    # calibration motion
-    target2=['MOVJ',np.degrees(q_bp2[1][0]),s2_all[0]]
-    mp.MoveL(np.degrees(q_bp1[1][0]), scan_speed, 0, target2=target2)
-    # routine motion
-    for path_i in range(2,len(q_bp1)-1):
-        target2=['MOVJ',np.degrees(q_bp2[path_i][0]),s2_all[path_i]]
-        mp.MoveL(np.degrees(q_bp1[path_i][0]), s1_all[path_i], target2=target2)
-    target2=['MOVJ',np.degrees(q_bp2[-1][0]),s2_all[-1]]
-    mp.MoveL(np.degrees(q_bp1[-1][0]), s1_all[-1], 0, target2=target2)
+    ###unmodified
+    # ## motion start
+    # mp = MotionProgram(ROBOT_CHOICE='RB2',ROBOT_CHOICE2='ST1',pulse2deg=robot2_mti.pulse2deg,pulse2deg_2=positioner.pulse2deg)
+    # # calibration motion
+    # target2=['MOVJ',np.degrees(q_bp2[1][0]),s2_all[0]]
+    # mp.MoveL(np.degrees(q_bp1[1][0]), scan_speed, 0, target2=target2)
+    # # routine motion
+    # for path_i in range(2,len(q_bp1)-1):
+    #     target2=['MOVJ',np.degrees(q_bp2[path_i][0]),s2_all[path_i]]
+    #     mp.MoveL(np.degrees(q_bp1[path_i][0]), s1_all[path_i], target2=target2)
+    # target2=['MOVJ',np.degrees(q_bp2[-1][0]),s2_all[-1]]
+    # mp.MoveL(np.degrees(q_bp1[-1][0]), s1_all[-1], 0, target2=target2)
+
+    ###modified
+    mp=MotionProgram(ROBOT_CHOICE='RB2',pulse2deg=robot2_mti.pulse2deg)
+    mp.MoveJ(np.degrees(q_bp_init), 1)
+    mp.MoveL(np.degrees(q_bp_end), scan_speed)
 
     ws.client.execute_motion_program_nonblocking(mp)
     ###streaming
@@ -150,22 +188,12 @@ for x in x_all:
     mti_recording=np.array(mti_recording)
     q_out_exe=joint_recording
 
-    # move robot to home
-    q2=np.array([-2.704468035842202411e-01,9.330144509521144380e-01,-3.376213326477142118e-01,-1.228474839331376023e+00,-1.395732731587226549e+00,2.846773448527548656e+00])
-    q3=np.radians([-15,90])
-    # ## move to home
-    # to_home_speed=7
-    # mp = MotionProgram(ROBOT_CHOICE='RB2',ROBOT_CHOICE2='ST1',pulse2deg=robot2_mti.pulse2deg,pulse2deg_2=positioner.pulse2deg)
-    # target2=['MOVJ',q3,to_home_speed]
-    # mp.MoveJ(q2, to_home_speed, 0, target2=target2)
-    # robot_client.execute_motion_program(mp)
-    ws.jog_dual(robot2_mti,positioner,q2,q3,v=3)
     #####################
 
     print("Total exe len:",len(q_out_exe))
-    out_scan_dir = layer_data_dir+'scans/'
+    out_scan_dir = recorded_dir+'scans/x_%.1f'%x+'/'
     ## save traj
-    Path(out_scan_dir).mkdir(exist_ok=True)
+    os.makedirs(out_scan_dir,exist_ok=True)
     # save poses
     np.savetxt(out_scan_dir + 'scan_js_exe.csv',q_out_exe,delimiter=',')
     np.savetxt(out_scan_dir + 'scan_robot_stamps.csv',robot_stamps,delimiter=',')
