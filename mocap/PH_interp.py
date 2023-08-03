@@ -5,7 +5,7 @@ from scipy.interpolate import LinearNDInterpolator,CloughTocher2DInterpolator,RB
 from copy import deepcopy
 
 class RBFFourierInterpolator(object):
-    def __init__(self,train_q,value,basis_function_num=3) -> None:
+    def __init__(self,train_q,value,basis_function_num=2) -> None:
         
         self.train_x = np.array(train_q)
         self.train_y = np.array(value)
@@ -34,6 +34,9 @@ class RBFFourierInterpolator(object):
             this_basis = self.build_basis(q)
             basis_func_q2q3.append(this_basis)
         basis_func_q2q3=np.array(basis_func_q2q3).T
+        
+        # if test_x not in self.train_x:
+        #     return np.nan
         
         return self.coeff_A@basis_func_q2q3
     
@@ -234,19 +237,19 @@ class PH_Param(object):
 
 if __name__=='__main__':
 
-    PH_data_dir='PH_grad_data/test0725_R1/train_data_'
-    test_data_dir='kinematic_raw_data/test0725/'
+    PH_data_dir='PH_grad_data/test0801_R1/train_data_'
+    test_data_dir='kinematic_raw_data/test0801/'
 
     import pickle
     with open(PH_data_dir+'calib_PH_q.pickle','rb') as file:
         PH_q=pickle.load(file)
-
-    ph_param=PH_Param()
-    ph_param.fit(PH_q,method='linear')
-
+        
     nom_P=np.array([[0,0,0],[150,0,0],[0,0,760],\
                    [1082,0,200],[0,0,0],[0,0,0],[100,0,0]]).T
     nom_H=np.array([[0,0,1],[0,1,0],[0,-1,0],\
                    [-1,0,0],[0,-1,0],[-1,0,0]]).T
-    
+
+    ph_param=PH_Param(nom_P,nom_H)
+    ph_param.fit(PH_q,method='linear')
+
     ph_param.compare_nominal(nom_P,nom_H)

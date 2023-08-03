@@ -93,8 +93,8 @@ def to_frame(curve_p,curve_R,mocap_stamps,target_frame,markers_id):
 config_dir='../config/'
 
 # robot_type='R1'
-robot_type='R2'
-# robot_type='S1'
+# robot_type='R2'
+robot_type='S1'
 
 # all_datasets=['train_data','valid_data_1','valid_data_2']
 dataset_date='0801'
@@ -174,7 +174,13 @@ for dataset in all_datasets:
         # read q
         with open(raw_data_dir+'_'+str(j+1)+'_robot_q.pickle', 'rb') as handle:
             robot_q = pickle.load(handle)
-            robot_q = robot_q[:,:jN]
+            
+            if "2010" in robot.robot_name:
+                robot_q = robot_q[:,:jN]
+            elif "1440" in robot.robot_name:
+                robot_q = robot_q[:,jN:2*jN]
+            elif "500" in robot.robot_name:
+                robot_q = robot_q[:,-2:]
         for i in range(jN):
             if i!=j:
                 zero_config_q[i].extend(robot_q[:,i])

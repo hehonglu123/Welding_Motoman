@@ -16,7 +16,7 @@ calib_toolmarker_flange_pose:
     z: 0.009023482827071098
   position:
     x: 19.32497963315006
-    y: 3.298040492827228
+    y: 3.29804049282723
     z: 134.61614867664656
 tool_markers:
   marker1_rigid5:
