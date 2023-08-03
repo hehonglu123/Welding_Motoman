@@ -144,6 +144,13 @@ class ScanProcess():
     
     def pcd_register_mti(self,all_scan_points,rob_js_exe,rob_stamps,voxel_size=0.05,static_positioner_q=np.radians([-60,180])):
 
+        use_calib=False
+        if use_calib:
+            origin_P = deepcopy(self.robot.robot.P)
+            origin_H = deepcopy(self.robot.robot.H)
+            self.robot.robot.P=deepcopy(self.robot.calib_P)
+            self.robot.robot.H=deepcopy(self.robot.calib_H)
+
         pcd_combined = None
         scan_N = len(rob_stamps) ## total scans
         for scan_i in range(scan_N):
@@ -152,6 +159,9 @@ class ScanProcess():
                 robt_T = self.robot.fwd(rob_js_exe[scan_i],world=True) # T_world^r2tool
                 T_origin = self.positioner.fwd(static_positioner_q,world=True).inv() # T_tabletool^world
             else:
+                # print(np.degrees(rob_js_exe[scan_i][:6]))
+                # print(np.degrees(self.robot.robot.joint_lower_limit))
+                # print("===============")
                 robt_T = self.robot.fwd(rob_js_exe[scan_i][:6],world=True) # T_world^r2tool
                 T_origin = self.positioner.fwd(rob_js_exe[scan_i][6:],world=True).inv() # T_tabletool^world
                 # T_origin = turn_table.fwd(np.radians([-30,0]),world=True).inv()
@@ -175,16 +185,22 @@ class ScanProcess():
             else:
                 pcd_combined+=pcd
         
+        if use_calib:
+            self.robot.robot.P=deepcopy(origin_P)
+            self.robot.robot.H=deepcopy(origin_H)
+        
         return pcd_combined
     
     def pcd_noise_remove(self,pcd_combined,voxel_down_flag=True,voxel_size=0.1,crop_flag=True,min_bound=(-50,-30,-10),max_bound=(50,30,50),\
                          crop_path_flag=False,curve_relative=None,\
                          outlier_remove=True,nb_neighbors=40,std_ratio=0.5,cluster_based_outlier_remove=True,cluster_neighbor=0.75,min_points=50*4):
 
+        # visualize_pcd([pcd_combined])
         ## crop point clouds
         if crop_flag:
             bbox = o3d.geometry.AxisAlignedBoundingBox(min_bound=min_bound,max_bound=max_bound)
             pcd_combined=pcd_combined.crop(bbox)
+        # visualize_pcd([pcd_combined])
 
         #### processing
         ## voxel down sample
@@ -208,7 +224,7 @@ class ScanProcess():
         
         return pcd_combined
 
-    def pcd2dh(self,scanned_points,curve_relative):
+    def pcd2dh(self,scanned_points,curve_relative,robot_weld=None,q_weld=None,drawing=False):
 
         ##### cross section parameters
         # resolution_z=0.1
@@ -221,42 +237,111 @@ class ScanProcess():
         # width_thres=0.8 # prune width that is too close
         ###################################
 
+        if robot_weld is not None:
+            origin_P = deepcopy(robot_weld.robot.P)
+            origin_H = deepcopy(robot_weld.robot.H)
+            origin_flange = deepcopy(robot_weld.robot.T_flange)
+            origin_R_tool = deepcopy(robot_weld.robot.R_tool)
+            origin_p_tool = deepcopy(robot_weld.robot.p_tool)
+
+            robot_weld.robot.P=deepcopy(robot_weld.calib_P)
+            robot_weld.robot.H=deepcopy(robot_weld.calib_H)
+            robot_weld.robot.T_flange = deepcopy(robot_weld.T_tool_flange)
+            robot_weld.robot.R_tool = deepcopy(robot_weld.T_tool_toolmarker.R)
+            robot_weld.robot.p_tool = deepcopy(robot_weld.T_tool_toolmarker.p)
+            curve_relative = []
+            for q in q_weld:
+                Table_home_T = self.positioner.fwd(q[-2:])
+                T_S1TCP_R1Base = np.matmul(self.positioner.base_H,H_from_RT(Table_home_T.R,Table_home_T.p))
+                T_R1Base_S1TCP = np.linalg.inv(T_S1TCP_R1Base)
+                robot_T = robot_weld.fwd(q[:6])
+                T_R1TCP_S1TCP = np.matmul(T_R1Base_S1TCP,H_from_RT(robot_T.R,robot_T.p))
+                curve_relative.append(np.append(T_R1TCP_S1TCP[:3,-1],T_R1TCP_S1TCP[:3,2]))
+            
+            robot_weld.robot.P=deepcopy(origin_P)
+            robot_weld.robot.H=deepcopy(origin_H)
+            robot_weld.robot.T_flange = deepcopy(origin_flange)
+            robot_weld.robot.R_tool = deepcopy(origin_R_tool)
+            robot_weld.robot.p_tool = deepcopy(origin_p_tool)
+        
+        curve_relative=np.array(curve_relative)
+
         # create the cropping polygon
         poly_num=12
-        radius_scale=0.8
+        radius_scale=0.55
         radius=np.mean(np.linalg.norm(np.diff(curve_relative[:,:3],axis=0),axis=1))*radius_scale
+        print("height neighbor radius:",radius)
         bounding_polygon=[]
-        for n in poly_num:
-            ang=n/(np.pi*2)
+        for n in range(poly_num):
+            ang=(n/poly_num)*(np.pi*2)
             bounding_polygon.append(np.array([radius*np.cos(ang),radius*np.sin(ang),0]))
         bounding_polygon = np.array(bounding_polygon).astype("float64")
         crop_poly = o3d.visualization.SelectionPolygonVolume()
         crop_poly.bounding_polygon = o3d.utility.Vector3dVector(bounding_polygon)
         crop_poly.orthogonal_axis = 'z'
-        crop_poly.axis_max=3
-        crop_poly.axis_min=-1.5
+        crop_poly.axis_max=30
+        crop_poly.axis_min=-15
+
+        if drawing:
+            scanned_points_draw = deepcopy(scanned_points)
+            scanned_points_draw.paint_uniform_color([0.3,0.3,0.3])
+            path_points = o3d.geometry.PointCloud()
+            curve_R = []
+            curve_p = []
         
         # loop through curve to get dh
         curve_i=0
+        total_curve_i = len(curve_relative)
         dh=[]
         for curve_wp in curve_relative:
-            if curve_wp==curve_relative[-1]:
-                curve_R = direction2R(curve_wp[3:],curve_wp[:3]-curve_relative[curve_i-1][:3])
+            if np.all(curve_wp==curve_relative[-1]):
+                wp_R = direction2R(-1*curve_wp[3:],curve_wp[:3]-curve_relative[curve_i-1][:3])
             else:
-                curve_R = direction2R(curve_wp[3:],curve_relative[curve_i+1][:3]-curve_wp[:3])
+                wp_R = direction2R(-1*curve_wp[3:],curve_relative[curve_i+1][:3]-curve_wp[:3])
 
             sp_lamx=deepcopy(scanned_points)
             ## transform the scanned points to waypoints
-            sp_lamx.transform(H_from_RT(curve_R,curve_wp[:3]))
+            sp_lamx.transform(np.linalg.inv(H_from_RT(wp_R,curve_wp[:3])))
+            # visualize_pcd([sp_lamx])
             ## crop the scanned points around the waypoints
             sp_lamx = crop_poly.crop_point_cloud(sp_lamx)
+            # visualize_pcd([sp_lamx],origin_size=10)
             ## dh is simply the z height after transform. Average over an radius
             this_dh = np.mean(np.asarray(sp_lamx.points)[:,2])
+
             dh.append(this_dh)
 
+            if drawing:
+                ## paint pcd for visualization
+                color_dist = plt.get_cmap("rainbow")(float(curve_i)/total_curve_i)
+                sp_lamx.paint_uniform_color(color_dist[:3])
+                sp_lamx.transform(H_from_RT(wp_R,curve_wp[:3]))
+                path_points = path_points+sp_lamx
+                curve_R.append(wp_R)
+                curve_p.append(curve_wp[:3])
+
             curve_i+=1
-        lam = calc_lam_cs(curve_relative[:][:3])
+
+        for curve_i in range(len(dh)):
+            if np.isnan(dh[curve_i]):
+                if curve_i==0:
+                    dh[curve_i]=np.nanmean(dh[curve_i:curve_i+2])
+                elif curve_i!=len(dh)-1:
+                    dh[curve_i]=np.nanmean(dh[curve_i-2:curve_i])
+                else:
+                    dh[curve_i]=np.nanmean(dh[curve_i-1:curve_i+1])
+
+        curve_relative=np.array(curve_relative)
+        lam = calc_lam_cs(curve_relative[:,:3])
         profile_height = np.array([lam,dh]).T   
+
+        if drawing:
+            path_points.transform(H_from_RT(np.eye(3),[0,0,0.0001]))
+            path_viz_frames = visualize_frames(curve_R,curve_p,size=1,visualize=False,frame_obj=True)
+            draw_obj = []
+            draw_obj.extend(path_viz_frames)
+            draw_obj.extend([scanned_points_draw,path_points])
+            visualize_pcd(draw_obj)
         
         return profile_height
     
