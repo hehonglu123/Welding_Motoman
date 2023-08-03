@@ -22,7 +22,8 @@ import time
 import datetime
 import numpy as np
 import open3d as o3d
-
+from scipy.interpolate import interp1d
+from scipy.signal import resample
 # def moving_average(a,w=3):
     
 #     if w%2==0:
@@ -101,8 +102,8 @@ R_S1TCP = np.matmul(T_S1TCP_R1Base[:3,:3],path_R)
 build_height_profile=False
 plot_correction=True
 # show_layer = [12]
-show_layer = [12,29,30]
-
+show_layer = [12]
+all_data = []
 x_lower = -99999
 x_upper = 999999
 
@@ -115,8 +116,7 @@ for dataset in datasets:
     if dataset=='baseline':
         data_dir = '../data/wall_weld_test/baseline_weld_scan_2023_06_06_15_28_31/'
     elif dataset=='full_test':
-        data_dir = '../data/wall_weld_test/moveL_220_weld_scan_2023_07_05_17_58_09/'
-    print('data_dir',data_dir)
+        data_dir = '../data/wall_weld_test/moveL_100_repeat_weld_scan_2023_08_02_17_07_02/'
     forward_flag=False
     all_profile_height=[]
     all_correction_layer=[]
@@ -168,13 +168,14 @@ for dataset in datasets:
         profile_height=np.delete(profile_height,np.where(profile_height[:,0]<x_lower),axis=0)
 
         all_profile_height.append(profile_height)
-
+        all_layer = list(range(1,47))
+        
         h_std_thres=0.48
         h_std = np.std(profile_height[:,1])
         if i>2 and h_std>h_std_thres:
             all_correction_layer.append(i)
-
-        if (plot_correction and (i in show_layer)):
+        
+        if (plot_correction and (i in all_layer)):
             # weld path
             if forward_flag:
                 curve_sliced_relative=[np.array([ 3.30445152e+01,  1.72700000e+00,  3.31751393e+01,  1.55554573e-04,
@@ -192,7 +193,7 @@ for dataset in datasets:
             h_std_thres=h_std_thres
             nominal_v=18
             input_dh=1.7
-            num_l=40
+            num_l=23
             ############
 
             ### delete noise
@@ -345,56 +346,83 @@ for dataset in datasets:
                 all_profile_v_plot.extend(np.array([p[:,0],np.repeat(this_weld_v[seg_i],len(p[:,0]))]).T)
             all_profile_plot=np.array(all_profile_plot)
             all_profile_v_plot=np.array(all_profile_v_plot)
+    
             
-            fig, ax1 = plt.subplots()
-            ax2 = ax1.twinx()
-            ax1.scatter(profile_height[:,0],profile_height[:,1],label='Height Layer'+str(i))
-            ax1.scatter(next_profile_height[:,0],next_profile_height[:,1],label='Height Layer'+str(i+1))
-            ax2.plot(all_profile_v_plot[:,0],all_profile_v_plot[:,1],label='Planned Corrected Speed')
-            ax2.plot(robot_p_S1TCP[:,0],robot_v_S1TCP,label='Actual Cartesian Speed')
-            ax1.set_xlabel('X-axis (Lambda) (mm)')
-            ax1.set_ylabel('Height (mm)', color='g')
-            ax2.set_ylabel('Speed (mm/sec)', color='b')
-            ax1.legend(loc=0)
-            ax2.legend(loc=0)
-            plt.title("Height and Speed, 40 MoveL")
-            plt.legend()
-            plt.show()
+            # fig, ax1 = plt.subplots()
+            # ax2 = ax1.twinx()
+            # ax1.scatter(profile_height[:,0],profile_height[:,1],label='Height Layer'+str(i))
+            # ax1.scatter(next_profile_height[:,0],next_profile_height[:,1],label='Height Layer'+str(i+1))
+            # ax2.plot(all_profile_v_plot[:,0],all_profile_v_plot[:,1],label='Planned Corrected Speed')
+            # ax2.plot(robot_p_S1TCP[:,0],robot_v_S1TCP,label='Actual Cartesian Speed')
+            # ax1.set_xlabel('X-axis (Lambda) (mm)')
+            # ax1.set_ylabel('Height (mm)', color='g')
+            # ax2.set_ylabel('Speed (mm/sec)', color='b')
+            # ax1.legend(loc=0)
+            # ax2.legend(loc=0)
+            # plt.title("Height and Speed, 40 MoveL")
+            # plt.legend()
+            # plt.show()
+            # print('dh_in_layer[:,0]',dh_in_layer[:,0])
+            # print('robot_p_S1TCP[:,0]',robot_p_S1TCP[:,0])
+            # fig, ax1 = plt.subplots()
+            # ax2 = ax1.twinx()
+            # ax1.scatter(dh_in_layer[:,0],dh_in_layer[:,1],label='dH L'+str(i)+'L'+str(i+1))
+            # ax2.plot(robot_p_S1TCP[:,0],robot_v_S1TCP,label='Actual Cartesian Speed')
+            # ax1.set_xlabel('X-axis (Lambda) (mm)')
+            # ax1.set_ylabel('dH (mm)', color='g')
+            # ax2.set_ylabel('Speed (mm/sec)', color='b')
+            # ax1.legend(loc=0)
+            # ax2.legend(loc=0)
+            # plt.title("dH and Speed, 40 MoveL")
+            # plt.legend()
+            # plt.show()
 
-            fig, ax1 = plt.subplots()
-            ax2 = ax1.twinx()
-            ax1.scatter(dh_in_layer[:,0],dh_in_layer[:,1],label='dH L'+str(i)+'L'+str(i+1))
-            ax2.plot(robot_p_S1TCP[:,0],robot_v_S1TCP,label='Actual Cartesian Speed')
-            ax1.set_xlabel('X-axis (Lambda) (mm)')
-            ax1.set_ylabel('dH (mm)', color='g')
-            ax2.set_ylabel('Speed (mm/sec)', color='b')
-            ax1.legend(loc=0)
-            ax2.legend(loc=0)
-            plt.title("dH and Speed, 40 MoveL")
-            plt.legend()
-            plt.show()
+            # fig, ax1 = plt.subplots()
+            # ax2 = ax1.twinx()
+            # ax1.scatter(dh_in_layer[:,0],dh_in_layer[:,1],label='dH L'+str(i)+'L'+str(i+1))
+            # ax2.plot(robot_p_S1TCP[:,0],robot_a_S1TCP,label='Actual Cart Acc')
+            # ax1.set_xlabel('X-axis (Lambda) (mm)')
+            # ax1.set_ylabel('dH (mm)', color='g')
+            # ax2.set_ylabel('Acceleration (mm/sec^2)', color='b')
+            # ax1.legend(loc=2)
+            # ax2.legend(loc=1)
+            # plt.title("dH and Acceleration, 40 MoveL")
+            # plt.show()
+            # 生成对应长度的索引
+            # 用于存储对应的robot_v_S1TCP的值
+            robot_v_S1TCP_res = np.zeros_like(dh_in_layer[:, 1])
 
-            fig, ax1 = plt.subplots()
-            ax2 = ax1.twinx()
-            ax1.scatter(dh_in_layer[:,0],dh_in_layer[:,1],label='dH L'+str(i)+'L'+str(i+1))
-            ax2.plot(robot_p_S1TCP[:,0],robot_a_S1TCP,label='Actual Cart Acc')
-            ax1.set_xlabel('X-axis (Lambda) (mm)')
-            ax1.set_ylabel('dH (mm)', color='g')
-            ax2.set_ylabel('Acceleration (mm/sec^2)', color='b')
-            ax1.legend(loc=2)
-            ax2.legend(loc=1)
-            plt.title("dH and Acceleration, 40 MoveL")
-            plt.show()
-            
+            # 对于每一个时间点dh_in_layer[i, 0]，找到最接近它的时间点robot_p_S1TCP[j, 0]
+            for i in range(len(dh_in_layer)):
+                j = np.argmin(np.abs(robot_p_S1TCP[:, 0] - dh_in_layer[i, 0]))
+                robot_v_S1TCP_res[i] = robot_v_S1TCP[j]
+            dh_in_layer_res = dh_in_layer[:, 1]
+            all_data.append([dh_in_layer_res[30:-30], robot_v_S1TCP_res[30:-30]])
+            # # 创建一个新的figure
+            # plt.figure()
+
+            # # 绘制dh_in_layer[:, 1]
+            # plt.plot(dh_in_layer[:, 0], dh_in_layer[:, 1], label='dh_in_layer[:, 1]')
+
+            # # 绘制对应的robot_v_S1TCP
+            # plt.plot(dh_in_layer[:, 0], robot_v_S1TCP_res, label='robot_v_S1TCP_res')
+
+            # # 添加图例
+            # plt.legend()
+
+            # # 显示图表
+            # plt.show()
+            # exit()
         forward_flag= not forward_flag
-
         all_h_mean.append(np.mean(profile_height[:,1]))
         all_h_std.append(np.std(profile_height[:,1]))
 
     i=0
     m_size=12
-    # print('profile_height',profile_height)
-    # print('all_profile_height',all_profile_height)
+    print('profile_height',profile_height)
+    print('len(profile_height)',len(profile_height))
+    print('all_profile_height',all_profile_height)
+    print('len(all_profile_height)',len(all_profile_height))
     for profile_height in all_profile_height:
         if i in all_correction_layer:
             if i==all_correction_layer[0]:
@@ -419,23 +447,75 @@ for dataset in datasets:
     datasets_h_mean[dataset]=np.array(all_h_mean)
     datasets_h_std[dataset]=np.array(all_h_std)
 
-for dataset in datasets:
-    plt.plot(np.arange(len(datasets_h_mean[dataset])),datasets_h_mean[dataset],'-o',label=dataset)
+# for dataset in datasets:
+#     plt.plot(np.arange(len(datasets_h_mean[dataset])),datasets_h_mean[dataset],'-o',label=dataset)
+# plt.legend()
+# plt.xlabel('Layer')
+# plt.ylabel('Mean Height (mm)')
+# plt.title("Mean Height")
+# plt.show()
+# print('datasets_h_mean[dataset]',datasets_h_mean[dataset])
+# datasets_without_baselayer = datasets_h_mean[dataset][2:]
+# diff_arr = np.diff(datasets_without_baselayer)
+# print(diff_arr)
+# print(len(datasets_without_baselayer))
+# for dataset in datasets:
+#     plt.plot(np.arange(len(datasets_h_std[dataset])),datasets_h_std[dataset],'-o',label=dataset)
+# plt.axhline(y = 0.48, color = 'r', linestyle = '-')
+# plt.legend()
+# plt.xlabel('Layer')
+# plt.ylabel('Height STD (mm)')
+# plt.title("Height STD")
+# plt.show()
+print('all_data',all_data)
+print('len(all_data)',len(all_data))
+plt.figure()
+
+# 遍历all_data中的每一个元素
+for data in all_data:
+    x, y = data  # 每一个元素都是一个[x, y]的形式，其中x, y都是数组
+    log_x = np.log(x)  # 计算x的对数
+    log_y = np.log(y)  # 计算y的对数
+    plt.scatter(log_y, log_x, color='blue',s = 10)  # 使用蓝色绘制点，设置标签为'test_data'
+
+# 计算线的x和y
+line_x = np.linspace(0, 5, 1000)  # x的范围和步长
+line_y = -0.6201508222063208 * line_x + 1.8491301017700346  # 计算y
+
+# 绘制线
+plt.plot(line_x, line_y, color='red', label='loglog model of 100ipm')  # 使用红色绘制线，设置标签为'loglog model of 220ipm'
+
+# 设置x轴和y轴的标签
+plt.xlabel('log(v) (mm/s)')
+plt.ylabel('log(dh) (mm)')
+
+
+# 显示图例
 plt.legend()
-plt.xlabel('Layer')
-plt.ylabel('Mean Height (mm)')
-plt.title("Mean Height")
+
+# 显示图表
 plt.show()
-print('datasets_h_mean[dataset]',datasets_h_mean[dataset])
-datasets_without_baselayer = datasets_h_mean[dataset][2:]
-diff_arr = np.diff(datasets_without_baselayer)
-print(diff_arr)
-print(len(datasets_without_baselayer))
-for dataset in datasets:
-    plt.plot(np.arange(len(datasets_h_std[dataset])),datasets_h_std[dataset],'-o',label=dataset)
-plt.axhline(y = 0.48, color = 'r', linestyle = '-')
-plt.legend()
-plt.xlabel('Layer')
-plt.ylabel('Height STD (mm)')
-plt.title("Height STD")
-plt.show()
+
+# plt.figure()
+
+# # 遍历all_data中的每一个元素
+# for data in all_data:
+#     x, y = data  # 每一个元素都是一个[x, y]的形式，其中x, y都是数组
+#     plt.scatter(y, x, color='blue')  # 使用蓝色绘制点，设置标签为'test_data'
+
+# # 计算线的x和y
+# line_x = np.linspace(0, 35, 1000)  # x的范围和步长
+# line_y = 0.002428 * line_x**2 - 0.1580 * line_x + 3.491  # 计算y
+
+# # 绘制线
+# plt.plot(line_x, line_y, color='red', label='model')  # 使用红色绘制线，设置标签为'model'
+
+# # 设置x轴和y轴的标签
+# plt.xlabel('v (mm/s)')
+# plt.ylabel('dh (mm)')
+
+# # 显示图例
+# plt.legend()
+
+# # 显示图表
+# plt.show()

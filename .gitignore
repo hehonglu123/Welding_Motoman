@@ -371,7 +371,7 @@ data/**/*.pcd
 scan/data/no_base_layer.stl
 scan/data/no_base_plate.stl
 scan/data/surface.stl
-
+data/
 data/wall_weld_test/baseline_test_weld_scan*
 data/wall_weld_test/baseline_weld_scan*
 data/wall_weld_test/full_test_weld_scan*

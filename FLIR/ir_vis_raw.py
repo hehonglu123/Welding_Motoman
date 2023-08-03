@@ -4,9 +4,13 @@ import pickle, sys
 import matplotlib.animation as animation
 from tkinter import *
 import time
+import os
+import glob
 
 with open('recorded_data/layer_150/ir_recording.pickle', 'rb') as file:
-    ir_recording=pickle.load(file)
+    ir_recording=pickle.
+    load(file)
+print(len(ir_recording))
 freq=13
 rot_ir_recording = [None] * len(ir_recording)
 vmin = 8000
