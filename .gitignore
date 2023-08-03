@@ -266,7 +266,7 @@ typings/
 **/*.Server/GeneratedArtifacts
 **/*.Server/ModelManifest.xml
 _Pvt_Extensions
-
+FLIR/recorded_data
 # Paket dependency manager
 .paket/paket.exe
 paket-files/
