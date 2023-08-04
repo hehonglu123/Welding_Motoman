@@ -21,7 +21,7 @@ dataset_date='0801'
 
 config_dir='../config/'
 
-robot_type = 'R2'
+robot_type = 'R1'
 
 if robot_type == 'R1':
     robot=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',\
@@ -284,8 +284,11 @@ plot_grad=False
 plot_error=True
 save_PH = True
 all_testing_pose=np.arange(N_per_pose)
+# max_iteration = 500
 max_iteration = 200
 terminate_eps = 0.0002
+terminate_ori_error=999
+# terminate_ori_error=0.05
 total_grad_sample = 40
 dP_up_range = 0.05
 dP_low_range = 0.01
@@ -294,10 +297,12 @@ dH_up_range = np.radians(0.1)
 dH_low_range = np.radians(0.03)
 H_size = 6
 dH_rotate_axis = [[Rx,Ry],[Rz,Rx],[Rz,Rx],[Ry,Rz],[Rz,Rx],[Ry,Rz]]
-alpha=0.3
+alpha=0.5
 weight_ori = 0.1
+# weight_ori = 1
 weight_pos = 1
 lambda_H = 10
+# lambda_H = 1
 lambda_P = 1
 start_t = time.time()
 
@@ -386,7 +391,7 @@ for N in train_set:
         pos_error_norm_progress.append(np.linalg.norm(error_pos,ord=2,axis=1))
         ori_error_progress.append(error_ori[0])
         ori_error_norm_progress.append(np.linalg.norm(error_ori,ord=2,axis=1))
-        if iter_N>0 and np.linalg.norm(pos_error_norm_progress[-1]-pos_error_norm_progress[-2])<terminate_eps:
+        if iter_N>0 and np.linalg.norm(pos_error_norm_progress[-1]-pos_error_norm_progress[-2])<terminate_eps and np.mean(ori_error_norm_progress[-1])<terminate_ori_error:
             break
 
         # print(np.array(d_T_all).shape)
@@ -424,6 +429,7 @@ for N in train_set:
             robot_opt_H[:,i] = new_H
 
     print("Final Mean Position Error:",np.mean(pos_error_norm_progress[-1]))
+    print("Final Mean Orientation Error:",np.mean(ori_error_norm_progress[-1]))
     print('P:',np.round(robot_opt_P,3).T)
     print('H:',np.round(robot_opt_H,3).T)
 
