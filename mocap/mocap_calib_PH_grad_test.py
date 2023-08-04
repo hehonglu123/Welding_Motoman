@@ -16,12 +16,11 @@ Rx=np.array([1,0,0])
 Ry=np.array([0,1,0])
 Rz=np.array([0,0,1])
 
-
 ph_dataset_date='0801'
 test_dataset_date='0801'
 config_dir='../config/'
 
-robot_type = 'R2'
+robot_type = 'R1'
 
 if robot_type == 'R1':
     robot=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',\
@@ -300,13 +299,13 @@ plot_origin=True
 if plot_origin:
     plt.plot(error_pos_origin_norm,'-o',markersize=1,label='Origin PH')    
 plt.plot(error_pos_baseline_norm,'-o',markersize=1,label='CPA PH')
-plt.plot(error_pos_PHZero_norm,'-o',markersize=1,label='Zero PH')
-plt.plot(error_pos_onePH_norm,'-o',markersize=1,label='One PH')
-plt.plot(error_pos_near_norm,'-o',markersize=1,label='Nearest PH')
+# plt.plot(error_pos_PHZero_norm,'-o',markersize=1,label='Zero PH')
+# plt.plot(error_pos_onePH_norm,'-o',markersize=1,label='One PH')
+# plt.plot(error_pos_near_norm,'-o',markersize=1,label='Nearest PH')
 plt.plot(error_pos_lin_norm,'-o',markersize=1,label='Linear Interp PH')
-plt.plot(error_pos_cub_norm,'-o',markersize=1,label='Cubic Interp PH')
-plt.plot(error_pos_rbf_norm,'-o',markersize=1,label='RBF Interp PH')
-plt.plot(error_pos_fbf_norm,'-o',markersize=1,label='FBF Interp PH')
+# plt.plot(error_pos_cub_norm,'-o',markersize=1,label='Cubic Interp PH')
+# plt.plot(error_pos_rbf_norm,'-o',markersize=1,label='RBF Interp PH')
+plt.plot(error_pos_fbf_norm,'-o',markersize=1,label='Fourier Basis PH')
 plt.legend()
 plt.title("Position Error using Optimized PH")
 # plt.xticks(np.arange(0,total_test_N,100),np.round(q1_all[::100]))
@@ -320,13 +319,13 @@ plt.show()
 if plot_origin:
     plt.plot(error_ori_origin_norm,'-o',markersize=1,label='Origin PH')
 plt.plot(error_ori_baseline_norm,'-o',markersize=1,label='CPA PH')
-plt.plot(error_ori_PHZero_norm,'-o',markersize=1,label='Zero PH')
-plt.plot(error_ori_onePH_norm,'-o',markersize=1,label='One PH')
-plt.plot(error_ori_near_norm,'-o',markersize=1,label='Nearest PH')
+# plt.plot(error_ori_PHZero_norm,'-o',markersize=1,label='Zero PH')
+# plt.plot(error_ori_onePH_norm,'-o',markersize=1,label='One PH')
+# plt.plot(error_ori_near_norm,'-o',markersize=1,label='Nearest PH')
 plt.plot(error_ori_lin_norm,'-o',markersize=1,label='Linear Interp PH')
-plt.plot(error_ori_cub_norm,'-o',markersize=1,label='Cubic Interp PH')
-plt.plot(error_ori_rbf_norm,'-o',markersize=1,label='RBF Interp PH')
-plt.plot(error_ori_fbf_norm,'-o',markersize=1,label='FBF Interp PH')
+# plt.plot(error_ori_cub_norm,'-o',markersize=1,label='Cubic Interp PH')
+# plt.plot(error_ori_rbf_norm,'-o',markersize=1,label='RBF Interp PH')
+plt.plot(error_ori_fbf_norm,'-o',markersize=1,label='Fourier Basis PH')
 plt.legend()
 plt.title("Orientation Error using Optimized PH")
 # plt.xticks(np.arange(0,total_test_N,100),np.round(q1_all[::100]))
