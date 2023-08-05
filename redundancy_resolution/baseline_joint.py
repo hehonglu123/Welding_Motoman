@@ -12,20 +12,12 @@ def main():
 	positioner=positioner_obj('D500B',def_path='../config/D500B_robot_default_config.yml',tool_file_path='../config/positioner_tcp.csv',\
 		pulse2deg_file_path='../config/D500B_pulse2deg_real.csv',base_transformation_file='../config/D500B_pose.csv')
 	
-	dataset='wall/'
-	sliced_alg='dense_slice/'
+	dataset='cup/'
+	sliced_alg='circular_slice_shifted/'
 	data_dir='../data/'+dataset+sliced_alg
 	with open(data_dir+'slicing.yml', 'r') as file:
 		slicing_meta = yaml.safe_load(file)
 		
-
-	###################################################################
-	# dataset='blade0.1/'
-	# sliced_alg='auto_slice/'
-	# data_dir='../data/'+dataset+sliced_alg
-	# num_layers=757
-	# num_baselayers=2
-	# q_positioner_seed=[0,-2]
 
 	curve_sliced_relative_base=[]
 	curve_sliced_relative=[]

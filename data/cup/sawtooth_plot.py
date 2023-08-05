@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # Define the parameters
-magnitude = 0.3*2
+magnitude = np.pi*2
 frequency = 0.1
 osc_center=-0.3
 # Define the time range
