@@ -32,10 +32,10 @@ sliced_alg='circular_slice_shifted/'
 data_dir='../../data/'+dataset+sliced_alg
 with open(data_dir+'slicing.yml', 'r') as file:
 	slicing_meta = yaml.safe_load(file)
-recorded_dir='recorded_data/cup_ER316L/'
+recorded_dir='recorded_data/'
 
 waypoint_distance=7 	###waypoint separation
-layer_height_num=int(1.7/slicing_meta['line_resolution'])
+layer_height_num=int(1.8/slicing_meta['line_resolution'])
 layer_width_num=int(4/slicing_meta['line_resolution'])
 
 
@@ -50,9 +50,9 @@ fronius_client = fronius_sub.GetDefaultClientWait(1)      #connect, timeout=30s
 welder_state_sub=fronius_sub.SubscribeWire("welder_state")
 welder_state_sub.WireValueChanged += wire_cb
 hflags_const = RRN.GetConstants("experimental.fronius", fronius_client)["WelderStateHighFlags"]
-fronius_client.job_number = 200
+fronius_client.job_number = 203
 fronius_client.prepare_welder()
-vd_relative=5
+vd_relative=12
 ########################################################RR STREAMING########################################################
 
 RR_robot_sub = RRN.SubscribeService('rr+tcp://192.168.55.15:59945?service=robot')
@@ -73,8 +73,11 @@ SS=StreamingSend(RR_robot,RR_robot_state,RobotJointCommand,streaming_rate)
 
 
 ###########################################layer welding############################################
-num_layer_start=int(0*layer_height_num)	###modify layer num here
-num_layer_end=int(1*layer_height_num)
+layer_start=32
+layers2weld=10
+layer_counts=layer_start
+num_layer_start=int(layer_start*layer_height_num)	###modify layer num here
+num_layer_end=int((layer_start+layers2weld)*layer_height_num)
 res, robot_state, _ = RR_robot_state.TryGetInValue()
 q_prev=robot_state.joint_position[-2:]
 # q_prev=np.array([9.53E-02,-2.71E+00])	###for motosim tests only
@@ -109,8 +112,8 @@ for layer in range(num_layer_start,num_layer_end,layer_height_num):
 		breakpoints=SS.get_breakpoints(lam_relative_dense,vd_relative)
 
 
-		###find which end to start depending on how close to joint limit
-		if positioner.upper_limit[1]-q_prev[1]<q_prev[1]-positioner.lower_limit[1]:
+		###find which end to start depending on layer count
+		if layer_counts%2==1:
 			breakpoints=np.flip(breakpoints)
 
 
@@ -150,11 +153,12 @@ for layer in range(num_layer_start,num_layer_end,layer_height_num):
 		ts,js=SS.traj_streaming(curve_js_all,ctrl_joints=np.array([1,1,1,1,1,1,0,0,0,0,0,0,1,1]))
 		timestamp_robot.extend(ts)
 		joint_recording.extend(js)
-		time.sleep(0.2)
+		time.sleep(0.1)
 		fronius_client.stop_weld()
 
 		q_prev=positioner_js_dense[breakpoints[-1]]
-		
+		layer_counts+=1
+
 		if logging:
 			np.savetxt(local_recorded_dir +'welder_info.csv',
 						np.array([timestamp, voltage, current, feedrate, energy]).T, delimiter=',',
