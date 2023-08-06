@@ -4,6 +4,7 @@ import numpy as np
 sys.path.append('../toolbox/')
 from flir_toolbox import *
 
+
 # Load the IR recording data from the pickle file
 with open('../../recorded_data/weld_scan_job205_v152023_07_27_13_23_06/layer_150/ir_recording.pickle', 'rb') as file:
     ir_recording = pickle.load(file)
@@ -24,6 +25,9 @@ colorbar_max = np.max(ir_recording)
 
 for i in range(len(ir_recording)):
     # print(np.max(ir_recording[i]), np.min(ir_recording[i]))
+    centroid, bbox=flame_detection(ir_recording[i])
+    
+
     temp=counts2temp(ir_recording[i].flatten(),6.39661118e+03, 1.40469989e+03, 1.00000008e+00, 8.69393436e+00, 8.40029488e+03,Emiss=0.13).reshape((240,320))
     temp[temp > 1300] = 1300    ##thresholding
     # Normalize the data to [0, 255]
@@ -36,7 +40,12 @@ for i in range(len(ir_recording)):
     ir_bgr = cv2.applyColorMap(ir_normalized.astype(np.uint8), cv2.COLORMAP_INFERNO)
 
     # add bounding box
-    cv2.rectangle(ir_bgr, (165,130), (175,140), (0,255,0), thickness=1)
+    if centroid is not None:
+        # cv2.rectangle(ir_bgr, (bbox[0],bbox[1]), (bbox[0]+bbox[2],bbox[1]+bbox[3]), (0,255,0), thickness=1)   #flame bbox
+        bbox_below_size=10
+        centroid_below=(int(centroid[0]+bbox[2]/2+bbox_below_size/2),centroid[1])
+        cv2.rectangle(ir_bgr, (int(centroid_below[0]-bbox_below_size/2),int(centroid_below[1]-bbox_below_size/2)), (int(centroid_below[0]+bbox_below_size/2),int(centroid_below[1]+bbox_below_size/2)), (0,255,0), thickness=1)   #flame below centroid
+
 
     # Write the IR image to the video file
     result.write(ir_bgr)
