@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pickle, sys
 
-with open('recorded_data/slice_180_0_flir.pickle', 'rb') as file:
+with open('../../recorded_data/weld_scan_job205_v152023_07_27_13_23_06/layer_150/ir_recording.pickle', 'rb') as file:
     ir_recording=pickle.load(file)
 freq=13
 
