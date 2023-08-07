@@ -93,8 +93,8 @@ def to_frame(curve_p,curve_R,mocap_stamps,target_frame,markers_id):
 config_dir='../config/'
 
 # robot_type='R1'
-# robot_type='R2'
-robot_type='S1'
+robot_type='R2'
+# robot_type='S1'
 
 # all_datasets=['train_data','valid_data_1','valid_data_2']
 dataset_date='0804'
