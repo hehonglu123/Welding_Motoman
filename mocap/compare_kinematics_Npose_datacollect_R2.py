@@ -14,7 +14,7 @@ import time
 import pickle
 from MocapPoseListener import *
 
-dataset_date = '0801'
+dataset_date = '0804'
 
 config_dir='../config/'
 robot_scan=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.yml',tool_file_path=config_dir+'mti.csv',\
@@ -22,10 +22,17 @@ pulse2deg_file_path=config_dir+'MA1440_A0_pulse2deg_real.csv',\
 base_marker_config_file=config_dir+'MA1440_'+dataset_date+'_marker_config.yaml',tool_marker_config_file=config_dir+'mti_'+dataset_date+'_marker_config.yaml')
 
 test_qs = []
-sample_q = np.radians([[37,35,-2,19,-53,-2],[-34,40,0,-15,-49,44],\
-                       [0,-50,-50,0,-22,0],[0,0,0,0,0,0],\
-                       [0,45,20,0,22,0],[37,35,-2,19,-53,-2],[0,0,0,0,0,0]])
-sample_N = [369,238,193,203,264,233] # len(sample_q)-1
+# sample_q = np.radians([[37,35,-2,19,-53,-2],[-34,40,0,-15,-49,44],\
+#                        [0,-50,-50,0,-22,0],[0,0,0,0,0,0],\
+#                        [0,45,20,0,22,0],[37,35,-2,19,-53,-2],[0,0,0,0,0,0]])
+
+# sample_q = np.radians([[37.6,39.3,2.8,31.6,-44.7,-20],\
+#                        [-26.0,35.9,-2.8,-30.8,-49.7,61.2],\
+#                        [0,-50,-40,0,-22,0],[0,0,0,0,0,0],\
+#                        [0,45,20,0,22,0],[37.6,39.3,2.8,31.6,-44.7,-20],[0,0,0,0,0,0]])
+sample_q = np.radians([[0,45,20,0,22,0],[37,35,-2,19,-53,-2],[0,0,0,0,0,0]])
+# sample_N = [369,238,193,203,264,233] # len(sample_q)-1
+sample_N = [264,233] # len(sample_q)-1
 # sample_N = [2,2,2,2,2,2] # len(sample_q)-1
 for i in range(len(sample_N)):
     start_T = robot_scan.fwd(sample_q[i])
@@ -71,6 +78,7 @@ mp=MotionProgram(ROBOT_CHOICE='RB2',pulse2deg=robot_scan.pulse2deg)
 start_q = test_qs[0]+np.array([1,1,1,1,1,1])
 mp.MoveJ(start_q,5,0)
 robot_client.execute_motion_program(mp)
+time.sleep(3)
 
 mp=MotionProgram(ROBOT_CHOICE='RB2',pulse2deg=robot_scan.pulse2deg)
 for N in range(repeats_N):

@@ -45,14 +45,16 @@ class CalibRobotPH:
         for j in range(len(paths)-1,-1,-1): # from axis 6 to axis 1
             mp=MotionProgram(ROBOT_CHOICE=ROBOT_CHOICE,pulse2deg=rob_p2d)
             mp.MoveJ(start_p[j],rob_speed,0)
+            # mp.MoveJ(paths[j][0],rob_speed,0)
             client.execute_motion_program(mp)
+            time.sleep(3)
 
-            self.mpl_obj.run_pose_listener()
             mp=MotionProgram(ROBOT_CHOICE=ROBOT_CHOICE,pulse2deg=rob_p2d)
             for N in range(repeat_N):
                 mp.MoveJ(paths[j][0],rob_speed,0)
                 mp.MoveJ(paths[j][1],rob_speed,0)
             mp.MoveJ(start_p[j],rob_speed,0)
+            self.mpl_obj.run_pose_listener()
             robot_stamps,curve_exe, job_line,job_step = client.execute_motion_program(mp)
             self.mpl_obj.stop_pose_listener()
             curve_p,curve_R,timestamps = self.mpl_obj.get_frames_traj()
@@ -255,5 +257,5 @@ def calib_R1():
 if __name__=='__main__':
 
     # calib_R1()
-    calib_S1()
-    # calib_R2()
+    # calib_S1()
+    calib_R2()
