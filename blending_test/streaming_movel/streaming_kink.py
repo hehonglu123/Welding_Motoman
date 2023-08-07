@@ -85,7 +85,7 @@ def main():
 		
 		q_all=np.array(q_all)
 		timestamp_recording,joint_recording=SS.traj_streaming(q_all,ctrl_joints=np.array([1,1,1,1,1,1,0,0,0,0,0,0,0,0]))
-		np.savetxt('streaming_test/wfronius/joint_recording_%i.csv'%vd,np.hstack((timestamp_recording.reshape(-1, 1),joint_recording)),delimiter=',')
+		np.savetxt('streaming_test/wofronius/joint_recording_%i.csv'%vd,np.hstack((timestamp_recording.reshape(-1, 1),joint_recording)),delimiter=',')
 
 if __name__ == '__main__':
 	main()

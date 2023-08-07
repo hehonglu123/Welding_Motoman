@@ -9,7 +9,7 @@ class WeldSend(object):
 	def __init__(self,client) -> None:
 		self.client=client
 		self.ROBOT_CHOICE_MAP={'MA2010_A0':'RB1','MA1440_A0':'RB2','D500B':'ST1'}
-		self.ROBOT_TOOL_MAP={'MA2010_A0':12,'MA1440_A0':2}
+		self.ROBOT_TOOL_MAP={'MA2010_A0':12,'MA1440_A0':2,'D500B':0}
 
 	def jog_single(self,robot,q,v=1):
 		mp=MotionProgram(ROBOT_CHOICE=self.ROBOT_CHOICE_MAP[robot.robot_name],pulse2deg=robot.pulse2deg, tool_num=self.ROBOT_TOOL_MAP[robot.robot_name])

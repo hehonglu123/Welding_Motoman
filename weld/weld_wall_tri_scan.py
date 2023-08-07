@@ -23,7 +23,6 @@ sliced_alg='dense_slice/'
 data_dir='../data/'+dataset+sliced_alg
 with open(data_dir+'slicing.yml', 'r') as file:
 	slicing_meta = yaml.safe_load(file)
-recorded_dir='recorded_data/wall/'
 vd_relative=15
 feedrate_job=205
 

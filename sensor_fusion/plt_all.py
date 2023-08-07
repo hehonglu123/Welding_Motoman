@@ -51,7 +51,7 @@ ax2.plot(welding_data[:,0],welding_data[:,2],label='current')
 ax2.plot(welding_data[:,0],welding_data[:,3],c='gray',label='feedrate')
 
 
-# plt.show()
+# plt.show() 
 
 ##height profile
 profile_height=np.load(data_dir+'scans/height_profile.npy')

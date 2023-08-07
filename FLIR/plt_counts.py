@@ -13,7 +13,7 @@ with open(data_dir+'ir_recording.pickle', 'rb') as file:
     ir_recording = pickle.load(file)
 ir_ts=np.loadtxt(data_dir+'ir_stamps.csv', delimiter=',')
 ir_ts=ir_ts-ir_ts[0]
-center_brightness=np.average(ir_recording[:,100:140,140:180],axis=(1,2))
+center_brightness=np.average(ir_recording[:,110:140,150:180],axis=(1,2))
 all_birghtness=np.average(ir_recording,axis=(1,2))
 plt.plot(ir_ts, center_brightness, c='red', label='ir center counts')
 plt.plot(ir_ts, all_birghtness, c='blue', label='ir all counts')

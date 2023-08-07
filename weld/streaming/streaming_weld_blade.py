@@ -160,8 +160,8 @@ res, robot_state, _ = RR_robot_state.TryGetInValue()
 q_prev=robot_state.joint_position[:6]
 
 
-num_layer_start=int(13*layer_height_num)
-num_layer_end=int(23*layer_height_num)
+num_layer_start=int(49*layer_height_num)
+num_layer_end=int(55*layer_height_num)
 num_sections=1
 for layer in range(num_layer_start,num_layer_end,layer_height_num):
 	num_sections_prev=num_sections
@@ -208,8 +208,7 @@ for layer in range(num_layer_start,num_layer_end,layer_height_num):
 			waypoint_pose=robot.fwd(rob1_js_dense[breakpoints[0]])
 			waypoint_pose.p[-1]+=30
 			waypoint_q=robot.inv(waypoint_pose.p,waypoint_pose.R,rob1_js_dense[breakpoints[0]])[0]
-
-			SS.jog2q(np.hstack((waypoint_q,rob2_js[breakpoints[0]],positioner_js_dense[breakpoints[0]])))
+			SS.jog2q(np.hstack((waypoint_q,rob2_js_dense[breakpoints[0]],positioner_js_dense[breakpoints[0]])))
 
 
 		curve_js_all=np.hstack((rob1_js_dense[breakpoints],rob2_js_dense[breakpoints],positioner_js_dense[breakpoints]))
@@ -221,7 +220,7 @@ for layer in range(num_layer_start,num_layer_end,layer_height_num):
 		fronius_client.start_weld()
 		robot_ts,robot_js=SS.traj_streaming(curve_js_all,ctrl_joints=np.ones(14))
 
-		time.sleep(0.12)
+		time.sleep(0.1)
 		fronius_client.stop_weld()
 
 		local_recorded_dir='recorded_data/blade_recording/'
