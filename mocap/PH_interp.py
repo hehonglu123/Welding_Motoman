@@ -184,6 +184,8 @@ class PH_Param(object):
         markdown_str=''
         markdown_str+='||Mean (mm)|Std (mm)|\n'
         markdown_str+='|-|-|-|\n'
+        draw_mean=[]
+        draw_std=[]
         for i in range(len(nom_P[0])):
             p_dist = []
             for q in self.train_q:
@@ -203,13 +205,21 @@ class PH_Param(object):
             # plt.show()
 
             markdown_str+='|P'+str(i+1)+'|'+format(round(np.mean(p_dist),4),'.4f')+'|'+format(round(np.std(p_dist),4),'.4f')+'|\n'
+            draw_mean.append(np.mean(p_dist))
+            draw_std.append(np.std(p_dist))
         print(markdown_str)
+        plt.errorbar(np.arange(len(draw_mean)),draw_mean,draw_std)
+        plt.xticks(np.arange(len(draw_mean)),['P1','P2','P3','P4','P5','P6','P7'])
+        plt.title('P Variation')
+        plt.show()
 
         # plot H
         print("**H Variation**")
         markdown_str=''
         markdown_str+='||Mean (deg)|Std (deg)|\n'
         markdown_str+='|-|-|-|\n'
+        draw_mean=[]
+        draw_std=[]
         for i in range(len(nom_H[0])):
             h_ang = []
             for q in self.train_q:
@@ -233,7 +243,13 @@ class PH_Param(object):
             # plt.show()
 
             markdown_str+='|H'+str(i+1)+'|'+format(round(np.mean(h_ang),4),'.4f')+'|'+format(round(np.std(h_ang),4),'.4f')+'|\n'
+            draw_mean.append(np.mean(h_ang))
+            draw_std.append(np.std(h_ang))
         print(markdown_str)
+        plt.errorbar(np.arange(len(draw_mean)),draw_mean,draw_std)
+        plt.xticks(np.arange(len(draw_mean)),['H1','H2','H3','H4','H5','H6'])
+        plt.title('H Variation')
+        plt.show()
 
 if __name__=='__main__':
 
