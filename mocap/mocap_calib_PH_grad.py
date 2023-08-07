@@ -17,11 +17,11 @@ Rx=np.array([1,0,0])
 Ry=np.array([0,1,0])
 Rz=np.array([0,0,1])
 
-dataset_date='0801'
+dataset_date='0804'
 
 config_dir='../config/'
 
-robot_type = 'R1'
+robot_type = 'R2'
 
 if robot_type == 'R1':
     robot=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',\
