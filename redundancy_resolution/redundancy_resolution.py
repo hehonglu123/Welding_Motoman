@@ -229,11 +229,13 @@ class redundancy_resolution(object):
 		###resolve 2DOF positioner joint angle 
 		positioner_js=[]
 		q_prev=q_seed
+
 		for i in range(1,len(curve_sliced_relative)):
 			positioner_js_ith_layer=[]
 			for x in range(len(curve_sliced_relative[i])):
 				positioner_js_ith_layer_xth_section=self.positioner.find_curve_js(-curve_sliced_relative[i][x][:,3:],q_prev)
 
+				q_prev=positioner_js_ith_layer_xth_section[-1]
 				###filter noise
 				if smooth_filter:
 					positioner_js_ith_layer_xth_section[:,0]=moving_average(positioner_js_ith_layer_xth_section[:,0],padding=True)
