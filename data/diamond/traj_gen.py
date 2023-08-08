@@ -64,7 +64,8 @@ def main():
     slope1=(r_middle-r_init)/z_middle
     slope2=-r_middle/(z_end-z_middle)
 
-    line_resolution=1
+    line_resolution=1.8
+    point_distance=1
     z_inc1=line_resolution/slope1
     z_inc2=abs(line_resolution/slope2)
 
@@ -107,16 +108,38 @@ def main():
             z+=z_inc2
             r=r_middle+slope2*(z-z_middle)
 
+        if r<10:    ###tip overhang, connect all sections
+            hex_comb,indices=np.unique(np.vstack(hex_all),axis=0,return_index=True)
+            ith_layer=[np.hstack((hex_comb[np.argsort(indices)],[[z,0,0,-1]]*len(hex_comb)))]
 
-        for hex in hex_all:
-            if len(hex)==0:
-                break
-            #get normal:
-            # normal=get_curve_normal_from_curves(hex,curve_prev)
-            ax.plot3D(hex[::vis_step,0],hex[::vis_step,1],z,'b.-')
-            
+            ax.plot3D(ith_layer[0][::vis_step,0],ith_layer[0][::vis_step,1],ith_layer[0][::vis_step,2],'b.-')
+            ax.quiver(ith_layer[0][::vis_step,0],ith_layer[0][::vis_step,1],ith_layer[0][::vis_step,2],ith_layer[0][::vis_step,3],ith_layer[0][::vis_step,4],ith_layer[0][::vis_step,5],length=5, normalize=True)
 
+
+        else:
+            ith_layer=[]
+            for hex in hex_all:
+                if len(hex)==0:
+                    break
+                hex_section=np.hstack((hex,np.ones((len(hex),1))*z))
+                #get normal:
+                normal=-get_curve_normal_from_curves(hex_section,np.vstack(curve_dense[-1])[:,:3])
+                
+
+                normal[:]=np.average(normal[~np.isnan(normal[:,0])],axis=0)
+
+                hex_section=np.hstack((hex_section,normal))
+                ax.plot3D(hex_section[::vis_step,0],hex_section[::vis_step,1],hex_section[::vis_step,2],'b.-')
+                ax.quiver(hex_section[::vis_step,0],hex_section[::vis_step,1],hex_section[::vis_step,2],hex_section[::vis_step,3],hex_section[::vis_step,4],hex_section[::vis_step,5],length=5, normalize=True)
+
+                ith_layer.append(hex_section)
+        curve_dense.append(ith_layer)
     plt.show()
+
+    
+    for i in range(len(curve_dense)):
+        for x in range(len(curve_dense[i])):
+            np.savetxt('slicing/curve_sliced/slice%i_%i.csv'%(i,x),curve_dense[i][x],delimiter=',')
 
 if __name__ == "__main__":
     main()
