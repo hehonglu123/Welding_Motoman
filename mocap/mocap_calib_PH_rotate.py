@@ -37,21 +37,49 @@ def read_and_convert_frame(filename,target_frame,markers_id):
         # convert everything in basemarker frame
         curve_p,curve_R,mocap_stamps = to_frame(curve_p,curve_R,mocap_stamps,target_frame,markers_id)
 
-        with open(base_filename+'_p.pickle', 'wb') as handle:
-            pickle.dump(curve_p, handle, protocol=pickle.HIGHEST_PROTOCOL)
-        with open(base_filename+'_R.pickle', 'wb') as handle:
-            pickle.dump(curve_R, handle, protocol=pickle.HIGHEST_PROTOCOL)
-        with open(base_filename+'_timestamps.pickle', 'wb') as handle:
-            pickle.dump(mocap_stamps, handle, protocol=pickle.HIGHEST_PROTOCOL)
+        # with open(base_filename+'_p.pickle', 'wb') as handle:
+        #     pickle.dump(curve_p, handle, protocol=pickle.HIGHEST_PROTOCOL)
+        # with open(base_filename+'_R.pickle', 'wb') as handle:
+        #     pickle.dump(curve_R, handle, protocol=pickle.HIGHEST_PROTOCOL)
+        # with open(base_filename+'_timestamps.pickle', 'wb') as handle:
+        #     pickle.dump(mocap_stamps, handle, protocol=pickle.HIGHEST_PROTOCOL)
     
     return curve_p,curve_R,mocap_stamps
 
-def detect_axis(points,rough_axis_direction,calib_marker_ids):
+def cut_adge(points,center,normal,cut_edge_angle):
+    
+    points=np.array(points)
+    z_axis=normal/np.linalg.norm(normal)
+    x_axis=(points[0]-center)/np.linalg.norm((points[0]-center))
+    x_axis=x_axis-np.dot(x_axis,z_axis)*z_axis
+    x_axis=x_axis/np.linalg.norm(x_axis)
+    y_axis=np.cross(z_axis,x_axis)
+    y_axis=y_axis/np.linalg.norm(y_axis)
+    R = np.array([x_axis,y_axis,z_axis])
+    
+    p_transformed = (R@((points-center).T)).T
+    
+    p_atan2 = np.arctan2(p_transformed[:,1],p_transformed[:,0])
+    
+    p_lower_id = np.where(p_atan2<(np.max(p_atan2)-cut_edge_angle))
+    points=points[p_lower_id]
+    p_atan2=p_atan2[p_lower_id]
+    
+    p_upper_id = np.where(p_atan2>(np.min(p_atan2)+cut_edge_angle))
+    points=points[p_upper_id]
+    p_atan2=p_atan2[p_upper_id]
+    
+    return points
+
+def detect_axis(points,rough_axis_direction,calib_marker_ids,cut_edge=False,cut_edge_angle=np.radians(3)):
 
     all_normals=[]
     all_centers=[]
     for i in range(len(calib_marker_ids)):
+        
         center, normal = fitting_3dcircle(points[calib_marker_ids[i]])
+        if cut_edge:
+            points[calib_marker_ids[i]]=cut_adge(points[calib_marker_ids[i]],center,normal,cut_edge_angle)
 
         if calib_marker_ids[i]=='marker8_rigid4':
             print("Radius:",np.mean(np.linalg.norm(points[calib_marker_ids[i]]-center,axis=1)))
@@ -186,7 +214,7 @@ for dataset in all_datasets:
                 zero_config_q[i].extend(robot_q[:,i])
 
         # detect axis
-        this_axis_p,this_axis_normal = detect_axis(curve_p,H_nom[:,j],robot.tool_markers_id)
+        this_axis_p,this_axis_normal = detect_axis(curve_p,H_nom[:,j],robot.tool_markers_id,cut_edge=True)
         H_act[:,j] = this_axis_normal
         axis_p[:,j] = this_axis_p
         print("Axis",j+1,"done.")
