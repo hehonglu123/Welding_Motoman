@@ -24,21 +24,23 @@ import glob
 import yaml
 from math import ceil,floor
 
-ph_dataset_date='0801'
+R1_ph_dataset_date='0801'
+R2_ph_dataset_date='0804'
+S1_ph_dataset_date='0801'
 
 zero_config=np.zeros(6)
 # 0. robots.
 config_dir='../config/'
 robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',d=15,tool_file_path=config_dir+'torch.csv',\
 	pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',\
-    base_marker_config_file=config_dir+'MA2010_'+ph_dataset_date+'_marker_config.yaml',tool_marker_config_file=config_dir+'weldgun_'+ph_dataset_date+'_marker_config.yaml')
-robot_scan=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.yml',tool_file_path=config_dir+'mti_backup0719.csv',\
+    base_marker_config_file=config_dir+'MA2010_'+R1_ph_dataset_date+'_marker_config.yaml',tool_marker_config_file=config_dir+'weldgun_'+R1_ph_dataset_date+'_marker_config.yaml')
+robot_scan=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.yml',tool_file_path=config_dir+'mti.csv',\
 	base_transformation_file=config_dir+'MA1440_pose.csv',pulse2deg_file_path=config_dir+'MA1440_A0_pulse2deg_real.csv',\
-    base_marker_config_file=config_dir+'MA1440_'+ph_dataset_date+'_marker_config.yaml',tool_marker_config_file=config_dir+'mti_'+ph_dataset_date+'_marker_config.yaml')
+    base_marker_config_file=config_dir+'MA1440_'+R2_ph_dataset_date+'_marker_config.yaml',tool_marker_config_file=config_dir+'mti_'+R2_ph_dataset_date+'_marker_config.yaml')
 
 positioner=positioner_obj('D500B',def_path=config_dir+'D500B_robot_default_config.yml',tool_file_path=config_dir+'positioner_tcp.csv',\
     base_transformation_file=config_dir+'D500B_pose.csv',pulse2deg_file_path=config_dir+'D500B_pulse2deg_real.csv',\
-    base_marker_config_file=config_dir+'D500B_'+ph_dataset_date+'_marker_config.yaml',tool_marker_config_file=config_dir+'positioner_tcp_marker_config.yaml')
+    base_marker_config_file=config_dir+'D500B_'+S1_ph_dataset_date+'_marker_config.yaml',tool_marker_config_file=config_dir+'positioner_tcp_marker_config.yaml')
 
 #### change base H to calibrated ones ####
 robot_scan_base = robot_weld.T_base_basemarker.inv()*robot_scan.T_base_basemarker
@@ -55,11 +57,11 @@ positioner.base_H = H_from_RT(positioner_base.R,positioner_base.p)
 # robot_weld.robot.R_tool = deepcopy(robot_weld.T_tool_toolmarker.R)
 # robot_weld.robot.p_tool = deepcopy(robot_weld.T_tool_toolmarker.p)
 
-# robot_scan.robot.P=deepcopy(robot_scan.calib_P)
-# robot_scan.robot.H=deepcopy(robot_scan.calib_H)
+robot_scan.robot.P=deepcopy(robot_scan.calib_P)
+robot_scan.robot.H=deepcopy(robot_scan.calib_H)
 
 #### load R1 kinematic model
-PH_data_dir='../mocap/PH_grad_data/test'+ph_dataset_date+'_R1/train_data_'
+PH_data_dir='../mocap/PH_grad_data/test'+R1_ph_dataset_date+'_R1/train_data_'
 with open(PH_data_dir+'calib_PH_q.pickle','rb') as file:
     PH_q=pickle.load(file)
 nom_P=np.array([[0,0,0],[150,0,0],[0,0,760],\
@@ -69,7 +71,7 @@ nom_H=np.array([[0,0,1],[0,1,0],[0,-1,0],\
 ph_param_r1=PH_Param(nom_P,nom_H)
 ph_param_r1.fit(PH_q,method='FBF')
 #### load R2 kinematic model
-PH_data_dir='../mocap/PH_grad_data/test'+ph_dataset_date+'_R2/train_data_'
+PH_data_dir='../mocap/PH_grad_data/test'+R2_ph_dataset_date+'_R2/train_data_'
 with open(PH_data_dir+'calib_PH_q.pickle','rb') as file:
     PH_q=pickle.load(file)
 nom_P=np.array([[0,0,0],[155,0,0],[0,0,614],\
@@ -79,17 +81,17 @@ nom_H=np.array([[0,0,1],[0,1,0],[0,-1,0],\
 ph_param_r2=PH_Param(nom_P,nom_H)
 ph_param_r2.fit(PH_q,method='FBF')
 #### load S1 kinematic model
-positioner.robot.P=deepcopy(positioner.calib_P)
-positioner.robot.H=deepcopy(positioner.calib_H)
+# positioner.robot.P=deepcopy(positioner.calib_P)
+# positioner.robot.H=deepcopy(positioner.calib_H)
 
 #### data directory
-dataset='cup/'
-sliced_alg='circular_slice_shifted/'
-curve_data_dir = '../data/'+dataset+sliced_alg
-data_dir=curve_data_dir+'weld_scan_'+'2023_07_11_16_25_30'+'/'
-baselayer=False
-layer=367
-x=0
+# dataset='cup/'
+# sliced_alg='circular_slice_shifted/'
+# curve_data_dir = '../data/'+dataset+sliced_alg
+# data_dir=curve_data_dir+'weld_scan_'+'2023_07_11_16_25_30'+'/'
+# baselayer=False
+# layer=367
+# x=0
 
 # dataset='blade0.1/'
 # sliced_alg='auto_slice/'
@@ -99,13 +101,13 @@ x=0
 # layer=1
 # x=0
 
-# dataset='blade0.1/'
-# sliced_alg='auto_slice/'
-# curve_data_dir = '../data/'+dataset+sliced_alg
-# data_dir=curve_data_dir+'weld_scan_'+'2023_07_24_13_13_53'+'/'
-# baselayer=False
-# layer=92
-# x=0
+dataset='blade0.1/'
+sliced_alg='auto_slice/'
+curve_data_dir = '../data/'+dataset+sliced_alg
+data_dir=curve_data_dir+'weld_scan_'+'2023_07_24_13_13_53'+'/'
+baselayer=False
+layer=92
+x=0
 
 use_actual = False
 
@@ -167,7 +169,11 @@ pcd = scan_process.pcd_register_mti(mti_recording,q_out_exe,robot_stamps,use_cal
 pcd = scan_process.pcd_noise_remove(pcd,nb_neighbors=40,std_ratio=1.5,\
                                     min_bound=crop_min,max_bound=crop_max,outlier_remove=True,cluster_based_outlier_remove=True,cluster_neighbor=1,min_points=100)
 visualize_pcd([pcd])
-profile_height = scan_process.pcd2dh(pcd,curve_sliced_relative,robot_weld,rob_js_plan,ph_param=ph_param_r1,drawing=True)
+if use_actual:
+    profile_height = scan_process.pcd2dh(pcd,curve_sliced_relative,drawing=True)
+else:
+    profile_height = scan_process.pcd2dh(pcd,curve_sliced_relative,robot_weld,rob_js_plan,ph_param=ph_param_r1,drawing=True)
+
 
 curve_i=0
 total_curve_i = len(profile_height)

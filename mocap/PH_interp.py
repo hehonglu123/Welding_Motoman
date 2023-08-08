@@ -253,17 +253,25 @@ class PH_Param(object):
 
 if __name__=='__main__':
 
-    PH_data_dir='PH_grad_data/test0801_R1/train_data_'
+    # PH_data_dir='PH_grad_data/test0801_R1/train_data_'
+    # test_data_dir='kinematic_raw_data/test0801/'
+    
+    # nom_P=np.array([[0,0,0],[150,0,0],[0,0,760],\
+    #                [1082,0,200],[0,0,0],[0,0,0],[100,0,0]]).T
+    # nom_H=np.array([[0,0,1],[0,1,0],[0,-1,0],\
+    #                [-1,0,0],[0,-1,0],[-1,0,0]]).T
+    
+    PH_data_dir='PH_grad_data/test0804_R2/train_data_'
     test_data_dir='kinematic_raw_data/test0801/'
+    
+    nom_P=np.array([[0,0,0],[155,0,0],[0,0,614],\
+                   [640,0,200],[0,0,0],[0,0,0],[100,0,0]]).T
+    nom_H=np.array([[0,0,1],[0,1,0],[0,-1,0],\
+                [-1,0,0],[0,-1,0],[-1,0,0]]).T
 
     import pickle
     with open(PH_data_dir+'calib_PH_q.pickle','rb') as file:
         PH_q=pickle.load(file)
-        
-    nom_P=np.array([[0,0,0],[150,0,0],[0,0,760],\
-                   [1082,0,200],[0,0,0],[0,0,0],[100,0,0]]).T
-    nom_H=np.array([[0,0,1],[0,1,0],[0,-1,0],\
-                   [-1,0,0],[0,-1,0],[-1,0,0]]).T
 
     ph_param=PH_Param(nom_P,nom_H)
     ph_param.fit(PH_q,method='linear')
