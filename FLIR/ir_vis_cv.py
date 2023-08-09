@@ -6,10 +6,10 @@ from flir_toolbox import *
 
 
 # Load the IR recording data from the pickle file
-with open('../../recorded_data/weld_scan_job205_v152023_07_27_13_23_06/layer_150/ir_recording.pickle', 'rb') as file:
+with open('../data/wall_weld_test/moveL_100_repeat_weld_scan_2023_08_02_17_07_02/layer_16/ir_recording.pickle', 'rb') as file:
     ir_recording = pickle.load(file)
 
-ir_ts=np.loadtxt('../../recorded_data/weld_scan_job205_v152023_07_27_13_23_06/layer_150/ir_stamps.csv', delimiter=',')
+ir_ts=np.loadtxt('../data/wall_weld_test/moveL_100_repeat_weld_scan_2023_08_02_17_07_02/layer_16/ir_stamps.csv', delimiter=',')
 
 
 result = cv2.VideoWriter('output.avi', 
@@ -48,13 +48,13 @@ for i in range(len(ir_recording)):
 
 
     # Write the IR image to the video file
-    result.write(ir_bgr)
+    # result.write(ir_bgr)
 
-    # # Display the IR image
-    # cv2.imshow("IR Recording", ir_bgr)
+    # Display the IR image
+    cv2.imshow("IR Recording", ir_bgr)
 
-    # # Wait for a specific time (in milliseconds) before displaying the next frame
-    # cv2.waitKey(int(1000*(ir_ts[i+1]-ir_ts[i])))
+    # Wait for a specific time (in milliseconds) before displaying the next frame
+    cv2.waitKey(int(1000*(ir_ts[i+1]-ir_ts[i])))
 
 result.release()
 # Close the window after the loop is completed

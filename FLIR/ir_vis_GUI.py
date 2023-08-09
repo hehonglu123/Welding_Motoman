@@ -2,48 +2,79 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pickle, sys
 import matplotlib.animation as animation
-from matplotlib.animation import FuncAnimation
+from matplotlib.colors import Normalize
+from matplotlib.colorbar import ColorbarBase
 from tkinter import *
 import time
 import os
 import glob
-
+sys.path.append('../toolbox/')
+from flir_toolbox import *
 freq=13
-vmin = 8000
-vmax = 10000
 vmin_value = 0
-vmax_value = 10000
-tmin = 500
-tmax = 725
-# 初始化一个空列表来保存所有的ir_recording对象
+vmax_value = 1300
+# Empty list creation
 ir_recordings = []
+counts_all_frames = []
+temp_all_frames=[]
 all_frames = []
-# 你的主文件夹路径
-main_folder_path = '../data/wall_weld_test/moveL_100_weld_scan_2023_08_02_15_17_25'
+# Initialize data mode (0 for ir_recording, 1 for temperature)
+data_mode = 0
+# Local folder path
+main_folder_path = '../data/wall_weld_test/moveL_100_repeat_weld_scan_2023_08_02_17_07_02'
 
 for folder_name in os.listdir(main_folder_path):
     if folder_name.startswith('layer_'):
-        # 构建完整的文件夹路径和文件路径
         folder_path = os.path.join(main_folder_path, folder_name)
         file_path = os.path.join(folder_path, 'ir_recording.pickle')
 
-        # 检查文件大小是否大于1000KB
+        # Filter less than 1000KB
         file_size_kb = os.path.getsize(file_path) / 1024
         if file_size_kb > 1000:
-            # 如果文件存在并且大于1000KB，则读取并附加到列表中
             if os.path.isfile(file_path):
                 with open(file_path, 'rb') as file:
                     ir_recording = pickle.load(file)
-                    all_frames.extend(ir_recording)  # 添加到总列表
+                    for i in range(len(ir_recording)):
+                        temp = counts2temp(ir_recording[i].flatten(),6.39661118e+03, 1.40469989e+03, 1.00000008e+00, 8.69393436e+00, 8.40029488e+03,Emiss=0.13).reshape((240,320))
+                        temp_all_frames.append(temp.astype(np.uint8))
+                        print(np.max(temp))
+                    counts_all_frames.extend(ir_recording)
 
-# 全局变量
+
+# Global parameters
 global interval
 global frame_index
 global direction
 interval = 0.05
 frame_index = 0
-direction = 1  # 1 表示向前播放，-1 表示回退
+direction = 1  # 1 play，-1 reverse
+def update_animation_data():
+    global all_frames, data_mode, vmin_slider, vmax_slider, vmin_value, vmax_value
+    if data_mode == 0:
+        all_frames = temp_all_frames
+        vmin_slider.config(from_=0, to=2000)  # Update vmin_slider range for temperature mode
+        vmax_slider.config(from_=0, to=2000)  # Update vmax_slider range for temperature mode
+        vmin_slider.set(vmin_value)  # Set vmin_slider value for temperature mode
+        vmax_slider.set(vmax_value)  # Set vmax_slider value for temperature mode
+    else:
+        all_frames = counts_all_frames
+        vmin_slider.config(from_=0, to=20000)  # Update vmin_slider range for counts mode
+        vmax_slider.config(from_=0, to=20000)  # Update vmax_slider range for counts mode
+        vmin_slider.set(vmin_value)  # Set vmin_slider value for counts mode
+        vmax_slider.set(vmax_value)  # Set vmax_slider value for counts mode
 
+    data_mode = 1 - data_mode  # Toggle data mode
+
+    # Ensure all_frames is not empty before updating the animation
+    if all_frames:
+        ani.event_source.stop()  # Stop the current animation
+        im.set_data(all_frames[0])  # Update the image data
+        im.set_clim(vmin=vmin_value, vmax=vmax_value)  # Update vmin and vmax
+        frame_index = 0
+        ani.event_source.start()  # Start the animation
+
+# Set initial animation data to temp_all_frames
+all_frames = temp_all_frames
 def update(frame):
     global frame_index
     im.set_array(all_frames[frame_index])
@@ -52,12 +83,31 @@ def update(frame):
     frame_index = (frame_index + direction) % len(all_frames)
     return im,
 
-# 创建动画
+# Create a separate figure for the colorbar
+fig_cbar, ax_cbar = plt.subplots(figsize=(1, 4))
+fig_cbar.subplots_adjust(left=0.1, right=0.5)  # Adjust the layout as needed
+norm = Normalize(vmin=vmin_value, vmax=vmax_value)
+cbar = ColorbarBase(ax_cbar, cmap="inferno", orientation="vertical", norm=norm)
+cbar.set_label('Temperature', rotation=270, labelpad=15)
+
+# Function to update colorbar
+def update_colorbar():
+    norm.vmin = vmin_value
+    norm.vmax = vmax_value
+    cbar.update_normal(cbar.mappable)
+    fig_cbar.canvas.draw()
+
+# Animation creation
 fig, ax = plt.subplots()
 plt.title(main_folder_path)
 im = ax.imshow(all_frames[0], animated=True, cmap="inferno", aspect='auto')
-im.set_clim(vmin=vmin_value, vmax=vmax_value)  # 初始化 vmin 和 vmax
+im.set_clim(vmin=vmin_value, vmax=vmax_value)
 ani = animation.FuncAnimation(fig, update, frames=len(all_frames), interval=1, blit=True)
+
+
+
+
+
 # fig = plt.figure(1)
 # for i in range(len(ir_recording)):
 #     # print(np.max(ir_recordings[i]),np.min(ir_recordings[i]))
@@ -70,12 +120,12 @@ ani = animation.FuncAnimation(fig, update, frames=len(all_frames), interval=1, b
 #     # plt.pause(1/freq)
 #     # plt.clf()
 
-# 创建Tkinter窗口
+#  Create Tkinter Windows
 root = Tk()
 frame = Frame(root)
 frame.pack()
 
-# 播放控制函数
+# Control function
 def play():
     global direction
     direction = 1
@@ -91,7 +141,7 @@ def pause():
 
 def set_speed(val):
     global interval
-    interval = (200 - float(val)) / 1000
+    interval = (400 - float(val)) / 1000
 def set_vmin(val):
     global vmin_value
     vmin_value = float(val)
@@ -101,7 +151,7 @@ def set_vmax(val):
     vmax_value = float(val)
 
 
-# 添加控制按钮
+# Add control button
 play_button = Button(frame, text="Play", command=play)
 play_button.pack(side=LEFT)
 reverse_button = Button(frame, text="Reverse", command=reverse)
@@ -109,20 +159,23 @@ reverse_button.pack(side=LEFT)
 pause_button = Button(frame, text="Pause", command=pause)
 pause_button.pack(side=LEFT)
 
-# 添加滑块以控制速度
-speed_slider = Scale(frame, from_=10, to=200, orient=HORIZONTAL, label="Speed", command=set_speed)
-speed_slider.set(200) # 初始速度设为最快
+# Add button to change speed
+speed_slider = Scale(frame, from_=10, to=400, orient=HORIZONTAL, label="Speed", command=set_speed)
+speed_slider.set(200)
 speed_slider.pack(side=LEFT)
-# 控制 vmin 的滑块
+
 vmin_slider = Scale(frame, from_=0, to=8000, orient=VERTICAL, label="VMin", command=set_vmin)
 vmin_slider.pack(side=LEFT)
-
-# 控制 vmax 的滑块
 vmax_slider = Scale(frame, from_=8000, to=20000, orient=VERTICAL, label="VMax", command=set_vmax)
 vmax_slider.pack(side=LEFT)
-vmin_slider = Scale(frame, from_=0, to=8000, orient=VERTICAL, label="VMin", length=200, command=set_vmin)
-vmax_slider = Scale(frame, from_=8000, to=20000, orient=VERTICAL, label="VMax", length=200, command=set_vmax)
 
-# 显示matplotlib图窗口
+# # Connect slider updates to the function
+# vmin_slider.config(command=lambda val: [set_vmin(val), update_colorbar_limits(val)])
+# vmax_slider.config(command=lambda val: [set_vmax(val), update_colorbar_limits(val)])
+
+# Button to toggle between original and temperature data
+toggle_button = Button(frame, text="Toggle Data", command=update_animation_data)
+toggle_button.pack(side=LEFT)
+# Show matplotlib window
 plt.show(block=False)
 root.mainloop()

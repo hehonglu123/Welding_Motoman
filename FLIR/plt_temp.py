@@ -6,7 +6,7 @@ sys.path.append('../toolbox/')
 from flir_toolbox import *
 import matplotlib.pyplot as plt
 
-data_dir="../../recorded_data/weld_scan_job205_v152023_07_27_13_23_06/layer_150/"
+data_dir='../data/wall_weld_test/moveL_100_repeat_weld_scan_2023_08_02_17_07_02/layer_16/'
 with open('calibration.yml', 'r') as file:
 	param= yaml.safe_load(file)
 print(param)
