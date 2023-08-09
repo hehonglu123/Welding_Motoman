@@ -85,21 +85,21 @@ positioner.robot.P=deepcopy(positioner.calib_P)
 positioner.robot.H=deepcopy(positioner.calib_H)
 
 #### data directory
-# dataset='cup/'
-# sliced_alg='circular_slice_shifted/'
-# curve_data_dir = '../data/'+dataset+sliced_alg
-# data_dir=curve_data_dir+'weld_scan_'+'2023_07_11_16_25_30'+'/'
-# baselayer=False
-# layer=367
-# x=0
-
-dataset='blade0.1/'
-sliced_alg='auto_slice/'
+dataset='cup/'
+sliced_alg='circular_slice_shifted/'
 curve_data_dir = '../data/'+dataset+sliced_alg
-data_dir=curve_data_dir+'weld_scan_'+'2023_07_19_11_41_30'+'/'
-baselayer=True
-layer=0
+data_dir=curve_data_dir+'weld_scan_'+'2023_07_11_16_25_30'+'/'
+baselayer=False
+layer=367
 x=0
+
+# dataset='blade0.1/'
+# sliced_alg='auto_slice/'
+# curve_data_dir = '../data/'+dataset+sliced_alg
+# data_dir=curve_data_dir+'weld_scan_'+'2023_07_19_11_41_30'+'/'
+# baselayer=True
+# layer=0
+# x=0
 
 # dataset='blade0.1/'
 # sliced_alg='auto_slice/'
