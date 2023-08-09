@@ -96,7 +96,7 @@ try:
 except: pass
 ########################################################RR FRONIUS########################################################
 fronius_client = RRN.ConnectService('rr+tcp://192.168.55.21:60823?service=welder')
-fronius_client.job_number = 200
+fronius_client.job_number = 215
 fronius_client.prepare_welder()
 vd_relative=5
 ########################################################RR STREAMING########################################################
@@ -226,6 +226,7 @@ for layer in range(num_layer_start,num_layer_end,layer_height_num):
 		local_recorded_dir='recorded_data/blade_recording/'
 		os.makedirs(local_recorded_dir,exist_ok=True)
 		np.savetxt(local_recorded_dir+'slice_%i_%i_joint.csv'%(layer,x),np.hstack((robot_ts.reshape((-1,1)),robot_js)),delimiter=',')
+		flir_ts=np.array(flir_ts)-flir_ts[0]
 		np.savetxt(local_recorded_dir+'slice_%i_%i_flir_ts.csv'%(layer,x),flir_ts,delimiter=',')
 		with open(local_recorded_dir+'slice_%i_%i_flir.pickle'%(layer,x), 'wb') as file:
 			pickle.dump(flir_logging, file)
