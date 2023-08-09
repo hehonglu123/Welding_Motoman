@@ -17,7 +17,7 @@ Rx=np.array([1,0,0])
 Ry=np.array([0,1,0])
 Rz=np.array([0,0,1])
 
-dataset_date='0804'
+dataset_date='0801'
 
 config_dir='../config/'
 
@@ -50,8 +50,56 @@ if use_toolmaker:
 data_dir='PH_grad_data/test'+dataset_date+'_'+robot_type+'/train_data_'
 
 try:
+    use_raw=False
+    
     robot_q = np.loadtxt(data_dir+'robot_q_align.csv',delimiter=',')
     mocap_T = np.loadtxt(data_dir+'mocap_T_align.csv',delimiter=',')
+    
+    if use_raw:
+        mocap_T=[]
+        toolrigid_raw = np.loadtxt(data_dir+'tool_T_raw.csv',delimiter=',')
+        baserigid_raw = np.loadtxt(data_dir+'base_T_raw.csv',delimiter=',')
+        
+        raw_id=0
+        same_pose_thres=0.1 #mm
+        pos_toolrigid=[]
+        pose_toolrigid_base=[]
+        while True:
+            if len(pos_toolrigid)==0:
+                pos_toolrigid.append(toolrigid_raw[raw_id][:3])
+            elif np.linalg.norm(np.mean(pos_toolrigid,axis=0)-toolrigid_raw[raw_id][:3])<same_pose_thres:
+                pos_toolrigid.append(toolrigid_raw[raw_id][:3])
+            else:
+                pose_toolrigid_base=np.array(pose_toolrigid_base)
+                if np.linalg.norm(np.degrees(np.max(pose_toolrigid_base[:,3:],axis=0)\
+                    -np.min(pose_toolrigid_base[:,3:],axis=0)))>0.1:
+                    print("RPY max min:",np.degrees(np.min(pose_toolrigid_base[:,3:],axis=0)),\
+                        np.degrees(np.max(pose_toolrigid_base[:,3:],axis=0)))
+                p_mean = np.mean(pose_toolrigid_base,axis=0)
+                this_T = np.append(p_mean[:3],R2q(rpy2R(p_mean[3:])))
+                mocap_T.append(this_T)
+                pos_toolrigid=[]
+                pose_toolrigid_base=[]
+                continue
+            
+            T_mocap_basemarker = Transform(q2R(baserigid_raw[raw_id][3:]),baserigid_raw[raw_id][:3]).inv()
+            T_marker_mocap = Transform(q2R(toolrigid_raw[raw_id][3:]),toolrigid_raw[raw_id][:3])
+            T_marker_basemarker = T_mocap_basemarker*T_marker_mocap
+            T_marker_base = T_basemarker_base*T_marker_basemarker
+            pose_toolrigid_base.append(np.append(T_marker_base.p,R2rpy(T_marker_base.R)))
+            raw_id+=1
+            
+            if raw_id>=len(toolrigid_raw):
+                pose_toolrigid_base=np.array(pose_toolrigid_base)
+                if np.linalg.norm(np.degrees(np.max(pose_toolrigid_base[:,3:],axis=0)\
+                    -np.min(pose_toolrigid_base[:,3:],axis=0)))>0.1:
+                    print("RPY max min:",np.degrees(np.min(pose_toolrigid_base[:,3:],axis=0)),\
+                        np.degrees(np.max(pose_toolrigid_base[:,3:],axis=0)))
+                p_mean = np.mean(pose_toolrigid_base,axis=0)
+                this_T = np.append(p_mean[:3],R2q(rpy2R(p_mean[3:])))
+                mocap_T.append(this_T)
+                pos_toolrigid=[]
+                break
 
 except:
 
@@ -301,8 +349,8 @@ alpha=0.5
 weight_ori = 0.1
 # weight_ori = 1
 weight_pos = 1
-lambda_H = 10
-# lambda_H = 1
+# lambda_H = 10
+lambda_H = 1
 lambda_P = 1
 start_t = time.time()
 
@@ -453,7 +501,7 @@ for N in train_set:
         ori_error_diff = np.linalg.norm(np.diff(ori_error_norm_progress,axis=0),axis=1).flatten()
         axs[1,2].plot(np.array(ori_error_diff))
         axs[1,2].set_title("Orientation Error Norm Diff")
-        fig.canvas.manager.window.wm_geometry("+%d+%d" % (10,10))
+        fig.canvas.manager.window.wm_geometry("+%d+%d" % (1920+10,10))
         fig.set_size_inches([13.95,7.92],forward=True)
         plt.tight_layout()
         plt.show(block=False)

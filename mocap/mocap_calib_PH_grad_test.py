@@ -16,8 +16,8 @@ Rx=np.array([1,0,0])
 Ry=np.array([0,1,0])
 Rz=np.array([0,0,1])
 
-ph_dataset_date='0804'
-test_dataset_date='0804'
+ph_dataset_date='0801'
+test_dataset_date='0801'
 config_dir='../config/'
 
 robot_type = 'R2'
@@ -68,8 +68,57 @@ test_data_dir='kinematic_raw_data/test'+test_dataset_date+'_'+robot_type+'/'
 print(PH_data_dir)
 print(test_data_dir)
 
+use_raw=False
 test_robot_q = np.loadtxt(test_data_dir+'robot_q_align.csv',delimiter=',')
 test_mocap_T = np.loadtxt(test_data_dir+'mocap_T_align.csv',delimiter=',')
+if use_raw:
+    test_mocap_T=[]
+    toolrigid_raw = np.loadtxt(test_data_dir+'mocap_tool_T_raw.csv',delimiter=',')
+    baserigid_raw = np.loadtxt(test_data_dir+'mocap_base_T_raw.csv',delimiter=',')
+    
+    raw_id=0
+    same_pose_thres=0.1 #mm
+    pos_toolrigid=[]
+    pose_toolrigid_base=[]
+    while True:
+        if len(pos_toolrigid)==0:
+            pos_toolrigid.append(toolrigid_raw[raw_id][:3])
+        elif np.linalg.norm(np.mean(pos_toolrigid,axis=0)-toolrigid_raw[raw_id][:3])<same_pose_thres:
+            pos_toolrigid.append(toolrigid_raw[raw_id][:3])
+        else:
+            pose_toolrigid_base=np.array(pose_toolrigid_base)
+            if np.linalg.norm(np.degrees(np.max(pose_toolrigid_base[:,3:],axis=0)\
+                -np.min(pose_toolrigid_base[:,3:],axis=0)))>0.1:
+                print("RPY max min:",np.degrees(np.min(pose_toolrigid_base[:,3:],axis=0)),\
+                    np.degrees(np.max(pose_toolrigid_base[:,3:],axis=0)))
+            p_mean = np.mean(pose_toolrigid_base,axis=0)
+            this_T = np.append(p_mean[:3],R2q(rpy2R(p_mean[3:])))
+            test_mocap_T.append(this_T)
+            pos_toolrigid=[]
+            pose_toolrigid_base=[]
+            continue
+        
+        T_mocap_basemarker = Transform(q2R(baserigid_raw[raw_id][3:]),baserigid_raw[raw_id][:3]).inv()
+        T_marker_mocap = Transform(q2R(toolrigid_raw[raw_id][3:]),toolrigid_raw[raw_id][:3])
+        T_marker_basemarker = T_mocap_basemarker*T_marker_mocap
+        T_marker_base = T_basemarker_base*T_marker_basemarker
+        pose_toolrigid_base.append(np.append(T_marker_base.p,R2rpy(T_marker_base.R)))
+        raw_id+=1
+        
+        if raw_id>=len(toolrigid_raw):
+            pose_toolrigid_base=np.array(pose_toolrigid_base)
+            if np.linalg.norm(np.degrees(np.max(pose_toolrigid_base[:,3:],axis=0)\
+                -np.min(pose_toolrigid_base[:,3:],axis=0)))>0.1:
+                print("RPY max min:",np.degrees(np.min(pose_toolrigid_base[:,3:],axis=0)),\
+                    np.degrees(np.max(pose_toolrigid_base[:,3:],axis=0)))
+            p_mean = np.mean(pose_toolrigid_base,axis=0)
+            this_T = np.append(p_mean[:3],R2q(rpy2R(p_mean[3:])))
+            test_mocap_T.append(this_T)
+            pos_toolrigid=[]
+            break
+
+
+print(len(test_mocap_T))
 assert len(test_robot_q)==len(test_mocap_T), f"Need to have the same amount of robot_q and mocap_T"
 
 with open(PH_data_dir+'calib_PH_q.pickle','rb') as file:
