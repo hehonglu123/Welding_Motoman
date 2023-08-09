@@ -58,8 +58,8 @@ def update_animation_data():
         vmax_slider.set(vmax_value)  # Set vmax_slider value for temperature mode
     else:
         all_frames = counts_all_frames
-        vmin_slider.config(from_=0, to=20000)  # Update vmin_slider range for counts mode
-        vmax_slider.config(from_=0, to=20000)  # Update vmax_slider range for counts mode
+        vmin_slider.config(from_=0, to=8000)  # Update vmin_slider range for counts mode
+        vmax_slider.config(from_=8000, to=20000)  # Update vmax_slider range for counts mode
         vmin_slider.set(vmin_value)  # Set vmin_slider value for counts mode
         vmax_slider.set(vmax_value)  # Set vmax_slider value for counts mode
 
@@ -141,7 +141,7 @@ def pause():
 
 def set_speed(val):
     global interval
-    interval = (400 - float(val)) / 1000
+    interval = (200 - float(val)) / 1000
 def set_vmin(val):
     global vmin_value
     vmin_value = float(val)
@@ -160,7 +160,7 @@ pause_button = Button(frame, text="Pause", command=pause)
 pause_button.pack(side=LEFT)
 
 # Add button to change speed
-speed_slider = Scale(frame, from_=10, to=400, orient=HORIZONTAL, label="Speed", command=set_speed)
+speed_slider = Scale(frame, from_=10, to=200, orient=HORIZONTAL, label="Speed", command=set_speed)
 speed_slider.set(200)
 speed_slider.pack(side=LEFT)
 

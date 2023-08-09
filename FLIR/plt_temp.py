@@ -28,7 +28,7 @@ for i in range(len(ir_recording)):
     if centroid is not None:
         bbox_below_size=10
         centroid_below=(int(centroid[0]+bbox[2]/2+bbox_below_size/2),centroid[1])
-        temp_below.append(np.average(temp[int(centroid_below[1]-bbox_below_size):int(centroid_below[1]+bbox_below_size),int(centroid_below[0]-bbox_below_size):int(centroid_below[0]+bbox_below_size)]))
+        temp_below.append(np.max(temp[int(centroid_below[1]-bbox_below_size):int(centroid_below[1]+bbox_below_size),int(centroid_below[0]-bbox_below_size):int(centroid_below[0]+bbox_below_size)]))
     else:
         temp_below.append(np.nan)
 plt.plot(ir_ts, temp_below, c='red', label='temperature below')
