@@ -228,6 +228,40 @@ class robot_obj(object):
 	def jacobian(self,q):
 		return robotjacobian(self.robot,q)
 
+	def fwd_ph(self,q,ph_param):
+     
+		q=np.array(q)
+    
+		origin_P=copy.deepcopy(self.robot.P)
+		origin_H=copy.deepcopy(self.robot.H)
+    
+		opt_P,opt_H = ph_param.predict(q[1:3])
+		self.robot.P=opt_P
+		self.robot.H=opt_H
+		robot_T = fwdkin(self.robot,q)
+  
+		self.robot.P=origin_P
+		self.robot.H=origin_H
+  
+		return robot_T
+
+	def jacobian_ph(self,q,ph_param):
+     
+		q=np.array(q)
+    
+		origin_P=copy.deepcopy(self.robot.P)
+		origin_H=copy.deepcopy(self.robot.H)
+    
+		opt_P,opt_H = ph_param.predict(q[1:3])
+		self.robot.P=opt_P
+		self.robot.H=opt_H
+		J = robotjacobian(self.robot,q)
+  
+		self.robot.P=origin_P
+		self.robot.H=origin_H
+  
+		return J
+
 	def inv(self,p,R=np.eye(3),last_joints=None):
 		pose=Transform(R,p)
 		q_all=robot6_sphericalwrist_invkin(self.robot,pose,last_joints)

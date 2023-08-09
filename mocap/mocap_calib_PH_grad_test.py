@@ -16,8 +16,8 @@ Rx=np.array([1,0,0])
 Ry=np.array([0,1,0])
 Rz=np.array([0,0,1])
 
-ph_dataset_date='0801'
-test_dataset_date='0801'
+ph_dataset_date='0804'
+test_dataset_date='0804'
 config_dir='../config/'
 
 robot_type = 'R2'
@@ -263,7 +263,7 @@ for N in range(total_test_N):
     error_pos_rbf.append(T_tool_base.p-robot_T.p)
     error_ori_rbf.append(k*np.degrees(theta))
     
-    #### get error (rbf)
+    #### get error (fbf)
     opt_P,opt_H = ph_param_fbf.predict(test_q[1:3])
     if np.any(opt_P is np.nan) or np.any(opt_H is np.nan):
         print(np.degrees(test_q))
