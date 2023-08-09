@@ -10,13 +10,13 @@ from robot_def import *
 from matplotlib import pyplot as plt
 from dx200_motion_program_exec_client import *
 
-data_dir='R2_mti_0809/'
+data_dir='R1_weldgun_0809/'
 
-ph_dataset_date='0804'
+ph_dataset_date='0801'
 
 config_dir='../config/'
 
-robot_type = 'R2'
+robot_type = 'R1'
 
 if robot_type == 'R1':
     robot=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',\
