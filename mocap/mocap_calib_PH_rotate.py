@@ -121,13 +121,15 @@ def to_frame(curve_p,curve_R,mocap_stamps,target_frame,markers_id):
 config_dir='../config/'
 
 # robot_type='R1'
-robot_type='R2'
-# robot_type='S1'
+# robot_type='R2'
+robot_type='S1'
 
 # all_datasets=['train_data','valid_data_1','valid_data_2']
-dataset_date='0804'
+dataset_date='0801'
 # all_datasets=['test'+dataset_date+'_R1_aftercalib/train_data']
 all_datasets=['test'+dataset_date+'_'+robot_type+'/train_data']
+
+cut_edge=True
 
 if robot_type=='R1':
     base_marker_config_file=config_dir+'MA2010_marker_config.yaml'
@@ -214,7 +216,7 @@ for dataset in all_datasets:
                 zero_config_q[i].extend(robot_q[:,i])
 
         # detect axis
-        this_axis_p,this_axis_normal = detect_axis(curve_p,H_nom[:,j],robot.tool_markers_id,cut_edge=True)
+        this_axis_p,this_axis_normal = detect_axis(curve_p,H_nom[:,j],robot.tool_markers_id,cut_edge=cut_edge)
         H_act[:,j] = this_axis_normal
         axis_p[:,j] = this_axis_p
         print("Axis",j+1,"done.")
