@@ -22,6 +22,47 @@ class WeldSend(object):
 
 		self.client.execute_motion_program(mp)
 	
+	def weld_segment_cool(self,primitives,robot,q_all,v_all,cond_all,cool=False,wait=0):
+		###single arm weld segment 
+		#q_all: list of joint angles (N x 6)
+		#v_all: list of segment speed (N x 1)
+		#cond_all: list of job number (N x 1) or (1,), 0 refers to off
+		#wait: wait time after motion, before arcof
+		q_all=np.degrees(q_all)
+		coolof=True
+		
+		mp=MotionProgram(ROBOT_CHOICE=self.ROBOT_CHOICE_MAP[robot.robot_name],pulse2deg=robot.pulse2deg, tool_num=self.ROBOT_TOOL_MAP[robot.robot_name])
+		mp.primitive_call(primitives[0],q_all[0],v_all[0])
+		if cool:
+			if len(cond_all)==1: 
+				mp.setDO(21,True)
+				coolof=False
+			else:
+				if cond_all[1]!=0:
+					mp.setDO(21,True)
+					coolof=False
+
+
+		for i in range(1,len(q_all)):
+			if len(cond_all)>1 and cool and i>1:
+				if coolof:
+					if cond_all[i]!=0:
+						mp.setDO(21,True)
+						coolof=False
+				else:
+					if cond_all[i]==0:
+						mp.setDO(21,False)
+						coolof=True
+
+			mp.primitive_call(primitives[i],q_all[i],v_all[i])
+		
+		if wait:
+			mp.setWaitTime(wait)
+			
+		if cool and not coolof:
+			mp.setDO(21,False)
+		return self.client.execute_motion_program(mp)
+
 	def jog_dual(self,robot1,robot2,q1,q2,v=1):
 		mp=MotionProgram(ROBOT_CHOICE=self.ROBOT_CHOICE_MAP[robot1.robot_name],ROBOT_CHOICE2=self.ROBOT_CHOICE_MAP[robot2.robot_name],pulse2deg=robot1.pulse2deg,pulse2deg_2=robot2.pulse2deg, tool_num=self.ROBOT_TOOL_MAP[robot1.robot_name])
 		
