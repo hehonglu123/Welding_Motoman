@@ -236,12 +236,12 @@ class robot_obj(object):
 		origin_H=copy.deepcopy(self.robot.H)
     
 		opt_P,opt_H = ph_param.predict(q[1:3])
-		self.robot.P=opt_P
-		self.robot.H=opt_H
+		self.robot.P=copy.deepcopy(opt_P)
+		self.robot.H=copy.deepcopy(opt_H)
 		robot_T = fwdkin(self.robot,q)
   
-		self.robot.P=origin_P
-		self.robot.H=origin_H
+		self.robot.P=copy.deepcopy(origin_P)
+		self.robot.H=copy.deepcopy(origin_H)
   
 		return robot_T
 
