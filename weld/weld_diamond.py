@@ -32,13 +32,13 @@ if logging:
 
 
 dataset='diamond/'
-sliced_alg='slicing/'
+sliced_alg='cont_sections/'
 data_dir='../data/'+dataset+sliced_alg
 with open(data_dir+'slicing.yml', 'r') as file:
 	slicing_meta = yaml.safe_load(file)
 recorded_dir='recorded_data/cup_ER316L/'
 
-waypoint_distance=5 	###waypoint separation
+waypoint_distance=2	###waypoint separation
 layer_height_num=int(1.8/slicing_meta['line_resolution'])
 
 
@@ -51,10 +51,14 @@ client=MotionProgramExecClient()
 ws=WeldSend(client)
 
 ###########################################layer welding############################################
-num_layer_start=int(24*layer_height_num)	###modify layer num here
-num_layer_end=int(39*layer_height_num)
+vd_relative=4
+layer_start=19
+layers2weld=10
+layer_counts=layer_start
+num_layer_start=int(layer_start*layer_height_num)	###modify layer num here
+num_layer_end=int((layer_start+layers2weld)*layer_height_num)
 
-q_prev=client.getJointAnglesDB(positioner.pulse2deg)
+# q_prev=client.getJointAnglesDB(positioner.pulse2deg)
 # q_prev=np.array([9.53E-02,-2.71E+00])	###for motosim tests only
 
 if num_layer_start<=1*layer_height_num:
@@ -69,29 +73,33 @@ for layer in range(num_layer_start,num_layer_end,layer_height_num):
 	num_sections=len(glob.glob(data_dir+'curve_sliced_relative/slice'+str(layer)+'_*.csv'))
 
 	if layer==0:
-		layer_width_num	=int(4/slicing_meta['line_resolution'])
+		layer_width_num	=int(5.4/slicing_meta['line_resolution'])
 	else:
 		layer_width_num=1
+	
+	###find which end to start depending on layer count
+	if layer_counts%2==1:
+		sections=reversed(range(num_sections))
+	else:
+		sections=range(num_sections)
 	####################DETERMINE CURVE ORDER##############################################
-	for x in range(0,num_sections,layer_width_num):
+	for x in sections:
 		curve_sliced_js=np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(layer)+'_'+str(x)+'.csv',delimiter=',').reshape((-1,6))
 		if len(curve_sliced_js)<2:
 			continue
 		positioner_js=np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
 		curve_sliced_relative=np.loadtxt(data_dir+'curve_sliced_relative/slice'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
 
-		vd_relative=5
+		
 		lam1=calc_lam_js(curve_sliced_js,robot)
 		lam2=calc_lam_js(positioner_js,positioner)
 		lam_relative=calc_lam_cs(curve_sliced_relative)
 
 		num_points_layer=max(2,int(lam_relative[-1]/waypoint_distance))
 
-		###find which end to start depending on how close to joint limit
-		if positioner.upper_limit[1]-q_prev[1]>q_prev[1]-positioner.lower_limit[1]:
-			breakpoints=np.linspace(0,len(curve_sliced_js)-1,num=num_points_layer).astype(int)
-		else:
-			breakpoints=np.linspace(len(curve_sliced_js)-1,0,num=num_points_layer).astype(int)
+		breakpoints=np.linspace(0,len(curve_sliced_js)-1,num=num_points_layer).astype(int)
+		if layer_counts%2==1:
+			breakpoints=np.flip(breakpoints)
 
 		s1_all,s2_all=calc_individual_speed(vd_relative,lam1,lam2,lam_relative,breakpoints)
 
@@ -113,10 +121,11 @@ for layer in range(num_layer_start,num_layer_end,layer_height_num):
 			q2_all.append(positioner_js[breakpoints[j]])
 			v1_all.append(max(s1_all[j-1],0.1))
 			positioner_w=vd_relative/np.linalg.norm(curve_sliced_relative[breakpoints[j]][:2])
-			v2_all.append(min(100,100*positioner_w/positioner.joint_vel_limit[1]))
+			# v2_all.append(min(100,100*positioner_w/positioner.joint_vel_limit[1]))
+			v2_all.append(50)
 			primitives.append('movel')
 
-		q_prev=positioner_js[breakpoints[-1]]
+		# q_prev=positioner_js[breakpoints[-1]]
 	
 
 		####DATA LOGGING
@@ -129,10 +138,12 @@ for layer in range(num_layer_start,num_layer_end,layer_height_num):
 			feedrate=[]
 			energy=[]
 
-		timestamp_robot,joint_recording,job_line,_=ws.weld_segment_dual(primitives,robot,positioner,q1_all,q2_all,v1_all,v2_all,cond_all=[202],arc=True)
+		timestamp_robot,joint_recording,job_line,_=ws.weld_segment_dual(primitives,robot,positioner,q1_all,q2_all,v1_all,v2_all,cond_all=[200],arc=True)
 
 		if logging:
 			np.savetxt(local_recorded_dir +'welder_info.csv',
 						np.array([timestamp, voltage, current, feedrate, energy]).T, delimiter=',',
 						header='timestamp,voltage,current,feedrate,energy', comments='')
 			np.savetxt(local_recorded_dir+'joint_recording.csv',np.hstack((timestamp_robot.reshape(-1, 1),job_line.reshape(-1, 1),joint_recording)),delimiter=',')
+
+	layer_counts+=1
