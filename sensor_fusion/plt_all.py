@@ -6,7 +6,7 @@ sys.path.append('../toolbox/')
 from flir_toolbox import *
 import matplotlib.pyplot as plt
 
-data_dir="../FLIR/recorded_data/layer_285/"
+data_dir="../data/wall_weld_test/moveL_100_repeat_weld_scan_2023_08_02_17_07_02/layer_15/"
 
 fig, ax1 = plt.subplots()
 ax1.set_title('Welding All Data')
@@ -23,7 +23,7 @@ ax1.set_ylabel('Center Brightness (counts)')
 ax1.set_xlabel('Time (s)')
 
 ##microphone data
-wavfile = wave.open('../FLIR/recorded_data/layer_285/mic_recording.wav', 'rb')
+wavfile = wave.open('../data/wall_weld_test/moveL_100_repeat_weld_scan_2023_08_02_17_07_02/layer_15/mic_recording.wav', 'rb')
 samplerate = 44000
 channels = 1
 audio_data=np.frombuffer(wavfile.readframes(wavfile.getnframes()),dtype=np.int16)
