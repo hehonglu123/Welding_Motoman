@@ -16,7 +16,7 @@ counts_all_frames = []
 temp_all_frames = []
 all_frames = []
 data_mode = 0
-main_folder_path = '../data/wall_weld_test/weld_scan_100ipm_cool_2023_08_10_11_28_20'
+main_folder_path = '../data/wall_weld_test/moveL_100_repeat_weld_scan_2023_08_02_17_07_02'
 for folder_name in os.listdir(main_folder_path):
     if folder_name.startswith('layer_'):
         folder_path = os.path.join(main_folder_path, folder_name)
@@ -31,7 +31,7 @@ for folder_name in os.listdir(main_folder_path):
                         temp = counts2temp(ir_recording[i].flatten(),6.39661118e+03, 1.40469989e+03, 1.00000008e+00, 8.69393436e+00, 8.40029488e+03,Emiss=0.13).reshape((240,320))
                         temp[temp > 1300] = 1300
                         temp_all_frames.append(temp)
-                        print(np.max(temp))
+                        # print(np.max(temp))
                     counts_all_frames.extend(ir_recording)
 
 global interval
@@ -83,7 +83,8 @@ fig, ax = plt.subplots()
 plt.title('Test')
 im = ax.imshow(all_frames[0], animated=True, cmap="inferno", aspect='auto')
 im.set_clim(vmin=vmin_value, vmax=vmax_value)
-cbar = plt.colorbar(im, format='%.2f')  # 记录colorbar对象
+cbar = plt.colorbar(im, format='%.2f')
+cbar.set_label('Temperature (C)',rotation = 270, labelpad = 15)
 ani = animation.FuncAnimation(fig, update, frames=len(all_frames), interval=1, blit=True)
 
 
@@ -107,7 +108,7 @@ def pause():
 
 def set_speed(val):
     global interval
-    interval = (20 - float(val)*0.001) / 1000
+    interval = 1/(30.*float(val))
 
 def set_vmin(val):
     global vmin_value
@@ -124,7 +125,7 @@ reverse_button.pack(side=LEFT)
 pause_button = Button(frame, text="Pause", command=pause)
 pause_button.pack(side=LEFT)
 
-speed_slider = Scale(frame, from_=10, to=20000, orient=HORIZONTAL, label="Speed", command=set_speed)
+speed_slider = Scale(frame, from_=1, to=10, orient=HORIZONTAL, label="Speed", command=set_speed)
 speed_slider.set(1000)
 speed_slider.pack(side=LEFT)
 
