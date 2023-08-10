@@ -31,10 +31,10 @@ def main():
 
 
 	slice=414
-	js_all=np.loadtxt(data_dir+'slice_%i_0_joint.csv'%slice,delimiter=',')
+	js_all=np.loadtxt(recorded_dir+'slice_%i_0_joint.csv'%slice,delimiter=',')
 	
 	
-	relative_path_exe,relative_path_exe_R=form_relative_path(js_all[:,1:7],js_all[:,-2:],robot,positioner)
+	_,_,_,_,relative_path_exe,relative_path_exe_R=form_relative_path(js_all[:,1:7],js_all[:,-2:],robot,positioner)
 	lam_exe=calc_lam_cs(relative_path_exe)
 	speed=np.gradient(lam_exe)/np.gradient(js_all[:,0])
 
