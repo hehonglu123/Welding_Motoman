@@ -45,14 +45,16 @@ class CalibRobotPH:
         for j in range(len(paths)-1,-1,-1): # from axis 6 to axis 1
             mp=MotionProgram(ROBOT_CHOICE=ROBOT_CHOICE,pulse2deg=rob_p2d)
             mp.MoveJ(start_p[j],rob_speed,0)
+            # mp.MoveJ(paths[j][0],rob_speed,0)
             client.execute_motion_program(mp)
+            time.sleep(3)
 
-            self.mpl_obj.run_pose_listener()
             mp=MotionProgram(ROBOT_CHOICE=ROBOT_CHOICE,pulse2deg=rob_p2d)
             for N in range(repeat_N):
                 mp.MoveJ(paths[j][0],rob_speed,0)
                 mp.MoveJ(paths[j][1],rob_speed,0)
             mp.MoveJ(start_p[j],rob_speed,0)
+            self.mpl_obj.run_pose_listener()
             robot_stamps,curve_exe, job_line,job_step = client.execute_motion_program(mp)
             self.mpl_obj.stop_pose_listener()
             curve_p,curve_R,timestamps = self.mpl_obj.get_frames_traj()
@@ -106,12 +108,12 @@ def calib_S1():
 
     # calibration
     ## zero config
-    start_p = np.array([[0,180],
-                        [0,180]])
-    q1_1=start_p[0] + np.array([-60,0])
-    q1_2=start_p[0] + np.array([45,0])
-    q2_1=start_p[1] + np.array([0,-120])
-    q2_2=start_p[1] + np.array([0,120])
+    start_p = np.array([[0,0],
+                        [0,0]])
+    q1_1=start_p[0] + np.array([-30,0])
+    q1_2=start_p[0] + np.array([40,0])
+    q2_1=start_p[1] + np.array([0,-60])
+    q2_2=start_p[1] + np.array([0,60])
 
     q_paths = [[q1_1,q1_2],[q2_1,q2_2]]
     
@@ -121,16 +123,16 @@ def calib_S1():
     # raw_data_dir='PH_raw_data/valid_data_2'
     #####################
 
-    calib_obj.run_calib(config_dir+'D500B_robot_default_config.yaml','192.168.1.31','ST1',turn_table.pulse2deg,start_p,q_paths,rob_speed=3,repeat_N=1\
+    calib_obj.run_calib(config_dir+'D500B_robot_default_config.yaml','192.168.1.31','ST1',turn_table.pulse2deg,start_p,q_paths,rob_speed=2,repeat_N=1\
                         ,raw_data_dir=raw_data_dir) # save calib config to file
     print("Collect PH data done")
 
 def calib_R2():
 
     config_dir='../config/'
-    robot=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.yml',tool_file_path=config_dir+'scanner_tcp2.csv',\
+    robot=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.yml',tool_file_path=config_dir+'mti.csv',\
 	pulse2deg_file_path=config_dir+'MA1440_A0_pulse2deg_real.csv',\
-    base_marker_config_file=config_dir+'MA1440_marker_config.yaml',tool_marker_config_file=config_dir+'scanner_marker_config.yaml')
+    base_marker_config_file=config_dir+'MA1440_marker_config.yaml',tool_marker_config_file=config_dir+'mti_marker_config.yaml')
 
     mocap_url = 'rr+tcp://localhost:59823?service=optitrack_mocap'
     mocap_cli = RRN.ConnectService(mocap_url)
@@ -153,7 +155,7 @@ def calib_R2():
     q3_2=start_p[2] + np.array([0,0,10,0,0,0])
     q4_1=start_p[3] + np.array([0,0,0,-60,0,0])
     q4_2=start_p[3] + np.array([0,0,0,60,0,0])
-    q5_1=start_p[4] + np.array([0,0,0,0,60,0])
+    q5_1=start_p[4] + np.array([0,0,0,0,10,0])
     q5_2=start_p[4] + np.array([0,0,0,0,-60,0])
     q6_1=start_p[5] + np.array([0,0,0,0,0,-60])
     q6_2=start_p[5] + np.array([0,0,0,0,0,60])
@@ -164,7 +166,7 @@ def calib_R2():
     raw_data_dir='PH_rotate_data/train_data'
     #####################
 
-    calib_obj.run_calib(config_dir+'MA1440_marker_config.yaml','192.168.1.31','RB2',robot.pulse2deg,start_p,q_paths,rob_speed=3,repeat_N=1\
+    calib_obj.run_calib(config_dir+'MA1440_marker_config.yaml','192.168.1.31','RB2',robot.pulse2deg,start_p,q_paths,rob_speed=1,repeat_N=1\
                         ,raw_data_dir=raw_data_dir) # save calib config to file
     print("Collect PH data done")
 
@@ -188,18 +190,18 @@ def calib_R1():
                         [0,0,0,0,0,0],
                         [0,0,0,0,0,0],
                         [0,0,0,0,0,0]])
-    q1_1=start_p[0] + np.array([-80,0,0,0,0,0])
-    q1_2=start_p[0] + np.array([56,0,0,0,0,0])
+    q1_1=start_p[0] + np.array([-45,0,0,0,0,0])
+    q1_2=start_p[0] + np.array([45,0,0,0,0,0])
     q2_1=start_p[1] + np.array([0,50,0,0,0,0])
     q2_2=start_p[1] + np.array([0,-10,0,0,0,0])
     q3_1=start_p[2] + np.array([0,0,-60,0,0,0])
     q3_2=start_p[2] + np.array([0,0,10,0,0,0])
-    q4_1=start_p[3] + np.array([0,0,0,-120,0,0])
-    q4_2=start_p[3] + np.array([0,0,0,120,0,0])
-    q5_1=start_p[4] + np.array([0,0,0,0,80,0])
+    q4_1=start_p[3] + np.array([0,0,0,-90,0,0])
+    q4_2=start_p[3] + np.array([0,0,0,90,0,0])
+    q5_1=start_p[4] + np.array([0,0,0,0,45,0])
     q5_2=start_p[4] + np.array([0,0,0,0,-80,0])
-    q6_1=start_p[5] + np.array([0,0,0,0,0,-180])
-    q6_2=start_p[5] + np.array([0,0,0,0,0,180])
+    q6_1=start_p[5] + np.array([0,0,0,0,0,-120])
+    q6_2=start_p[5] + np.array([0,0,0,0,0,120])
     ## out stretch
     # start_p = np.array([[0,50,31,0,0,0],
     #                     [0,50,31,0,0,0],
@@ -247,13 +249,13 @@ def calib_R1():
     # raw_data_dir='PH_raw_data/valid_data_2'
     #####################
 
-    calib_obj.run_calib(config_dir+'MA2010_marker_config.yaml','192.168.1.31','RB1',robot_weld.pulse2deg,start_p,q_paths,rob_speed=3,repeat_N=1\
+    calib_obj.run_calib(config_dir+'MA2010_marker_config.yaml','192.168.1.31','RB1',robot_weld.pulse2deg,start_p,q_paths,rob_speed=2,repeat_N=1\
                         ,raw_data_dir=raw_data_dir) # save calib config to file
     print("Collect PH data done")
 
 
 if __name__=='__main__':
 
-    calib_R1()
+    # calib_R1()
     # calib_S1()
-    # calib_R2()
+    calib_R2()

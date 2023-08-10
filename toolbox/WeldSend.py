@@ -2,7 +2,7 @@ import numpy as np
 from general_robotics_toolbox import *
 import sys, glob, fnmatch
 from robot_def import *
-from pandas import read_csv
+from pandas import read_csv,DataFrame
 from dx200_motion_program_exec_client import *
 
 class WeldSend(object):
@@ -13,12 +13,31 @@ class WeldSend(object):
 
 	def jog_single(self,robot,q,v=1):
 		mp=MotionProgram(ROBOT_CHOICE=self.ROBOT_CHOICE_MAP[robot.robot_name],pulse2deg=robot.pulse2deg, tool_num=self.ROBOT_TOOL_MAP[robot.robot_name])
-		mp.MoveJ(np.degrees(q),v,None)
+		
+		if len(np.array(q).shape)==1:
+			mp.MoveJ(np.degrees(q),v,0)
+		else:
+			for q_wp in q:
+				mp.MoveJ(np.degrees(q_wp),v,0)
+
 		self.client.execute_motion_program(mp)
 	
 	def jog_dual(self,robot1,robot2,q1,q2,v=1):
 		mp=MotionProgram(ROBOT_CHOICE=self.ROBOT_CHOICE_MAP[robot1.robot_name],ROBOT_CHOICE2=self.ROBOT_CHOICE_MAP[robot2.robot_name],pulse2deg=robot1.pulse2deg,pulse2deg_2=robot2.pulse2deg, tool_num=self.ROBOT_TOOL_MAP[robot1.robot_name])
-		mp.MoveJ(np.degrees(q1),v,None,target2=['MOVJ',np.degrees(q2),10])
+		
+		if len(np.array(q1).shape)==1 and len(np.array(q2).shape)==1:
+			mp.MoveJ(np.degrees(q1),v,0,target2=['MOVJ',np.degrees(q2),10])
+		elif len(np.array(q1).shape)==2 and len(np.array(q2).shape)==1:
+			for q1_wp in q1:
+				mp.MoveJ(np.degrees(q1_wp),v,0,target2=['MOVJ',np.degrees(q2),10])
+		elif len(np.array(q1).shape)==1 and len(np.array(q2).shape)==2:
+			for q2_wp in q2:
+				mp.MoveJ(np.degrees(q1),v,0,target2=['MOVJ',np.degrees(q2_wp),10])
+		else:
+			wp_length = min(len(q1),len(q2))
+			for wp_i in range(wp_length):
+				mp.MoveJ(np.degrees(q1[wp_i]),v,0,target2=['MOVJ',np.degrees(q2[wp_i]),10])
+
 		self.client.execute_motion_program(mp)
 
 	def weld_segment_single(self,primitives,robot,q_all,v_all,cond_all,arc=False,wait=0):
@@ -219,6 +238,37 @@ class WeldSend(object):
 
 		return  curve_exe_pw[:,:3], curve_exe_pw[:,3:], timestamp
 
+	def save_weld_cmd(self,filename,breakpoints,primitives,q_bp,weld_v):
+
+		q_bp_new=[]
+		weld_v_new=[]
+		for i in range(len(primitives)):
+			if len(q_bp[i])==2:
+				q_bp_new.append([np.array(q_bp[i][0]),np.array(q_bp[i][1])])
+				weld_v_new.append([weld_v[i],weld_v[i]])
+			else:
+				q_bp_new.append([np.array(q_bp[i][0])])
+				weld_v_new.append([weld_v[i]])
+		df=DataFrame({'breakpoints':breakpoints,'primitives':primitives, 'q_bp':q_bp_new, 'weld_v':weld_v_new})
+		df.to_csv(filename,header=True,index=False)
+	
+	def load_weld_cmd(self,filename):
+		
+		data = read_csv(filename)
+		breakpoints=np.array(data['breakpoints'].tolist()).astype(int)
+		primitives=data['primitives'].tolist()
+		qs=data['q_bp'].tolist()
+		weld_v_str=np.array(data['weld_v'].tolist())
+		q_bp=[]
+		for q in qs:
+			endpoint=q[8:-3].split(',')
+			qarr = np.array(list(map(float, endpoint)))
+			q_bp.append([np.array(qarr)])
+		weld_v=[]
+		for v in weld_v_str:
+			weld_v.append(float(v[1:-1]))
+
+		return breakpoints,primitives,q_bp,weld_v
 
 	# def extract_data_from_cmd(self,filename):
 	# 	data = read_csv(filename)

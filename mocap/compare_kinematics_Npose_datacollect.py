@@ -14,7 +14,7 @@ import time
 import pickle
 from MocapPoseListener import *
 
-dataset_date = '0621'
+dataset_date = '0801'
 
 config_dir='../config/'
 # robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path=config_dir+'weldgun.csv',d=15,\
@@ -30,9 +30,12 @@ base_marker_config_file=config_dir+'MA2010_'+dataset_date+'_marker_config.yaml',
 # print(robot_weld.fwd(np.radians([-0.5,-68,-68,0,0,0])))
 
 test_qs = []
-sample_q = np.radians([[33,18,-14,-50,36,63],[-37,19,-15,46,32,-56],\
+# sample_q = np.radians([[33,18,-14,-50,36,63],[-37,19,-15,46,32,-56],\
+#                        [0,-60,-60,0,-22,0],[0,0,0,0,0,0],\
+#                        [0,57,31,0,34,0],[37,-15,-44,-91,34,73],[0,0,0,0,0,0]])
+sample_q = np.radians([[32,14,-5,22,-37,20],[-41,31,6,-41,-49,66],\
                        [0,-60,-60,0,-22,0],[0,0,0,0,0,0],\
-                       [0,57,31,0,34,0],[37,-15,-44,-91,34,73],[0,0,0,0,0,0]])
+                       [0,57,31,0,34,0],[32,14,-5,22,-37,20],[0,0,0,0,0,0]])
 sample_N = [369,238,193,203,264,233] # len(sample_q)-1
 # sample_N = [2,2,2,2,2,2] # len(sample_q)-1
 for i in range(len(sample_N)):
@@ -67,10 +70,16 @@ mpl_obj = MocapFrameListener(mocap_cli,all_ids,'world',use_quat=True)
 data_dir = 'kinematic_raw_data/'
 
 repeats_N = 1
-rob_speed = 5
-waitTime = 0.5
+rob_speed = 3
+waitTime = 0.75
 
 robot_client = MotionProgramExecClient()
+
+mp=MotionProgram(ROBOT_CHOICE='RB1',pulse2deg=robot_weld.pulse2deg)
+start_q = test_qs[0]+np.array([1,1,1,1,1,1])
+mp.MoveJ(start_q,5,0)
+robot_client.execute_motion_program(mp)
+
 mp=MotionProgram(ROBOT_CHOICE='RB1',pulse2deg=robot_weld.pulse2deg)
 for N in range(repeats_N):
     for test_q in test_qs:
@@ -78,43 +87,19 @@ for N in range(repeats_N):
         mp.MoveJ(test_q,rob_speed,0)
         mp.setWaitTime(waitTime)
 
-# Run
-# mpl_obj.run_pose_listener()
-# robot_stamps,curve_exe, job_line,job_step = robot_client.execute_motion_program(mp)
-# mpl_obj.stop_pose_listener()
-# curve_p,curve_R,timestamps = mpl_obj.get_frames_traj()
-
-# for ids in all_ids:
-#     print(curve_R[ids][0])
-# save_curve_R = {}
-# save_curve_R[robot_weld.base_rigid_id]=curve_R[robot_weld.base_rigid_id]
-# save_curve_R[robot_weld.tool_rigid_id]=curve_R[robot_weld.tool_rigid_id]
-# print(save_curve_R[robot_weld.base_rigid_id][0])
-# print(save_curve_R[robot_weld.tool_rigid_id][0])
-
-# with open(data_dir+'mocap_p_cont.pickle', 'wb') as handle:
-#     pickle.dump(curve_p, handle, protocol=pickle.HIGHEST_PROTOCOL)
-# with open(data_dir+'mocap_quat_cont.pickle', 'wb') as handle:
-#     pickle.dump(save_curve_R, handle, protocol=pickle.HIGHEST_PROTOCOL)
-# with open(data_dir+'robot_q_cont.pickle', 'wb') as handle:
-#     pickle.dump(curve_exe, handle, protocol=pickle.HIGHEST_PROTOCOL)
-
-# with open(data_dir+'mocap_p_timestamps_cont.pickle', 'wb') as handle:
-#     pickle.dump(timestamps, handle, protocol=pickle.HIGHEST_PROTOCOL)
-# with open(data_dir+'robot_q_timestamps_cont.pickle', 'wb') as handle:
-#     pickle.dump(robot_stamps, handle, protocol=pickle.HIGHEST_PROTOCOL)
-
 robot_client.execute_motion_program_nonblocking(mp)
 ###streaming
 robot_client.StartStreaming()
 start_time=time.time()
 
+program_start=False
 state_flag=0
 robot_q_align=[]
 mocap_T_align=[]
 
 robot_q_raw=[]
-mocap_T_raw=[]
+tool_T_raw=[]
+base_T_raw=[]
 
 joint_recording=[]
 robot_stamps=[]
@@ -127,15 +112,9 @@ while True:
     res, data = robot_client.receive_from_robot(0.01)
     if res:
         state_flag=data[16]
-
-        # print(data[18])
-        # if data[18]!=0 and data[18]%2==0:
-        #     print(time.time()-start_time)
-
-        # print(np.divide(np.array(data[20:26]),r_pulse2deg))
-        # print("================")
-        
-        if data[18]!=0 and data[18]%2==0: # when the robot stop
+        if data[18]==0:
+            program_start=True
+        if data[18]!=0 and data[18]%2==0 and program_start: # when the robot stop
             if len(joint_recording)==0:
                 mpl_obj.run_pose_listener()
             joint_angle=np.radians(np.divide(np.array(data[20:26]),r_pulse2deg))
@@ -163,10 +142,12 @@ while True:
                 base_rigid_p=mocap_curve_p[robot_weld.base_rigid_id]
                 mocap_p=mocap_curve_p[robot_weld.tool_rigid_id]
                 for k in range(start_i,end_i):
+                    tool_T_raw.append(np.append(mocap_p[k],mocap_R[k]))
+                    base_T_raw.append(np.append(base_rigid_p[k],base_rigid_R[k]))
+
                     T_mocap_basemarker = Transform(q2R(base_rigid_R[k]),base_rigid_p[k]).inv()
                     T_marker_mocap = Transform(q2R(mocap_R[k]),mocap_p[k])
                     T_marker_basemarker = T_mocap_basemarker*T_marker_mocap
-                    mocap_T_raw.append(np.append(T_marker_basemarker.p,R2q(T_marker_basemarker.R)))
                     T_marker_base = T_basemarker_base*T_marker_basemarker
                     this_mocap_ori.append(R2rpy(T_marker_base.R))
                     this_mocap_p.append(T_marker_base.p)
@@ -180,24 +161,30 @@ while True:
                 joint_recording = joint_recording[start_i:end_i]
                 robot_stamps = robot_stamps[start_i:end_i]
                 robot_q_align.append(np.mean(joint_recording,axis=0))
+                print(np.degrees(np.mean(joint_recording,axis=0)))
                 joint_recording=[]
                 robot_stamps=[]
                 mpl_obj.clear_traj()
 
                 print("Q align num:",len(robot_q_align))
                 print("mocap align num:",len(mocap_T_align))
-                print("mocap raw num:",len(mocap_T_raw))
+                print("mocap tool raw num:",len(tool_T_raw))
+                print("mocap base raw num:",len(base_T_raw))
                 print("=========================")
 
 robot_client.servoMH(False)
 
 np.savetxt(data_dir+'robot_q_align.csv',robot_q_align,delimiter=',')
 np.savetxt(data_dir+'mocap_T_align.csv',mocap_T_align,delimiter=',')
-np.savetxt(data_dir+'mocap_T_raw.csv',mocap_T_raw,delimiter=',')
+np.savetxt(data_dir+'_tool_T_raw.csv',tool_T_raw,delimiter=',')
+np.savetxt(data_dir+'_base_T_raw.csv',base_T_raw,delimiter=',')
 
 print("Q align num:",len(robot_q_align))
 print("mocap align num:",len(mocap_T_align))
-print("mocap raw num:",len(mocap_T_raw))
+print("Tool T raw num:",len(tool_T_raw))
+print("Base T raw num:",len(base_T_raw))
+
+exit()
 
 robot_weld.robot.P = robot_weld.calib_P
 robot_weld.robot.H = robot_weld.calib_H

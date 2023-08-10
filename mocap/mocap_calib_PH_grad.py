@@ -17,48 +17,89 @@ Rx=np.array([1,0,0])
 Ry=np.array([0,1,0])
 Rz=np.array([0,0,1])
 
-dataset_date='0621'
+dataset_date='0801'
 
 config_dir='../config/'
 
-# robot_weld_collect=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',\
-#                     #  tool_file_path=config_dir+'torch.csv',d=15,\
-#                      tool_file_path='',d=0,\
-# pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',\
-# base_marker_config_file=config_dir+'MA2010_marker_config.yaml',tool_marker_config_file=config_dir+'weldgun_marker_config.yaml')
+robot_type = 'R2'
 
-robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',\
-                    #  tool_file_path=config_dir+'torch.csv',d=15,\
-                     tool_file_path='',d=0,\
-pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',\
-base_marker_config_file=config_dir+'MA2010_'+dataset_date+'_marker_config.yaml',tool_marker_config_file=config_dir+'weldgun_'+dataset_date+'_marker_config.yaml')
+if robot_type == 'R1':
+    robot=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',\
+                        tool_file_path=config_dir+'torch.csv',d=15,\
+                        #  tool_file_path='',d=0,\
+                        pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',\
+                        base_marker_config_file=config_dir+'MA2010_'+dataset_date+'_marker_config.yaml',\
+                        tool_marker_config_file=config_dir+'weldgun_'+dataset_date+'_marker_config.yaml')
+elif robot_type == 'R2':
+    robot=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.yml',\
+                        tool_file_path=config_dir+'mti.csv',\
+                        pulse2deg_file_path=config_dir+'MA1440_A0_pulse2deg_real.csv',\
+                        base_marker_config_file=config_dir+'MA1440_'+dataset_date+'_marker_config.yaml',\
+                        tool_marker_config_file=config_dir+'mti_'+dataset_date+'_marker_config.yaml')
 
 #### using rigid body
-robot_weld.T_tool_toolmarker=Transform(np.eye(3),[0,0,0])
-
-T_base_basemarker = robot_weld.T_base_basemarker
+use_toolmaker=True
+T_base_basemarker = robot.T_base_basemarker
 T_basemarker_base = T_base_basemarker.inv()
-robot_weld.robot.T_flange = robot_weld.T_tool_flange
-#### using tool
-robot_weld.robot.R_tool = robot_weld.T_tool_toolmarker.R
-robot_weld.robot.p_tool = robot_weld.T_tool_toolmarker.p
 
-data_dir='PH_grad_data/test'+dataset_date+'_R1/train_data_'
+if use_toolmaker:
+    robot.robot.R_tool = robot.T_toolmarker_flange.R
+    robot.robot.p_tool = robot.T_toolmarker_flange.p
+    robot.T_tool_toolmarker = Transform(np.eye(3),[0,0,0])
+
+data_dir='PH_grad_data/test'+dataset_date+'_'+robot_type+'/train_data_'
 
 try:
+    use_raw=False
+    
     robot_q = np.loadtxt(data_dir+'robot_q_align.csv',delimiter=',')
     mocap_T = np.loadtxt(data_dir+'mocap_T_align.csv',delimiter=',')
-
-    # mocap_T_actual=[]
-    # for mT in mocap_T:
-    #     T_toolrigid_base_collect=Transform(q2R(mT[3:]),mT[:3])
-    #     T_toolrigid_basemarker = robot_weld_collect.T_base_basemarker*T_toolrigid_base_collect
-    #     T_toolrigid_base = T_basemarker_base*T_toolrigid_basemarker
-    #     mocap_T_actual.append(np.append(T_toolrigid_base.p,R2q(T_toolrigid_base.R)))
-
-    # mocap_T_actual = np.array(mocap_T_actual)
-    # np.savetxt(data_dir+'mocap_T_align.csv',mocap_T_actual,delimiter=',')
-    # exit()
+    
+    if use_raw:
+        mocap_T=[]
+        toolrigid_raw = np.loadtxt(data_dir+'tool_T_raw.csv',delimiter=',')
+        baserigid_raw = np.loadtxt(data_dir+'base_T_raw.csv',delimiter=',')
+        
+        raw_id=0
+        same_pose_thres=0.1 #mm
+        pos_toolrigid=[]
+        pose_toolrigid_base=[]
+        while True:
+            if len(pos_toolrigid)==0:
+                pos_toolrigid.append(toolrigid_raw[raw_id][:3])
+            elif np.linalg.norm(np.mean(pos_toolrigid,axis=0)-toolrigid_raw[raw_id][:3])<same_pose_thres:
+                pos_toolrigid.append(toolrigid_raw[raw_id][:3])
+            else:
+                pose_toolrigid_base=np.array(pose_toolrigid_base)
+                if np.linalg.norm(np.degrees(np.max(pose_toolrigid_base[:,3:],axis=0)\
+                    -np.min(pose_toolrigid_base[:,3:],axis=0)))>0.1:
+                    print("RPY max min:",np.degrees(np.min(pose_toolrigid_base[:,3:],axis=0)),\
+                        np.degrees(np.max(pose_toolrigid_base[:,3:],axis=0)))
+                p_mean = np.mean(pose_toolrigid_base,axis=0)
+                this_T = np.append(p_mean[:3],R2q(rpy2R(p_mean[3:])))
+                mocap_T.append(this_T)
+                pos_toolrigid=[]
+                pose_toolrigid_base=[]
+                continue
+            
+            T_mocap_basemarker = Transform(q2R(baserigid_raw[raw_id][3:]),baserigid_raw[raw_id][:3]).inv()
+            T_marker_mocap = Transform(q2R(toolrigid_raw[raw_id][3:]),toolrigid_raw[raw_id][:3])
+            T_marker_basemarker = T_mocap_basemarker*T_marker_mocap
+            T_marker_base = T_basemarker_base*T_marker_basemarker
+            pose_toolrigid_base.append(np.append(T_marker_base.p,R2rpy(T_marker_base.R)))
+            raw_id+=1
+            
+            if raw_id>=len(toolrigid_raw):
+                pose_toolrigid_base=np.array(pose_toolrigid_base)
+                if np.linalg.norm(np.degrees(np.max(pose_toolrigid_base[:,3:],axis=0)\
+                    -np.min(pose_toolrigid_base[:,3:],axis=0)))>0.1:
+                    print("RPY max min:",np.degrees(np.min(pose_toolrigid_base[:,3:],axis=0)),\
+                        np.degrees(np.max(pose_toolrigid_base[:,3:],axis=0)))
+                p_mean = np.mean(pose_toolrigid_base,axis=0)
+                this_T = np.append(p_mean[:3],R2q(rpy2R(p_mean[3:])))
+                mocap_T.append(this_T)
+                pos_toolrigid=[]
+                break
 
 except:
 
@@ -70,16 +111,16 @@ except:
     robot_qdot = np.divide(np.gradient(robot_q,axis=0),np.tile(np.gradient(robot_q_stamps),(6,1)).T)
     robot_qdot_norm = np.linalg.norm(robot_qdot,axis=1)
 
-    marker_id = robot_weld.tool_rigid_id
+    marker_id = robot.tool_rigid_id
     with open(data_dir+'mocap_p_cont.pickle', 'rb') as handle:
         mocap_p = pickle.load(handle)
-        # static_mocap_marker = mocap_p[robot_weld.base_markers_id[0]]
-        base_rigid_p = mocap_p[robot_weld.base_rigid_id]
+        # static_mocap_marker = mocap_p[robot.base_markers_id[0]]
+        base_rigid_p = mocap_p[robot.base_rigid_id]
         mocap_p = np.array(mocap_p[marker_id])
     with open(data_dir+'mocap_R_cont.pickle', 'rb') as handle:
         mocap_R = pickle.load(handle)
-        # static_mocap_marker = mocap_p[robot_weld.base_markers_id[0]]
-        base_rigid_R = mocap_R[robot_weld.base_rigid_id]
+        # static_mocap_marker = mocap_p[robot.base_markers_id[0]]
+        base_rigid_R = mocap_R[robot.base_rigid_id]
         mocap_R = np.array(mocap_R[marker_id])
     with open(data_dir+'mocap_timestamps_cont.pickle', 'rb') as handle:
         mocap_stamps = pickle.load(handle)
@@ -186,17 +227,17 @@ except:
 
     if len(robot_stop_k)!=len(mocap_stop_k):
         # change robot PH to calib PH
-        robot_weld.robot.P = robot_weld.calib_P
-        robot_weld.robot.H = robot_weld.calib_H
+        robot.robot.P = robot.calib_P
+        robot.robot.H = robot.calib_H
         # change to calibrated flange (tool rigidbody orientation)
-        robot_weld.robot.T_flange = robot_weld.T_tool_flange
+        robot.robot.T_flange = robot.T_tool_flange
 
         threshold = 3
         erase_robot_stop = []
         mocap_start_offset = 0
         for i in range(len(robot_stop_k)):
             this_robot_q = np.mean(robot_q[robot_stop_k[i]:robot_stop_k[i]+all_dkrobot[i]],axis=0)
-            rob_T = robot_weld.fwd(this_robot_q)
+            rob_T = robot.fwd(this_robot_q)
 
             find_flag = False
             for j in range(i-mocap_start_offset,i-mocap_start_offset+5):
@@ -281,17 +322,6 @@ N_per_pose = 7
 total_pose = int(len(robot_q)/N_per_pose)
 robot_q_sample = deepcopy(robot_q[0:-1:N_per_pose])
 
-# choosing poses
-# train_N = 3
-# train_set=[]
-# # linearly choose poses
-# set1desired = np.linspace(robot_q_sample[0][1:3],np.zeros(2),int(train_N/2)+1)
-# set2desired = np.linspace(np.zeros(2),robot_q_sample[-1][1:3],int(train_N/2)+1)
-# setdesired = np.vstack((set1desired,set2desired[1:]))
-# for desired_q in setdesired:
-#     q_index = np.argmin(np.linalg.norm(robot_q_sample[:,1:3]-desired_q,ord=2,axis=1))
-#     train_set.append(q_index)
-
 train_N = total_pose
 train_set=np.arange(train_N).astype(int)
 print(data_dir)
@@ -299,23 +329,28 @@ print(train_set)
 
 #### Gradient
 plot_grad=False
-plot_error=False
+plot_error=True
 save_PH = True
 all_testing_pose=np.arange(N_per_pose)
+# max_iteration = 500
 max_iteration = 200
 terminate_eps = 0.0002
+terminate_ori_error=999
+# terminate_ori_error=0.05
 total_grad_sample = 40
 dP_up_range = 0.05
 dP_low_range = 0.01
-P_size = 6
+P_size = 7
 dH_up_range = np.radians(0.1)
 dH_low_range = np.radians(0.03)
 H_size = 6
 dH_rotate_axis = [[Rx,Ry],[Rz,Rx],[Rz,Rx],[Ry,Rz],[Rz,Rx],[Ry,Rz]]
-alpha=0.3
+alpha=0.5
 weight_ori = 0.1
+# weight_ori = 1
 weight_pos = 1
 lambda_H = 10
+# lambda_H = 1
 lambda_P = 1
 start_t = time.time()
 
@@ -323,14 +358,15 @@ PH_q = {}
 # train_set=[]
 for N in train_set:
     print("Training #"+str(N),"at Pose (q2q3):", np.round(np.degrees(robot_q_sample[N,1:3])))
+    print(np.degrees(robot.robot.joint_lower_limit))
     print("Progress:",str(N)+"/"+str(total_pose),"Time Pass:",str(np.round(time.time()-start_t)))
 
     pos_error_progress = []
     pos_error_norm_progress = []
     ori_error_progress = []
     ori_error_norm_progress = []
-    robot_opt_P = deepcopy(robot_weld.calib_P)
-    robot_opt_H = deepcopy(robot_weld.calib_H)
+    robot_opt_P = deepcopy(robot.calib_P)
+    robot_opt_H = deepcopy(robot.calib_H)
     for iter_N in range(max_iteration):
         # print(iter_N)
 
@@ -363,12 +399,12 @@ for N in train_set:
             for testing_pose in all_testing_pose:
                 pose_ind=N*N_per_pose+testing_pose
                 # print(np.round(np.degrees(robot_q[pose_ind])))
-                robot_weld.robot.P=deepcopy(robot_init_P)
-                robot_weld.robot.H=deepcopy(robot_init_H)
-                robot_init_T = robot_weld.fwd(robot_q[pose_ind])
-                robot_weld.robot.P=deepcopy(robot_pert_P)
-                robot_weld.robot.H=deepcopy(robot_pert_H)
-                robot_pert_T = robot_weld.fwd(robot_q[pose_ind])
+                robot.robot.P=deepcopy(robot_init_P)
+                robot.robot.H=deepcopy(robot_init_H)
+                robot_init_T = robot.fwd(robot_q[pose_ind])
+                robot.robot.P=deepcopy(robot_pert_P)
+                robot.robot.H=deepcopy(robot_pert_H)
+                robot_pert_T = robot.fwd(robot_q[pose_ind])
                 dR = robot_init_T.R.T@robot_pert_T.R
                 k,theta = R2rot(dR)
                 dPos = robot_pert_T.p-robot_init_T.p
@@ -386,13 +422,13 @@ for N in train_set:
         error_pos_ori = []
         error_pos = []
         error_ori = []
-        robot_weld.robot.P=deepcopy(robot_init_P)
-        robot_weld.robot.H=deepcopy(robot_init_H)
+        robot.robot.P=deepcopy(robot_init_P)
+        robot.robot.H=deepcopy(robot_init_H)
         for testing_pose in all_testing_pose:
             pose_ind=N*N_per_pose+testing_pose
-            robot_init_T = robot_weld.fwd(robot_q[pose_ind])
+            robot_init_T = robot.fwd(robot_q[pose_ind])
             T_marker_base = Transform(q2R(mocap_T[pose_ind][3:]),mocap_T[pose_ind][:3])
-            T_tool_base = T_marker_base*robot_weld.T_tool_toolmarker
+            T_tool_base = T_marker_base*robot.T_tool_toolmarker
             k,theta = R2rot(robot_init_T.R.T@T_tool_base.R)
             k=np.array(k)
             error_pos_ori = np.append(error_pos_ori,np.append((T_tool_base.p-robot_init_T.p)*weight_pos,(k*np.degrees(theta))*weight_ori))
@@ -403,7 +439,7 @@ for N in train_set:
         pos_error_norm_progress.append(np.linalg.norm(error_pos,ord=2,axis=1))
         ori_error_progress.append(error_ori[0])
         ori_error_norm_progress.append(np.linalg.norm(error_ori,ord=2,axis=1))
-        if iter_N>0 and np.linalg.norm(pos_error_norm_progress[-1]-pos_error_norm_progress[-2])<terminate_eps:
+        if iter_N>0 and np.linalg.norm(pos_error_norm_progress[-1]-pos_error_norm_progress[-2])<terminate_eps and np.mean(ori_error_norm_progress[-1])<terminate_ori_error:
             break
 
         # print(np.array(d_T_all).shape)
@@ -414,10 +450,12 @@ for N in train_set:
         G = np.matmul(d_T_all,np.linalg.pinv(d_pH_all))
         
         if (iter_N==0) and plot_grad:
+            plt.clf()
             print("Gradient Size:",G.shape)
             plt.matshow(G)
             plt.colorbar()
-            plt.show()
+            plt.show(block=False)
+            
         
         # update PH
         Kq = np.diag(np.append(np.ones(P_size*3)*lambda_P,np.ones(H_size*2))*lambda_H)
@@ -439,33 +477,43 @@ for N in train_set:
             robot_opt_H[:,i] = new_H
 
     print("Final Mean Position Error:",np.mean(pos_error_norm_progress[-1]))
+    print("Final Mean Orientation Error:",np.mean(ori_error_norm_progress[-1]))
     print('P:',np.round(robot_opt_P,3).T)
     print('H:',np.round(robot_opt_H,3).T)
 
     if plot_error:
-        plt.plot(np.array(pos_error_progress))
-        plt.title("Position XYZ error of Pose 1")
-        plt.show()
-        plt.plot(np.array(pos_error_norm_progress))
-        plt.title("Position error norm of all poses")
-        plt.show()
-        error_diff = np.linalg.norm(np.diff(pos_error_norm_progress,axis=0),axis=1).flatten()
-        plt.plot(error_diff)
-        plt.title("Error Diff Norm")
-        plt.show()    
-        plt.plot(np.array(ori_error_progress))
-        plt.title("Orientation kdtheta error of Pose 1")
-        plt.show()
-        plt.plot(np.array(ori_error_norm_progress))
-        plt.title("Orientation error norm of all poses")
-        plt.show()
+        try:
+            plt.close(fig)
+        except:
+            pass
+        fig,axs = plt.subplots(2,3)
+        axs[0,0].plot(np.array(pos_error_progress))
+        axs[0,0].set_title("Position XYZ error of Pose 1")
+        axs[0,1].plot(np.array(pos_error_norm_progress))
+        axs[0,1].set_title("Position error norm of all poses")
+        pos_error_diff = np.linalg.norm(np.diff(pos_error_norm_progress,axis=0),axis=1).flatten()
+        axs[0,2].plot(np.array(pos_error_diff))
+        axs[0,2].set_title("Position Error Norm Diff")
+        axs[1,0].plot(np.array(ori_error_progress))
+        axs[1,0].set_title("Orientation kdtheta error of Pose 1")
+        axs[1,1].plot(np.array(ori_error_norm_progress))
+        axs[1,1].set_title("Orientation error norm of all poses")
+        ori_error_diff = np.linalg.norm(np.diff(ori_error_norm_progress,axis=0),axis=1).flatten()
+        axs[1,2].plot(np.array(ori_error_diff))
+        axs[1,2].set_title("Orientation Error Norm Diff")
+        fig.canvas.manager.window.wm_geometry("+%d+%d" % (1920+10,10))
+        fig.set_size_inches([13.95,7.92],forward=True)
+        plt.tight_layout()
+        plt.show(block=False)
+        plt.pause(0.01)
     
     if save_PH:
         q_key = tuple(robot_q_sample[N,1:3])
         PH_q[q_key]={}
         PH_q[q_key]['P']=robot_opt_P
         PH_q[q_key]['H']=robot_opt_H
-        PH_q[q_key]['train_pos_error']=pos_error_norm_progress[-1]
+        PH_q[q_key]['train_pos_error']=pos_error_norm_progress
+        PH_q[q_key]['train_ori_error']=ori_error_norm_progress
         with open(data_dir+'calib_PH_q.pickle','wb') as file:
             pickle.dump(PH_q, file)
 
@@ -478,8 +526,8 @@ pos_error_progress = []
 pos_error_norm_progress = []
 ori_error_progress = []
 ori_error_norm_progress = []
-robot_opt_P = deepcopy(robot_weld.calib_P)
-robot_opt_H = deepcopy(robot_weld.calib_H)
+robot_opt_P = deepcopy(robot.calib_P)
+robot_opt_H = deepcopy(robot.calib_H)
 for iter_N in range(max_iteration):
     print(iter_N)
 
@@ -511,12 +559,12 @@ for iter_N in range(max_iteration):
         # iterate all surrounding poses
         for pose_ind in range(len(robot_q)):
             # print(np.round(np.degrees(robot_q[pose_ind])))
-            robot_weld.robot.P=deepcopy(robot_init_P)
-            robot_weld.robot.H=deepcopy(robot_init_H)
-            robot_init_T = robot_weld.fwd(robot_q[pose_ind])
-            robot_weld.robot.P=deepcopy(robot_pert_P)
-            robot_weld.robot.H=deepcopy(robot_pert_H)
-            robot_pert_T = robot_weld.fwd(robot_q[pose_ind])
+            robot.robot.P=deepcopy(robot_init_P)
+            robot.robot.H=deepcopy(robot_init_H)
+            robot_init_T = robot.fwd(robot_q[pose_ind])
+            robot.robot.P=deepcopy(robot_pert_P)
+            robot.robot.H=deepcopy(robot_pert_H)
+            robot_pert_T = robot.fwd(robot_q[pose_ind])
             dR = robot_init_T.R.T@robot_pert_T.R
             k,theta = R2rot(dR)
             dPos = robot_pert_T.p-robot_init_T.p
@@ -534,12 +582,12 @@ for iter_N in range(max_iteration):
     error_pos_ori = []
     error_pos = []
     error_ori = []
-    robot_weld.robot.P=deepcopy(robot_init_P)
-    robot_weld.robot.H=deepcopy(robot_init_H)
+    robot.robot.P=deepcopy(robot_init_P)
+    robot.robot.H=deepcopy(robot_init_H)
     for pose_ind in range(len(robot_q)):
-        robot_init_T = robot_weld.fwd(robot_q[pose_ind])
+        robot_init_T = robot.fwd(robot_q[pose_ind])
         T_marker_base = Transform(q2R(mocap_T[pose_ind][3:]),mocap_T[pose_ind][:3])
-        T_tool_base = T_marker_base*robot_weld.T_tool_toolmarker
+        T_tool_base = T_marker_base*robot.T_tool_toolmarker
         k,theta = R2rot(robot_init_T.R.T@T_tool_base.R)
         k=np.array(k)
         error_pos_ori = np.append(error_pos_ori,np.append((T_tool_base.p-robot_init_T.p)*weight_pos,(k*np.degrees(theta))*weight_ori))
@@ -561,10 +609,11 @@ for iter_N in range(max_iteration):
     G = np.matmul(d_T_all,np.linalg.pinv(d_pH_all))
     
     if (iter_N==0) and plot_grad:
+        plt.clf()
         print("Gradient Size:",G.shape)
         plt.matshow(G)
         plt.colorbar()
-        plt.show()
+        plt.show(block=False)
     
     # update PH
     Kq = np.diag(np.append(np.ones(P_size*3)*lambda_P,np.ones(H_size*2))*lambda_H)
@@ -589,7 +638,17 @@ print("Final Mean Position Error:",np.mean(pos_error_norm_progress[-1]))
 print('P:',np.round(robot_opt_P,3).T)
 print('H:',np.round(robot_opt_H,3).T)
 
+if save_PH:
+    PH_q={}
+    PH_q['P']=robot_opt_P
+    PH_q['H']=robot_opt_H
+    PH_q['train_pos_error']=pos_error_norm_progress
+    PH_q['train_ori_error']=ori_error_norm_progress
+    with open(data_dir+'calib_one_PH.pickle','wb') as file:
+        pickle.dump(PH_q, file)
+
 if plot_error:
+    plt.clf()
     plt.plot(np.array(pos_error_progress))
     plt.title("Position XYZ error of Pose 1")
     plt.show()
@@ -606,15 +665,7 @@ if plot_error:
     plt.plot(np.array(ori_error_norm_progress))
     plt.title("Orientation error norm of all poses")
     plt.show()
-
-if save_PH:
-    PH_q={}
-    PH_q['P']=robot_opt_P
-    PH_q['H']=robot_opt_H
-    PH_q['train_pos_error']=pos_error_norm_progress
-    with open(data_dir+'calib_one_PH.pickle','wb') as file:
-        pickle.dump(PH_q, file)
-
+plt.clf()
 plt.plot(np.mean(pos_error_norm_progress,axis=1))
 plt.title("Average Position error norm of all poses")
 plt.show()

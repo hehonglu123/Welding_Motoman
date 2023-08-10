@@ -31,6 +31,7 @@ class robot_obj(object):
 		self.robot_name=robot_name
 		with open(def_path, 'r') as f:
 			self.robot = rr_rox.load_robot_info_yaml_to_robot(f)
+   
 
 		self.def_path=def_path
 		#define robot without tool
@@ -132,10 +133,10 @@ class robot_obj(object):
 						self.calib_H[0,i] = marker_data['H'][i]['x']
 						self.calib_H[1,i] = marker_data['H'][i]['y']
 						self.calib_H[2,i] = marker_data['H'][i]['z']
-				if 'zero_config' in marker_data.keys():
-					self.calib_zero_config = np.array(marker_data['zero_config'])
-					self.robot.joint_upper_limit = self.robot.joint_upper_limit-self.calib_zero_config
-					self.robot.joint_lower_limit = self.robot.joint_lower_limit-self.calib_zero_config
+				# if 'zero_config' in marker_data.keys():
+				# 	self.calib_zero_config = np.array(marker_data['zero_config'])
+				# 	self.robot.joint_upper_limit = self.robot.joint_upper_limit-self.calib_zero_config
+				# 	self.robot.joint_lower_limit = self.robot.joint_lower_limit-self.calib_zero_config
 		self.tool_marker_config_file=tool_marker_config_file
 		self.T_tool_toolmarker = None # T^tool_toolmarker
 		if len(tool_marker_config_file)>0:
@@ -156,6 +157,15 @@ class robot_obj(object):
 					# add d
 					T_d1_d2 = Transform(np.eye(3),p=[0,0,d-15])
 					self.T_tool_toolmarker = self.T_tool_toolmarker*T_d1_d2
+				if 'calib_toolmarker_flange_pose' in marker_data.keys():
+					p = [marker_data['calib_toolmarker_flange_pose']['position']['x'],
+						marker_data['calib_toolmarker_flange_pose']['position']['y'],
+						marker_data['calib_toolmarker_flange_pose']['position']['z']]
+					q = [marker_data['calib_toolmarker_flange_pose']['orientation']['w'],
+						marker_data['calib_toolmarker_flange_pose']['orientation']['x'],
+						marker_data['calib_toolmarker_flange_pose']['orientation']['y'],
+						marker_data['calib_toolmarker_flange_pose']['orientation']['z']]
+					self.T_toolmarker_flange = Transform(q2R(q),p)
 
 	def get_acc(self,q_all,direction=[]):
 		###get acceleration limit from q config, assume last 3 joints acc fixed direction is 3 length vector, 0 is -, 1 is +
@@ -217,6 +227,40 @@ class robot_obj(object):
 	
 	def jacobian(self,q):
 		return robotjacobian(self.robot,q)
+
+	def fwd_ph(self,q,ph_param):
+     
+		q=np.array(q)
+    
+		origin_P=copy.deepcopy(self.robot.P)
+		origin_H=copy.deepcopy(self.robot.H)
+    
+		opt_P,opt_H = ph_param.predict(q[1:3])
+		self.robot.P=copy.deepcopy(opt_P)
+		self.robot.H=copy.deepcopy(opt_H)
+		robot_T = fwdkin(self.robot,q)
+  
+		self.robot.P=copy.deepcopy(origin_P)
+		self.robot.H=copy.deepcopy(origin_H)
+  
+		return robot_T
+
+	def jacobian_ph(self,q,ph_param):
+     
+		q=np.array(q)
+    
+		origin_P=copy.deepcopy(self.robot.P)
+		origin_H=copy.deepcopy(self.robot.H)
+    
+		opt_P,opt_H = ph_param.predict(q[1:3])
+		self.robot.P=opt_P
+		self.robot.H=opt_H
+		J = robotjacobian(self.robot,q)
+  
+		self.robot.P=origin_P
+		self.robot.H=origin_H
+  
+		return J
 
 	def inv(self,p,R=np.eye(3),last_joints=None):
 		pose=Transform(R,p)
@@ -356,10 +400,10 @@ class positioner_obj(object):
 						self.calib_H[1,i] = marker_data['H'][i]['y']
 						self.calib_H[2,i] = marker_data['H'][i]['z']
 				self.calib_zero_config=np.zeros(self.robot.H.shape[1])
-				if 'zero_config' in marker_data.keys():
-					self.calib_zero_config = np.array(marker_data['zero_config'])
-					self.robot.joint_upper_limit = self.robot.joint_upper_limit-self.calib_zero_config
-					self.robot.joint_lower_limit = self.robot.joint_lower_limit-self.calib_zero_config
+				# if 'zero_config' in marker_data.keys():
+				# 	self.calib_zero_config = np.array(marker_data['zero_config'])
+				# 	self.robot.joint_upper_limit = self.robot.joint_upper_limit-self.calib_zero_config
+				# 	self.robot.joint_lower_limit = self.robot.joint_lower_limit-self.calib_zero_config
 		self.tool_marker_config_file=tool_marker_config_file
 		self.T_tool_toolmarker = None # T^tool_toolmarker
 		if len(tool_marker_config_file)>0:

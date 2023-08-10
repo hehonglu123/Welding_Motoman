@@ -106,13 +106,18 @@ class CalibRobotPH:
             with open(raw_data_dir+'_robot_timestamps_cont.pickle', 'wb') as handle:
                 pickle.dump(all_robot_stamp, handle, protocol=pickle.HIGHEST_PROTOCOL)
     
-    def run_datacollect_sync(self,base_marker_config_file,rob_IP=None,ROBOT_CHOICE=None,rob_p2d=None,paths=[],rob_speed=3,waittime=1,
+    def run_datacollect_sync(self,rob_IP=None,ROBOT_CHOICE=None,rob_p2d=None,paths=[],rob_speed=3,waittime=1,
                   raw_data_dir='',split_motion=2):
         
         input("Press Enter and the robot will start moving.")
         robot_client = MotionProgramExecClient()
 
-        mp=MotionProgram(ROBOT_CHOICE='RB1',pulse2deg=self.robot.pulse2deg)
+        mp=MotionProgram(ROBOT_CHOICE=ROBOT_CHOICE,pulse2deg=self.robot.pulse2deg)
+        start_q = paths[0]+np.array([1,1,1,1,1,1])
+        mp.MoveJ(start_q,1,0)
+        robot_client.execute_motion_program(mp)
+
+        mp=MotionProgram(ROBOT_CHOICE=ROBOT_CHOICE,pulse2deg=self.robot.pulse2deg)
         for test_q in paths:
             # move robot
             mp.MoveJ(test_q,rob_speed,0)
@@ -123,12 +128,14 @@ class CalibRobotPH:
         robot_client.StartStreaming()
         start_time=time.time()
 
+        program_start=False
         state_flag=0
         robot_q_align=[]
         mocap_T_align=[]
 
         robot_q_raw=[]
-        mocap_T_raw=[]
+        tool_T_raw=[]
+        base_T_raw=[]
         
         joint_recording=[]
         robot_stamps=[]
@@ -141,11 +148,16 @@ class CalibRobotPH:
             res, data = robot_client.receive_from_robot(0.01)
             if res:
                 state_flag=data[16]
-                if data[18]!=0 and data[18]%2==0: # when the robot stop
+                if data[18]==0:
+                    program_start=True
+                if data[18]!=0 and data[18]%2==0 and program_start: # when the robot stop
                     if len(joint_recording)==0:
                         print("Start collect")
                         self.mpl_obj.run_pose_listener()
-                    joint_angle=np.radians(np.divide(np.array(data[20:26]),r_pulse2deg))
+                    if ROBOT_CHOICE=='RB1':
+                        joint_angle=np.radians(np.divide(np.array(data[20:26]),r_pulse2deg))
+                    elif ROBOT_CHOICE=='RB2':
+                        joint_angle=np.radians(np.divide(np.array(data[26:32]),r_pulse2deg))
                     joint_recording.append(joint_angle)
                     timestamp=data[0]+data[1]*1e-9
                     robot_stamps.append(timestamp)
@@ -169,10 +181,12 @@ class CalibRobotPH:
                         base_rigid_p=mocap_curve_p[self.robot.base_rigid_id]
                         mocap_p=mocap_curve_p[self.robot.tool_rigid_id]
                         for k in range(start_i,end_i):
+                            tool_T_raw.append(np.append(mocap_p[k],mocap_R[k]))
+                            base_T_raw.append(np.append(base_rigid_p[k],base_rigid_R[k]))
+
                             T_mocap_basemarker = Transform(q2R(base_rigid_R[k]),base_rigid_p[k]).inv()
                             T_marker_mocap = Transform(q2R(mocap_R[k]),mocap_p[k])
                             T_marker_basemarker = T_mocap_basemarker*T_marker_mocap
-                            mocap_T_raw.append(np.append(T_marker_basemarker.p,R2q(T_marker_basemarker.R)))
                             T_marker_base = T_basemarker_base*T_marker_basemarker
                             this_mocap_ori.append(R2rpy(T_marker_base.R))
                             this_mocap_p.append(T_marker_base.p)
@@ -186,61 +200,115 @@ class CalibRobotPH:
                         joint_recording = joint_recording[start_i:end_i]
                         robot_stamps = robot_stamps[start_i:end_i]
                         robot_q_align.append(np.mean(joint_recording,axis=0))
+                        print(np.degrees(np.mean(joint_recording,axis=0)))
                         joint_recording=[]
                         robot_stamps=[]
                         self.mpl_obj.clear_traj()
 
                         print("Q align num:",len(robot_q_align))
                         print("mocap align num:",len(mocap_T_align))
-                        print("mocap raw num:",len(mocap_T_raw))
+                        print("mocap tool raw num:",len(tool_T_raw))
+                        print("mocap base raw num:",len(base_T_raw))
                         print("=========================")
                 
         robot_client.servoMH(False)
 
         np.savetxt(raw_data_dir+'_robot_q_align.csv',robot_q_align,delimiter=',')
         np.savetxt(raw_data_dir+'_mocap_T_align.csv',mocap_T_align,delimiter=',')
-        np.savetxt(raw_data_dir+'_mocap_T_raw.csv',mocap_T_raw,delimiter=',')
+        np.savetxt(raw_data_dir+'_tool_T_raw.csv',tool_T_raw,delimiter=',')
+        np.savetxt(raw_data_dir+'_base_T_raw.csv',base_T_raw,delimiter=',')
 
         print("Q align num:",len(robot_q_align))
         print("mocap align num:",len(mocap_T_align))
-        print("mocap raw num:",len(mocap_T_raw))
+        print("Tool T raw num:",len(tool_T_raw))
+        print("Base T raw num:",len(base_T_raw))
 
-def calib_S1():
+def calib_R2():
+
+    dataset_date = '0804'
+    print("Dataset Date:",dataset_date)
 
     config_dir='../config/'
-    turn_table=positioner_obj('D500B',def_path=config_dir+'D500B_robot_default_config.yml',tool_file_path=config_dir+'positioner_tcp.csv'\
-        ,pulse2deg_file_path=config_dir+'D500B_pulse2deg_real.csv',\
-        base_marker_config_file=config_dir+'D500B_marker_config.yaml',tool_marker_config_file=config_dir+'positioner_tcp_marker_config.yaml')
+    robot_scan=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.yml',tool_file_path=config_dir+'mti.csv',\
+	pulse2deg_file_path=config_dir+'MA1440_A0_pulse2deg_real.csv',\
+    base_marker_config_file=config_dir+'MA1440_'+dataset_date+'_marker_config.yaml',tool_marker_config_file=config_dir+'mti_'+dataset_date+'_marker_config.yaml')
 
     mocap_url = 'rr+tcp://localhost:59823?service=optitrack_mocap'
     mocap_cli = RRN.ConnectService(mocap_url)
 
-    calib_obj = CalibRobotPH(mocap_cli,turn_table)
+    calib_obj = CalibRobotPH(mocap_cli,robot_scan)
 
     # calibration
-    ## zero config
-    start_p = np.array([[0,180],
-                        [0,180]])
-    q1_1=start_p[0] + np.array([-60,0])
-    q1_2=start_p[0] + np.array([45,0])
-    q2_1=start_p[1] + np.array([0,-120])
-    q2_2=start_p[1] + np.array([0,120])
+    q2_up=50
+    q2_low=-55
+    q3_up_sample = np.array([[-55,-40],[0,10],[50,60]]) #[[q2 q3]]
+    q3_low_sample = np.array([[-55,-70],[0,-60],[50,0]]) #[[q2 q3]]
+    d_angle = 5 # 5 degree
+    # add 7 points (at least 6 is needed)
+    # dq_sample = [[0,0,0,0,0,0],\
+    #       [-1,0,0,0,0,0],[1,0,0,0,0,0],\
+    #       [0,-1,-1,0,0,0],[0,-1,1,0,0,0],\
+    #       [0,1,1,0,0,0],[0,1,-1,0,0,0]]
+    # dq_sample = [[0,0,0,0,0,0],\
+    #       [-9,0,0,-9,-9,9],[-6,0,0,-6,-6,6],\
+    #       [-3,0,0,-3,-3,3],[4,0,0,4,4,-4],\
+    #       [8,0,0,8,8,-8],[12,0,0,12,12,-12]]
+    # dq_sample = [[0,0,0,0,0,0],\
+    #       [-3,0,0,-3,-3,3],[-2,0,0,-2,-2,2],\
+    #       [-1,0,0,-1,-1,1],[1,0,0,1,1,-1],\
+    #       [2,0,0,2,2,-2],[3,0,0,3,3,-3]]
+    dq_sample = [[0,0,0,0,0,0],\
+          [1,0,0,-0,-0,0],[0,1,0,0,0,0],\
+          [0,0,1,0,0,0],[0,0,0,1,0,0],\
+          [0,0,0,0,1,0],[0,0,0,0,0,1]]
+    scale=1
+    dq_sample = np.array(dq_sample)*scale
 
-    q_paths = [[q1_1,q1_2],[q2_1,q2_2]]
-    
+    target_q_zero = np.array([1,0,0,1,1,1])
+
+    # speed
+    rob_speed=0.2
+    waittime=0.75 # stop 0.5 sec for sync
+
+    q_paths = []
+    forward=True
+    for q2 in np.append(np.arange(q2_low,q2_up,d_angle),q2_up):
+        q3_low = np.interp(q2,q3_low_sample[:,0],q3_low_sample[:,1])
+        q3_up = np.interp(q2,q3_up_sample[:,0],q3_up_sample[:,1])
+        this_q_paths=[]
+        for q3 in np.append(np.arange(q3_low,q3_up,d_angle),q3_up):
+            target_q = deepcopy(target_q_zero)
+            target_q[1]=q2
+            target_q[2]=q3
+            q_path_pose=[]
+            for dq in dq_sample:
+                q_path_pose.append(target_q+dq)
+            if forward:
+                this_q_paths.extend(q_path_pose)
+            else:
+                this_q_paths.extend(q_path_pose[::-1])
+        if forward:
+            q_paths.extend(this_q_paths)
+        else:
+            q_paths.extend(this_q_paths[::-1])
+        forward = not forward
+    print("total pose:",len(q_paths))
+    print("Data Base:",dataset_date)
+
+    # exit()
+
     # collecting raw data
-    raw_data_dir='PH_raw_data/train_data'
-    # raw_data_dir='PH_raw_data/valid_data_1'
-    # raw_data_dir='PH_raw_data/valid_data_2'
+    raw_data_dir='PH_grad_data/train_data'
     #####################
 
-    calib_obj.run_datacollect(config_dir+'D500B_robot_default_config.yaml','192.168.1.31','ST1',turn_table.pulse2deg,q_paths,rob_speed=3,waittime=0.5,repeat_N=1\
+    calib_obj.run_datacollect_sync('192.168.1.31','RB2',robot_scan.pulse2deg,q_paths,rob_speed=rob_speed,waittime=waittime\
                         ,raw_data_dir=raw_data_dir) # save calib config to file
     print("Collect PH data done")
 
 def calib_R1():
 
-    dataset_date = '0621'
+    dataset_date = '0801'
+    print("Dataset Date:",dataset_date)
 
     config_dir='../config/'
     robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path=config_dir+'torch.csv',\
@@ -259,10 +327,10 @@ def calib_R1():
     q3_low_sample = np.array([[-55,-70],[0,-50],[50,0]]) #[[q2 q3]]
     d_angle = 5 # 5 degree
     # add 7 points (at least 6 is needed)
-    dq_sample = [[0,0,0,0,0,0],\
-          [-1,0,0,0,0,0],[1,0,0,0,0,0],\
-          [0,-1,-1,0,0,0],[0,-1,1,0,0,0],\
-          [0,1,1,0,0,0],[0,1,-1,0,0,0]]
+    # dq_sample = [[0,0,0,0,0,0],\
+    #       [-1,0,0,0,0,0],[1,0,0,0,0,0],\
+    #       [0,-1,-1,0,0,0],[0,-1,1,0,0,0],\
+    #       [0,1,1,0,0,0],[0,1,-1,0,0,0]]
     # dq_sample = [[0,0,0,0,0,0],\
     #       [-9,0,0,-9,-9,9],[-6,0,0,-6,-6,6],\
     #       [-3,0,0,-3,-3,3],[4,0,0,4,4,-4],\
@@ -271,24 +339,43 @@ def calib_R1():
     #       [-3,0,0,-3,-3,3],[-2,0,0,-2,-2,2],\
     #       [-1,0,0,-1,-1,1],[1,0,0,1,1,-1],\
     #       [2,0,0,2,2,-2],[3,0,0,3,3,-3]]
+    dq_sample = [[0,0,0,0,0,0],\
+          [1,0,0,-0,-0,0],[0,1,0,0,0,0],\
+          [0,0,1,0,0,0],[0,0,0,1,0,0],\
+          [0,0,0,0,1,0],[0,0,0,0,0,1]]
     scale=1
     dq_sample = np.array(dq_sample)*scale
 
+    target_q_zero = np.array([1,0,0,1,1,1])
+
     # speed
-    rob_speed=5
+    rob_speed=3
     waittime=0.5 # stop 0.5 sec for sync
 
     q_paths = []
+    forward=True
     for q2 in np.append(np.arange(q2_low,q2_up,d_angle),q2_up):
         q3_low = np.interp(q2,q3_low_sample[:,0],q3_low_sample[:,1])
         q3_up = np.interp(q2,q3_up_sample[:,0],q3_up_sample[:,1])
+        this_q_paths=[]
         for q3 in np.append(np.arange(q3_low,q3_up,d_angle),q3_up):
-            target_q = np.zeros(6)
+            target_q = deepcopy(target_q_zero)
             target_q[1]=q2
             target_q[2]=q3
+            q_path_pose=[]
             for dq in dq_sample:
-                q_paths.append(target_q+dq)
+                q_path_pose.append(target_q+dq)
+            if forward:
+                this_q_paths.extend(q_path_pose)
+            else:
+                this_q_paths.extend(q_path_pose[::-1])
+        if forward:
+            q_paths.extend(this_q_paths)
+        else:
+            q_paths.extend(this_q_paths[::-1])
+        forward = not forward
     print("total pose:",len(q_paths))
+    print("Data Base:",dataset_date)
 
     # exit()
 
@@ -296,12 +383,13 @@ def calib_R1():
     raw_data_dir='PH_grad_data/train_data'
     #####################
 
-    calib_obj.run_datacollect_sync(config_dir+'MA2010_marker_config.yaml','192.168.1.31','RB1',robot_weld.pulse2deg,q_paths,rob_speed=rob_speed,waittime=waittime\
+    calib_obj.run_datacollect_sync('192.168.1.31','RB1',robot_weld.pulse2deg,q_paths,rob_speed=rob_speed,waittime=waittime\
                         ,raw_data_dir=raw_data_dir) # save calib config to file
     print("Collect PH data done")
 
 
 if __name__=='__main__':
 
-    calib_R1()
+    # calib_R1()
+    calib_R2()
     # calib_S1()

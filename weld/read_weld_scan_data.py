@@ -100,27 +100,38 @@ R_S1TCP = np.matmul(T_S1TCP_R1Base[:3,:3],path_R)
 
 build_height_profile=False
 plot_correction=True
-# show_layer = [12]
-show_layer = [12,29,30]
+show_layer = []
+# show_layer = [12,29,30]
 
 x_lower = -99999
 x_upper = 999999
 
-# datasets=['baseline','full_test']
-datasets=['full_test']
+# start_id=0
+# end_id=-1
+
+start_id=75
+end_id=-75
+
+datasets=['baseline','correction']
+# datasets=['baseline']
+
+datasets=['baseline','correction','repeat 1','repeat 2']
 datasets_h_mean={}
 datasets_h_std={}
 for dataset in datasets:
 
     if dataset=='baseline':
-        data_dir = '../data/wall_weld_test/baseline_weld_scan_2023_06_06_15_28_31/'
-    elif dataset=='full_test':
-        data_dir = '../data/wall_weld_test/moveL_220_weld_scan_2023_07_05_17_58_09/'
-    print('data_dir',data_dir)
+        data_dir = '../data/wall_weld_test/moveL_100_baseline_weld_scan_2023_07_07_15_20_56/'
+    elif dataset=='correction':
+        data_dir = '../data/wall_weld_test/moveL_100_weld_scan_2023_08_02_15_17_25/'
+    elif dataset=='repeat 1':
+        data_dir = '../data/wall_weld_test/moveL_100_repeat_weld_scan_2023_08_02_16_03_50/'
+    elif dataset=='repeat 2':
+        data_dir = '../data/wall_weld_test/moveL_100_repeat_weld_scan_2023_08_02_17_07_02/'
+
     forward_flag=False
     all_profile_height=[]
     all_correction_layer=[]
-
     all_h_mean=[]
     all_h_std=[]
     for i in range(0,9999999):
@@ -169,9 +180,10 @@ for dataset in datasets:
 
         all_profile_height.append(profile_height)
 
-        h_std_thres=0.48
+        # h_std_thres=0.48
+        h_std_thres=9
         h_std = np.std(profile_height[:,1])
-        if i>2 and h_std>h_std_thres:
+        if i>2 and h_std>h_std_thres and dataset != "baseline":
             all_correction_layer.append(i)
 
         if (plot_correction and (i in show_layer)):
@@ -298,7 +310,7 @@ for dataset in datasets:
                 r_S1TCP=Transform(T_S1TCP_R1Base[:3,:3],T_S1TCP_R1Base[:3,-1])*r_tcp
                 robot_p_S1TCP.append(r_S1TCP.p)
             robot_p_S1TCP=np.array(robot_p_S1TCP)
-            print('robot_p_S1TCP',robot_p_S1TCP)
+
             # start_idx=0
             # end_idx=-2
             plan_x = np.array(curve_sliced_relative)[:,0]
@@ -318,7 +330,7 @@ for dataset in datasets:
             next_weld_stamp=next_weld_stamp[start_idx:end_idx+1]
             robot_v_S1TCP=robot_v_S1TCP[start_idx:end_idx+1]
             robot_a_S1TCP=robot_a_S1TCP[start_idx:end_idx+1]
-            print('robot_v_S1TCP',robot_v_S1TCP)
+
             # plt.plot(robot_v_S1TCP)
             # plt.plot(robot_p_S1TCP[:,0],robot_v_S1TCP)
             # plt.show()
@@ -346,76 +358,81 @@ for dataset in datasets:
             all_profile_plot=np.array(all_profile_plot)
             all_profile_v_plot=np.array(all_profile_v_plot)
             
-            fig, ax1 = plt.subplots()
-            ax2 = ax1.twinx()
-            ax1.scatter(profile_height[:,0],profile_height[:,1],label='Height Layer'+str(i))
-            ax1.scatter(next_profile_height[:,0],next_profile_height[:,1],label='Height Layer'+str(i+1))
-            ax2.plot(all_profile_v_plot[:,0],all_profile_v_plot[:,1],label='Planned Corrected Speed')
-            ax2.plot(robot_p_S1TCP[:,0],robot_v_S1TCP,label='Actual Cartesian Speed')
-            ax1.set_xlabel('X-axis (Lambda) (mm)')
-            ax1.set_ylabel('Height (mm)', color='g')
-            ax2.set_ylabel('Speed (mm/sec)', color='b')
-            ax1.legend(loc=0)
-            ax2.legend(loc=0)
-            plt.title("Height and Speed, 40 MoveL")
-            plt.legend()
-            plt.show()
+            # fig, ax1 = plt.subplots()
+            # ax2 = ax1.twinx()
+            # ax1.scatter(profile_height[:,0],profile_height[:,1],label='Height Layer'+str(i))
+            # ax1.scatter(next_profile_height[:,0],next_profile_height[:,1],label='Height Layer'+str(i+1))
+            # ax2.plot(all_profile_v_plot[:,0],all_profile_v_plot[:,1],label='Planned Corrected Speed')
+            # ax2.plot(robot_p_S1TCP[:,0],robot_v_S1TCP,label='Actual Cartesian Speed')
+            # ax1.set_xlabel('X-axis (Lambda) (mm)')
+            # ax1.set_ylabel('Height (mm)', color='g')
+            # ax2.set_ylabel('Speed (mm/sec)', color='b')
+            # ax1.legend(loc=0)
+            # ax2.legend(loc=0)
+            # plt.title("Height and Speed, 40 MoveL")
+            # plt.legend()
+            # plt.show()
 
-            fig, ax1 = plt.subplots()
-            ax2 = ax1.twinx()
-            ax1.scatter(dh_in_layer[:,0],dh_in_layer[:,1],label='dH L'+str(i)+'L'+str(i+1))
-            ax2.plot(robot_p_S1TCP[:,0],robot_v_S1TCP,label='Actual Cartesian Speed')
-            ax1.set_xlabel('X-axis (Lambda) (mm)')
-            ax1.set_ylabel('dH (mm)', color='g')
-            ax2.set_ylabel('Speed (mm/sec)', color='b')
-            ax1.legend(loc=0)
-            ax2.legend(loc=0)
-            plt.title("dH and Speed, 40 MoveL")
-            plt.legend()
-            plt.show()
+            # fig, ax1 = plt.subplots()
+            # ax2 = ax1.twinx()
+            # ax1.scatter(dh_in_layer[:,0],dh_in_layer[:,1],label='dH L'+str(i)+'L'+str(i+1))
+            # ax2.plot(robot_p_S1TCP[:,0],robot_v_S1TCP,label='Actual Cartesian Speed')
+            # ax1.set_xlabel('X-axis (Lambda) (mm)')
+            # ax1.set_ylabel('dH (mm)', color='g')
+            # ax2.set_ylabel('Speed (mm/sec)', color='b')
+            # ax1.legend(loc=0)
+            # ax2.legend(loc=0)
+            # plt.title("dH and Speed, 40 MoveL")
+            # plt.legend()
+            # plt.show()
 
-            fig, ax1 = plt.subplots()
-            ax2 = ax1.twinx()
-            ax1.scatter(dh_in_layer[:,0],dh_in_layer[:,1],label='dH L'+str(i)+'L'+str(i+1))
-            ax2.plot(robot_p_S1TCP[:,0],robot_a_S1TCP,label='Actual Cart Acc')
-            ax1.set_xlabel('X-axis (Lambda) (mm)')
-            ax1.set_ylabel('dH (mm)', color='g')
-            ax2.set_ylabel('Acceleration (mm/sec^2)', color='b')
-            ax1.legend(loc=2)
-            ax2.legend(loc=1)
-            plt.title("dH and Acceleration, 40 MoveL")
-            plt.show()
-            
+            # fig, ax1 = plt.subplots()
+            # ax2 = ax1.twinx()
+            # ax1.scatter(dh_in_layer[:,0],dh_in_layer[:,1],label='dH L'+str(i)+'L'+str(i+1))
+            # ax2.plot(robot_p_S1TCP[:,0],robot_a_S1TCP,label='Actual Cart Acc')
+            # ax1.set_xlabel('X-axis (Lambda) (mm)')
+            # ax1.set_ylabel('dH (mm)', color='g')
+            # ax2.set_ylabel('Acceleration (mm/sec^2)', color='b')
+            # ax1.legend(loc=2)
+            # ax2.legend(loc=1)
+            # plt.title("dH and Acceleration, 40 MoveL")
+            # plt.show()
+
         forward_flag= not forward_flag
 
-        all_h_mean.append(np.mean(profile_height[:,1]))
-        all_h_std.append(np.std(profile_height[:,1]))
+        all_h_mean.append(np.mean(profile_height[start_id:end_id,1]))
+        # all_h_mean.append(np.mean(profile_height[75:-75,1]))
+        # print(len(profile_height[75:-75,1]))
+
+        all_h_std.append(np.std(profile_height[start_id:end_id,1]))
 
     i=0
     m_size=12
-    # print('profile_height',profile_height)
+    # print('all_correction_layer',all_correction_layer)
     # print('all_profile_height',all_profile_height)
     for profile_height in all_profile_height:
         if i in all_correction_layer:
             if i==all_correction_layer[0]:
-                plt.scatter(profile_height[:,0],profile_height[:,1],s=3,c='tab:green',label='Corrected Layer')
+                plt.scatter(profile_height[start_id:end_id,0],profile_height[start_id:end_id,1],s=3,c='tab:green',label='Corrected Layer')
             else:
-                plt.scatter(profile_height[:,0],profile_height[:,1],s=3,c='tab:green')
+                plt.scatter(profile_height[start_id:end_id,0],profile_height[start_id:end_id,1],s=3,c='tab:green')
         else:
             if i==0:
-                plt.scatter(profile_height[:,0],profile_height[:,1],s=3,c='tab:blue',label='Forward (Right to Left)')
+                plt.scatter(profile_height[start_id:end_id,0],profile_height[start_id:end_id,1],s=3,c='tab:blue',label='Forward (Right to Left)')
             elif i==1:
-                plt.scatter(profile_height[:,0],profile_height[:,1],s=3,c='tab:orange',label='Backward (Left to Right)')
+                plt.scatter(profile_height[start_id:end_id,0],profile_height[start_id:end_id,1],s=3,c='tab:orange',label='Backward (Left to Right)')
             elif i%2==0:
-                plt.scatter(profile_height[:,0],profile_height[:,1],s=3,c='tab:blue')
+                plt.scatter(profile_height[start_id:end_id,0],profile_height[start_id:end_id,1],s=3,c='tab:blue')
             else:
-                plt.scatter(profile_height[:,0],profile_height[:,1],s=3,c='tab:orange')
+                plt.scatter(profile_height[start_id:end_id,0],profile_height[start_id:end_id,1],s=3,c='tab:orange')
         i+=1
-    plt.xlabel('X-axis (Lambda) (mm)')
-    plt.ylabel('height (mm)')
+    plt.xlabel('x-axis')
+    plt.ylabel('z-axis')
     plt.legend()
     plt.title("Height Profile")
+    plt.tight_layout()
     plt.show()
+
     datasets_h_mean[dataset]=np.array(all_h_mean)
     datasets_h_std[dataset]=np.array(all_h_std)
 
@@ -425,17 +442,27 @@ plt.legend()
 plt.xlabel('Layer')
 plt.ylabel('Mean Height (mm)')
 plt.title("Mean Height")
+plt.tight_layout()
 plt.show()
-print('datasets_h_mean[dataset]',datasets_h_mean[dataset])
-datasets_without_baselayer = datasets_h_mean[dataset][2:]
-diff_arr = np.diff(datasets_without_baselayer)
-print(diff_arr)
-print(len(datasets_without_baselayer))
+
 for dataset in datasets:
     plt.plot(np.arange(len(datasets_h_std[dataset])),datasets_h_std[dataset],'-o',label=dataset)
-plt.axhline(y = 0.48, color = 'r', linestyle = '-')
+# plt.axhline(y = 0.48, color = 'r', linestyle = '-')
 plt.legend()
 plt.xlabel('Layer')
 plt.ylabel('Height STD (mm)')
 plt.title("Height STD")
+plt.tight_layout()
+plt.show()
+
+datasets_dh_mean={}
+for dataset in datasets:
+    datasets_dh_mean[dataset] = np.diff(datasets_h_mean[dataset])
+    datasets_dh_mean[dataset] = np.append(datasets_h_mean[dataset][0],datasets_dh_mean[dataset])
+    plt.plot(np.arange(len(datasets_dh_mean[dataset])),datasets_h_std[dataset]/datasets_dh_mean[dataset]*100,'-o',label=dataset)
+plt.legend()
+plt.xlabel('Layer')
+plt.ylabel('Height STD/Mean dh (%)')
+plt.title("Height STD/Mean dh (%)")
+plt.tight_layout()
 plt.show()

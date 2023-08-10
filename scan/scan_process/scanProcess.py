@@ -142,34 +142,38 @@ class ScanProcess():
         
         return pcd_combined
     
-    def pcd_register_mti(self,all_scan_points,rob_js_exe,rob_stamps,voxel_size=0.05,static_positioner_q=np.radians([-60,180])):
-
-        use_calib=False
-        if use_calib:
-            origin_P = deepcopy(self.robot.robot.P)
-            origin_H = deepcopy(self.robot.robot.H)
-            self.robot.robot.P=deepcopy(self.robot.calib_P)
-            self.robot.robot.H=deepcopy(self.robot.calib_H)
+    def pcd_register_mti(self,all_scan_points,rob_js_exe,rob_stamps,voxel_size=0.05,static_positioner_q=np.radians([-60,180]),use_calib=False,ph_param=None):
 
         pcd_combined = None
         scan_N = len(rob_stamps) ## total scans
         for scan_i in range(scan_N):
 
             if len(rob_js_exe[scan_i])<=6:
-                robt_T = self.robot.fwd(rob_js_exe[scan_i],world=True) # T_world^r2tool
+                if use_calib:
+                    opt_P,opt_H = ph_param.predict(rob_js_exe[scan_i][1:3])
+                    self.robot.robot.P=opt_P
+                    self.robot.robot.H=opt_H
+                    robt_T = self.robot.fwd(rob_js_exe[scan_i][:6],world=True) # T_world^r2tool
+                else:
+                    robt_T = self.robot.fwd(rob_js_exe[scan_i][:6],world=True) # T_world^r2tool
                 T_origin = self.positioner.fwd(static_positioner_q,world=True).inv() # T_tabletool^world
             else:
                 # print(np.degrees(rob_js_exe[scan_i][:6]))
                 # print(np.degrees(self.robot.robot.joint_lower_limit))
                 # print("===============")
-                robt_T = self.robot.fwd(rob_js_exe[scan_i][:6],world=True) # T_world^r2tool
+                if use_calib:
+                    opt_P,opt_H = ph_param.predict(rob_js_exe[scan_i][1:3])
+                    self.robot.robot.P=opt_P
+                    self.robot.robot.H=opt_H
+                    robt_T = self.robot.fwd(rob_js_exe[scan_i][:6],world=True) # T_world^r2tool
+                else:
+                    robt_T = self.robot.fwd(rob_js_exe[scan_i][:6],world=True) # T_world^r2tool
                 T_origin = self.positioner.fwd(rob_js_exe[scan_i][6:],world=True).inv() # T_tabletool^world
-                # T_origin = turn_table.fwd(np.radians([-30,0]),world=True).inv()
             T_rob_positioner_top = T_origin*robt_T
 
             scan_points=deepcopy(all_scan_points[scan_i])
             scan_points = np.insert(scan_points,1,np.zeros(len(scan_points[0])),axis=0)
-            scan_points[0]=scan_points[0]*-1
+            scan_points[0]=scan_points[0]*-1 # reversed x-axis
             scan_points = scan_points.T
             ## get the points closed to origin
             scan_points = np.transpose(np.matmul(T_rob_positioner_top.R,np.transpose(scan_points)))+T_rob_positioner_top.p
@@ -184,10 +188,6 @@ class ScanProcess():
                 pcd_combined=deepcopy(pcd)
             else:
                 pcd_combined+=pcd
-        
-        if use_calib:
-            self.robot.robot.P=deepcopy(origin_P)
-            self.robot.robot.H=deepcopy(origin_H)
         
         return pcd_combined
     
@@ -224,7 +224,7 @@ class ScanProcess():
         
         return pcd_combined
 
-    def pcd2dh(self,scanned_points,curve_relative,robot_weld=None,q_weld=None,drawing=False):
+    def pcd2dh(self,scanned_points,curve_relative,robot_weld=None,q_weld=None,ph_param=None,drawing=False):
 
         ##### cross section parameters
         # resolution_z=0.1
@@ -240,29 +240,38 @@ class ScanProcess():
         if robot_weld is not None:
             origin_P = deepcopy(robot_weld.robot.P)
             origin_H = deepcopy(robot_weld.robot.H)
-            origin_flange = deepcopy(robot_weld.robot.T_flange)
-            origin_R_tool = deepcopy(robot_weld.robot.R_tool)
-            origin_p_tool = deepcopy(robot_weld.robot.p_tool)
-
-            robot_weld.robot.P=deepcopy(robot_weld.calib_P)
-            robot_weld.robot.H=deepcopy(robot_weld.calib_H)
-            robot_weld.robot.T_flange = deepcopy(robot_weld.T_tool_flange)
-            robot_weld.robot.R_tool = deepcopy(robot_weld.T_tool_toolmarker.R)
-            robot_weld.robot.p_tool = deepcopy(robot_weld.T_tool_toolmarker.p)
+            # origin_flange = deepcopy(robot_weld.robot.T_flange)
+            # origin_R_tool = deepcopy(robot_weld.robot.R_tool)
+            # origin_p_tool = deepcopy(robot_weld.robot.p_tool)
+            # robot_weld.robot.P=deepcopy(robot_weld.calib_P)
+            # robot_weld.robot.H=deepcopy(robot_weld.calib_H)
+            # robot_weld.robot.T_flange = deepcopy(robot_weld.T_tool_flange)
+            # robot_weld.robot.R_tool = deepcopy(robot_weld.T_tool_toolmarker.R)
+            # robot_weld.robot.p_tool = deepcopy(robot_weld.T_tool_toolmarker.p)
+            
+            
+            
             curve_relative = []
             for q in q_weld:
                 Table_home_T = self.positioner.fwd(q[-2:])
                 T_S1TCP_R1Base = np.matmul(self.positioner.base_H,H_from_RT(Table_home_T.R,Table_home_T.p))
                 T_R1Base_S1TCP = np.linalg.inv(T_S1TCP_R1Base)
+                
+                ### R1 fwd
+                opt_P,opt_H = ph_param.predict(q[1:3])
+                robot_weld.robot.P=opt_P
+                robot_weld.robot.H=opt_H
                 robot_T = robot_weld.fwd(q[:6])
+                ###
+                
                 T_R1TCP_S1TCP = np.matmul(T_R1Base_S1TCP,H_from_RT(robot_T.R,robot_T.p))
                 curve_relative.append(np.append(T_R1TCP_S1TCP[:3,-1],T_R1TCP_S1TCP[:3,2]))
             
             robot_weld.robot.P=deepcopy(origin_P)
             robot_weld.robot.H=deepcopy(origin_H)
-            robot_weld.robot.T_flange = deepcopy(origin_flange)
-            robot_weld.robot.R_tool = deepcopy(origin_R_tool)
-            robot_weld.robot.p_tool = deepcopy(origin_p_tool)
+            # robot_weld.robot.T_flange = deepcopy(origin_flange)
+            # robot_weld.robot.R_tool = deepcopy(origin_R_tool)
+            # robot_weld.robot.p_tool = deepcopy(origin_p_tool)
         
         curve_relative=np.array(curve_relative)
 
@@ -280,7 +289,8 @@ class ScanProcess():
         crop_poly.bounding_polygon = o3d.utility.Vector3dVector(bounding_polygon)
         crop_poly.orthogonal_axis = 'z'
         crop_poly.axis_max=30
-        crop_poly.axis_min=-15
+        # crop_poly.axis_min=-15
+        crop_poly.axis_min=-0.1
 
         if drawing:
             scanned_points_draw = deepcopy(scanned_points)
@@ -308,6 +318,8 @@ class ScanProcess():
             # visualize_pcd([sp_lamx],origin_size=10)
             ## dh is simply the z height after transform. Average over an radius
             this_dh = np.mean(np.asarray(sp_lamx.points)[:,2])
+            if np.isnan(this_dh):
+                this_dh=0
 
             dh.append(this_dh)
 

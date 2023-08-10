@@ -2,52 +2,7 @@ import numpy as np
 from copy import deepcopy
 from matplotlib import pyplot as plt
 from general_robotics_toolbox import *
-
-def v2dh_loglog(v,mode=140):
-
-    if mode==140:
-        # 140 ipm
-        # log(Δh)=-0.5068*log(V)+1.643
-        logdh = -0.5068*np.log(v)+1.643
-    elif mode==160:
-        # 160 ipm
-        # log(Δh)=-0.4619*log(V)+1.647 
-        logdh = -0.4619*np.log(v)+1.647 
-    
-    dh = np.exp(logdh)
-    return dh
-
-def dh2v_loglog(dh,mode=140):
-
-    logdh = np.log(dh)
-
-    if mode==140:
-        # 140 ipm
-        # log(Δh)=-0.5068∗log(V)+1.643
-        logv = (logdh-1.643)/(-0.5068)
-    elif mode==160:
-        # 160 ipm
-        # log(Δh)=-0.4619∗log(V)+1.647 
-        logv = (logdh-1.647)/(-0.4619)
-    
-    v = np.exp(logv)
-    return v
-
-def dh2v_quadratic(dh,mode=140):
-
-    if mode==140:
-        # 140 ipm
-        a=0.006477
-        b=-0.2362
-        c=3.339-dh
-    elif mode==160:
-        # 160 ipm
-        a=0.006043
-        b=-0.2234
-        c=3.335-dh
-    
-    v=(-b-np.sqrt(b**2-4*a*c))/(2*a)
-    return v
+from weld_dh2v import *
 
 def strategy_1():
     pass
@@ -295,7 +250,7 @@ def strategy_2(profile_height,last_mean_h,forward_flag,curve_sliced_relative,R_S
 
     return curve_sliced_relative_correct,path_T_S1,this_weld_v,all_dh,mean_h
 
-def strategy_3(profile_height,input_dh,curve_sliced_relative,R_S1TCP,num_l,noise_h_thres = 3,min_v=5,max_v=30,h_std_thres=0.48,nominal_v=18):
+def strategy_3(profile_height,input_dh,curve_sliced_relative,R_S1TCP,num_l,noise_h_thres = 3,min_v=5,max_v=30,h_std_thres=0.48,nominal_v=18,ipm_mode=160):
 
     ## parameters
     # noise_h_thres = 3
@@ -370,14 +325,13 @@ def strategy_3(profile_height,input_dh,curve_sliced_relative,R_S1TCP,num_l,noise
             this_profile = deepcopy(profile_height[np.where(profile_height[:,0]>=min_x)[0]])
             this_profile = this_profile[np.where(max_x>=this_profile[:,0])[0]]
 
-
             all_profile.append(this_profile)
             this_mean_h=np.mean(this_profile[:,1])
             ## using model to get the velocity
             this_dh = h_target-this_mean_h
             this_dh=max(0.01,this_dh) # to prevent inf or nan
 
-            this_v = dh2v_loglog(this_dh,mode=160)
+            this_v = dh2v_loglog(this_dh,mode=ipm_mode)
             this_v = min(max(min_v,this_v),max_v)
 
             this_weld_v.append(this_v)
@@ -396,3 +350,22 @@ def strategy_3(profile_height,input_dh,curve_sliced_relative,R_S1TCP,num_l,noise
         plt.show()
     
     return curve_sliced_relative_correct,path_T_S1,this_weld_v,all_dh,mean_h
+
+def strategy_4(profile_height,des_dh,curve_sliced_relative,last_curve_sliced_relative,breakpoints,max_v=1000,min_v=1,ipm_mode=160):
+
+    mean_dh = np.mean(profile_height[:,1])
+    all_dh=[]
+    weld_v=[]
+    for bp_i in range(1,len(breakpoints)):
+        this_dh=[]
+        for curve_i in np.arange(breakpoints[bp_i-1],breakpoints[bp_i],int(np.sign(breakpoints[bp_i]-breakpoints[bp_i-1]))).astype(int):
+            this_p = deepcopy(curve_sliced_relative[curve_i][:3])
+            cor_last_p_id = np.argmin(np.linalg.norm(last_curve_sliced_relative[:,:3]-this_p,2,1))
+            this_dh.append(profile_height[cor_last_p_id,1])
+        seg_dh = des_dh-(np.mean(this_dh)-mean_dh)
+        seg_dh = max(0.1,seg_dh)
+        all_dh.append(seg_dh)
+        this_v = dh2v_loglog(seg_dh,mode=ipm_mode)
+        this_v = min(max_v,max(min_v,this_v))
+        weld_v.append(this_v)
+    return weld_v,all_dh
