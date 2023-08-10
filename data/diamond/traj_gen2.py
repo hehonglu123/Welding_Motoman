@@ -132,14 +132,16 @@ def main():
                 ax.plot3D(hex_section[::vis_step,0],hex_section[::vis_step,1],hex_section[::vis_step,2],'b.-')
                 ax.quiver(hex_section[::vis_step,0],hex_section[::vis_step,1],hex_section[::vis_step,2],hex_section[::vis_step,3],hex_section[::vis_step,4],hex_section[::vis_step,5],length=5, normalize=True)
 
-                ith_layer.append(hex_section)
+                ith_layer.extend(hex_section)
+            ith_layer=[np.vstack(ith_layer)]
+
         curve_dense.append(ith_layer)
     plt.show()
 
     
     for i in range(len(curve_dense)):
         for x in range(len(curve_dense[i])):
-            np.savetxt('sep_sections/curve_sliced/slice%i_%i.csv'%(i,x),curve_dense[i][x],delimiter=',')
+            np.savetxt('cont_sections/curve_sliced/slice%i_%i.csv'%(i,x),curve_dense[i][x],delimiter=',')
 
 if __name__ == "__main__":
     main()
