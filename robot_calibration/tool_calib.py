@@ -13,9 +13,10 @@ from PH_interp import *
 from matplotlib import pyplot as plt
 from dx200_motion_program_exec_client import *
 
-data_dir='R2_mti_0809/'
+# data_dir='tool_data/'+'R1_weldgun_0809/'
+data_dir='tool_data/'+'R2_mti_0809/'
 
-ph_dataset_date='0801'
+ph_dataset_date='0804'
 
 config_dir='../config/'
 
@@ -52,6 +53,7 @@ with open(PH_data_dir+'train_data_calib_PH_q.pickle','rb') as file:
 ph_param=PH_Param(nom_P,nom_H)
 ph_param.fit(PH_q,method='FBF')
 
+origin_R_tool=deepcopy(robot.robot.R_tool)
 robot.robot.R_tool = np.eye(3)
 robot.robot.p_tool = np.zeros(3)
 
@@ -59,13 +61,14 @@ robot_Ts=[]
 for i in range(num_js):
     q=np.loadtxt(data_dir+'pose_js_'+str(i)+'.csv',delimiter=',')
     robot_T=robot.fwd_ph(q,ph_param)
+    # robot_T=robot.fwd(q)
     robot_Ts.append(H_from_RT(robot_T.R,robot_T.p))
 
 A=[]
 b=[]
 
+# num_js=7
 for i in range(num_js):
-    
     next_id=i+1
     if next_id>=num_js:
         next_id=0
@@ -75,3 +78,25 @@ for i in range(num_js):
 
 p_tool=np.linalg.pinv(A)@b
 print(p_tool)
+
+robot.robot.p_tool=p_tool
+robot_Ts=[]
+for i in range(num_js):
+    q=np.loadtxt(data_dir+'pose_js_'+str(i)+'.csv',delimiter=',')
+    robot_T=robot.fwd_ph(q,ph_param)
+    # robot_T=robot.fwd(q)
+    robot_Ts.append(robot_T.p)
+robot_Ts=np.array(robot_Ts)
+print(robot_Ts)
+mean_p = np.mean(robot_Ts,axis=0)
+residual = np.mean(np.linalg.norm(robot_Ts-mean_p,axis=1))
+
+print('resdual:',residual)
+
+if robot_type=='R1':
+    p_tool = p_tool+-1*origin_R_tool[:,-1]*15
+elif robot_type=='R2':
+    p_tool = p_tool+-1*origin_R_tool[:,-1]*95
+    
+print(p_tool)
+

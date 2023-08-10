@@ -25,7 +25,7 @@ import yaml
 from math import ceil,floor
 
 R1_ph_dataset_date='0801'
-R2_ph_dataset_date='0801'
+R2_ph_dataset_date='0804'
 S1_ph_dataset_date='0801'
 
 zero_config=np.zeros(6)
@@ -98,7 +98,7 @@ x=0
 # curve_data_dir = '../data/'+dataset+sliced_alg
 # data_dir=curve_data_dir+'weld_scan_'+'2023_07_19_11_41_30'+'/'
 # baselayer=True
-# layer=0
+# layer=1
 # x=0
 
 # dataset='blade0.1/'
