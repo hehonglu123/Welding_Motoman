@@ -16,8 +16,8 @@ Rx=np.array([1,0,0])
 Ry=np.array([0,1,0])
 Rz=np.array([0,0,1])
 
-ph_dataset_date='0804'
-test_dataset_date='0804'
+ph_dataset_date='0801'
+test_dataset_date='0801'
 config_dir='../config/'
 
 robot_type = 'R2'

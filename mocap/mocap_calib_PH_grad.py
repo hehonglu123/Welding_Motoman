@@ -349,8 +349,8 @@ alpha=0.5
 weight_ori = 0.1
 # weight_ori = 1
 weight_pos = 1
-# lambda_H = 10
-lambda_H = 1
+lambda_H = 10
+# lambda_H = 1
 lambda_P = 1
 start_t = time.time()
 
