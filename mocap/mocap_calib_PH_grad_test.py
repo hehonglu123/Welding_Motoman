@@ -16,8 +16,8 @@ Rx=np.array([1,0,0])
 Ry=np.array([0,1,0])
 Rz=np.array([0,0,1])
 
-ph_dataset_date='0801'
-test_dataset_date='0801'
+ph_dataset_date='0804'
+test_dataset_date='0804'
 config_dir='../config/'
 
 robot_type = 'R2'
@@ -48,7 +48,7 @@ T_base_basemarker = robot.T_base_basemarker
 T_basemarker_base = T_base_basemarker.inv()
 
 #### using rigid body
-use_toolmaker=True
+use_toolmaker=False
 T_base_basemarker = robot.T_base_basemarker
 T_basemarker_base = T_base_basemarker.inv()
 
