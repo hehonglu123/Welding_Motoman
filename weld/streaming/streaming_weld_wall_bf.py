@@ -64,8 +64,7 @@ flir.setf_param("atmospheric_temperature", RR.VarValue(293.15,"double"))
 flir.setf_param("relative_humidity", RR.VarValue(50,"double"))
 flir.setf_param("ext_optics_temperature", RR.VarValue(293.15,"double"))
 flir.setf_param("ext_optics_transmission", RR.VarValue(0.99,"double"))
-flir.setf_param("current_case", RR.VarValue(2,"int32"))
-# flir.setf_param("ir_format", RR.VarValue("temperature_linear_100mK","string"))
+# flir.setf_param("current_case", RR.VarValue(2,"int32"))
 flir.setf_param("ir_format", RR.VarValue("radiometric","string"))
 flir.setf_param("object_emissivity", RR.VarValue(0.13,"double"))
 flir.setf_param("scale_limit_low", RR.VarValue(293.15,"double"))
@@ -113,22 +112,104 @@ slice_num=0
 welding_started=False
 ###job=feedrate/10+200
 job_offset=200
-nominal_feedrate=100
-nominal_vd_relative=5
-nominal_wire_length=23 #pixels
-nominal_temp_below=400
+nominal_feedrate=150
+nominal_vd_relative=10
+nominal_wire_length=25 #pixels
+nominal_temp_below=500
 
 ###set up control parameters
+base_feedrate=180
+base_vd=1
 feedrate=nominal_feedrate
 vd_relative=nominal_vd_relative
-feedrate_gain=1.
+feedrate_gain=0.5
 feedrate_min=60
 feedrate_max=300
 nominal_slice_increment=int(1.5/slicing_meta['line_resolution'])
-slice_inc_gain=1.
+slice_inc_gain=3.
 
-# while slice_num<slicing_meta['num_layers']:
-while slice_num<574:
+###BASELAYER WELDING
+# slice_num=0
+# for i in range(2):
+# 	x=0
+# 	rob1_js=np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(slice_num)+'_'+str(x)+'.csv',delimiter=',')
+# 	rob2_js=np.loadtxt(data_dir+'curve_sliced_js/MA1440_js'+str(slice_num)+'_'+str(x)+'.csv',delimiter=',')
+# 	positioner_js=np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(slice_num)+'_'+str(x)+'.csv',delimiter=',')
+# 	curve_sliced_relative=np.loadtxt(data_dir+'curve_sliced_relative/slice'+str(slice_num)+'_'+str(x)+'.csv',delimiter=',')
+
+	
+# 	lam_relative=calc_lam_cs(curve_sliced_relative)
+
+# 	lam_relative_dense=np.linspace(0,lam_relative[-1],num=int(lam_relative[-1]/point_distance))
+# 	rob1_js_dense=interp1d(lam_relative,rob1_js,kind='cubic',axis=0)(lam_relative_dense)
+# 	rob2_js_dense=interp1d(lam_relative,rob2_js,kind='cubic',axis=0)(lam_relative_dense)
+# 	positioner_js_dense=interp1d(lam_relative,positioner_js,kind='cubic',axis=0)(lam_relative_dense)
+
+# 	breakpoints=SS.get_breakpoints(lam_relative_dense,base_vd)
+
+# 	###find which end to start
+# 	if np.linalg.norm(q14[:6]-rob1_js_dense[0])>np.linalg.norm(q14[:6]-rob1_js_dense[-1]):
+# 		breakpoints=np.flip(breakpoints)
+
+# 	###monitoring parameters
+# 	wire_length=[]
+# 	temp_below=[]
+	
+# 	fronius_client.job_number = int(base_feedrate/10)+job_offset
+# 	###start welding at the first layer, then non-stop
+# 	if not welding_started:
+# 		SS.jog2q(np.hstack((rob1_js_dense[breakpoints[0]],rob2_js_dense[breakpoints[0]],positioner_js_dense[breakpoints[0]])))
+# 		fronius_client.start_weld()
+
+# 	robot_ts=[]
+# 	robot_js=[]
+# 	for bp_idx in range(len(breakpoints)):
+		
+# 		if bp_idx<10:	###streaming 10 points before process FLIR monitoring
+# 			robot_timestamp,q14=SS.position_cmd(np.hstack((rob1_js_dense[breakpoints[bp_idx]],rob2_js_dense[breakpoints[bp_idx]],positioner_js_dense[breakpoints[bp_idx]])),time.time())
+# 		else:
+# 			point_stream_start_time=time.time()
+# 			robot_timestamp,q14=SS.position_cmd(np.hstack((rob1_js_dense[breakpoints[bp_idx]],rob2_js_dense[breakpoints[bp_idx]],positioner_js_dense[breakpoints[bp_idx]])))
+# 			####################################FLIR PROCESSING####################################
+# 			#TODO: make sure processing time within 8ms
+# 			centroid, bbox=flame_detection(flir_logging[-1])
+# 			if centroid is not None:
+# 				bbox_below_size=5
+# 				centroid_below=(int(centroid[0]+bbox[2]/2+bbox_below_size/2),centroid[1])
+# 				temp_in_bbox=counts2temp(flir_logging[-1][int(centroid_below[1]-bbox_below_size):int(centroid_below[1]+bbox_below_size),int(centroid_below[0]-bbox_below_size):int(centroid_below[0]+bbox_below_size)].flatten(),6.39661118e+03, 1.40469989e+03, 1.00000008e+00, 8.69393436e+00, 8.40029488e+03,Emiss=0.13)
+# 				temp_below.append(np.average(temp_in_bbox))
+# 				wire_length.append(centroid[0]-139)
+			
+# 			if bp_idx<len(breakpoints)-1: ###no wait at last point
+# 				###busy wait for accurate 8ms streaming
+# 				while time.time()-point_stream_start_time<1/SS.streaming_rate-0.0005:
+# 					continue
+# 		robot_ts.append(robot_timestamp)
+# 		robot_js.append(q14)
+
+# 	###LOGGING
+# 	local_recorded_dir='recorded_data/wall_recording/'
+# 	os.makedirs(local_recorded_dir,exist_ok=True)
+# 	np.savetxt(local_recorded_dir+'slice_%i_%i_joint.csv'%(slice_num,x),np.hstack((np.array(robot_ts).reshape((-1,1)),np.array(robot_js))),delimiter=',')
+# 	flir_ts=np.array(flir_ts)-flir_ts[0]
+# 	np.savetxt(local_recorded_dir+'slice_%i_%i_flir_ts.csv'%(slice_num,x),flir_ts,delimiter=',')
+# 	with open(local_recorded_dir+'slice_%i_%i_flir.pickle'%(slice_num,x), 'wb') as file:
+# 		pickle.dump(flir_logging, file)
+# 	flir_ts=[flir_ts[-1]]
+# 	flir_logging=[flir_logging[-1]]
+
+# 	wire_length_avg=np.average(wire_length)
+# 	temp_below_avg=np.average(temp_below)
+# 	###proportional feedback
+# 	feedrate=min(max(feedrate+1*(nominal_temp_below-temp_below_avg),feedrate_min),feedrate_max)
+# 	slice_increment=max(nominal_slice_increment+slice_inc_gain*(nominal_wire_length-wire_length_avg),1)
+# 	print('WIRE LENGTH: ',wire_length_avg,'TEMP BELOW: ',temp_below_avg,'FEEDRATE: ',feedrate,'SLICE INC: ',slice_increment)
+# 	slice_num+=int(nominal_slice_increment)
+
+	
+
+slice_num=30
+while slice_num<slicing_meta['num_layers']:
 
 	###############DETERMINE SECTION ORDER###########################
 	sections=[0]
@@ -158,44 +239,65 @@ while slice_num<574:
 			###monitoring parameters
 			wire_length=[]
 			temp_below=[]
+			robot_ts=[]
+			robot_js=[]
 			
 			fronius_client.job_number = int(feedrate/10)+job_offset
 			###start welding at the first layer, then non-stop
 			if not welding_started:
+				SS.jog2q(np.hstack((rob1_js_dense[breakpoints[0]],rob2_js_dense[breakpoints[0]],positioner_js_dense[breakpoints[0]])))
 				fronius_client.start_weld()
 
-			for bp in breakpoints:
+			for bp_idx in range(len(breakpoints)):
 				
-				if bp<breakpoints[10]:	###streaming 10 points before process FLIR monitoring
-					robot_ts,q14=SS.position_cmd(np.hstack((rob1_js_dense[bp],rob2_js_dense[bp],positioner_js_dense[bp])),time.time())
+				if bp_idx<10:	###streaming 10 points before process FLIR monitoring
+					robot_timestamp,q14=SS.position_cmd(np.hstack((rob1_js_dense[breakpoints[bp_idx]],rob2_js_dense[breakpoints[bp_idx]],positioner_js_dense[breakpoints[bp_idx]])),time.time())
 				else:
 					point_stream_start_time=time.time()
-					robot_ts,q14=SS.position_cmd(np.hstack((rob1_js_dense[bp],rob2_js_dense[bp],positioner_js_dense[bp])))
+					robot_timestamp,q14=SS.position_cmd(np.hstack((rob1_js_dense[breakpoints[bp_idx]],rob2_js_dense[breakpoints[bp_idx]],positioner_js_dense[breakpoints[bp_idx]])))
 					####################################FLIR PROCESSING####################################
 					#TODO: make sure processing time within 8ms
 					centroid, bbox=flame_detection(flir_logging[-1])
-					bbox_below_size=5
-					centroid_below=(int(centroid[0]+bbox[2]/2+bbox_below_size/2),centroid[1])
-					temp_in_bbox=counts2temp(flir_logging[-1][int(centroid_below[1]-bbox_below_size):int(centroid_below[1]+bbox_below_size),int(centroid_below[0]-bbox_below_size):int(centroid_below[0]+bbox_below_size)].flatten(),6.39661118e+03, 1.40469989e+03, 1.00000008e+00, 8.69393436e+00, 8.40029488e+03,Emiss=0.13)
-					temp_below.append(np.average(temp_in_bbox))
-					wire_length.append(centroid[0]-139)
+					if centroid is not None:
+						bbox_below_size=5
+						centroid_below=(int(centroid[0]+bbox[2]/2+bbox_below_size/2),centroid[1])
+						temp_in_bbox=counts2temp(flir_logging[-1][int(centroid_below[1]-bbox_below_size):int(centroid_below[1]+bbox_below_size),int(centroid_below[0]-bbox_below_size):int(centroid_below[0]+bbox_below_size)].flatten(),6.39661118e+03, 1.40469989e+03, 1.00000008e+00, 8.69393436e+00, 8.40029488e+03,Emiss=0.13)
+						temp_below.append(np.average(temp_in_bbox))
+						wire_length.append(centroid[0]-139)
 					
-					if bp!=breakpoints[-1]: ###no wait at last point
+					if bp_idx<len(breakpoints)-1: ###no wait at last point
 						###busy wait for accurate 8ms streaming
 						while time.time()-point_stream_start_time<1/SS.streaming_rate-0.0005:
 							continue
+					robot_ts.append(robot_timestamp)
+					robot_js.append(q14)
 			
+
+			###LOGGING
+			local_recorded_dir='recorded_data/wall_recording/'
+			os.makedirs(local_recorded_dir,exist_ok=True)
+			np.savetxt(local_recorded_dir+'slice_%i_%i_joint.csv'%(slice_num,x),np.hstack((np.array(robot_ts).reshape((-1,1)),np.array(robot_js))),delimiter=',')
+			flir_ts=np.array(flir_ts)-flir_ts[0]
+			np.savetxt(local_recorded_dir+'slice_%i_%i_flir_ts.csv'%(slice_num,x),flir_ts,delimiter=',')
+			with open(local_recorded_dir+'slice_%i_%i_flir.pickle'%(slice_num,x), 'wb') as file:
+				pickle.dump(flir_logging, file)
+			flir_ts=[flir_ts[-1]]
+			flir_logging=[flir_logging[-1]]
+
 			wire_length_avg=np.average(wire_length)
 			temp_below_avg=np.average(temp_below)
 			###proportional feedback
 			feedrate=min(max(feedrate+1*(nominal_temp_below-temp_below_avg),feedrate_min),feedrate_max)
-			slice_increment=max(nominal_slice_increment+slice_inc_gain*(nominal_wire_length-wire_length_avg),1)
-			slice_num+=int(slice_increment)
-
+			slice_increment=max(nominal_slice_increment+slice_inc_gain*(nominal_wire_length-wire_length_avg),-nominal_slice_increment+2)
+			vd_relative=feedrate/10-3
+			print('WIRE LENGTH: ',wire_length_avg,'TEMP BELOW: ',temp_below_avg,'FEEDRATE: ',feedrate,'VD: ',vd_relative,'SLICE INC: ',slice_increment)
+			slice_num+=int(nominal_slice_increment)
 
 		except:
 			traceback.print_exc()
 			fronius_client.stop_weld()
+		
+
 	
 	
 

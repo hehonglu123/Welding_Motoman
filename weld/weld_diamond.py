@@ -52,8 +52,8 @@ ws=WeldSend(client)
 
 ###########################################layer welding############################################
 vd_relative=4
-layer_start=0
-layers2weld=1
+layer_start=35
+layers2weld=5
 layer_counts=layer_start
 num_layer_start=int(layer_start*layer_height_num)	###modify layer num here
 num_layer_end=int((layer_start+layers2weld)*layer_height_num)
@@ -73,15 +73,15 @@ for layer in range(num_layer_start,num_layer_end,layer_height_num):
 	num_sections=len(glob.glob(data_dir+'curve_sliced_relative/slice'+str(layer)+'_*.csv'))
 
 	if layer==0:
-		layer_width_num	=int(5.4/slicing_meta['line_resolution'])
+		layer_width_num	=int(4/slicing_meta['line_resolution'])
 	else:
 		layer_width_num=1
 	
 	###find which end to start depending on layer count
 	if layer_counts%2==1:
-		sections=reversed(range(num_sections))
+		sections=reversed(range(0,num_sections,layer_width_num))
 	else:
-		sections=range(num_sections)
+		sections=range(0,num_sections,layer_width_num)
 	####################DETERMINE CURVE ORDER##############################################
 	for x in sections:
 		curve_sliced_js=np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(layer)+'_'+str(x)+'.csv',delimiter=',').reshape((-1,6))
@@ -120,9 +120,9 @@ for layer in range(num_layer_start,num_layer_end,layer_height_num):
 			q1_all.append(curve_sliced_js[breakpoints[j]])
 			q2_all.append(positioner_js[breakpoints[j]])
 			v1_all.append(max(s1_all[j-1],0.1))
-			positioner_w=vd_relative/np.linalg.norm(curve_sliced_relative[breakpoints[j]][:2])
-			# v2_all.append(min(100,100*positioner_w/positioner.joint_vel_limit[1]))
-			v2_all.append(50)
+			positioner_w=8*vd_relative/np.linalg.norm(curve_sliced_relative[breakpoints[j]][:2])
+			v2_all.append(min(100,100*positioner_w/positioner.joint_vel_limit[1]))
+			# v2_all.append(50)
 			primitives.append('movel')
 
 
