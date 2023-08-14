@@ -38,7 +38,7 @@ with open(data_dir+'slicing.yml', 'r') as file:
 	slicing_meta = yaml.safe_load(file)
 recorded_dir='recorded_data/cup_ER316L/'
 
-waypoint_distance=2	###waypoint separation
+waypoint_distance=5	###waypoint separation
 layer_height_num=int(1.8/slicing_meta['line_resolution'])
 
 
@@ -52,8 +52,8 @@ ws=WeldSend(client)
 
 ###########################################layer welding############################################
 vd_relative=4
-layer_start=19
-layers2weld=10
+layer_start=0
+layers2weld=1
 layer_counts=layer_start
 num_layer_start=int(layer_start*layer_height_num)	###modify layer num here
 num_layer_end=int((layer_start+layers2weld)*layer_height_num)
@@ -125,25 +125,8 @@ for layer in range(num_layer_start,num_layer_end,layer_height_num):
 			v2_all.append(50)
 			primitives.append('movel')
 
-		# q_prev=positioner_js[breakpoints[-1]]
-	
-
-		####DATA LOGGING
-		if logging:
-			local_recorded_dir=recorded_dir+'slice%i_%i/'%(layer,x)
-			os.makedirs(local_recorded_dir,exist_ok=True)
-			timestamp=[]
-			voltage=[]
-			current=[]
-			feedrate=[]
-			energy=[]
 
 		timestamp_robot,joint_recording,job_line,_=ws.weld_segment_dual(primitives,robot,positioner,q1_all,q2_all,v1_all,v2_all,cond_all=[200],arc=True)
 
-		if logging:
-			np.savetxt(local_recorded_dir +'welder_info.csv',
-						np.array([timestamp, voltage, current, feedrate, energy]).T, delimiter=',',
-						header='timestamp,voltage,current,feedrate,energy', comments='')
-			np.savetxt(local_recorded_dir+'joint_recording.csv',np.hstack((timestamp_robot.reshape(-1, 1),job_line.reshape(-1, 1),joint_recording)),delimiter=',')
 
 	layer_counts+=1

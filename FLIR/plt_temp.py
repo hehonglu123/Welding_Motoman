@@ -26,7 +26,7 @@ for i in range(len(ir_recording)):
     centroid, bbox=flame_detection(ir_recording[i])
     temp=counts2temp(ir_recording[i].flatten(),6.39661118e+03, 1.40469989e+03, 1.00000008e+00, 8.69393436e+00, 8.40029488e+03,Emiss=0.13).reshape((240,320))
     if centroid is not None:
-        bbox_below_size=10
+        bbox_below_size=5
         centroid_below=(int(centroid[0]+bbox[2]/2+bbox_below_size/2),centroid[1])
         temp_below.append(np.average(temp[int(centroid_below[1]-bbox_below_size):int(centroid_below[1]+bbox_below_size),int(centroid_below[0]-bbox_below_size):int(centroid_below[0]+bbox_below_size)]))
     else:
