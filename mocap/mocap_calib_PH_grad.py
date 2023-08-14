@@ -17,7 +17,7 @@ Rx=np.array([1,0,0])
 Ry=np.array([0,1,0])
 Rz=np.array([0,0,1])
 
-dataset_date='0801'
+dataset_date='0804'
 
 config_dir='../config/'
 
@@ -38,7 +38,7 @@ elif robot_type == 'R2':
                         tool_marker_config_file=config_dir+'mti_'+dataset_date+'_marker_config.yaml')
 
 #### using rigid body
-use_toolmaker=True
+use_toolmaker=False
 T_base_basemarker = robot.T_base_basemarker
 T_basemarker_base = T_base_basemarker.inv()
 
