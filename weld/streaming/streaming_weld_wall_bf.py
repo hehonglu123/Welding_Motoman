@@ -1,4 +1,4 @@
-import sys, glob, pickle, os, traceback
+import sys, glob, pickle, os, traceback, wave
 from RobotRaconteur.Client import *
 from scipy.interpolate import interp1d
 sys.path.append('../../toolbox/')
@@ -12,6 +12,39 @@ from StreamingSend import *
 def traj_warp():
 	return
 
+
+	
+############################################################WELDING PARAMETERS########################################################
+
+dataset='wall/'
+sliced_alg='dense_slice/'
+data_dir='../../data/'+dataset+sliced_alg
+with open(data_dir+'slicing.yml', 'r') as file:
+	slicing_meta = yaml.safe_load(file)
+
+
+
+robot=robot_obj('MA2010_A0',def_path='../../config/MA2010_A0_robot_default_config.yml',tool_file_path='../../config/torch.csv',\
+	pulse2deg_file_path='../../config/MA2010_A0_pulse2deg_real.csv',d=15)
+robot2=robot_obj('MA1440_A0',def_path='../../config/MA1440_A0_robot_default_config.yml',tool_file_path='../../config/flir.csv',\
+		pulse2deg_file_path='../../config/MA1440_A0_pulse2deg_real.csv',base_transformation_file='../../config/MA1440_pose_mocap.csv')
+positioner=positioner_obj('D500B',def_path='../../config/D500B_robot_default_config.yml',tool_file_path='../../config/positioner_tcp.csv',\
+	pulse2deg_file_path='../../config/D500B_pulse2deg_real.csv',base_transformation_file='../../config/D500B_pose.csv')
+
+########################################################RR Microphone########################################################
+samplerate = 44000
+channels = 1
+audio_recording=[]
+def microphone_new_frame(pipe_ep):
+    global audio_recording
+    #Loop to get the newest frame
+    while (pipe_ep.Available > 0):
+        #Receive the packet
+        audio_recording.extend(pipe_ep.ReceivePacket().audio_data)
+microphone = RRN.ConnectService('rr+tcp://192.168.55.20:60828?service=microphone')
+p_microphone = microphone.microphone_stream.Connect(-1)
+p_microphone.PacketReceivedEvent+=microphone_new_frame
+########################################################RR FLIR########################################################
 def new_frame(pipe_ep):
 	global flir_logging, flir_ts, image_consts
 	#Loop to get the newest frame
@@ -37,25 +70,6 @@ def new_frame(pipe_ep):
 		#Convert the packet to an image and set the global variable
 		flir_logging.append(display_mat)
 		flir_ts.append(time.time())
-	
-############################################################WELDING PARAMETERS########################################################
-
-dataset='wall/'
-sliced_alg='dense_slice/'
-data_dir='../../data/'+dataset+sliced_alg
-with open(data_dir+'slicing.yml', 'r') as file:
-	slicing_meta = yaml.safe_load(file)
-
-
-
-robot=robot_obj('MA2010_A0',def_path='../../config/MA2010_A0_robot_default_config.yml',tool_file_path='../../config/torch.csv',\
-	pulse2deg_file_path='../../config/MA2010_A0_pulse2deg_real.csv',d=15)
-robot2=robot_obj('MA1440_A0',def_path='../../config/MA1440_A0_robot_default_config.yml',tool_file_path='../../config/flir.csv',\
-		pulse2deg_file_path='../../config/MA1440_A0_pulse2deg_real.csv',base_transformation_file='../../config/MA1440_pose_mocap.csv')
-positioner=positioner_obj('D500B',def_path='../../config/D500B_robot_default_config.yml',tool_file_path='../../config/positioner_tcp.csv',\
-	pulse2deg_file_path='../../config/D500B_pulse2deg_real.csv',base_transformation_file='../../config/D500B_pose.csv')
-
-########################################################RR FLIR########################################################
 flir=RRN.ConnectService('rr+tcp://192.168.55.10:60827/?service=camera')
 flir.setf_param("focus_pos", RR.VarValue(int(1900),"int32"))
 flir.setf_param("object_distance", RR.VarValue(0.4,"double"))
@@ -69,7 +83,6 @@ flir.setf_param("ir_format", RR.VarValue("radiometric","string"))
 flir.setf_param("object_emissivity", RR.VarValue(0.13,"double"))
 flir.setf_param("scale_limit_low", RR.VarValue(293.15,"double"))
 flir.setf_param("scale_limit_upper", RR.VarValue(5000,"double"))
-global image_consts
 image_consts = RRN.GetConstants('com.robotraconteur.image', flir)
 p=flir.frame_stream.Connect(-1)
 #Set the callback for when a new pipe packet is received to the
@@ -112,14 +125,14 @@ slice_num=0
 welding_started=False
 ###job=feedrate/10+200
 job_offset=200
-nominal_feedrate=150
+nominal_feedrate=100
 nominal_vd_relative=10
 nominal_wire_length=25 #pixels
 nominal_temp_below=500
 
 ###set up control parameters
-base_feedrate=180
-base_vd=1
+base_feedrate=200
+base_vd=2
 feedrate=nominal_feedrate
 vd_relative=nominal_vd_relative
 feedrate_gain=0.5
@@ -239,6 +252,7 @@ while slice_num<slicing_meta['num_layers']:
 			###monitoring parameters
 			wire_length=[]
 			temp_below=[]
+			audio_recording=[]
 			robot_ts=[]
 			robot_js=[]
 			
@@ -281,17 +295,28 @@ while slice_num<slicing_meta['num_layers']:
 			np.savetxt(local_recorded_dir+'slice_%i_%i_flir_ts.csv'%(slice_num,x),flir_ts,delimiter=',')
 			with open(local_recorded_dir+'slice_%i_%i_flir.pickle'%(slice_num,x), 'wb') as file:
 				pickle.dump(flir_logging, file)
+			first_channel = np.concatenate(audio_recording)
+			first_channel_int16=(first_channel*32767).astype(np.int16)
+			with wave.open(local_recorded_dir+'slice_%i_%i_microphone.wav'%(slice_num,x), 'wb') as wav_file:
+				# Set the WAV file parameters
+				wav_file.setnchannels(channels)
+				wav_file.setsampwidth(2)  # 2 bytes per sample (16-bit)
+				wav_file.setframerate(samplerate)
+
+				# Write the audio data to the WAV file
+				wav_file.writeframes(first_channel_int16.tobytes())
+				
 			flir_ts=[flir_ts[-1]]
 			flir_logging=[flir_logging[-1]]
 
 			wire_length_avg=np.average(wire_length)
 			temp_below_avg=np.average(temp_below)
 			###proportional feedback
-			feedrate=min(max(feedrate+1*(nominal_temp_below-temp_below_avg),feedrate_min),feedrate_max)
+			# feedrate=min(max(feedrate+1*(nominal_temp_below-temp_below_avg),feedrate_min),feedrate_max)
 			slice_increment=max(nominal_slice_increment+slice_inc_gain*(nominal_wire_length-wire_length_avg),-nominal_slice_increment+2)
-			vd_relative=feedrate/10-3
+			# vd_relative=feedrate/10-3
 			print('WIRE LENGTH: ',wire_length_avg,'TEMP BELOW: ',temp_below_avg,'FEEDRATE: ',feedrate,'VD: ',vd_relative,'SLICE INC: ',slice_increment)
-			slice_num+=int(nominal_slice_increment)
+			slice_num+=int(slice_increment)
 
 		except:
 			traceback.print_exc()
