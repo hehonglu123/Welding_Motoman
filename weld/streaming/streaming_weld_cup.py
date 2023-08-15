@@ -71,6 +71,19 @@ robot2=robot_obj('MA1440_A0',def_path='../../config/MA1440_A0_robot_default_conf
 positioner=positioner_obj('D500B',def_path='../../config/D500B_robot_default_config.yml',tool_file_path='../../config/positioner_tcp.csv',\
 	pulse2deg_file_path='../../config/D500B_pulse2deg_real.csv',base_transformation_file='../../config/D500B_pose.csv')
 
+########################################################RR Microphone########################################################
+samplerate = 44000
+channels = 1
+audio_recording=[]
+def microphone_new_frame(pipe_ep):
+    global audio_recording
+    #Loop to get the newest frame
+    while (pipe_ep.Available > 0):
+        #Receive the packet
+        audio_recording.extend(pipe_ep.ReceivePacket().audio_data)
+microphone = RRN.ConnectService('rr+tcp://192.168.55.20:60828?service=microphone')
+p_microphone = microphone.microphone_stream.Connect(-1)
+p_microphone.PacketReceivedEvent+=microphone_new_frame
 ########################################################RR FLIR########################################################
 flir=RRN.ConnectService('rr+tcp://192.168.55.10:60827/?service=camera')
 flir.setf_param("focus_pos", RR.VarValue(int(2000),"int32"))
@@ -187,6 +200,7 @@ for layer in range(num_layer_start,num_layer_end,layer_height_num):
 
 		flir_logging=[]
 		flir_ts=[]
+		audio_recording=[]
 		##########WELDING#######
 		fronius_client.start_weld()
 		robot_ts,robot_js=SS.traj_streaming(curve_js_all,ctrl_joints=np.ones(14))
@@ -201,5 +215,16 @@ for layer in range(num_layer_start,num_layer_end,layer_height_num):
 		np.savetxt(local_recorded_dir+'slice_%i_%i_flir_ts.csv'%(layer,x),flir_ts,delimiter=',')
 		with open(local_recorded_dir+'slice_%i_%i_flir.pickle'%(layer,x), 'wb') as file:
 			pickle.dump(flir_logging, file)
+		
+		first_channel = np.concatenate(audio_recording)
+		first_channel_int16=(first_channel*32767).astype(np.int16)
+		with wave.open('output.wav', 'wb') as wav_file:
+			# Set the WAV file parameters
+			wav_file.setnchannels(channels)
+			wav_file.setsampwidth(2)  # 2 bytes per sample (16-bit)
+			wav_file.setframerate(samplerate)
+
+			# Write the audio data to the WAV file
+			wav_file.writeframes(first_channel_int16.tobytes())
 
 		layer_counts+=1

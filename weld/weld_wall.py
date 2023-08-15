@@ -17,6 +17,7 @@ q_seed=np.radians([-35.4291,56.6333,40.5194,4.5177,-52.2505,-11.6546])
 client=MotionProgramExecClient()
 ws=WeldSend(client)
 
+feedrate=70
 base_layer_height=2
 layer_height=1.0
 q_all=[]
@@ -36,15 +37,15 @@ for i in range(1,2):
 	q_init=robot.inv(p1,R,q_seed)[0]
 	q_end=robot.inv(p2,R,q_seed)[0]
 
-	p_mid1=p1+5*(p2-p1)/np.linalg.norm(p2-p1)
+	# p_mid1=p1+5*(p2-p1)/np.linalg.norm(p2-p1)
 	# p_mid2=p2-5*(p2-p1)/np.linalg.norm(p2-p1)
-	q_mid1=robot.inv(p_mid1,R,q_seed)[0]
+	# q_mid1=robot.inv(p_mid1,R,q_seed)[0]
 	# q_mid2=robot.inv(p_mid2,R,q_seed)[0]
 
-	q_all.extend([q_init,q_mid1,q_end])
-	v_all.extend([1,20,10])
-	primitives.extend(['movej','movel','movel'])
-	cond_all.extend([0,210,210])
+	q_all.extend([q_init,q_end])
+	v_all.extend([1,10])
+	primitives.extend(['movej','movel'])
+	cond_all.extend([0,feedrate/10+200])
 
 # for i in range(2,3):
 # 	if i%2==0:
@@ -62,4 +63,4 @@ for i in range(1,2):
 # 	cond_all.extend([0,210])
 
 
-ws.weld_segment_single(primitives,robot,q_all,v_all,cond_all,arc=True,wait=0.5)
+ws.weld_segment_single(primitives,robot,q_all,v_all,cond_all,arc=False,wait=0.)
