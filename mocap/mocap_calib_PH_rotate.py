@@ -412,11 +412,9 @@ T_tool_flange = Transform(robot.robot.R_tool,robot.robot.p_tool)
 
 robot.robot.R_tool=np.eye(3)
 robot.robot.p_tool=np.zeros(3)
-print(robot.fwd(zero_config_q))
 robot.robot.P = deepcopy(P)
 robot.robot.H = deepcopy(H)
 T_flange_base = robot.fwd(zero_config_q)
-print(T_flange_base)
 T_base_flange = T_flange_base.inv()
 
 toolid = robot.tool_rigid_id
