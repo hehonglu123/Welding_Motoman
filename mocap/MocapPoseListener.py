@@ -169,10 +169,12 @@ class MocapFrameListener():
         self.target_frames_traj_p={}
         self.target_frames_traj_R={}
         self.traj_stamps={}
+        self.traj_condition={}
         for frame_name in self.target_frames:
             self.target_frames_traj_p[frame_name] = []
             self.target_frames_traj_R[frame_name] = []
             self.traj_stamps[frame_name]=[]
+            self.traj_condition[frame_name]=[]
     
     def collect_point_thread(self):
 
@@ -215,6 +217,7 @@ class MocapFrameListener():
                         else:
                             self.target_frames_traj_R[this_marker_id].append(T_target_source.R)
                         self.traj_stamps[this_marker_id].append(float(data.sensor_data.ts[0]['seconds'])+data.sensor_data.ts[0]['nanoseconds']*1e-9)
+                        self.traj_condition[this_marker_id].append(data.fiducials.recognized_fiducials[i].confidence)
 
         sensor_data_srv.Close()
 
@@ -244,6 +247,10 @@ class MocapFrameListener():
     def get_frames_traj(self):
 
         return self.target_frames_traj_p,self.target_frames_traj_R,self.traj_stamps
+
+    def get_frames_traj_cond(self):
+
+        return self.target_frames_traj_p,self.target_frames_traj_R,self.traj_stamps,self.traj_condition
 
 def robotposelistener():
     config_dir='../config/'
