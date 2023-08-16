@@ -99,6 +99,7 @@ def new_frame(pipe_ep):
 
         #Convert the packet to an image and set the global variable
         current_mat = display_mat
+        ts=rr_img.image_info.ts.seconds+rr_img.image_info.ts.nanoseconds*1e-9
 
 if __name__ == "__main__":
     main()
