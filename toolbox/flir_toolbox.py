@@ -75,6 +75,8 @@ def flame_detection(raw_img,threshold=1.2e4,area_threshold=10):
     nb_components, labels, stats, centroids = cv2.connectedComponentsWithStats(thresholded_img, connectivity=4)
 
     valid_indices=np.where(stats[:, cv2.CC_STAT_AREA] > area_threshold)[0][1:]  ###threshold connected area
+    if len(valid_indices)==0:
+        return None, None
     
     average_pixel_values = [np.mean(raw_img[labels == label]) for label in valid_indices]   ###sorting
 

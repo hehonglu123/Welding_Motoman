@@ -16,8 +16,8 @@ fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
 curve_dense=[]
 ###BASE LAYER
 radius_outter = radii_coeff*z_offset**(1/4)
-num_circle=int(np.ceil(radius_outter/line_resolution))
-radii=np.linspace(line_resolution/2,radius_outter,num_circle)
+num_circle=int(radius_outter/line_resolution)
+radii=np.linspace(line_resolution,radius_outter,num_circle)
 slice0=[]
 section_num=0
 for r in radii:

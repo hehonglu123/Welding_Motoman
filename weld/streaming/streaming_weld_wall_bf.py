@@ -69,7 +69,7 @@ def new_frame(pipe_ep):
 
 		#Convert the packet to an image and set the global variable
 		flir_logging.append(display_mat)
-		flir_ts.append(time.time())
+		flir_ts.append(rr_img.image_info.data_header.ts.seconds+1e-9*rr_img.image_info.data_header.ts.nanoseconds)
 flir=RRN.ConnectService('rr+tcp://192.168.55.10:60827/?service=camera')
 flir.setf_param("focus_pos", RR.VarValue(int(1900),"int32"))
 flir.setf_param("object_distance", RR.VarValue(0.4,"double"))
@@ -203,13 +203,11 @@ slice_inc_gain=3.
 # 	###LOGGING
 # 	local_recorded_dir='recorded_data/wall_recording/'
 # 	os.makedirs(local_recorded_dir,exist_ok=True)
-# 	np.savetxt(local_recorded_dir+'slice_%i_%i_joint.csv'%(slice_num,x),np.hstack((np.array(robot_ts).reshape((-1,1)),np.array(robot_js))),delimiter=',')
-# 	flir_ts=np.array(flir_ts)-flir_ts[0]
-# 	np.savetxt(local_recorded_dir+'slice_%i_%i_flir_ts.csv'%(slice_num,x),flir_ts,delimiter=',')
+# 	np.savetxt(local_recorded_dir+'slice_%i_%i_joint.csv'%(slice_num,x),np.hstack((np.array(robot_ts)-robot_ts[0].reshape((-1,1)),np.array(robot_js))),delimiter=',')
+# 	flir_ts_rec=np.array(flir_ts)-flir_ts[0]
+# 	np.savetxt(local_recorded_dir+'slice_%i_%i_flir_ts.csv'%(slice_num,x),flir_ts_rec,delimiter=',')
 # 	with open(local_recorded_dir+'slice_%i_%i_flir.pickle'%(slice_num,x), 'wb') as file:
 # 		pickle.dump(flir_logging, file)
-# 	flir_ts=[flir_ts[-1]]
-# 	flir_logging=[flir_logging[-1]]
 
 # 	wire_length_avg=np.average(wire_length)
 # 	temp_below_avg=np.average(temp_below)
@@ -255,7 +253,9 @@ while slice_num<slicing_meta['num_layers']:
 			audio_recording=[]
 			robot_ts=[]
 			robot_js=[]
-			
+			flir_logging=[]
+			flir_ts=[]
+
 			fronius_client.job_number = int(feedrate/10)+job_offset
 			###start welding at the first layer, then non-stop
 			if not welding_started:
@@ -290,9 +290,9 @@ while slice_num<slicing_meta['num_layers']:
 			###LOGGING
 			local_recorded_dir='recorded_data/wall_recording/'
 			os.makedirs(local_recorded_dir,exist_ok=True)
-			np.savetxt(local_recorded_dir+'slice_%i_%i_joint.csv'%(slice_num,x),np.hstack((np.array(robot_ts).reshape((-1,1)),np.array(robot_js))),delimiter=',')
-			flir_ts=np.array(flir_ts)-flir_ts[0]
-			np.savetxt(local_recorded_dir+'slice_%i_%i_flir_ts.csv'%(slice_num,x),flir_ts,delimiter=',')
+			np.savetxt(local_recorded_dir+'slice_%i_%i_joint.csv'%(slice_num,x),np.hstack((np.array(robot_ts)-robot_ts[0].reshape((-1,1)),np.array(robot_js))),delimiter=',')
+			flir_ts_rec=np.array(flir_ts)-flir_ts[0]
+			np.savetxt(local_recorded_dir+'slice_%i_%i_flir_ts.csv'%(slice_num,x),flir_ts_rec,delimiter=',')
 			with open(local_recorded_dir+'slice_%i_%i_flir.pickle'%(slice_num,x), 'wb') as file:
 				pickle.dump(flir_logging, file)
 			first_channel = np.concatenate(audio_recording)
@@ -305,9 +305,6 @@ while slice_num<slicing_meta['num_layers']:
 
 				# Write the audio data to the WAV file
 				wav_file.writeframes(first_channel_int16.tobytes())
-				
-			flir_ts=[flir_ts[-1]]
-			flir_logging=[flir_logging[-1]]
 
 			wire_length_avg=np.average(wire_length)
 			temp_below_avg=np.average(temp_below)
