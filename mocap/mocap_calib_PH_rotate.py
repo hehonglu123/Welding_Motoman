@@ -342,6 +342,9 @@ for dataset in all_datasets:
         P=np.zeros((3,3))
         P[:,0]=np.array([0,0,0])
         P[:,1]=j2_center-j1_center
+        
+        
+        
         P[:,2]=np.linalg.norm(robot.robot.P[:,2]+robot.robot.P[:,1])*(-1*H[:,1])
         
     print("P:",P.T)
