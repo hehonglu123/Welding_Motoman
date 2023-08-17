@@ -121,19 +121,21 @@ def to_frame(curve_p,curve_R,mocap_stamps,target_frame,markers_id):
 config_dir='../config/'
 
 # robot_type='R1'
-robot_type='R2'
-# robot_type='S1'
+# robot_type='R2'
+robot_type='S1'
 
 # all_datasets=['train_data','valid_data_1','valid_data_2']
-dataset_date='0804'
+dataset_date='0801'
 # all_datasets=['test'+dataset_date+'_R1_aftercalib/train_data']
 all_datasets=['test'+dataset_date+'_'+robot_type+'/train_data']
 
 cut_edge=False
 
 if robot_type=='R1':
-    base_marker_config_file=config_dir+'MA2010_marker_config.yaml'
-    tool_marker_config_file=config_dir+'weldgun_marker_config.yaml'
+    base_marker_dir=config_dir+'MA2010_marker_config/'
+    tool_marker_dir=config_dir+'weldgun_marker_config/'
+    base_marker_config_file=base_marker_dir+'MA2010_marker_config.yaml'
+    tool_marker_config_file=tool_marker_dir+'weldgun_marker_config.yaml'
     robot=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path=config_dir+'torch.csv',d=15,\
     pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',\
     base_marker_config_file=base_marker_config_file,tool_marker_config_file=tool_marker_config_file)
@@ -147,16 +149,18 @@ if robot_type=='R1':
     jN=6
 
     # output_base_marker_config_file = config_dir+'MA2010_marker_config.yaml'
-    output_base_marker_config_file = config_dir+'MA2010_'+dataset_date+'_marker_config.yaml'
+    output_base_marker_config_file = base_marker_dir+'MA2010_'+dataset_date+'_marker_config.yaml'
     # output_base_marker_config_file = config_dir+'MA2010_0613_marker_config.yaml'
     # output_base_marker_config_file = config_dir+'MA2010_0504stretch_marker_config.yaml'
     # output_base_marker_config_file = config_dir+'MA2010_0504inward_marker_config.yaml'
 
-    output_tool_marker_config_file = config_dir+'weldgun_'+dataset_date+'_marker_config.yaml'
+    output_tool_marker_config_file = tool_marker_dir+'weldgun_'+dataset_date+'_marker_config.yaml'
 
 elif robot_type=='R2':
-    base_marker_config_file=config_dir+'MA1440_marker_config.yaml'
-    tool_marker_config_file=config_dir+'mti_marker_config.yaml'
+    base_marker_dir=config_dir+'MA1440_marker_config/'
+    tool_marker_dir=config_dir+'mti_marker_config/'
+    base_marker_config_file=base_marker_dir+'MA1440_marker_config.yaml'
+    tool_marker_config_file=tool_marker_dir+'mti_marker_config.yaml'
     robot=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.yml',tool_file_path=config_dir+'mti.csv',\
     pulse2deg_file_path=config_dir+'MA1440_A0_pulse2deg_real.csv',\
     base_marker_config_file=base_marker_config_file,tool_marker_config_file=tool_marker_config_file)
@@ -169,12 +173,14 @@ elif robot_type=='R2':
 
     jN=6
 
-    output_base_marker_config_file = config_dir+'MA1440_'+dataset_date+'_marker_config.yaml'
-    output_tool_marker_config_file = config_dir+'mti_'+dataset_date+'_marker_config.yaml'
+    output_base_marker_config_file = base_marker_dir+'MA1440_'+dataset_date+'_marker_config.yaml'
+    output_tool_marker_config_file = tool_marker_dir+'mti_'+dataset_date+'_marker_config.yaml'
 
 elif robot_type=='S1':
-    base_marker_config_file=config_dir+'D500B_marker_config.yaml'
-    tool_marker_config_file=config_dir+'positioner_tcp_marker_config.yaml'
+    base_marker_dir=config_dir+'D500B_marker_config/'
+    tool_marker_dir=config_dir+'positioner_tcp_marker_config/'
+    base_marker_config_file=base_marker_dir+'D500B_marker_config.yaml'
+    tool_marker_config_file=tool_marker_dir+'positioner_tcp_marker_config.yaml'
     robot=positioner_obj('D500B',def_path=config_dir+'D500B_robot_default_config.yml',tool_file_path=config_dir+'positioner_tcp.csv',\
     pulse2deg_file_path=config_dir+'D500B_pulse2deg_real.csv',\
     base_marker_config_file=base_marker_config_file,tool_marker_config_file=tool_marker_config_file)
@@ -186,8 +192,8 @@ elif robot_type=='S1':
 
     jN=2
 
-    output_base_marker_config_file = config_dir+'D500B_'+dataset_date+'_marker_config.yaml'
-    output_tool_marker_config_file = config_dir+'positioner_tcp_'+dataset_date+'_marker_config.yaml'
+    output_base_marker_config_file = base_marker_dir+'D500B_'+dataset_date+'_marker_config.yaml'
+    output_tool_marker_config_file = tool_marker_dir+'positioner_tcp_'+dataset_date+'_marker_config.yaml'
 
 H_act = deepcopy(H_nom)
 axis_p = deepcopy(H_nom)
@@ -343,7 +349,21 @@ for dataset in all_datasets:
         P[:,0]=np.array([0,0,0])
         P[:,1]=j2_center-j1_center
         
+        # calibrate tool (using zero config pose)
+        curve_p,curve_R,mocap_stamps = read_and_convert_frame(raw_data_dir+'_zero',robot.base_rigid_id,robot.tool_markers_id)
+        tcp_marker_p={}
+        for mkr_id in robot.tool_markers_id:
+            curve_p_base=[]
+            for p in curve_p[mkr_id]:
+                curve_p_base.append(np.matmul(T_basemarker_base.R,p) + T_basemarker_base.p)
+            tcp_marker_p[mkr_id]=np.mean(curve_p_base,axis=0)
         
+        
+        # read q
+        # with open(raw_data_dir+'_zero_robot_q.pickle', 'rb') as handle:
+        #     robot_q = pickle.load(handle)
+        #     robot_q = robot_q[:,-2:]
+        # zero_config_q=np.mean(robot_q,axis=0)
         
         P[:,2]=np.linalg.norm(robot.robot.P[:,2]+robot.robot.P[:,1])*(-1*H[:,1])
         
