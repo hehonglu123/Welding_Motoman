@@ -57,7 +57,9 @@ def main():
                 # print(c1.getf_param('focus_pos').data[0])
                 # print(1/(time.time()-now))
                 # now=time.time()
+                print(ts)
                 plt.imshow(current_mat, cmap='inferno', aspect='auto')
+
                 plt.colorbar(format='%.2f')
             plt.pause(0.001)
             plt.clf()
@@ -75,7 +77,7 @@ def main():
 current_mat = None
 
 def new_frame(pipe_ep):
-    global current_mat
+    global current_mat, ts
 
     #Loop to get the newest frame
     while (pipe_ep.Available > 0):
@@ -100,6 +102,7 @@ def new_frame(pipe_ep):
         #Convert the packet to an image and set the global variable
         current_mat = display_mat
         ts=rr_img.image_info.ts.seconds+rr_img.image_info.ts.nanoseconds*1e-9
+        
 
 if __name__ == "__main__":
     main()
