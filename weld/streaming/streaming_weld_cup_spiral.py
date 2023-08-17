@@ -9,10 +9,15 @@ from dx200_motion_program_exec_client import *
 from StreamingSend import *
 
 
-def spiralize(traj1,traj2):
+def spiralize(traj1,traj2,reversed=False):
 	###interpolate traj1 to traj2 with spiral printing
-	weight=np.linspace(0,1,num=len(traj1))
-	traj_new=weight*traj1+(1-weight)*traj2
+	###interp traj2 to be of same length
+	traj2_interp=np.interp(np.linspace(0,1,num=len(traj1)),np.linspace(0,1,num=len(traj2)),traj2,axis=0)
+	if not reversed:
+		weight=np.linspace(1,0.5,num=len(traj1))
+	else:
+		weight=np.linspace(0.5,1,num=len(traj1))
+	traj_new=weight*traj1+(1-weight)*traj2_interp
 	return traj_new
 
 timestamp=[]
@@ -60,7 +65,7 @@ def new_frame(pipe_ep):
 
 
 dataset='cup/'
-sliced_alg='circular_slice_shifted/'
+sliced_alg='circular_slice/'
 data_dir='../../data/'+dataset+sliced_alg
 with open(data_dir+'slicing.yml', 'r') as file:
 	slicing_meta = yaml.safe_load(file)
@@ -152,11 +157,12 @@ layer_counts=layer_start
 num_layer_start=int(layer_start*layer_height_num)	###modify layer num here
 num_layer_end=int((layer_start+layers2weld)*layer_height_num)
 res, robot_state, _ = RR_robot_state.TryGetInValue()
-q_prev=robot_state.joint_position[-2:]
-# q_prev=np.array([9.53E-02,-2.71E+00])	###for motosim tests only
+# q_prev=robot_state.joint_position[-2:]
+q_prev=np.array([9.53E-02,-2.71E+00])	###for motosim tests only
+
 timestamp_robot=[]
 joint_recording=[]
-
+curve_js_all=[]
 if num_layer_start<=1*layer_height_num:
 	num_sections=len(glob.glob(data_dir+'curve_sliced_relative/slice0_*.csv'))
 else:
@@ -173,9 +179,49 @@ for layer in range(num_layer_start,num_layer_end,layer_height_num):
 		rob1_js=np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
 		rob2_js=np.loadtxt(data_dir+'curve_sliced_js/MA1440_js'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
 		positioner_js=np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
+		traj_length=len(rob1_js)
 		curve_sliced_relative=np.loadtxt(data_dir+'curve_sliced_relative/slice'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
 		if curve_sliced_relative.shape==(6,):
 			continue
+		
+		###TRJAECTORY WARPING
+		if x>0:###if multiple sections
+			rob1_js_prev=np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(layer)+'_'+str(x-layer_width_num)+'.csv',delimiter=',')
+			rob2_js_prev=np.loadtxt(data_dir+'curve_sliced_js/MA1440_js'+str(layer)+'_'+str(x-layer_width_num)+'.csv',delimiter=',')
+			positioner_js_prev=np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(layer)+'_'+str(x-layer_width_num)+'.csv',delimiter=',')
+			traj_length_prev=len(rob1_js_prev)
+			rob2_js[:int(traj_length/2)]=spiralize(rob2_js[:int(traj_length/2)],rob2_js_prev[:int(traj_length_prev/2)],reversed=True)
+			rob2_js[:int(traj_length/2)]=spiralize(rob2_js[:int(traj_length/2)],rob2_js_prev[:int(traj_length_prev/2)],reversed=True)
+			positioner_js[:int(traj_length/2)]=spiralize(positioner_js[:int(traj_length/2)],positioner_js_prev[:int(traj_length_prev/2)],reversed=True)
+			if x<int(num_sections/layer_width_num):
+				rob1_js_next=np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(layer)+'_'+str(x+layer_width_num)+'.csv',delimiter=',')
+				rob2_js_next=np.loadtxt(data_dir+'curve_sliced_js/MA1440_js'+str(layer)+'_'+str(x+layer_width_num)+'.csv',delimiter=',')
+				positioner_js_next=np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(layer)+'_'+str(x+layer_width_num)+'.csv',delimiter=',')
+				traj_length_next=len(rob1_js_next)
+				rob2_js[int(traj_length/2):]=spiralize(rob2_js[int(traj_length/2):],rob2_js_next[int(traj_length_next/2):])
+				rob2_js[int(traj_length/2):]=spiralize(rob2_js[int(traj_length/2):],rob2_js_next[int(traj_length_next/2):])
+				positioner_js[int(traj_length/2):]=spiralize(positioner_js[int(traj_length/2):],positioner_js_next[int(traj_length_next/2):])
+
+		if layer>0:
+			rob1_js_prev=np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(layer-layer_height_num)+'_'+str(x)+'.csv',delimiter=',')
+			rob2_js_prev=np.loadtxt(data_dir+'curve_sliced_js/MA1440_js'+str(layer-layer_height_num)+'_'+str(x)+'.csv',delimiter=',')
+			positioner_js_prev=np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(layer-layer_height_num)+'_'+str(x)+'.csv',delimiter=',')
+			traj_length_prev=len(rob1_js_prev)
+			rob2_js[:int(traj_length/2)]=spiralize(rob2_js[:int(traj_length/2)],rob2_js_prev[:int(traj_length_prev/2)],reversed=True)
+			rob2_js[:int(traj_length/2)]=spiralize(rob2_js[:int(traj_length/2)],rob2_js_prev[:int(traj_length_prev/2)],reversed=True)
+			positioner_js[:int(traj_length/2)]=spiralize(positioner_js[:int(traj_length/2)],positioner_js_prev[:int(traj_length_prev/2)],reversed=True)
+			if layer<int(num_layer_end/layer_height_num):
+				rob1_js_next=np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(layer+layer_height_num)+'_'+str(x)+'.csv',delimiter=',')
+				rob2_js_next=np.loadtxt(data_dir+'curve_sliced_js/MA1440_js'+str(layer+layer_height_num)+'_'+str(x)+'.csv',delimiter=',')
+				positioner_js_next=np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(layer+layer_height_num)+'_'+str(x)+'.csv',delimiter=',')
+				traj_length_next=len(rob1_js_next)
+				rob2_js[int(traj_length/2):]=spiralize(rob2_js[int(traj_length/2):],rob2_js_next[int(traj_length_next/2):])
+				rob2_js[int(traj_length/2):]=spiralize(rob2_js[int(traj_length/2):],rob2_js_next[int(traj_length_next/2):])
+				positioner_js[int(traj_length/2):]=spiralize(positioner_js[int(traj_length/2):],positioner_js_next[int(traj_length_next/2):])
+
+		###find closest %2pi
+		num2p=np.round((q_prev-positioner_js[0])/(2*np.pi))
+		positioner_js+=num2p*2*np.pi
 			
 		lam_relative=calc_lam_cs(curve_sliced_relative)
 		lam_relative_dense=np.linspace(0,lam_relative[-1],num=int(lam_relative[-1]/point_distance))
@@ -184,12 +230,7 @@ for layer in range(num_layer_start,num_layer_end,layer_height_num):
 		positioner_js_dense=interp1d(lam_relative,positioner_js,kind='cubic',axis=0)(lam_relative_dense)
 		breakpoints=SS.get_breakpoints(lam_relative_dense,vd_relative)
 
-
-		###find which end to start depending on layer count
-		if layer_counts%2==1:
-			breakpoints=np.flip(breakpoints)
-
-
+		q_prev=positioner_js_dense[breakpoints[-1]]
 
 		###move to intermidieate waypoint for collision avoidance if multiple section
 		if num_sections!=num_sections_prev:
@@ -199,39 +240,20 @@ for layer in range(num_layer_start,num_layer_end,layer_height_num):
 			SS.jog2q(np.hstack((waypoint_q,rob2_js_dense[breakpoints[0]],positioner_js_dense[breakpoints[0]])))
 
 
-		curve_js_all=np.hstack((rob1_js_dense[breakpoints],rob2_js_dense[breakpoints],positioner_js_dense[breakpoints]))
+		curve_js_all.append(np.hstack((rob1_js_dense[breakpoints],rob2_js_dense[breakpoints],positioner_js_dense[breakpoints])))
+
+curve_js_all=np.vstack(curve_js_all)
 
 
-		SS.jog2q(curve_js_all[0])
-		q_prev=positioner_js_dense[breakpoints[-1]]
+SS.jog2q(curve_js_all[0])
+flir_logging=[]
+flir_ts=[]
+audio_recording=[]
+##########WELDING#######
+fronius_client.start_weld()
+robot_ts,robot_js=SS.traj_streaming(curve_js_all,ctrl_joints=np.ones(14))
 
-		flir_logging=[]
-		flir_ts=[]
-		audio_recording=[]
-		##########WELDING#######
-		fronius_client.start_weld()
-		robot_ts,robot_js=SS.traj_streaming(curve_js_all,ctrl_joints=np.ones(14))
+time.sleep(0.1)
+fronius_client.stop_weld()
 
-		time.sleep(0.1)
-		fronius_client.stop_weld()
 
-		local_recorded_dir='recorded_data/cup_recording/'
-		os.makedirs(local_recorded_dir,exist_ok=True)
-		np.savetxt(local_recorded_dir+'slice_%i_%i_joint.csv'%(layer,x),np.hstack((robot_ts.reshape((-1,1)),robot_js)),delimiter=',')
-		flir_ts=np.array(flir_ts)-flir_ts[0]
-		np.savetxt(local_recorded_dir+'slice_%i_%i_flir_ts.csv'%(layer,x),flir_ts,delimiter=',')
-		with open(local_recorded_dir+'slice_%i_%i_flir.pickle'%(layer,x), 'wb') as file:
-			pickle.dump(flir_logging, file)
-		
-		first_channel = np.concatenate(audio_recording)
-		first_channel_int16=(first_channel*32767).astype(np.int16)
-		with wave.open('output.wav', 'wb') as wav_file:
-			# Set the WAV file parameters
-			wav_file.setnchannels(channels)
-			wav_file.setsampwidth(2)  # 2 bytes per sample (16-bit)
-			wav_file.setframerate(samplerate)
-
-			# Write the audio data to the WAV file
-			wav_file.writeframes(first_channel_int16.tobytes())
-
-		layer_counts+=1
