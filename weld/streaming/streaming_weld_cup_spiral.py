@@ -12,11 +12,14 @@ from StreamingSend import *
 def spiralize(traj1,traj2,reversed=False):
 	###interpolate traj1 to traj2 with spiral printing
 	###interp traj2 to be of same length
-	traj2_interp=np.interp(np.linspace(0,1,num=len(traj1)),np.linspace(0,1,num=len(traj2)),traj2,axis=0)
+
+	traj2_interp=interp1d(np.linspace(0,1,num=len(traj2)),traj2,axis=0)(np.linspace(0,1,num=len(traj1)))
 	if not reversed:
 		weight=np.linspace(1,0.5,num=len(traj1))
 	else:
 		weight=np.linspace(0.5,1,num=len(traj1))
+	
+	weight=np.tile(weight,(len(traj1[0]),1)).T
 	traj_new=weight*traj1+(1-weight)*traj2_interp
 	return traj_new
 
@@ -71,7 +74,6 @@ with open(data_dir+'slicing.yml', 'r') as file:
 	slicing_meta = yaml.safe_load(file)
 recorded_dir='recorded_data/'
 
-waypoint_distance=7 	###waypoint separation
 layer_height_num=int(1.8/slicing_meta['line_resolution'])
 layer_width_num=int(4/slicing_meta['line_resolution'])
 
@@ -123,14 +125,15 @@ try:
 	flir.start_streaming()
 except: pass
 ########################################################RR FRONIUS########################################################
+feedrate_cmd=170
+vd_relative=1
 fronius_sub=RRN.SubscribeService('rr+tcp://192.168.55.21:60823?service=welder')
 fronius_client = fronius_sub.GetDefaultClientWait(1)      #connect, timeout=30s
 welder_state_sub=fronius_sub.SubscribeWire("welder_state")
 welder_state_sub.WireValueChanged += wire_cb
 hflags_const = RRN.GetConstants("experimental.fronius", fronius_client)["WelderStateHighFlags"]
-fronius_client.job_number = 200
+fronius_client.job_number = int(feedrate_cmd/10)+200
 fronius_client.prepare_welder()
-vd_relative=5
 ########################################################RR STREAMING########################################################
 
 RR_robot_sub = RRN.SubscribeService('rr+tcp://192.168.55.15:59945?service=robot')
@@ -151,14 +154,14 @@ SS=StreamingSend(RR_robot,RR_robot_state,RobotJointCommand,streaming_rate)
 
 
 ###########################################layer welding############################################
-layer_start=0
-layers2weld=10
+layer_start=2
+layers2weld=50
 layer_counts=layer_start
 num_layer_start=int(layer_start*layer_height_num)	###modify layer num here
-num_layer_end=int((layer_start+layers2weld)*layer_height_num)
+num_layer_end=min(int((layer_start+layers2weld)*layer_height_num),slicing_meta['num_layers'])
 res, robot_state, _ = RR_robot_state.TryGetInValue()
-# q_prev=robot_state.joint_position[-2:]
-q_prev=np.array([9.53E-02,-2.71E+00])	###for motosim tests only
+q_prev=robot_state.joint_position[-2:]
+# q_prev=np.array([9.53E-02,-2.71E+00])	###for motosim tests only
 
 timestamp_robot=[]
 joint_recording=[]
@@ -181,7 +184,7 @@ for layer in range(num_layer_start,num_layer_end,layer_height_num):
 		positioner_js=np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
 		traj_length=len(rob1_js)
 		curve_sliced_relative=np.loadtxt(data_dir+'curve_sliced_relative/slice'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
-		if curve_sliced_relative.shape==(6,):
+		if positioner_js.shape==(2,) and rob1_js.shape==(6,):
 			continue
 		
 		###TRJAECTORY WARPING
@@ -189,36 +192,41 @@ for layer in range(num_layer_start,num_layer_end,layer_height_num):
 			rob1_js_prev=np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(layer)+'_'+str(x-layer_width_num)+'.csv',delimiter=',')
 			rob2_js_prev=np.loadtxt(data_dir+'curve_sliced_js/MA1440_js'+str(layer)+'_'+str(x-layer_width_num)+'.csv',delimiter=',')
 			positioner_js_prev=np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(layer)+'_'+str(x-layer_width_num)+'.csv',delimiter=',')
+			if positioner_js_prev.shape==(2,) and rob1_js_prev.shape==(6,):
+				continue
 			traj_length_prev=len(rob1_js_prev)
-			rob2_js[:int(traj_length/2)]=spiralize(rob2_js[:int(traj_length/2)],rob2_js_prev[:int(traj_length_prev/2)],reversed=True)
+			rob1_js[:int(traj_length/2)]=spiralize(rob1_js[:int(traj_length/2)],rob1_js_prev[:int(traj_length_prev/2)],reversed=True)
 			rob2_js[:int(traj_length/2)]=spiralize(rob2_js[:int(traj_length/2)],rob2_js_prev[:int(traj_length_prev/2)],reversed=True)
 			positioner_js[:int(traj_length/2)]=spiralize(positioner_js[:int(traj_length/2)],positioner_js_prev[:int(traj_length_prev/2)],reversed=True)
-			if x<int(num_sections/layer_width_num):
+			if x<num_sections-layer_width_num:
 				rob1_js_next=np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(layer)+'_'+str(x+layer_width_num)+'.csv',delimiter=',')
 				rob2_js_next=np.loadtxt(data_dir+'curve_sliced_js/MA1440_js'+str(layer)+'_'+str(x+layer_width_num)+'.csv',delimiter=',')
 				positioner_js_next=np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(layer)+'_'+str(x+layer_width_num)+'.csv',delimiter=',')
 				traj_length_next=len(rob1_js_next)
-				rob2_js[int(traj_length/2):]=spiralize(rob2_js[int(traj_length/2):],rob2_js_next[int(traj_length_next/2):])
+				rob1_js[int(traj_length/2):]=spiralize(rob1_js[int(traj_length/2):],rob1_js_next[int(traj_length_next/2):])
 				rob2_js[int(traj_length/2):]=spiralize(rob2_js[int(traj_length/2):],rob2_js_next[int(traj_length_next/2):])
 				positioner_js[int(traj_length/2):]=spiralize(positioner_js[int(traj_length/2):],positioner_js_next[int(traj_length_next/2):])
 
-		if layer>0:
+		if layer>1:
 			rob1_js_prev=np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(layer-layer_height_num)+'_'+str(x)+'.csv',delimiter=',')
 			rob2_js_prev=np.loadtxt(data_dir+'curve_sliced_js/MA1440_js'+str(layer-layer_height_num)+'_'+str(x)+'.csv',delimiter=',')
 			positioner_js_prev=np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(layer-layer_height_num)+'_'+str(x)+'.csv',delimiter=',')
+			
+			if positioner_js_prev.shape==(2,) and rob1_js_prev.shape==(6,):
+				continue
 			traj_length_prev=len(rob1_js_prev)
-			rob2_js[:int(traj_length/2)]=spiralize(rob2_js[:int(traj_length/2)],rob2_js_prev[:int(traj_length_prev/2)],reversed=True)
+			rob1_js[:int(traj_length/2)]=spiralize(rob1_js[:int(traj_length/2)],rob1_js_prev[:int(traj_length_prev/2)],reversed=True)
 			rob2_js[:int(traj_length/2)]=spiralize(rob2_js[:int(traj_length/2)],rob2_js_prev[:int(traj_length_prev/2)],reversed=True)
 			positioner_js[:int(traj_length/2)]=spiralize(positioner_js[:int(traj_length/2)],positioner_js_prev[:int(traj_length_prev/2)],reversed=True)
-			if layer<int(num_layer_end/layer_height_num):
+			if layer<num_layer_end-layer_height_num:
 				rob1_js_next=np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(layer+layer_height_num)+'_'+str(x)+'.csv',delimiter=',')
 				rob2_js_next=np.loadtxt(data_dir+'curve_sliced_js/MA1440_js'+str(layer+layer_height_num)+'_'+str(x)+'.csv',delimiter=',')
 				positioner_js_next=np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(layer+layer_height_num)+'_'+str(x)+'.csv',delimiter=',')
 				traj_length_next=len(rob1_js_next)
-				rob2_js[int(traj_length/2):]=spiralize(rob2_js[int(traj_length/2):],rob2_js_next[int(traj_length_next/2):])
+				rob1_js[int(traj_length/2):]=spiralize(rob1_js[int(traj_length/2):],rob1_js_next[int(traj_length_next/2):])
 				rob2_js[int(traj_length/2):]=spiralize(rob2_js[int(traj_length/2):],rob2_js_next[int(traj_length_next/2):])
 				positioner_js[int(traj_length/2):]=spiralize(positioner_js[int(traj_length/2):],positioner_js_next[int(traj_length_next/2):])
-
+				
 		###find closest %2pi
 		num2p=np.round((q_prev-positioner_js[0])/(2*np.pi))
 		positioner_js+=num2p*2*np.pi
@@ -232,25 +240,41 @@ for layer in range(num_layer_start,num_layer_end,layer_height_num):
 
 		q_prev=positioner_js_dense[breakpoints[-1]]
 
-		###move to intermidieate waypoint for collision avoidance if multiple section
-		if num_sections!=num_sections_prev:
-			waypoint_pose=robot.fwd(rob1_js_dense[breakpoints[0]])
-			waypoint_pose.p[-1]+=50
-			waypoint_q=robot.inv(waypoint_pose.p,waypoint_pose.R,rob1_js_dense[breakpoints[0]])[0]
-			SS.jog2q(np.hstack((waypoint_q,rob2_js_dense[breakpoints[0]],positioner_js_dense[breakpoints[0]])))
-
-
 		curve_js_all.append(np.hstack((rob1_js_dense[breakpoints],rob2_js_dense[breakpoints],positioner_js_dense[breakpoints])))
+	
+	vd_relative+=1
+	vd_relative=min(vd_relative,20)
 
 curve_js_all=np.vstack(curve_js_all)
 
+#jog above
+waypoint_pose=robot.fwd(curve_js_all[0,:6])
+waypoint_pose.p[-1]+=50
+waypoint_q=robot.inv(waypoint_pose.p,waypoint_pose.R,rob1_js_dense[breakpoints[0]])[0]
+SS.jog2q(np.hstack((waypoint_q,curve_js_all[0,6:])))
+
+
 
 SS.jog2q(curve_js_all[0])
+
+
+
+
 flir_logging=[]
 flir_ts=[]
 audio_recording=[]
 ##########WELDING#######
 fronius_client.start_weld()
+###flag checking###
+time.sleep(0.5)
+# while True:
+# 	state, _ = fronius_client.welder_state.PeekInValue()
+# 	flags = state.welder_state_flags
+# 	hflags = state.welder_state_flags >> 32
+	
+# 	if hflags & 512:
+# 		break
+		
 robot_ts,robot_js=SS.traj_streaming(curve_js_all,ctrl_joints=np.ones(14))
 
 time.sleep(0.1)
