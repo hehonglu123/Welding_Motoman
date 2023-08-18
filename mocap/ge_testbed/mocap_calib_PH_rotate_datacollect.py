@@ -79,12 +79,12 @@ class CalibRobotPH:
 def calib_R2():
 
     config_dir='../config/'
-    robot_name='LRMate200id'
+    robot_name='LRMATE200id'
     tool_name='ge_R2_tool'
     robot_marker_dir=config_dir+robot_name+'_marker_config/'
-    tool_marker_dir=config_dir+robot_name+'_marker_config/'
-    robot=robot_obj('M10ia',def_path=config_dir+robot_name+'_robot_default_config.yml',tool_file_path=config_dir+tool_name+'.csv',\
-    base_marker_config_file=robot_marker_dir+robot_name+'_marker_config.yaml',tool_marker_config_file=tool_marker_dir+tool_name+'_config.yaml')
+    tool_marker_dir=config_dir+tool_name+'_marker_config/'
+    robot=robot_obj(robot_name,def_path=config_dir+robot_name+'_robot_default_config.yml',tool_file_path=config_dir+tool_name+'.csv',\
+    base_marker_config_file=robot_marker_dir+robot_name+'_marker_config.yaml',tool_marker_config_file=tool_marker_dir+tool_name+'_marker_config.yaml')
 
     mocap_url = 'rr+tcp://localhost:59823?service=phasespace_mocap'
     mocap_cli = RRN.ConnectService(mocap_url)
@@ -112,9 +112,9 @@ def calib_R1():
     robot_name='M10ia'
     tool_name='ge_R1_tool'
     robot_marker_dir=config_dir+robot_name+'_marker_config/'
-    tool_marker_dir=config_dir+robot_name+'_marker_config/'
-    robot=robot_obj('M10ia',def_path=config_dir+robot_name+'_robot_default_config.yml',tool_file_path=config_dir+tool_name+'.csv',\
-    base_marker_config_file=robot_marker_dir+robot_name+'_marker_config.yaml',tool_marker_config_file=tool_marker_dir+tool_name+'_config.yaml')
+    tool_marker_dir=config_dir+tool_name+'_marker_config/'
+    robot=robot_obj(robot_name,def_path=config_dir+robot_name+'_robot_default_config.yml',tool_file_path=config_dir+tool_name+'.csv',\
+    base_marker_config_file=robot_marker_dir+robot_name+'_marker_config.yaml',tool_marker_config_file=tool_marker_dir+tool_name+'_marker_config.yaml')
 
     mocap_url = 'rr+tcp://localhost:59823?service=phasespace_mocap'
     mocap_cli = RRN.ConnectService(mocap_url)
