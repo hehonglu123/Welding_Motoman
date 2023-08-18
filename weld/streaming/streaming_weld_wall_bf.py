@@ -173,6 +173,7 @@ slice_inc_gain=3.
 # 	if not welding_started:
 # 		SS.jog2q(np.hstack((rob1_js_dense[breakpoints[0]],rob2_js_dense[breakpoints[0]],positioner_js_dense[breakpoints[0]])))
 # 		fronius_client.start_weld()
+#		welding_started=True
 
 # 	robot_ts=[]
 # 	robot_js=[]
@@ -260,7 +261,9 @@ while slice_num<slicing_meta['num_layers']:
 			###start welding at the first layer, then non-stop
 			if not welding_started:
 				SS.jog2q(np.hstack((rob1_js_dense[breakpoints[0]],rob2_js_dense[breakpoints[0]],positioner_js_dense[breakpoints[0]])))
+				welding_started=True
 				fronius_client.start_weld()
+				
 
 			for bp_idx in range(len(breakpoints)):
 				
