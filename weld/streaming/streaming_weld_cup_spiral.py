@@ -8,21 +8,6 @@ from multi_robot import *
 from dx200_motion_program_exec_client import *
 from StreamingSend import *
 
-
-def spiralize(traj1,traj2,reversed=False):
-	###interpolate traj1 to traj2 with spiral printing
-	###interp traj2 to be of same length
-
-	traj2_interp=interp1d(np.linspace(0,1,num=len(traj2)),traj2,axis=0)(np.linspace(0,1,num=len(traj1)))
-	if not reversed:
-		weight=np.linspace(1,0.5,num=len(traj1))
-	else:
-		weight=np.linspace(0.5,1,num=len(traj1))
-	
-	weight=np.tile(weight,(len(traj1[0]),1)).T
-	traj_new=weight*traj1+(1-weight)*traj2_interp
-	return traj_new
-
 timestamp=[]
 voltage=[]
 current=[]
