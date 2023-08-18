@@ -63,8 +63,8 @@ positioner.base_H = H_from_RT(positioner_base.R,positioner_base.p)
 # robot_weld.robot.R_tool = deepcopy(robot_weld.T_tool_toolmarker.R)
 # robot_weld.robot.p_tool = deepcopy(robot_weld.T_tool_toolmarker.p)
 
-# robot_scan.robot.P=deepcopy(robot_scan.calib_P)
-# robot_scan.robot.H=deepcopy(robot_scan.calib_H)
+robot_scan.robot.P=deepcopy(robot_scan.calib_P)
+robot_scan.robot.H=deepcopy(robot_scan.calib_H)
 
 #### load R1 kinematic model
 PH_data_dir='../mocap/PH_grad_data/test'+R1_ph_dataset_date+'_R1/train_data_'
@@ -171,6 +171,7 @@ print(crop_min)
 print(crop_max)
 scan_process = ScanProcess(robot_scan,positioner)
 pcd = scan_process.pcd_register_mti(mti_recording,q_out_exe,robot_stamps,use_calib=True,ph_param=ph_param_r2)
+# pcd = scan_process.pcd_register_mti(mti_recording,q_out_exe,robot_stamps,use_calib=False)
 # visualize_pcd([pcd])
 pcd = scan_process.pcd_noise_remove(pcd,nb_neighbors=40,std_ratio=1.5,\
                                     min_bound=crop_min,max_bound=crop_max,outlier_remove=True,cluster_based_outlier_remove=True,cluster_neighbor=1,min_points=100)

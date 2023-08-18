@@ -359,13 +359,22 @@ for dataset in all_datasets:
             tcp_marker_p[mkr_id]=np.mean(curve_p_base,axis=0)
         
         
+        marker_height=34+15.8 # marker+metal plate
+        
+        m1l=np.dot(tcp_marker_p['marker1_rigid4'],-1*H[:,1])
+        m2l=np.dot(tcp_marker_p['marker2_rigid4'],-1*H[:,1])
+        m3l=np.dot(tcp_marker_p['marker4_rigid4'],-1*H[:,1])
+        P2_length = np.mean([m1l,m2l,m3l])-marker_height
+        print(P2_length)
+        
         # read q
         # with open(raw_data_dir+'_zero_robot_q.pickle', 'rb') as handle:
         #     robot_q = pickle.load(handle)
         #     robot_q = robot_q[:,-2:]
         # zero_config_q=np.mean(robot_q,axis=0)
         
-        P[:,2]=np.linalg.norm(robot.robot.P[:,2]+robot.robot.P[:,1])*(-1*H[:,1])
+        # P[:,2]=np.linalg.norm(robot.robot.P[:,2]+robot.robot.P[:,1])*(-1*H[:,1])
+        P[:,2]=P2_length*(-1*H[:,1])
         
     print("P:",P.T)
     print("H:",H.T)

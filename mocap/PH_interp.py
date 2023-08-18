@@ -94,6 +94,8 @@ class PH_Param(object):
         elif method=='FBF':
             self._fit_interp(RBFFourierInterpolator)
             self.predict_func=self._predict_interp
+        elif method=='CPA':
+            self.predict_func=self._predict_interp
         else:
             print("Choose a method")
             self.train_q=None
