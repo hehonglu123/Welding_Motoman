@@ -169,8 +169,8 @@ def calib_R1():
     mocap_url = 'rr+tcp://localhost:59823?service=phasespace_mocap'
     mocap_cli = RRN.ConnectService(mocap_url)
     
-    # rob_ip='127.0.0.2'
-    rob_ip='192.168.0.1'
+    rob_ip='127.0.0.2'
+    # rob_ip='192.168.0.1'
     rob_speed=3
 
     calib_obj = CalibRobotPH(mocap_cli,robot)
