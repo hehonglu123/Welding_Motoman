@@ -4,8 +4,24 @@ line_resolution: 1.8
 baselayer_thickness: 0
 point_distance: 1
 smooth_filter: False
-q_positioner_seed:
+q_positioner_seed: 
   - 1
-  - 0
-
-
+  - 3
+placing_vector: None
+H:
+  - - -9.499999999999761968e-01
+    - 3.122498999199924685e-01
+    - 0
+    - 0
+  - - -3.122498999199924685e-01
+    - -9.499999999999761968e-01
+    - 0
+    - 0
+  - - 0
+    - 0
+    - 1
+    - 0
+  - - 0
+    - 0
+    - 0
+    - 1
