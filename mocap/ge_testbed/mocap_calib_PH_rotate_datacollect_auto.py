@@ -114,7 +114,7 @@ def calib_R2():
     mocap_cli = RRN.ConnectService(mocap_url)
     
     rob_ip='127.0.0.2'
-    rob_speed=5
+    rob_speed=3
 
     calib_obj = CalibRobotPH(mocap_cli,robot)
 
@@ -169,8 +169,9 @@ def calib_R1():
     mocap_url = 'rr+tcp://localhost:59823?service=phasespace_mocap'
     mocap_cli = RRN.ConnectService(mocap_url)
     
-    rob_ip='127.0.0.2'
-    rob_speed=5
+    # rob_ip='127.0.0.2'
+    rob_ip='192.168.0.1'
+    rob_speed=3
 
     calib_obj = CalibRobotPH(mocap_cli,robot)
 
@@ -178,19 +179,20 @@ def calib_R1():
     ## zero config
     # calibration
     ## zero config
-    start_p = np.repeat([[-25,-30,-50,0,-75,-20]],repeats=6,axis=0)
-    q1_1=start_p[0] + np.array([10,0,0,0,0,0])
-    q1_2=start_p[0] + np.array([-20,0,0,0,0,0])
-    q2_1=start_p[1] + np.array([0,20,0,0,0,0])
-    q2_2=start_p[1] + np.array([0,-20,0,0,0,0])
-    q3_1=start_p[2] + np.array([0,0,-20,0,0,0])
-    q3_2=start_p[2] + np.array([0,0,20,0,0,0])
-    q4_1=start_p[3] + np.array([0,0,0,-20,0,0])
-    q4_2=start_p[3] + np.array([0,0,0,20,0,0])
-    q5_1=start_p[4] + np.array([0,0,0,0,0,0])
-    q5_2=start_p[4] + np.array([0,0,0,0,30,0])
-    q6_1=start_p[5] + np.array([0,0,0,0,0,10])
-    q6_2=start_p[5] + np.array([0,0,0,0,0,-30])
+    start_p = np.repeat([[-35,-32,-63,1.6,-56,-33]],repeats=6,axis=0)
+    
+    q1_1=start_p[0] + np.array([35,0,0,0,0,0])
+    q1_2=start_p[0] + np.array([-55,0,0,0,0,0])
+    q2_1=start_p[1] + np.array([0,17,0,0,0,0])
+    q2_2=start_p[1] + np.array([0,-14,0,0,0,0])
+    q3_1=start_p[2] + np.array([0,0,-17,0,0,0])
+    q3_2=start_p[2] + np.array([0,0,30,0,0,0])
+    q4_1=start_p[3] + np.array([0,0,0,-111.6,0,0])
+    q4_2=start_p[3] + np.array([0,0,0,98.4,0,0])
+    q5_1=start_p[4] + np.array([0,0,0,0,-64,0])
+    q5_2=start_p[4] + np.array([0,0,0,0,89,0])
+    q6_1=start_p[5] + np.array([0,0,0,0,0,88])
+    q6_2=start_p[5] + np.array([0,0,0,0,0,-107])
 
     q_paths = [[q1_1,q1_2],[q2_1,q2_2],[q3_1,q3_2],[q4_1,q4_2],[q5_1,q5_2],[q6_1,q6_2]]
 
@@ -206,5 +208,5 @@ def calib_R1():
 
 if __name__=='__main__':
 
-    # calib_R1()
-    calib_R2()
+    calib_R1()
+    # calib_R2()

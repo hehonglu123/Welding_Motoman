@@ -1,8 +1,11 @@
 base_markers:
-- marker1_rigid2
-- marker2_rigid2
-- marker3_rigid2
-- marker4_rigid2
-- marker5_rigid2
+- marker24_rigid4
 calibration_markers:
-- marker1_rigid0
+- marker24_rigid4
+- marker25_rigid4
+- marker26_rigid4
+- marker27_rigid4
+- marker28_rigid4
+- marker29_rigid4
+- marker30_rigid4
+- marker31_rigid4
