@@ -16,40 +16,28 @@ def main():
 
     c1=RRN.ConnectService(url)
 
-    # c1.setf_param("focus_pos", RR.VarValue(int(1600),"int32"))
-    # c1.setf_param("object_distance", RR.VarValue(0.4,"double"))
-    # c1.setf_param("reflected_temperature", RR.VarValue(291.15,"double"))
-    # c1.setf_param("atmospheric_temperature", RR.VarValue(293.15,"double"))
-    # c1.setf_param("relative_humidity", RR.VarValue(50,"double"))
-    # c1.setf_param("ext_optics_temperature", RR.VarValue(293.15,"double"))
-    # c1.setf_param("ext_optics_transmission", RR.VarValue(0.99,"double"))
-
-    # c1.setf_param("current_case", RR.VarValue(2,"int32"))
-    # # c1.setf_param("current_case", RR.VarValue(1,"int32"))
-    # # c1.setf_param("ir_format", RR.VarValue("temperature_linear_100mK","string"))
-    # # c1.setf_param("ir_format", RR.VarValue("temperature_linear_10mK","string"))
-    # c1.setf_param("ir_format", RR.VarValue("radiometric","string"))
-
-    # c1.setf_param("object_emissivity", RR.VarValue(0.13,"double"))
-    # # c1.setf_param("scale_limit_low", RR.VarValue(293.15,"double"))
-    # # c1.setf_param("scale_limit_upper", RR.VarValue(5000,"double"))
-    # c1.setf_param("scale_limit_low", RR.VarValue(293.15,"double"))
-    # c1.setf_param("scale_limit_upper", RR.VarValue(5000,"double"))
-
-    c1.setf_param("focus_pos", RR.VarValue(int(907),"int32"))
+    c1.setf_param("focus_pos", RR.VarValue(int(1900),"int32"))
     c1.setf_param("object_distance", RR.VarValue(0.3,"double"))
     c1.setf_param("reflected_temperature", RR.VarValue(291.15,"double"))
     c1.setf_param("atmospheric_temperature", RR.VarValue(293.15,"double"))
     c1.setf_param("relative_humidity", RR.VarValue(50,"double"))
     c1.setf_param("ext_optics_temperature", RR.VarValue(293.15,"double"))
     c1.setf_param("ext_optics_transmission", RR.VarValue(0.99,"double"))
+
     c1.setf_param("current_case", RR.VarValue(2,"int32"))
+    # c1.setf_param("ir_format", RR.VarValue("temperature_linear_100mK","string"))
     c1.setf_param("ir_format", RR.VarValue("radiometric","string"))
-    c1.setf_param("object_emissivity", RR.VarValue(0.13,"double"))
+
+    c1.setf_param("object_emissivity", RR.VarValue(0.9,"double"))
+    
+    
+    
+    
     c1.setf_param("scale_limit_low", RR.VarValue(293.15,"double"))
     c1.setf_param("scale_limit_upper", RR.VarValue(5000,"double"))
 
-    global image_consts
+    global image_consts, ts
+    ts=0
     image_consts = RRN.GetConstants('com.robotraconteur.image', c1)
 
     p=c1.frame_stream.Connect(-1)
@@ -70,7 +58,9 @@ def main():
                 # print(c1.getf_param('focus_pos').data[0])
                 # print(1/(time.time()-now))
                 # now=time.time()
+                print(ts)
                 plt.imshow(current_mat, cmap='inferno', aspect='auto')
+
                 plt.colorbar(format='%.2f')
             plt.pause(0.001)
             plt.clf()
@@ -88,7 +78,7 @@ def main():
 current_mat = None
 
 def new_frame(pipe_ep):
-    global current_mat
+    global current_mat, ts
 
     #Loop to get the newest frame
     while (pipe_ep.Available > 0):
@@ -111,7 +101,10 @@ def new_frame(pipe_ep):
             display_mat = mat
 
         #Convert the packet to an image and set the global variable
+        ts=rr_img.image_info.data_header.ts['seconds']+rr_img.image_info.data_header.ts['nanoseconds']*1e-9
         current_mat = display_mat
+        
+        
 
 if __name__ == "__main__":
     main()

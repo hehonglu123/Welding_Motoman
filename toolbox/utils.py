@@ -5,6 +5,31 @@ from scipy.interpolate import interp1d
 from scipy import signal
 import scipy, math
 
+def spiralize(traj1,traj2,reversed=False):
+	###interpolate traj1 to traj2 with spiral printing
+	###interp traj2 to be of same length
+
+	traj2_interp=interp1d(np.linspace(0,1,num=len(traj2)),traj2,axis=0)(np.linspace(0,1,num=len(traj1)))
+	if not reversed:
+		weight=np.linspace(1,0.5,num=len(traj1))
+	else:
+		weight=np.linspace(0.5,1,num=len(traj1))
+	
+	weight=np.tile(weight,(len(traj1[0]),1)).T
+	traj_new=weight*traj1+(1-weight)*traj2_interp
+	return traj_new
+
+def rotate_vector_at_angle(u, v, theta_rad):
+    ###rotate u to v at angle theta
+    # Compute the unit normal to the plane defined by u and v
+    n = np.cross(u, v)
+    n = n / np.linalg.norm(n)
+    
+    # Compute the vector w that lies at angle theta from u in the plane of u and v
+    w = u * np.cos(theta_rad) + np.cross(n, u) * np.sin(theta_rad)
+    
+    return w / np.linalg.norm(w)  # Return as unit vector
+
 def H_inv(H):
 	R=H[:3,:3].T
 	p=-R@H[:3,-1]

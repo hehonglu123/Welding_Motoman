@@ -493,17 +493,19 @@ class positioner_obj(object):
 		# 					np.linspace([-q[0],q[1]-np.pi-100*2*np.pi],[-q[0],q[1]-np.pi+100*2*np.pi],num=201)])
 
 		###extended 4pi solution stack
-		solutions=np.vstack([np.linspace([q[0],q[1]-2*2*np.pi],[q[0],q[1]+2*2*np.pi],num=5),\
-							np.linspace([-q[0],q[1]-np.pi-2*2*np.pi],[-q[0],q[1]-np.pi+2*2*np.pi],num=5)])
-		# solutions=[q]
-		# if q[1]+2*np.pi<self.upper_limit[1]:
-		# 	solutions.append([q[0],q[1]+2*np.pi])
-		# if q[1]+np.pi<self.upper_limit[1]:
-		# 	solutions.append([-q[0],q[1]+np.pi])
-		# if q[1]-np.pi>self.lower_limit[1]:
-		# 	solutions.append([-q[0],q[1]-np.pi])
-		# if q[1]-2*np.pi>self.lower_limit[1]:
-		# 	solutions.append([q[0],q[1]-2*np.pi])
+		# solutions=np.vstack([np.linspace([q[0],q[1]-2*2*np.pi],[q[0],q[1]+2*2*np.pi],num=5),\
+		# 					np.linspace([-q[0],q[1]-np.pi-2*2*np.pi],[-q[0],q[1]-np.pi+2*2*np.pi],num=5)])
+
+		###regular solution stack
+		solutions=[q]
+		if q[1]+2*np.pi<self.upper_limit[1]:
+			solutions.append([q[0],q[1]+2*np.pi])
+		if q[1]+np.pi<self.upper_limit[1]:
+			solutions.append([-q[0],q[1]+np.pi])
+		if q[1]-np.pi>self.lower_limit[1]:
+			solutions.append([-q[0],q[1]-np.pi])
+		if q[1]-2*np.pi>self.lower_limit[1]:
+			solutions.append([q[0],q[1]-2*np.pi])
 		
 		return np.array(solutions)
 	

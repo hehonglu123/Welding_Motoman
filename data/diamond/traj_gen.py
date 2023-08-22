@@ -21,6 +21,8 @@ def parametrize_hexagon(r,point_space=1):
     hex3=[]
     hex4=[]
     hex5=[]
+    
+    
 
     for i in range(num_points):
         if i*point_space>5*r:

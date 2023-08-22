@@ -16,13 +16,15 @@ fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
 curve_dense=[]
 ###BASE LAYER
 radius_outter = radii_coeff*z_offset**(1/4)
-num_circle=int(np.ceil(radius_outter/line_resolution))
-radii=np.linspace(line_resolution/2,radius_outter,num_circle)
+num_circle=int(radius_outter/line_resolution)
+radii=np.linspace(line_resolution,radius_outter,num_circle)
 slice0=[]
 section_num=0
 for r in radii:
 	diameter=2*np.pi*r
 	num_points=int(np.floor(diameter/point_distance))
+	if num_points<4:
+		continue
 	theta = np.linspace(0, 2 * np.pi, num_points)
 
 	section=np.vstack((r * np.cos(theta),r * np.sin(theta),np.zeros(num_points),np.zeros(num_points),np.zeros(num_points),-np.ones(num_points))).T

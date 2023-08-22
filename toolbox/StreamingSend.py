@@ -47,11 +47,11 @@ class StreamingSend(object):
 		return float(robot_state.ts['microseconds'])/1e6, robot_state.joint_position
 
 
-	def jog2q(self,qd):
+	def jog2q(self,qd,point_distance=0.2):
 		###JOG TO starting pose first
 		res, robot_state, _ = self.RR_robot_state.TryGetInValue()
 		q_cur=robot_state.joint_position
-		num_points_jogging=self.streaming_rate*np.max(np.abs(q_cur-qd))/0.2
+		num_points_jogging=self.streaming_rate*np.max(np.abs(q_cur-qd))/point_distance
 
 
 		for j in range(int(num_points_jogging)):
