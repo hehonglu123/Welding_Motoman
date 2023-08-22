@@ -7,6 +7,21 @@ from dx200_motion_program_exec_client import *
 from WeldSend import *
 from RobotRaconteur.Client import *
 
+def warp_traj(rob1_js,rob2_js,positioner_js,rob1_js_x,rob2_js_x,positioner_js_x,reversed=False):
+	if positioner_js_x.shape==(2,) and rob1_js_x.shape==(6,):
+		return rob1_js,rob2_js,positioner_js
+	traj_length_x_half=int(len(rob1_js_x)/2)
+	traj_length_half=int(len(rob1_js)/2)
+	if reversed:
+		rob1_js[:traj_length_half]=spiralize(rob1_js[:traj_length_half],rob1_js_x[:traj_length_x_half],reversed)
+		rob2_js[:traj_length_half]=spiralize(rob2_js[:traj_length_half],rob2_js_x[:traj_length_x_half],reversed)
+		positioner_js[:traj_length_half]=spiralize(positioner_js[:traj_length_half],positioner_js_x[:traj_length_x_half],reversed)
+	else:
+		rob1_js[traj_length_half:]=spiralize(rob1_js[traj_length_half:],rob1_js_x[traj_length_x_half:],reversed)
+		rob2_js[traj_length_half:]=spiralize(rob2_js[traj_length_half:],rob2_js_x[traj_length_x_half:],reversed)
+		positioner_js[traj_length_half:]=spiralize(positioner_js[traj_length_half:],positioner_js_x[traj_length_x_half:],reversed)
+	return rob1_js,rob2_js,positioner_js
+	
 timestamp=[]
 voltage=[]
 current=[]
@@ -52,7 +67,7 @@ ws=WeldSend(client)
 
 ###########################################layer welding############################################
 vd_relative=4
-layer_start=35
+layer_start=1
 layers2weld=5
 layer_counts=layer_start
 num_layer_start=int(layer_start*layer_height_num)	###modify layer num here
@@ -126,7 +141,7 @@ for layer in range(num_layer_start,num_layer_end,layer_height_num):
 			primitives.append('movel')
 
 
-		timestamp_robot,joint_recording,job_line,_=ws.weld_segment_dual(primitives,robot,positioner,q1_all,q2_all,v1_all,v2_all,cond_all=[200],arc=True)
+		timestamp_robot,joint_recording,job_line,_=ws.weld_segment_dual(primitives,robot,positioner,q1_all,q2_all,v1_all,v2_all,cond_all=[200],arc=False)
 
 
 	layer_counts+=1

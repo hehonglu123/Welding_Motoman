@@ -87,8 +87,10 @@ def main():
         
         hex_all,_=parametrize_hexagon(r,1)
         ###get rid of duplicates
-        hex_comb,indices=np.unique(np.vstack(hex_all),axis=0,return_index=True)
-        base_layer_x_section=np.hstack((hex_comb[np.argsort(indices)],[[0,0,0,-1]]*len(hex_comb)))
+        hex_comb=np.vstack(hex_all)
+        indices=np.unique(hex_comb,axis=0,return_index=True)[1]
+        hex_comb=[hex_comb[index] for index in sorted(indices)]
+        base_layer_x_section=np.hstack((hex_comb,[[0,0,0,-1]]*len(hex_comb)))
 
         for hex in hex_all:
             if len(hex)==0:
@@ -101,8 +103,8 @@ def main():
     curve_dense.append(base_layer)
 
     ###other layers
-    z+=z_inc1
-    r=r_init+slope1*z
+    # z+=z_inc1
+    # r=r_init+slope1*z
     while z<z_end:
         hex_all,hex_all_normal=parametrize_hexagon(r,1)
 
@@ -124,12 +126,13 @@ def main():
                 angle=angle2
 
         if r<10:    ###tip overhang, connect all sections
-            hex_comb,indices=np.unique(np.vstack(hex_all),axis=0,return_index=True)
-            ith_layer=[np.hstack((hex_comb[np.argsort(indices)],[[z,0,0,-1]]*len(hex_comb)))]
+            hex_comb=np.vstack(hex_all)
+            indices=np.unique(hex_comb,axis=0,return_index=True)[1]
+            hex_comb=[hex_comb[index] for index in sorted(indices)]
+            ith_layer=[np.hstack((hex_comb,[[z,0,0,-1]]*len(hex_comb)))]
 
             ax.plot3D(ith_layer[0][::vis_step,0],ith_layer[0][::vis_step,1],ith_layer[0][::vis_step,2],'b.-')
             ax.quiver(ith_layer[0][::vis_step,0],ith_layer[0][::vis_step,1],ith_layer[0][::vis_step,2],ith_layer[0][::vis_step,3],ith_layer[0][::vis_step,4],ith_layer[0][::vis_step,5],length=5, normalize=True)
-
 
         else:
             ith_layer=[]
@@ -148,8 +151,12 @@ def main():
                 ax.quiver(hex_section[::vis_step,0],hex_section[::vis_step,1],hex_section[::vis_step,2],hex_section[::vis_step,3],hex_section[::vis_step,4],hex_section[::vis_step,5],length=5, normalize=True)
 
                 ith_layer.extend(hex_section)
-            ith_layer=[np.vstack(ith_layer)]
-
+            
+            ith_layer=np.vstack(ith_layer)
+            ###get rid of duplicates
+            temp=np.delete(ith_layer[1:],np.diff(calc_lam_cs(ith_layer[:,:3]))==0,axis=0)
+            ith_layer=[np.vstack((ith_layer[0],temp))]
+        
         curve_dense.append(ith_layer)
     plt.show()
 

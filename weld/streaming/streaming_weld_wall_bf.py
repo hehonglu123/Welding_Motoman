@@ -69,7 +69,7 @@ def new_frame(pipe_ep):
 
 		#Convert the packet to an image and set the global variable
 		flir_logging.append(display_mat)
-		flir_ts.append(rr_img.image_info.data_header.ts.seconds+1e-9*rr_img.image_info.data_header.ts.nanoseconds)
+		flir_ts.append(rr_img.image_info.data_header.ts['seconds']+rr_img.image_info.data_header.ts['nanoseconds']*1e-9)
 flir=RRN.ConnectService('rr+tcp://192.168.55.10:60827/?service=camera')
 flir.setf_param("focus_pos", RR.VarValue(int(1900),"int32"))
 flir.setf_param("object_distance", RR.VarValue(0.4,"double"))

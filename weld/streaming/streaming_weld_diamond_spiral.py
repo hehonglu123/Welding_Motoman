@@ -68,7 +68,7 @@ def new_frame(pipe_ep):
 
 		#Convert the packet to an image and set the global variable
 		flir_logging.append(display_mat)
-		flir_ts.append(time.time())
+		flir_ts.append(rr_img.image_info.data_header.ts['seconds']+rr_img.image_info.data_header.ts['nanoseconds']*1e-9)
 
 
 dataset='diamond/'
@@ -257,7 +257,7 @@ while slice_num<13:
 	###find closest %2pi
 	num2p=np.round((q14[-2:]-positioner_js[0])/(2*np.pi))
 	positioner_js+=num2p*2*np.pi
-		
+
 	curve_js_all_dense=interp1d(lam_relative_all_slices[slice_num],np.hstack((rob1_js,rob2_js,positioner_js)),kind='cubic',axis=0)(lam_relative_dense_all_slices[slice_num])
 	breakpoints=SS.get_breakpoints(lam_relative_dense_all_slices[slice_num],vd_relative)
 
@@ -348,4 +348,7 @@ while slice_num<13:
 	except:
 		traceback.print_exc()
 		fronius_client.stop_weld()
+
+
+
 fronius_client.stop_weld()
