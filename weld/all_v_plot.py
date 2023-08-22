@@ -168,7 +168,7 @@ for dataset in datasets:
         profile_height=np.delete(profile_height,np.where(profile_height[:,0]<x_lower),axis=0)
 
         all_profile_height.append(profile_height)
-        all_layer = list(range(1,47))
+        all_layer = list(range(1,23))
         
         h_std_thres=0.48
         h_std = np.std(profile_height[:,1])

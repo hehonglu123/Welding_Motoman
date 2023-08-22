@@ -27,7 +27,7 @@ def plot_spectrum(samples, fs):
 y, sr = librosa.load("../data/wall_weld_test/moveL_100_repeat_weld_scan_2023_08_02_17_07_02/layer_10/mic_recording.wav", sr=None)
 
 # 剪切前3秒
-start_sample = int(4.5 * sr)
+start_sample = int(6 * sr)
 y = y[start_sample:]
 
 # 剪切最后1秒
