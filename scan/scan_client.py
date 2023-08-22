@@ -2,15 +2,13 @@ import sys
 sys.path.append('../toolbox/')
 from robot_def import *
 from dx200_motion_program_exec_client import *
-from MotionSendMotoman import *
 
 from RobotRaconteur.Client import *
-import cv2
 import matplotlib.pyplot as plt
 import time
 
-robot=robot_obj('MA_1440_A0',def_path='../config/MA_1440_A0_robot_default_config.yml',tool_file_path='../config/scanner_tcp2.csv',\
-	pulse2deg_file_path='../config/MA_1440_A0_pulse2deg.csv')
+robot=robot_obj('MA1440_A0',def_path='../config/MA1440_A0_robot_default_config.yml',tool_file_path='../config/scanner_tcp2.csv',\
+	pulse2deg_file_path='../config/MA1440_A0_pulse2deg_real.csv')
 q1=np.radians([31.1143,57.8258,10.2037,-0.4206,35.1934,-29.7721])
 q2=np.radians([38.7598,59.7069,18.4387,-45.9732,34.4456,29.4706])
 q3=np.radians([47.5995,59.7092,18.4380,-45.9742,46.3366,57.3870])

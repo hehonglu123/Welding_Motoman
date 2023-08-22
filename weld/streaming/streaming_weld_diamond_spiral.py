@@ -14,12 +14,16 @@ from StreamingSend import *
 def warp_traj(rob1_js,rob2_js,positioner_js,rob1_js_x,rob2_js_x,positioner_js_x,reversed=False):
 	if positioner_js_x.shape==(2,) and rob1_js_x.shape==(6,):
 		return rob1_js,rob2_js,positioner_js
-	traj_length_x_half=int(len(rob1_js_x/2))
+	traj_length_x_half=int(len(rob1_js_x)/2)
 	traj_length_half=int(len(rob1_js)/2)
-	rob1_js[:traj_length_half]=spiralize(rob1_js[:traj_length_half],rob1_js_x[:traj_length_x_half],reversed)
-	rob2_js[:traj_length_half]=spiralize(rob2_js[:traj_length_half],rob2_js_x[:traj_length_x_half],reversed)
-	positioner_js[:traj_length_half]=spiralize(positioner_js[:traj_length_half],positioner_js_x[:traj_length_x_half],reversed)
-
+	if reversed:
+		rob1_js[:traj_length_half]=spiralize(rob1_js[:traj_length_half],rob1_js_x[:traj_length_x_half],reversed)
+		rob2_js[:traj_length_half]=spiralize(rob2_js[:traj_length_half],rob2_js_x[:traj_length_x_half],reversed)
+		positioner_js[:traj_length_half]=spiralize(positioner_js[:traj_length_half],positioner_js_x[:traj_length_x_half],reversed)
+	else:
+		rob1_js[traj_length_half:]=spiralize(rob1_js[traj_length_half:],rob1_js_x[traj_length_x_half:],reversed)
+		rob2_js[traj_length_half:]=spiralize(rob2_js[traj_length_half:],rob2_js_x[traj_length_x_half:],reversed)
+		positioner_js[traj_length_half:]=spiralize(positioner_js[traj_length_half:],positioner_js_x[traj_length_x_half:],reversed)
 	return rob1_js,rob2_js,positioner_js
 
 
@@ -130,7 +134,6 @@ fronius_client = fronius_sub.GetDefaultClientWait(1)      #connect, timeout=30s
 welder_state_sub=fronius_sub.SubscribeWire("welder_state")
 welder_state_sub.WireValueChanged += wire_cb
 hflags_const = RRN.GetConstants("experimental.fronius", fronius_client)["WelderStateHighFlags"]
-fronius_client.job_number = int(feedrate_cmd/10)+200
 fronius_client.prepare_welder()
 ########################################################RR STREAMING########################################################
 
@@ -153,97 +156,110 @@ SS=StreamingSend(RR_robot,RR_robot_state,RobotJointCommand,streaming_rate)
 
 ###set up control parameters
 job_offset=200
-nominal_feedrate=300
+nominal_feedrate=210
 nominal_vd_relative=0.5
 nominal_wire_length=25 #pixels
 nominal_temp_below=500
 base_feedrate_cmd=270
-base_vd=2
+base_vd=5
 feedrate_cmd=nominal_feedrate
 vd_relative=nominal_vd_relative
 feedrate_gain=0.5
 feedrate_min=60
 feedrate_max=300
-nominal_slice_increment=int(1.5/slicing_meta['line_resolution'])
+nominal_slice_increment=int(1.8/slicing_meta['line_resolution'])
 slice_inc_gain=3.
 
 ###########################################layer welding############################################
 
 res, robot_state, _ = RR_robot_state.TryGetInValue()
-q_prev=robot_state.joint_position[-2:]
+q14=robot_state.joint_position
 # q_prev=np.array([9.53E-02,-2.71E+00])	###for motosim tests only
 
 welding_started=False
 ######################################################BASE LAYER##########################################################################################
-slice_num=0
-num_sections=len(glob.glob(data_dir+'curve_sliced_relative/slice'+str(slice_num)+'_*.csv'))
-for x in range(0,num_sections,layer_width_num):
-	rob1_js=np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(slice_num)+'_'+str(x)+'.csv',delimiter=',')
-	rob2_js=np.loadtxt(data_dir+'curve_sliced_js/MA1440_js'+str(slice_num)+'_'+str(x)+'.csv',delimiter=',')
-	positioner_js=np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(slice_num)+'_'+str(x)+'.csv',delimiter=',')
-	traj_length=len(rob1_js)
-	curve_sliced_relative=np.loadtxt(data_dir+'curve_sliced_relative/slice'+str(slice_num)+'_'+str(x)+'.csv',delimiter=',')
-	if positioner_js.shape==(2,) and rob1_js.shape==(6,):
-		continue
-	rob1_js_prev=np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(slice_num)+'_'+str(x-layer_width_num)+'.csv',delimiter=',')
-	rob2_js_prev=np.loadtxt(data_dir+'curve_sliced_js/MA1440_js'+str(slice_num)+'_'+str(x-layer_width_num)+'.csv',delimiter=',')
-	positioner_js_prev=np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(slice_num)+'_'+str(x-layer_width_num)+'.csv',delimiter=',')
-	rob1_js,rob2_js,positioner_js=warp_traj(rob1_js,rob2_js,positioner_js,rob1_js_prev,rob2_js_prev,positioner_js_prev,reversed=True)
-	if x<num_sections-layer_width_num:
-		rob1_js_next=np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(slice_num)+'_'+str(x+layer_width_num)+'.csv',delimiter=',')
-		rob2_js_next=np.loadtxt(data_dir+'curve_sliced_js/MA1440_js'+str(slice_num)+'_'+str(x+layer_width_num)+'.csv',delimiter=',')
-		positioner_js_next=np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(slice_num)+'_'+str(x+layer_width_num)+'.csv',delimiter=',')
-		rob1_js,rob2_js,positioner_js=warp_traj(rob1_js,rob2_js,positioner_js,rob1_js_next,rob2_js_next,positioner_js_next,reversed=False)
-	lam_relative=calc_lam_cs(curve_sliced_relative)
-	lam_relative_dense=np.linspace(0,lam_relative[-1],num=int(lam_relative[-1]/point_distance))
-	curve_js_all_dense=interp1d(lam_relative,np.hstack((rob1_js,rob2_js,positioner_js)),kind='cubic',axis=0)(lam_relative_dense)
-	breakpoints=SS.get_breakpoints(lam_relative_dense,vd_relative)
+# slice_num=0
+# num_sections=len(glob.glob(data_dir+'curve_sliced_relative/slice'+str(slice_num)+'_*.csv'))
+# for x in range(0,num_sections,layer_width_num):
+# 	rob1_js=np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(slice_num)+'_'+str(x)+'.csv',delimiter=',')
+# 	rob2_js=np.loadtxt(data_dir+'curve_sliced_js/MA1440_js'+str(slice_num)+'_'+str(x)+'.csv',delimiter=',')
+# 	positioner_js=np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(slice_num)+'_'+str(x)+'.csv',delimiter=',')
+# 	curve_sliced_relative=np.loadtxt(data_dir+'curve_sliced_relative/slice'+str(slice_num)+'_'+str(x)+'.csv',delimiter=',')
+# 	if positioner_js.shape==(2,) and rob1_js.shape==(6,):
+# 		continue
+# 	if x>0:
+# 		rob1_js_prev=np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(slice_num)+'_'+str(x-layer_width_num)+'.csv',delimiter=',')
+# 		rob2_js_prev=np.loadtxt(data_dir+'curve_sliced_js/MA1440_js'+str(slice_num)+'_'+str(x-layer_width_num)+'.csv',delimiter=',')
+# 		positioner_js_prev=np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(slice_num)+'_'+str(x-layer_width_num)+'.csv',delimiter=',')
+# 		rob1_js,rob2_js,positioner_js=warp_traj(rob1_js,rob2_js,positioner_js,rob1_js_prev,rob2_js_prev,positioner_js_prev,reversed=True)
+# 		if x<num_sections-layer_width_num:
+# 			rob1_js_next=np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(slice_num)+'_'+str(x+layer_width_num)+'.csv',delimiter=',')
+# 			rob2_js_next=np.loadtxt(data_dir+'curve_sliced_js/MA1440_js'+str(slice_num)+'_'+str(x+layer_width_num)+'.csv',delimiter=',')
+# 			positioner_js_next=np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(slice_num)+'_'+str(x+layer_width_num)+'.csv',delimiter=',')
+# 			rob1_js,rob2_js,positioner_js=warp_traj(rob1_js,rob2_js,positioner_js,rob1_js_next,rob2_js_next,positioner_js_next,reversed=False)
+	
+# 	###find closest %2pi
+# 	num2p=np.round((q14[-2:]-positioner_js[0])/(2*np.pi))
+# 	positioner_js+=num2p*2*np.pi
 
-	fronius_client.job_number = int(base_feedrate_cmd/10)+job_offset
-	fronius_client.start_weld()
-	SS.traj_streaming(curve_js_all_dense[breakpoints],ctrl_joints=np.ones(14))
-	fronius_client.stop_weld()
-######################################################LAYER##########################################################################################
+# 	lam_relative=calc_lam_cs(curve_sliced_relative)
+# 	lam_relative_dense=np.linspace(0,lam_relative[-1],num=int(lam_relative[-1]/point_distance))
+# 	curve_js_all_dense=interp1d(lam_relative,np.hstack((rob1_js,rob2_js,positioner_js)),kind='cubic',axis=0)(lam_relative_dense)
+# 	breakpoints=SS.get_breakpoints(lam_relative_dense,base_vd)
+
+# 	###start welding at the first layer, then non-stop
+# 	fronius_client.job_number = int(base_feedrate_cmd/10)+job_offset
+# 	if not welding_started:
+# 		SS.jog2q(curve_js_all_dense[breakpoints[0]])
+# 		welding_started=True
+# 		fronius_client.start_weld()
+# 	SS.traj_streaming(curve_js_all_dense[breakpoints],ctrl_joints=np.ones(14))
+
+# fronius_client.stop_weld()
+######################################################LAYER WELDING##########################################################################################
+####PRELOAD ALL SLICES TO SAVE INPROCESS TIME
+rob1_js_all_slices=[]
+rob2_js_all_slices=[]
+positioner_js_all_slices=[]
+lam_relative_all_slices=[]
+lam_relative_dense_all_slices=[]
+for i in range(0,slicing_meta['num_layers']-1):
+	rob1_js_all_slices.append(np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(i)+'_0.csv',delimiter=','))
+	rob2_js_all_slices.append(np.loadtxt(data_dir+'curve_sliced_js/MA1440_js'+str(i)+'_0.csv',delimiter=','))
+	positioner_js_all_slices.append(np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(i)+'_0.csv',delimiter=','))
+	curve_sliced_relative=np.loadtxt(data_dir+'curve_sliced_relative/slice'+str(i)+'_0.csv',delimiter=',')
+	lam_relative=calc_lam_cs(curve_sliced_relative)
+	lam_relative_all_slices.append(lam_relative)
+	lam_relative_dense_all_slices.append(np.linspace(0,lam_relative[-1],num=int(lam_relative[-1]/point_distance)))
 
 slice_num=1
 # while slice_num<slicing_meta['num_layers']:
 while slice_num<13:
-	num_sections_prev=num_sections
-	num_sections=len(glob.glob(data_dir+'curve_sliced_relative/slice'+str(slice_num)+'_*.csv'))
-
-	####################DETERMINE CURVE ORDER##############################################
 	x=0
 	
-	rob1_js=np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(slice_num)+'_'+str(x)+'.csv',delimiter=',')
-	rob2_js=np.loadtxt(data_dir+'curve_sliced_js/MA1440_js'+str(slice_num)+'_'+str(x)+'.csv',delimiter=',')
-	positioner_js=np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(slice_num)+'_'+str(x)+'.csv',delimiter=',')
-	traj_length=len(rob1_js)
-	curve_sliced_relative=np.loadtxt(data_dir+'curve_sliced_relative/slice'+str(slice_num)+'_'+str(x)+'.csv',delimiter=',')
+	rob1_js=copy.deepcopy(rob1_js_all_slices[slice_num])
+	rob2_js=copy.deepcopy(rob2_js_all_slices[slice_num])
+	positioner_js=copy.deepcopy(positioner_js_all_slices[slice_num])
 	if positioner_js.shape==(2,) and rob1_js.shape==(6,):
 		continue
 	
 	###TRJAECTORY WARPING
-	if slice_num>1:
-		rob1_js_prev=np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(slice_num-layer_height_num)+'_'+str(x)+'.csv',delimiter=',')
-		rob2_js_prev=np.loadtxt(data_dir+'curve_sliced_js/MA1440_js'+str(slice_num-layer_height_num)+'_'+str(x)+'.csv',delimiter=',')
-		positioner_js_prev=np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(slice_num-layer_height_num)+'_'+str(x)+'.csv',delimiter=',')
+	if slice_num>10:
+		rob1_js_prev=copy.deepcopy(rob1_js_all_slices[slice_num-layer_height_num])
+		rob2_js_prev=copy.deepcopy(rob2_js_all_slices[slice_num-layer_height_num])
+		positioner_js_prev=copy.deepcopy(positioner_js_all_slices[slice_num-layer_height_num])
 		rob1_js,rob2_js,positioner_js=warp_traj(rob1_js,rob2_js,positioner_js,rob1_js_prev,rob2_js_prev,positioner_js_prev,reversed=True)
 	if slice_num<slicing_meta['num_layers']-layer_height_num:
-		rob1_js_next=np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(slice_num+layer_height_num)+'_'+str(x)+'.csv',delimiter=',')
-		rob2_js_next=np.loadtxt(data_dir+'curve_sliced_js/MA1440_js'+str(slice_num+layer_height_num)+'_'+str(x)+'.csv',delimiter=',')
-		positioner_js_next=np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(slice_num+layer_height_num)+'_'+str(x)+'.csv',delimiter=',')
+		rob1_js_next=copy.deepcopy(rob1_js_all_slices[slice_num+layer_height_num])
+		rob2_js_next=copy.deepcopy(rob2_js_all_slices[slice_num+layer_height_num])
+		positioner_js_next=copy.deepcopy(positioner_js_all_slices[slice_num+layer_height_num])
 		rob1_js,rob2_js,positioner_js=warp_traj(rob1_js,rob2_js,positioner_js,rob1_js_next,rob2_js_next,positioner_js_next,reversed=False)
-			
 	###find closest %2pi
-	num2p=np.round((q_prev-positioner_js[0])/(2*np.pi))
+	num2p=np.round((q14[-2:]-positioner_js[0])/(2*np.pi))
 	positioner_js+=num2p*2*np.pi
 		
-	lam_relative=calc_lam_cs(curve_sliced_relative)
-	lam_relative_dense=np.linspace(0,lam_relative[-1],num=int(lam_relative[-1]/point_distance))
-	curve_js_all_dense=interp1d(lam_relative,np.hstack((rob1_js,rob2_js,positioner_js)),kind='cubic',axis=0)(lam_relative_dense)
-	breakpoints=SS.get_breakpoints(lam_relative_dense,vd_relative)
-
-	q_prev=positioner_js_dense[breakpoints[-1]]
+	curve_js_all_dense=interp1d(lam_relative_all_slices[slice_num],np.hstack((rob1_js,rob2_js,positioner_js)),kind='cubic',axis=0)(lam_relative_dense_all_slices[slice_num])
+	breakpoints=SS.get_breakpoints(lam_relative_dense_all_slices[slice_num],vd_relative)
 
 	###monitoring parameters
 	wire_length=[]
@@ -257,9 +273,15 @@ while slice_num<13:
 	fronius_client.job_number = int(feedrate_cmd/10)+job_offset
 	###start welding at the first layer, then non-stop
 	if not welding_started:
+		#jog above
+		waypoint_pose=robot.fwd(curve_js_all_dense[0,:6])
+		waypoint_pose.p[-1]+=50
+		waypoint_q=robot.inv(waypoint_pose.p,waypoint_pose.R,curve_js_all_dense[breakpoints[0],:6])[0]
+		SS.jog2q(np.hstack((waypoint_q,curve_js_all_dense[0,6:])))
 		SS.jog2q(curve_js_all_dense[breakpoints[0]])
 		welding_started=True
 		fronius_client.start_weld()
+		time.sleep(0.2)
 	
 	try:
 		for bp_idx in range(len(breakpoints)):
@@ -287,37 +309,43 @@ while slice_num<13:
 				robot_js.append(q14)
 	
 		###LOGGING
-		local_recorded_dir='recorded_data/cup_recording_spiral/'
-		os.makedirs(local_recorded_dir,exist_ok=True)
-		np.savetxt(local_recorded_dir+'slice_%i_%i_joint.csv'%(slice_num,x),np.hstack((np.array(robot_ts)-robot_ts[0].reshape((-1,1)),np.array(robot_js))),delimiter=',')
-		flir_ts_rec=np.array(flir_ts)-flir_ts[0]
-		np.savetxt(local_recorded_dir+'slice_%i_%i_flir_ts.csv'%(slice_num,x),flir_ts_rec,delimiter=',')
-		with open(local_recorded_dir+'slice_%i_%i_flir.pickle'%(slice_num,x), 'wb') as file:
-			pickle.dump(flir_logging, file)
-		first_channel = np.concatenate(audio_recording)
-		first_channel_int16=(first_channel*32767).astype(np.int16)
-		with wave.open(local_recorded_dir+'slice_%i_%i_microphone.wav'%(slice_num,x), 'wb') as wav_file:
-			# Set the WAV file parameters
-			wav_file.setnchannels(channels)
-			wav_file.setsampwidth(2)  # 2 bytes per sample (16-bit)
-			wav_file.setframerate(samplerate)
+		# local_recorded_dir='recorded_data/cup_recording_spiral/'
+		# os.makedirs(local_recorded_dir,exist_ok=True)
+		# np.savetxt(local_recorded_dir+'slice_%i_%i_joint.csv'%(slice_num,x),np.hstack((np.array(robot_ts)-robot_ts[0].reshape((-1,1)),np.array(robot_js))),delimiter=',')
+		# flir_ts_rec=np.array(flir_ts)-flir_ts[0]
+		# np.savetxt(local_recorded_dir+'slice_%i_%i_flir_ts.csv'%(slice_num,x),flir_ts_rec,delimiter=',')
+		# with open(local_recorded_dir+'slice_%i_%i_flir.pickle'%(slice_num,x), 'wb') as file:
+		# 	pickle.dump(flir_logging, file)
+		# first_channel = np.concatenate(audio_recording)
+		# first_channel_int16=(first_channel*32767).astype(np.int16)
+		# with wave.open(local_recorded_dir+'slice_%i_%i_microphone.wav'%(slice_num,x), 'wb') as wav_file:
+		# 	# Set the WAV file parameters
+		# 	wav_file.setnchannels(channels)
+		# 	wav_file.setsampwidth(2)  # 2 bytes per sample (16-bit)
+		# 	wav_file.setframerate(samplerate)
 
-			# Write the audio data to the WAV file
-			wav_file.writeframes(first_channel_int16.tobytes())
+		# 	# Write the audio data to the WAV file
+		# 	wav_file.writeframes(first_channel_int16.tobytes())
 
-		wire_length_avg=np.average(wire_length)
-		temp_below_avg=np.average(temp_below)
-		###proportional feedback
-		# feedrate=min(max(feedrate+1*(nominal_temp_below-temp_below_avg),feedrate_min),feedrate_max)
-		slice_increment=max(nominal_slice_increment+slice_inc_gain*(nominal_wire_length-wire_length_avg),-nominal_slice_increment+2)
-		# vd_relative=feedrate/10-3
-		print('WIRE LENGTH: ',wire_length_avg,'TEMP BELOW: ',temp_below_avg,'FEEDRATE: ',feedrate_cmd,'VD: ',vd_relative,'SLICE INC: ',slice_increment)
-		feedrate_cmd-=10
+		# wire_length_avg=np.average(wire_length)
+		# temp_below_avg=np.average(temp_below)
+		# ###proportional feedback
+		# # feedrate=min(max(feedrate+1*(nominal_temp_below-temp_below_avg),feedrate_min),feedrate_max)
+		# slice_increment=max(nominal_slice_increment+slice_inc_gain*(nominal_wire_length-wire_length_avg),-nominal_slice_increment+2)
+		# # vd_relative=feedrate/10-3
+		
+		
+		
+		
+		feedrate_cmd-=20
 		vd_relative+=1
-		vd_relatve=min(10,vd_relative)
+		vd_relative=min(10,vd_relative)
 		feedrate_cmd=max(feedrate_cmd,100)
-		slice_num+=int(slice_increment)
+		slice_num+=int(nominal_slice_increment)
+		print('FEEDRATE: ',feedrate_cmd,'VD: ',vd_relative)
+
 
 	except:
 		traceback.print_exc()
 		fronius_client.stop_weld()
+fronius_client.stop_weld()
