@@ -36,7 +36,8 @@ def main():
     c1.setf_param("scale_limit_low", RR.VarValue(293.15,"double"))
     c1.setf_param("scale_limit_upper", RR.VarValue(5000,"double"))
 
-    global image_consts
+    global image_consts, ts
+    ts=0
     image_consts = RRN.GetConstants('com.robotraconteur.image', c1)
 
     p=c1.frame_stream.Connect(-1)
@@ -100,8 +101,9 @@ def new_frame(pipe_ep):
             display_mat = mat
 
         #Convert the packet to an image and set the global variable
+        ts=rr_img.image_info.data_header.ts['seconds']+rr_img.image_info.data_header.ts['nanoseconds']*1e-9
         current_mat = display_mat
-        ts=rr_img.image_info.ts.seconds+rr_img.image_info.ts.nanoseconds*1e-9
+        
         
 
 if __name__ == "__main__":

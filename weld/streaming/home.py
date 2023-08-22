@@ -25,4 +25,4 @@ streaming_rate=125.
 point_distance=0.04		###STREAMING POINT INTERPOLATED DISTANCE
 SS=StreamingSend(RR_robot,RR_robot_state,RobotJointCommand,streaming_rate)
 
-SS.jog2q(np.zeros(14),point_distance=0.2)
+SS.jog2q(np.zeros(14),point_distance=1)

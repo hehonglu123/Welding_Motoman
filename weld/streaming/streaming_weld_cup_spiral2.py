@@ -68,7 +68,7 @@ def new_frame(pipe_ep):
 
 		#Convert the packet to an image and set the global variable
 		flir_logging.append(display_mat)
-		flir_ts.append(time.time())
+		flir_ts.append(rr_img.image_info.data_header.ts['seconds']+rr_img.image_info.data_header.ts['nanoseconds']*1e-9)
 
 
 dataset='cup/'
