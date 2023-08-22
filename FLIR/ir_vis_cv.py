@@ -6,10 +6,10 @@ from flir_toolbox import *
 
 
 # Load the IR recording data from the pickle file
-with open('../data/wall_weld_test/moveL_100_repeat_weld_scan_2023_08_02_17_07_02/layer_16/ir_recording.pickle', 'rb') as file:
+with open('../data/wall_weld_test/weld_scan_100ipm_cool_2023_08_10_11_28_20/layer_2/ir_recording.pickle', 'rb') as file:
     ir_recording = pickle.load(file)
 
-ir_ts=np.loadtxt('../data/wall_weld_test/moveL_100_repeat_weld_scan_2023_08_02_17_07_02/layer_16/ir_stamps.csv', delimiter=',')
+ir_ts=np.loadtxt('../data/wall_weld_test/weld_scan_100ipm_cool_2023_08_10_11_28_20/layer_2/ir_stamps.csv', delimiter=',')
 
 
 result = cv2.VideoWriter('output.avi', 

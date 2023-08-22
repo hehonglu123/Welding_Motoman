@@ -4,7 +4,7 @@ import pickle, sys
 sys.path.append('../toolbox/')
 from flir_toolbox import *
 
-with open('../data/wall_weld_test/moveL_100_repeat_weld_scan_2023_08_02_17_07_02/layer_16/ir_recording.pickle', 'rb') as file:
+with open('../data/wall_weld_test/weld_scan_100ipm_cool_2023_08_10_11_28_20/layer_1/ir_recording.pickle', 'rb') as file:
     ir_recording = pickle.load(file)
 freq=13
 
@@ -16,5 +16,5 @@ for i in range(len(ir_recording)):
     temp[temp > 1300] = 1300
     plt.imshow(temp, cmap='inferno', aspect='auto')
     plt.colorbar(format='%.2f')
-    plt.pause(1/freq)
+    plt.pause(0.001)
     plt.clf()

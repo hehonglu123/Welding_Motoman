@@ -24,23 +24,29 @@ def plot_spectrum(samples, fs):
     plt.grid()
 
 # 加载音频文件
-y, sr = librosa.load("../data/wall_weld_test/moveL_100_repeat_weld_scan_2023_08_02_17_07_02/layer_10/mic_recording.wav", sr=None)
+original_path = "../data/wall_weld_test/moveL_100_repeat_weld_scan_2023_08_02_17_07_02/layer_1/mic_recording_filter.wav"
+# 使用librosa加载音频文件
+y, sr = librosa.load(original_path, sr=None)
 
-# 剪切前3秒
-start_sample = int(6 * sr)
-y = y[start_sample:]
+# 基于采样率计算需要裁剪的样本数
+start_samples = 4 * sr
+end_samples = sr  # 最后一秒
 
-# 剪切最后1秒
-end_sample = -1 * sr
-y = y[:end_sample]
+# 使用数组切片来裁剪音频
+y_cut = y[start_samples:-end_samples]
+
+# 获取原始文件的目录，并在此基础上创建输出路径
+output_path = os.path.join(os.path.dirname(original_path), "mic_recording_cut.wav")
+sf.write(output_path, y_cut, sr)
 
 # 保存处理后的音频
-filepath = "../data/wall_weld_test/moveL_100_repeat_weld_scan_2023_08_02_17_07_02/layer_10/mic_recording_cut.wav"
-y, sr = sf.read(filepath)
+filepath = "../data/wall_weld_test/moveL_100_repeat_weld_scan_2023_08_02_17_07_02/layer_1/mic_recording_cut.wav"
+
+# y, sr = sf.read(filepath)
 # 获取文件所在的路径
 audio_directory = os.path.dirname(filepath)
 
-with wave.open("../data/wall_weld_test/moveL_100_repeat_weld_scan_2023_08_02_17_07_02/layer_10/mic_recording_cut.wav", "rb") as wf:
+with wave.open("../data/wall_weld_test/moveL_100_repeat_weld_scan_2023_08_02_17_07_02/layer_1/mic_recording_cut.wav", "rb") as wf:
     n_samples = wf.getnframes()
     audio_data = wf.readframes(n_samples)
     audio_samples = np.frombuffer(audio_data, dtype=np.int16)
