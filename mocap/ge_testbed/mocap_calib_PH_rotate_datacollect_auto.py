@@ -44,7 +44,14 @@ class CalibRobotPH:
         tp= TPMotionProgram(tool_num=utool_num,uframe_num=uframe_num)
         jtend = jointtarget(robot_group,uframe_num,utool_num,start_p[-1],[0]*6)
         tp.moveJ(jtend,rob_speed,'%',-1)
-        client.execute_motion_program(tp,record_joint=False)
+        tp.setIO('DO',10,False)
+        
+        client.set_ioport('DOUT',10,True)
+        client.execute_motion_program(tp,record_joint=False,non_block=True)
+        while True:
+            io_res=client.read_ioport('DOUT',10)
+            if not io_res:
+                break
         
         for j in range(5,-1,-1): # from axis 6 to axis 1
             
@@ -56,11 +63,17 @@ class CalibRobotPH:
                 tp.moveJ(jt2,rob_speed,'%',-1)
             jtend = jointtarget(robot_group,uframe_num,utool_num,start_p[j],[0]*6)
             tp.moveJ(jtend,rob_speed,'%',-1)
+            tp.setIO('DO',10,False)
 
             input("Press Enter and Start Rotating Joint "+str(j+1))
             self.mpl_obj.run_pose_listener()
             print("The robot is moving. Please wait")
-            client.execute_motion_program(tp,record_joint=False)
+            client.set_ioport('DOUT',10,True)
+            client.execute_motion_program(tp,record_joint=False,non_block=True)
+            while True:
+                io_res=client.read_ioport('DOUT',10)
+                if not io_res:
+                    break
             self.mpl_obj.stop_pose_listener()
             curve_p,curve_R,timestamps,curve_cond = self.mpl_obj.get_frames_traj_cond()
 
@@ -81,7 +94,7 @@ class CalibRobotPH:
         client.execute_motion_program(tp,record_joint=False)
         print("Reading Zero Config")
         self.mpl_obj.run_pose_listener()
-        curve_exe = client.get_joint_angle(read_N=10)
+        curve_exe = client.get_joint_angle(read_N=3)
         self.mpl_obj.stop_pose_listener()
         curve_p,curve_R,timestamps,curve_cond = self.mpl_obj.get_frames_traj_cond()
         
