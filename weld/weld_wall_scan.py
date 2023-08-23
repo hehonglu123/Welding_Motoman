@@ -62,7 +62,7 @@ config_dir='../config/'
 robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',d=15,tool_file_path=config_dir+'torch.csv',\
     pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',\
     base_marker_config_file=config_dir+'MA2010_marker_config.yaml',tool_marker_config_file=config_dir+'weldgun_marker_config.yaml')
-robot_scan=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.yml',tool_file_path=config_dir+'mti_backup0719.csv',\
+robot_scan=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.yml',tool_file_path=config_dir+'mti_backup.csv',\
     base_transformation_file=config_dir+'MA1440_pose.csv',pulse2deg_file_path=config_dir+'MA1440_A0_pulse2deg_real.csv',\
     base_marker_config_file=config_dir+'MA1440_marker_config.yaml')
 positioner=positioner_obj('D500B',def_path=config_dir+'D500B_robot_default_config.yml',tool_file_path=config_dir+'positioner_tcp.csv',\
@@ -108,15 +108,15 @@ to_home_speed=5
 
 save_weld_record=True
 
-start_correction_layer=2
-# start_correction_layer=99999999
+# start_correction_layer=2
+start_correction_layer=99999999
 
 current_time = datetime.datetime.now()
 formatted_time = current_time.strftime('%Y_%m_%d_%H_%M_%S.%f')[:-7]
 data_dir='../data/wall_weld_test/weld_scan_'+formatted_time+'/'
 
 ### read cmd
-use_previous_cmd=True
+use_previous_cmd=False
 cmd_dir = '../data/wall_weld_test/'+'moveL_100_weld_scan_2023_08_02_15_17_25/'
 
 ## rr drivers and all other drivers
@@ -129,7 +129,7 @@ mic_ser = RRN.ConnectService('rr+tcp://192.168.55.20:60828?service=microphone')
 ## RR sensor objects
 rr_sensors = WeldRRSensor(weld_service=weld_ser,cam_service=cam_ser,microphone_service=mic_ser)
 
-### test sensor (camera, microphone)
+# ## test sensor (camera, microphone)
 # print("Test 3 Sec.")
 # rr_sensors.test_all_sensors()
 # print(len(rr_sensors.ir_recording))
@@ -165,7 +165,7 @@ input("Start?")
 # move robot to ready position
 ws.jog_dual(robot_scan,positioner,[r2_mid,r2_ir_q],np.radians([-15,180]),to_start_speed)
 
-for i in range(18,end_layer):
+for i in range(0,end_layer):
     cycle_st = time.time()
     print("==================================")
     print("Layer:",i)
@@ -175,7 +175,7 @@ for i in range(18,end_layer):
         forward_flag = False
     #### welding
     weld_st = time.time()
-    if i>=19 and True:
+    if i>=0 and True:
         weld_plan_st = time.time()
         if i>=2:
             base_layer=False
@@ -320,7 +320,7 @@ for i in range(18,end_layer):
         ######################################################
         ########### Do welding #############
         
-        # input("Press Enter and move to weld starting point.")
+        input("Press Enter and move to weld starting point.")
         ws.jog_single(robot_weld,path_q[0],to_start_speed)
         
         weld_motion_weld_st = time.time()
