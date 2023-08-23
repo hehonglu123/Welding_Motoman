@@ -4,11 +4,24 @@ DEFAULT_GROUP	= 1,*,*,*,*;
 /MN
    1:  R[81]=1 ;
    2:J P[1] 3% FINE ;
-   3:  RUN DATARECORDER ;
-   4:  WAIT   0.50(sec) ;
-   5:  R[81]=0 ;
+   3:J P[2] 3% FINE ;
+   4:J P[3] 3% FINE ;
+   5:DO[10]=OFF ;
+   6:  R[81]=0 ;
 /POS
 P[1]{
+   GP1:
+   UF : 4, UT : 1,
+   J1 = -35.000 deg,  J2 = -32.000 deg,  J3 = -31.000 deg,
+   J4 = 1.600 deg,  J5 = -120.000 deg,  J6 = -33.000 deg
+};
+P[2]{
+   GP1:
+   UF : 4, UT : 1,
+   J1 = -35.000 deg,  J2 = -32.000 deg,  J3 = -31.000 deg,
+   J4 = 1.600 deg,  J5 = 33.000 deg,  J6 = -33.000 deg
+};
+P[3]{
    GP1:
    UF : 4, UT : 1,
    J1 = -35.000 deg,  J2 = -32.000 deg,  J3 = -31.000 deg,
