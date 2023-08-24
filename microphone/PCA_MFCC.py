@@ -7,22 +7,24 @@ from matplotlib.axes import Axes
 from sklearn.decomposition import PCA
 import sys
 
+
+file_path = '../data/wall_weld_test/weld_scan_2023_08_23_15_23_45/layer_1/'
 n=0
 while n < 1:
 # 加载音频文件
-    y, sr = librosa.load(f'../data/wall_weld_test/moveL_100_repeat_weld_scan_2023_08_02_17_07_02/layer_10/mic_recording.wav', sr=None)
+    y, sr = librosa.load(file_path + 'mic_recording.wav', sr=None)
 
     # 计算MFCC
     mfccs = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=13)  # 获取13个MFCC系数
     print("MFCCs shape:", mfccs.shape)  # 此处得到的形状通常为(13, 时间帧数)
-    # plt.figure(figsize=(10, 4))
-    # img = librosa.display.specshow(mfccs, x_axis='time', cmap='viridis')
-    # plt.colorbar(img, label='MFCC Coefficient Value')
-    # plt.ylabel('MFCC Coefficient Index')
-    # plt.xlabel('Time (frames)')
-    # plt.title('MFCCs')
-    # plt.tight_layout()
-    # plt.show()
+    plt.figure(figsize=(10, 4))
+    img = librosa.display.specshow(mfccs, x_axis='time', cmap='viridis')
+    plt.colorbar(img, label='MFCC Coefficient Value')
+    plt.ylabel('MFCC Coefficient Index')
+    plt.xlabel('Time (frames)')
+    plt.title('MFCCs')
+    plt.tight_layout()
+    plt.show()
 
     # 进行PCA分析，以减少维度（例如，从13维减少到2维以便于可视化）
     pca = PCA(n_components=2)

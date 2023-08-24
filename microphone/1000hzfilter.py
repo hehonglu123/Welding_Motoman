@@ -5,8 +5,10 @@ import librosa.display
 import matplotlib.pyplot as plt
 import soundfile as sf
 from scipy.signal import butter, lfilter
+
+file_path = '../data/wall_weld_test/weld_scan_2023_08_23_15_23_45/layer_4/'
 # 加载音频文件
-y, sr = librosa.load("../data/wall_weld_test/moveL_100_repeat_weld_scan_2023_08_02_17_07_02/layer_1/mic_recording.wav", sr=None)
+y, sr = librosa.load(file_path + "mic_recording.wav", sr=None)
 
 # # 设计一个低通滤波器
 # nyquist = 0.5 * sr
@@ -64,19 +66,19 @@ plt.subplot(1, 2, 1)
 librosa.display.specshow(librosa.amplitude_to_db(D_original, ref=np.max),
                          y_axis='log', x_axis='time')
 plt.title('Original Spectrum')
-plt.colorbar()
+# plt.colorbar()
 
 # Filtered Spectrum
 plt.subplot(1, 2, 2)
 librosa.display.specshow(librosa.amplitude_to_db(D_filtered, ref=np.max),
                          y_axis='log', x_axis='time')
 plt.title('Filtered Spectrum')
-plt.colorbar()
+# plt.colorbar()
 
 plt.tight_layout()
 plt.show()
 # 保存处理后的音频
-sf.write("../data/wall_weld_test/moveL_100_repeat_weld_scan_2023_08_02_17_07_02/layer_1/mic_recording_filter.wav", y_highpassed, sr)
+sf.write(file_path + "mic_recording_filter.wav", y_highpassed, sr)
 
 
 # plt.figure(figsize=(10, 4))

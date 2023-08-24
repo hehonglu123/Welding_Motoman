@@ -23,8 +23,9 @@ def plot_spectrum(samples, fs):
     plt.ylabel('Amplitude')
     plt.grid()
 
+file_path = '../data/wall_weld_test/weld_scan_2023_08_23_15_23_45/layer_4/'
 # 加载音频文件
-original_path = "../data/wall_weld_test/moveL_100_repeat_weld_scan_2023_08_02_17_07_02/layer_1/mic_recording_filter.wav"
+original_path = file_path + "mic_recording_filter.wav"
 # 使用librosa加载音频文件
 y, sr = librosa.load(original_path, sr=None)
 
@@ -40,13 +41,13 @@ output_path = os.path.join(os.path.dirname(original_path), "mic_recording_cut.wa
 sf.write(output_path, y_cut, sr)
 
 # 保存处理后的音频
-filepath = "../data/wall_weld_test/moveL_100_repeat_weld_scan_2023_08_02_17_07_02/layer_1/mic_recording_cut.wav"
+filepath = file_path +  "mic_recording_cut.wav"
 
 # y, sr = sf.read(filepath)
 # 获取文件所在的路径
 audio_directory = os.path.dirname(filepath)
 
-with wave.open("../data/wall_weld_test/moveL_100_repeat_weld_scan_2023_08_02_17_07_02/layer_1/mic_recording_cut.wav", "rb") as wf:
+with wave.open(file_path + "mic_recording_cut.wav", "rb") as wf:
     n_samples = wf.getnframes()
     audio_data = wf.readframes(n_samples)
     audio_samples = np.frombuffer(audio_data, dtype=np.int16)
