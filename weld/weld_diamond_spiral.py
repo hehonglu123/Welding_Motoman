@@ -87,8 +87,8 @@ for i in range(0,slicing_meta['num_layers']-1):
 
 
 ######################################################BASE LAYER##########################################################################################
-# base_feedrate_cmd=250
-# base_vd_relative=5
+# base_feedrate_cmd=300
+# base_vd_relative=10
 # slice_num=0
 # num_sections=len(glob.glob(data_dir+'curve_sliced_relative/slice'+str(slice_num)+'_*.csv'))
 # q1_all=[]
@@ -116,9 +116,7 @@ for i in range(0,slicing_meta['num_layers']-1):
 # 			positioner_js_next=np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(slice_num)+'_'+str(x+layer_width_num)+'.csv',delimiter=',')
 # 			rob1_js,rob2_js,positioner_js=warp_traj(rob1_js,rob2_js,positioner_js,rob1_js_next,rob2_js_next,positioner_js_next,reversed=False)
 	
-# 	###find closest %2pi
-# 	num2p=np.round((q_prev-positioner_js[0])/(2*np.pi))
-# 	positioner_js+=num2p*2*np.pi
+	
 
 # 	lam1=calc_lam_js(rob1_js,robot)
 # 	lam2=calc_lam_js(positioner_js,positioner)
@@ -130,6 +128,9 @@ for i in range(0,slicing_meta['num_layers']-1):
    
 # 	s1_all,s2_all=calc_individual_speed(base_vd_relative,lam1,lam2,lam_relative,breakpoints)
 
+# 	###find closest %2pi
+# 	num2p=np.round((q_prev[1]-positioner_js[0,1])/(2*np.pi))
+# 	positioner_js[:,1]=positioner_js[:,1]+num2p*2*np.pi
 # 	if len(q1_all)==0:
 # 		q1_all.extend([rob1_js[breakpoints[0]]])
 # 		q2_all.extend([positioner_js[breakpoints[0]]])
@@ -146,15 +147,15 @@ for i in range(0,slicing_meta['num_layers']-1):
 # 		# v2_all.append(50)
 # 		primitives.extend(['movel'])
 		
-# timestamp_robot,joint_recording,job_line,_=ws.weld_segment_dual(primitives,robot,positioner,q1_all,q2_all,v1_all,v2_all,cond_all=[int(base_feedrate_cmd/10+200)],arc=False)
+# timestamp_robot,joint_recording,job_line,_=ws.weld_segment_dual(primitives,robot,positioner,q1_all,q2_all,v1_all,v2_all,cond_all=[int(base_feedrate_cmd/10+200)],arc=True)
 
 
 
 ###########################################layer welding############################################
 vd_relative=5
-feedrate=150
+feedrate=120
 layer_start=1
-layers2weld=5
+layers2weld=13
 layer_counts=layer_start
 num_layer_start=int(layer_start*layer_height_num)	###modify layer num here
 num_layer_end=int((layer_start+layers2weld)*layer_height_num)
@@ -168,6 +169,9 @@ q2_all=[]
 v1_all=[]
 v2_all=[]
 primitives=[]
+primitives.extend(['movej'])
+v1_all.extend([1])
+v2_all.extend([10])
 for slice_num in range(num_layer_start,num_layer_end,layer_height_num):
 	####################DETERMINE CURVE ORDER##############################################
 	x=0
@@ -189,13 +193,8 @@ for slice_num in range(num_layer_start,num_layer_end,layer_height_num):
    
 	s1_all,s2_all=calc_individual_speed(vd_relative,lam1,lam2,lam_relative,breakpoints)
 
-	###move to intermidieate waypoint for collision avoidance if multiple section
-	if slice_num==1:
-		waypoint_pose=robot.fwd(rob1_js[breakpoints[0]])
-		waypoint_pose.p[-1]+=50
-		q1=robot.inv(waypoint_pose.p,waypoint_pose.R,rob1_js[breakpoints[0]])[0]
-		q2=positioner_js[breakpoints[0]]
-		ws.jog_dual(robot,positioner,q1,q2)
+	###for diamond shape only due to discontinuity at start/end
+	s1_all=np.insert(s1_all,0,3+np.max(s1_all))
 
 	###TRJAECTORY WARPING
 	if slice_num>1:
@@ -209,28 +208,38 @@ for slice_num in range(num_layer_start,num_layer_end,layer_height_num):
 		positioner_js_next=copy.deepcopy(positioner_js_all_slices[slice_num+layer_height_num])
 		rob1_js,rob2_js,positioner_js=warp_traj(rob1_js,rob2_js,positioner_js,rob1_js_next,rob2_js_next,positioner_js_next,reversed=False)
 	###find closest %2pi
-	num2p=np.round((q_prev-positioner_js[0])/(2*np.pi))
-	positioner_js+=num2p*2*np.pi
+	num2p=np.round((q_prev[1]-positioner_js[0,1])/(2*np.pi))
+	positioner_js[:,1]=positioner_js[:,1]+num2p*2*np.pi
+
+	###move to intermidieate waypoint for collision avoidance if multiple section
+	if slice_num==1:
+		waypoint_pose=robot.fwd(rob1_js[breakpoints[0]])
+		waypoint_pose.p[-1]+=50
+		q1=robot.inv(waypoint_pose.p,waypoint_pose.R,rob1_js[breakpoints[0]])[0]
+		q2=positioner_js[breakpoints[0]]
+		ws.jog_dual(robot,positioner,q1,q2)
 
 
-	q1_all.extend([rob1_js[breakpoints[0]]])
-	q2_all.extend([positioner_js[breakpoints[0]]])
-	primitives.extend(['movej'])
-
-	v1_all.extend([1])
-	v2_all.extend([10])
+	if len(q1_all)==0:
+		q1_all.extend([rob1_js[breakpoints[0]]])
+		q2_all.extend([positioner_js[breakpoints[0]]])
+	
 		
-	for j in range(1,len(breakpoints)):
+	for j in range(0,len(breakpoints)):
 		q1_all.extend([rob1_js[breakpoints[j]]])
 		q2_all.extend([positioner_js[breakpoints[j]]])
-		v1_all.extend([max(s1_all[j-1],0.1)])
-		positioner_w=4*vd_relative/np.linalg.norm(curve_sliced_relative[breakpoints[j]][:2])
-		v2_all.extend([min(100,100*positioner_w/positioner.joint_vel_limit[1])])
-		# v2_all.append(50)
+		v1=max(s1_all[j],0.1)
+		if v1>2*vd_relative:
+			v1_all.extend([v1])
+		else:
+			v1_all.extend([v1])
+		# positioner_w=4*vd_relative/np.linalg.norm(curve_sliced_relative[breakpoints[j]][:2])
+		# v2_all.extend([min(100,100*positioner_w/positioner.joint_vel_limit[1])])
+		v2_all.append(100)
 		primitives.extend(['movel'])
 
 	q_prev=positioner_js[-1]
 
-timestamp_robot,joint_recording,job_line,_=ws.weld_segment_dual(primitives,robot,positioner,q1_all,q2_all,v1_all,v2_all,cond_all=[int(feedrate/10+200)],arc=False)
+timestamp_robot,joint_recording,job_line,_=ws.weld_segment_dual(primitives,robot,positioner,q1_all,q2_all,v1_all,v2_all,cond_all=[int(feedrate/10+200)],arc=True)
 
 
