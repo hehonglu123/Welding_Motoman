@@ -199,8 +199,8 @@ welding_started=False
 # 			rob1_js,rob2_js,positioner_js=warp_traj(rob1_js,rob2_js,positioner_js,rob1_js_next,rob2_js_next,positioner_js_next,reversed=False)
 	
 # 	###find closest %2pi
-# 	num2p=np.round((q14[-2:]-positioner_js[0])/(2*np.pi))
-# 	positioner_js+=num2p*2*np.pi
+# 	num2p=np.round((q14[-1]-positioner_js[0,1])/(2*np.pi))
+# 	positioner_js[:,1]=positioner_js[:,1]+num2p*2*np.pi
 
 # 	lam_relative=calc_lam_cs(curve_sliced_relative)
 # 	lam_relative_dense=np.linspace(0,lam_relative[-1],num=int(lam_relative[-1]/point_distance))
@@ -254,8 +254,8 @@ while slice_num<slicing_meta['num_layers']:
 		positioner_js_next=copy.deepcopy(positioner_js_all_slices[slice_num+layer_height_num])
 		rob1_js,rob2_js,positioner_js=warp_traj(rob1_js,rob2_js,positioner_js,rob1_js_next,rob2_js_next,positioner_js_next,reversed=False)
 	###find closest %2pi
-	num2p=np.round((q14[-2:]-positioner_js[0])/(2*np.pi))
-	positioner_js+=num2p*2*np.pi
+	num2p=np.round((q14[-1]-positioner_js[0,1])/(2*np.pi))
+	positioner_js[:,1]=positioner_js[:,1]+num2p*2*np.pi
 		
 	curve_js_all_dense=interp1d(lam_relative_all_slices[slice_num],np.hstack((rob1_js,rob2_js,positioner_js)),kind='cubic',axis=0)(lam_relative_dense_all_slices[slice_num])
 	breakpoints=SS.get_breakpoints(lam_relative_dense_all_slices[slice_num],vd_relative)
