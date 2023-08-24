@@ -153,15 +153,14 @@ for i in range(0,slicing_meta['num_layers']-1):
 
 ###########################################layer welding############################################
 vd_relative=5
-feedrate=120
-layer_start=1
-layers2weld=13
+feedrate=110
+layer_start=14
+layers2weld=21
 layer_counts=layer_start
 num_layer_start=int(layer_start*layer_height_num)	###modify layer num here
 num_layer_end=int((layer_start+layers2weld)*layer_height_num)
 
 q_prev=client.getJointAnglesDB(positioner.pulse2deg)
-print(q_prev)
 # q_prev=np.array([9.53E-02,-2.71E+00])	###for motosim tests only
 
 q1_all=[]
@@ -194,7 +193,11 @@ for slice_num in range(num_layer_start,num_layer_end,layer_height_num):
 	s1_all,s2_all=calc_individual_speed(vd_relative,lam1,lam2,lam_relative,breakpoints)
 
 	###for diamond shape only due to discontinuity at start/end
-	s1_all=np.insert(s1_all,0,3+np.max(s1_all))
+	s1_all=np.insert(s1_all,0,5+np.max(s1_all))
+	breakpoints[-1]=breakpoints[-1]-int((breakpoints[-1]-breakpoints[-2])/2)
+	if len(q1_all)==0:
+		breakpoints[0]=breakpoints[0]+int((breakpoints[1]-breakpoints[0])/2)
+
 
 	###TRJAECTORY WARPING
 	if slice_num>1:
@@ -229,10 +232,7 @@ for slice_num in range(num_layer_start,num_layer_end,layer_height_num):
 		q1_all.extend([rob1_js[breakpoints[j]]])
 		q2_all.extend([positioner_js[breakpoints[j]]])
 		v1=max(s1_all[j],0.1)
-		if v1>2*vd_relative:
-			v1_all.extend([v1])
-		else:
-			v1_all.extend([v1])
+		v1_all.extend([v1])
 		# positioner_w=4*vd_relative/np.linalg.norm(curve_sliced_relative[breakpoints[j]][:2])
 		# v2_all.extend([min(100,100*positioner_w/positioner.joint_vel_limit[1])])
 		v2_all.append(100)
@@ -240,6 +240,6 @@ for slice_num in range(num_layer_start,num_layer_end,layer_height_num):
 
 	q_prev=positioner_js[-1]
 
-timestamp_robot,joint_recording,job_line,_=ws.weld_segment_dual(primitives,robot,positioner,q1_all,q2_all,v1_all,v2_all,cond_all=[int(feedrate/10+200)],arc=True)
+timestamp_robot,joint_recording,job_line,_=ws.weld_segment_dual(primitives,robot,positioner,q1_all,q2_all,v1_all,v2_all,cond_all=[int(feedrate/10+200)],arc=False)
 
 
