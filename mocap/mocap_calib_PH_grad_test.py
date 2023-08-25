@@ -16,29 +16,33 @@ Rx=np.array([1,0,0])
 Ry=np.array([0,1,0])
 Rz=np.array([0,0,1])
 
-ph_dataset_date='0804'
-test_dataset_date='0804'
+ph_dataset_date='0801'
+test_dataset_date='0801'
 config_dir='../config/'
 
-robot_type = 'R2'
+robot_type = 'R1'
 
 if robot_type == 'R1':
+    robot_marker_dir=config_dir+'MA2010_marker_config/'
+    tool_marker_dir=config_dir+'weldgun_marker_config/'
     robot=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',\
                         tool_file_path=config_dir+'torch.csv',d=15,\
                         #  tool_file_path='',d=0,\
                         pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',\
-                        base_marker_config_file=config_dir+'MA2010_'+ph_dataset_date+'_marker_config.yaml',\
-                        tool_marker_config_file=config_dir+'weldgun_'+ph_dataset_date+'_marker_config.yaml')
+                        base_marker_config_file=robot_marker_dir+'MA2010_'+ph_dataset_date+'_marker_config.yaml',\
+                        tool_marker_config_file=tool_marker_dir+'weldgun_'+ph_dataset_date+'_marker_config.yaml')
     nom_P=np.array([[0,0,0],[150,0,0],[0,0,760],\
                    [1082,0,200],[0,0,0],[0,0,0],[100,0,0]]).T
     nom_H=np.array([[0,0,1],[0,1,0],[0,-1,0],\
                    [-1,0,0],[0,-1,0],[-1,0,0]]).T
 elif robot_type == 'R2':
+    robot_marker_dir=config_dir+'MA1440_marker_config/'
+    tool_marker_dir=config_dir+'mti_marker_config/'
     robot=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.yml',\
                         tool_file_path=config_dir+'mti.csv',\
                         pulse2deg_file_path=config_dir+'MA1440_A0_pulse2deg_real.csv',\
-                        base_marker_config_file=config_dir+'MA1440_'+ph_dataset_date+'_marker_config.yaml',\
-                        tool_marker_config_file=config_dir+'mti_'+ph_dataset_date+'_marker_config.yaml')
+                        base_marker_config_file=robot_marker_dir+'MA1440_'+ph_dataset_date+'_marker_config.yaml',\
+                        tool_marker_config_file=tool_marker_dir+'mti_'+ph_dataset_date+'_marker_config.yaml')
     nom_P=np.array([[0,0,0],[155,0,0],[0,0,614],\
                    [640,0,200],[0,0,0],[0,0,0],[100,0,0]]).T
     nom_H=np.array([[0,0,1],[0,1,0],[0,-1,0],\
@@ -48,7 +52,7 @@ T_base_basemarker = robot.T_base_basemarker
 T_basemarker_base = T_base_basemarker.inv()
 
 #### using rigid body
-use_toolmaker=False
+use_toolmaker=True
 T_base_basemarker = robot.T_base_basemarker
 T_basemarker_base = T_base_basemarker.inv()
 
@@ -350,7 +354,7 @@ if plot_origin:
 plt.plot(error_pos_baseline_norm,'-o',markersize=1,label='CPA PH')
 # plt.plot(error_pos_PHZero_norm,'-o',markersize=1,label='Zero PH')
 # plt.plot(error_pos_onePH_norm,'-o',markersize=1,label='One PH')
-# plt.plot(error_pos_near_norm,'-o',markersize=1,label='Nearest PH')
+plt.plot(error_pos_near_norm,'-o',markersize=1,label='Nearest PH')
 plt.plot(error_pos_lin_norm,'-o',markersize=1,label='Linear Interp PH')
 # plt.plot(error_pos_cub_norm,'-o',markersize=1,label='Cubic Interp PH')
 # plt.plot(error_pos_rbf_norm,'-o',markersize=1,label='RBF Interp PH')
