@@ -5,23 +5,8 @@ from lambda_calc import *
 from multi_robot import *
 from dx200_motion_program_exec_client import *
 from WeldSend import *
+from traj_manipulation import *
 from RobotRaconteur.Client import *
-
-
-def warp_traj(rob1_js,rob2_js,positioner_js,rob1_js_x,rob2_js_x,positioner_js_x,reversed=False):
-	if positioner_js_x.shape==(2,) and rob1_js_x.shape==(6,):
-		return rob1_js,rob2_js,positioner_js
-	traj_length_x_half=int(len(rob1_js_x)/2)
-	traj_length_half=int(len(rob1_js)/2)
-	if reversed:
-		rob1_js[:traj_length_half]=spiralize(rob1_js[:traj_length_half],rob1_js_x[:traj_length_x_half],reversed)
-		rob2_js[:traj_length_half]=spiralize(rob2_js[:traj_length_half],rob2_js_x[:traj_length_x_half],reversed)
-		positioner_js[:traj_length_half]=spiralize(positioner_js[:traj_length_half],positioner_js_x[:traj_length_x_half],reversed)
-	else:
-		rob1_js[traj_length_half:]=spiralize(rob1_js[traj_length_half:],rob1_js_x[traj_length_x_half:],reversed)
-		rob2_js[traj_length_half:]=spiralize(rob2_js[traj_length_half:],rob2_js_x[traj_length_x_half:],reversed)
-		positioner_js[traj_length_half:]=spiralize(positioner_js[traj_length_half:],positioner_js_x[traj_length_x_half:],reversed)
-	return rob1_js,rob2_js,positioner_js
 
 
 timestamp=[]
@@ -55,7 +40,7 @@ with open(data_dir+'slicing.yml', 'r') as file:
 	slicing_meta = yaml.safe_load(file)
 recorded_dir='recorded_data/cup_ER316L/'
 
-waypoint_distance=3	###waypoint separation
+waypoint_distance=4	###waypoint separation
 layer_height_num=int(1.8/slicing_meta['line_resolution'])
 
 
@@ -153,9 +138,9 @@ for i in range(0,slicing_meta['num_layers']-1):
 
 ###########################################layer welding############################################
 vd_relative=5
-feedrate=110
-layer_start=14
-layers2weld=21
+feedrate=100
+layer_start=38
+layers2weld=1
 layer_counts=layer_start
 num_layer_start=int(layer_start*layer_height_num)	###modify layer num here
 num_layer_end=int((layer_start+layers2weld)*layer_height_num)
@@ -200,12 +185,12 @@ for slice_num in range(num_layer_start,num_layer_end,layer_height_num):
 
 
 	###TRJAECTORY WARPING
-	if slice_num>1:
+	if layer_counts>layer_start:
 		rob1_js_prev=copy.deepcopy(rob1_js_all_slices[slice_num-layer_height_num])
 		rob2_js_prev=copy.deepcopy(rob2_js_all_slices[slice_num-layer_height_num])
 		positioner_js_prev=copy.deepcopy(positioner_js_all_slices[slice_num-layer_height_num])
 		rob1_js,rob2_js,positioner_js=warp_traj(rob1_js,rob2_js,positioner_js,rob1_js_prev,rob2_js_prev,positioner_js_prev,reversed=True)
-	if slice_num<slicing_meta['num_layers']-layer_height_num:
+	if layer_counts<layer_start+layers2weld-1:
 		rob1_js_next=copy.deepcopy(rob1_js_all_slices[slice_num+layer_height_num])
 		rob2_js_next=copy.deepcopy(rob2_js_all_slices[slice_num+layer_height_num])
 		positioner_js_next=copy.deepcopy(positioner_js_all_slices[slice_num+layer_height_num])
@@ -232,12 +217,16 @@ for slice_num in range(num_layer_start,num_layer_end,layer_height_num):
 		q1_all.extend([rob1_js[breakpoints[j]]])
 		q2_all.extend([positioner_js[breakpoints[j]]])
 		v1=max(s1_all[j],0.1)
-		v1_all.extend([v1])
+		if v1>2*vd_relative:
+			v1_all.extend([v1/2])
+		else:
+			v1_all.extend([v1])
 		v2_all.append(100)
 		primitives.extend(['movel'])
 
 	q_prev=positioner_js[-1]
+	layer_counts+=1
 
-timestamp_robot,joint_recording,job_line,_=ws.weld_segment_dual(primitives,robot,positioner,q1_all,q2_all,v1_all,v2_all,cond_all=[int(feedrate/10+200)],arc=False)
+timestamp_robot,joint_recording,job_line,_=ws.weld_segment_dual(primitives,robot,positioner,q1_all,q2_all,v1_all,v2_all,cond_all=[int(feedrate/10+200)],arc=True)
 
 
