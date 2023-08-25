@@ -1,5 +1,6 @@
 from general_robotics_toolbox import *
 import numpy as np
+from scipy.interpolate import interp1d
 
 def spiralize(traj1,traj2,reversed=False):
 	###interpolate traj1 to traj2 with spiral printing
