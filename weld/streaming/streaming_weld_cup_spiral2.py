@@ -7,24 +7,11 @@ from robot_def import *
 from lambda_calc import *
 from multi_robot import *
 from flir_toolbox import *
+from traj_manipulation import *
 from dx200_motion_program_exec_client import *
 from StreamingSend import *
 
 
-def warp_traj(rob1_js,rob2_js,positioner_js,rob1_js_x,rob2_js_x,positioner_js_x,reversed=False):
-	if positioner_js_x.shape==(2,) and rob1_js_x.shape==(6,):
-		return rob1_js,rob2_js,positioner_js
-	traj_length_x_half=int(len(rob1_js_x)/2)
-	traj_length_half=int(len(rob1_js)/2)
-	if reversed:
-		rob1_js[:traj_length_half]=spiralize(rob1_js[:traj_length_half],rob1_js_x[:traj_length_x_half],reversed)
-		rob2_js[:traj_length_half]=spiralize(rob2_js[:traj_length_half],rob2_js_x[:traj_length_x_half],reversed)
-		positioner_js[:traj_length_half]=spiralize(positioner_js[:traj_length_half],positioner_js_x[:traj_length_x_half],reversed)
-	else:
-		rob1_js[traj_length_half:]=spiralize(rob1_js[traj_length_half:],rob1_js_x[traj_length_x_half:],reversed)
-		rob2_js[traj_length_half:]=spiralize(rob2_js[traj_length_half:],rob2_js_x[traj_length_x_half:],reversed)
-		positioner_js[traj_length_half:]=spiralize(positioner_js[traj_length_half:],positioner_js_x[traj_length_x_half:],reversed)
-	return rob1_js,rob2_js,positioner_js
 
 
 timestamp=[]
@@ -239,7 +226,7 @@ while slice_num<slicing_meta['num_layers']:
 	rob1_js=copy.deepcopy(rob1_js_all_slices[slice_num])
 	rob2_js=copy.deepcopy(rob2_js_all_slices[slice_num])
 	positioner_js=copy.deepcopy(positioner_js_all_slices[slice_num])
-	if positioner_js.shape==(2,) and rob1_js.shape==(6,):
+	if positioner_js.shape==(2,) and rob1_js.shape==(6,):	###if only a single point
 		continue
 	
 	###TRJAECTORY WARPING
@@ -288,8 +275,6 @@ while slice_num<slicing_meta['num_layers']:
 			if bp_idx<10:	###streaming 10 points before process FLIR monitoring
 				robot_timestamp,q14=SS.position_cmd(curve_js_all_dense[breakpoints[bp_idx]],time.time())
 			else:
-				point_stream_start_time=time.time()
-				robot_timestamp,q14=SS.position_cmd(curve_js_all_dense[breakpoints[bp_idx]])
 				####################################FLIR PROCESSING####################################
 				#TODO: make sure processing time within 8ms
 				centroid, bbox=flame_detection(flir_logging[-1])
@@ -304,6 +289,10 @@ while slice_num<slicing_meta['num_layers']:
 					###busy wait for accurate 8ms streaming
 					while time.time()-point_stream_start_time<1/SS.streaming_rate-0.0005:
 						continue
+					
+				point_stream_start_time=time.time()
+				robot_timestamp,q14=SS.position_cmd(curve_js_all_dense[breakpoints[bp_idx]])
+				
 				robot_ts.append(robot_timestamp)
 				robot_js.append(q14)
 	

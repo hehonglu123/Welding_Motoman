@@ -55,7 +55,7 @@ with open(data_dir+'slicing.yml', 'r') as file:
 	slicing_meta = yaml.safe_load(file)
 recorded_dir='recorded_data/cup_ER316L/'
 
-waypoint_distance=5	###waypoint separation
+waypoint_distance=3	###waypoint separation
 layer_height_num=int(1.8/slicing_meta['line_resolution'])
 
 
@@ -215,7 +215,7 @@ for slice_num in range(num_layer_start,num_layer_end,layer_height_num):
 	positioner_js[:,1]=positioner_js[:,1]+num2p*2*np.pi
 
 	###move to intermidieate waypoint for collision avoidance if multiple section
-	if slice_num==1:
+	if abs(q_prev[0]-positioner_js[0,0])>0.1:
 		waypoint_pose=robot.fwd(rob1_js[breakpoints[0]])
 		waypoint_pose.p[-1]+=50
 		q1=robot.inv(waypoint_pose.p,waypoint_pose.R,rob1_js[breakpoints[0]])[0]
@@ -233,8 +233,6 @@ for slice_num in range(num_layer_start,num_layer_end,layer_height_num):
 		q2_all.extend([positioner_js[breakpoints[j]]])
 		v1=max(s1_all[j],0.1)
 		v1_all.extend([v1])
-		# positioner_w=4*vd_relative/np.linalg.norm(curve_sliced_relative[breakpoints[j]][:2])
-		# v2_all.extend([min(100,100*positioner_w/positioner.joint_vel_limit[1])])
 		v2_all.append(100)
 		primitives.extend(['movel'])
 
