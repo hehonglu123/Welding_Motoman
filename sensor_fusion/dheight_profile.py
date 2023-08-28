@@ -12,8 +12,8 @@ def chunk_list(l, n):
     chunk_size = len(l) // n
     return [l[i:i+chunk_size] for i in range(0, len(l), chunk_size)]
 
-profile_height_10=np.load('../data/wall_weld_test/moveL_100_repeat_weld_scan_2023_08_02_17_07_02/layer_10/scans/height_profile.npy')
-profile_height_9=np.load('../data/wall_weld_test/moveL_100_repeat_weld_scan_2023_08_02_17_07_02/layer_9/scans/height_profile.npy')
+profile_height_10=np.load('../data/wall_weld_test/weld_scan_2023_08_23_15_23_45/layer_2/scans/height_profile.npy')
+profile_height_9=np.load('../data/wall_weld_test/weld_scan_2023_08_23_15_23_45/layer_1/scans/height_profile.npy')
 
 min_length = min(len(profile_height_10), len(profile_height_9))
 
