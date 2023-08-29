@@ -20,6 +20,14 @@ current=[]
 feedrate=[]
 energy=[]
 
+def my_handler(exp):
+	if (exp is not None):
+		# If "err" is not None it means that an exception occurred.
+		# "err" contains the exception object
+		print ("An error occured! " + str(exp))
+		return
+
+
 def wire_cb(sub, value, ts):
 	global timestamp, voltage, current, feedrate, energy
 
@@ -143,12 +151,12 @@ SS=StreamingSend(RR_robot,RR_robot_state,RobotJointCommand,streaming_rate)
 
 ###set up control parameters
 job_offset=200
-nominal_feedrate=210
+nominal_feedrate=170
 nominal_vd_relative=0.5
 nominal_wire_length=25 #pixels
 nominal_temp_below=500
-base_feedrate_cmd=270
-base_vd=5
+base_feedrate_cmd=300
+base_vd=10
 feedrate_cmd=nominal_feedrate
 vd_relative=nominal_vd_relative
 feedrate_gain=0.5
@@ -221,14 +229,14 @@ for i in range(0,slicing_meta['num_layers']-1):
 
 slice_num=10
 while slice_num<slicing_meta['num_layers']:
+	###change feedrate
+	fronius_client.async_set_job_number(int(feedrate_cmd/10)+job_offset, my_handler)
 	x=0
-	
 	rob1_js=copy.deepcopy(rob1_js_all_slices[slice_num])
 	rob2_js=copy.deepcopy(rob2_js_all_slices[slice_num])
 	positioner_js=copy.deepcopy(positioner_js_all_slices[slice_num])
 	if positioner_js.shape==(2,) and rob1_js.shape==(6,):	###if only a single point
 		continue
-	
 	###TRJAECTORY WARPING
 	if slice_num>10:
 		rob1_js_prev=copy.deepcopy(rob1_js_all_slices[slice_num-layer_height_num])
@@ -240,13 +248,12 @@ while slice_num<slicing_meta['num_layers']:
 		rob2_js_next=copy.deepcopy(rob2_js_all_slices[slice_num+layer_height_num])
 		positioner_js_next=copy.deepcopy(positioner_js_all_slices[slice_num+layer_height_num])
 		rob1_js,rob2_js,positioner_js=warp_traj(rob1_js,rob2_js,positioner_js,rob1_js_next,rob2_js_next,positioner_js_next,reversed=False)
+	
 	###find closest %2pi
 	num2p=np.round((q14[-1]-positioner_js[0,1])/(2*np.pi))
 	positioner_js[:,1]=positioner_js[:,1]+num2p*2*np.pi
-		
 	curve_js_all_dense=interp1d(lam_relative_all_slices[slice_num],np.hstack((rob1_js,rob2_js,positioner_js)),kind='cubic',axis=0)(lam_relative_dense_all_slices[slice_num])
 	breakpoints=SS.get_breakpoints(lam_relative_dense_all_slices[slice_num],vd_relative)
-
 	###monitoring parameters
 	wire_length=[]
 	temp_below=[]
@@ -256,7 +263,8 @@ while slice_num<slicing_meta['num_layers']:
 	flir_logging=[]
 	flir_ts=[]
 
-	fronius_client.job_number = int(feedrate_cmd/10)+job_offset
+	
+	
 	###start welding at the first layer, then non-stop
 	if not welding_started:
 		#jog above
@@ -274,6 +282,7 @@ while slice_num<slicing_meta['num_layers']:
 			
 			if bp_idx<10:	###streaming 10 points before process FLIR monitoring
 				robot_timestamp,q14=SS.position_cmd(curve_js_all_dense[breakpoints[bp_idx]],time.time())
+				point_stream_start_time=time.time()
 			else:
 				####################################FLIR PROCESSING####################################
 				#TODO: make sure processing time within 8ms
@@ -327,7 +336,7 @@ while slice_num<slicing_meta['num_layers']:
 		
 		feedrate_cmd-=20
 		vd_relative+=1
-		vd_relative=min(10,vd_relative)
+		vd_relative=min(6,vd_relative)
 		feedrate_cmd=max(feedrate_cmd,100)
 		slice_num+=int(nominal_slice_increment)
 		print('FEEDRATE: ',feedrate_cmd,'VD: ',vd_relative)
