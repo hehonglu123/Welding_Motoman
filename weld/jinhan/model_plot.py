@@ -31,15 +31,15 @@ for label, (a, b) in models.items():
     plt.plot(logV, logDh, label=label)
 
 # Customize the plot
-plt.xlabel("log(V) (mm/s)")
-plt.ylabel("log(Δh) (mm)")
-plt.title("Log-log Models")
+plt.xlabel("log(V) (log(mm/s))")
+plt.ylabel("log(Δh) (log(mm))")
+plt.title("Al 4043 Deposition Model")
 plt.xlim(1.5, 3.5)
 plt.ylim(0, 1.2)
 # Set finer grid
 ax = plt.gca()
-ax.xaxis.set_ticks(np.arange(1.5, 3.6, 0.1))  # Change 0.1 to any value for desired grid size on x-axis
-ax.yaxis.set_ticks(np.arange(0, 1.3, 0.05))   # Change 0.05 to any value for desired grid size on y-axis
+ax.xaxis.set_ticks(np.arange(1.5, 3.6, 0.5))  # Change 0.1 to any value for desired grid size on x-axis
+ax.yaxis.set_ticks(np.arange(0, 1.3, 0.25))   # Change 0.05 to any value for desired grid size on y-axis
 
 plt.grid(True)
 plt.legend()
