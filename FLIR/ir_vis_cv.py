@@ -6,15 +6,15 @@ from flir_toolbox import *
 
 
 # Load the IR recording data from the pickle file
-with open('../../recorded_data/weld_scan_job205_v152023_07_27_13_23_06/layer_150/ir_recording.pickle', 'rb') as file:
+with open('../../recorded_data/blade_recording/slice_330_0_flir.pickle', 'rb') as file:
     ir_recording = pickle.load(file)
 
-ir_ts=np.loadtxt('../../recorded_data/weld_scan_job205_v152023_07_27_13_23_06/layer_150/ir_stamps.csv', delimiter=',')
+ir_ts=np.loadtxt('../../recorded_data/blade_recording/slice_330_0_flir_ts.csv', delimiter=',')
 
 
 result = cv2.VideoWriter('output.avi', 
-                         cv2.VideoWriter_fourcc(*'MJPG'),
-                         13, (320,240))
+                         cv2.VideoWriter_fourcc(*'XVID'),
+                         30, (320,240))
 
 # Create a window to display the images
 cv2.namedWindow("IR Recording", cv2.WINDOW_NORMAL)
@@ -40,18 +40,18 @@ for i in range(len(ir_recording)):
     ir_bgr = cv2.applyColorMap(ir_normalized.astype(np.uint8), cv2.COLORMAP_INFERNO)
 
     # add bounding box
-    if centroid is not None:
-        # cv2.rectangle(ir_bgr, (bbox[0],bbox[1]), (bbox[0]+bbox[2],bbox[1]+bbox[3]), (0,255,0), thickness=1)   #flame bbox
-        bbox_below_size=10
-        centroid_below=(int(centroid[0]+bbox[2]/2+bbox_below_size/2),centroid[1])
-        cv2.rectangle(ir_bgr, (int(centroid_below[0]-bbox_below_size/2),int(centroid_below[1]-bbox_below_size/2)), (int(centroid_below[0]+bbox_below_size/2),int(centroid_below[1]+bbox_below_size/2)), (0,255,0), thickness=1)   #flame below centroid
+    # if centroid is not None:
+    #     # cv2.rectangle(ir_bgr, (bbox[0],bbox[1]), (bbox[0]+bbox[2],bbox[1]+bbox[3]), (0,255,0), thickness=1)   #flame bbox
+    #     bbox_below_size=10
+    #     centroid_below=(int(centroid[0]+bbox[2]/2+bbox_below_size/2),centroid[1])
+    #     cv2.rectangle(ir_bgr, (int(centroid_below[0]-bbox_below_size/2),int(centroid_below[1]-bbox_below_size/2)), (int(centroid_below[0]+bbox_below_size/2),int(centroid_below[1]+bbox_below_size/2)), (0,255,0), thickness=1)   #flame below centroid
 
-    cv2.rectangle(ir_bgr, (50,110,95,60), (255,0,0), thickness=1)   #flame below centroid
+    # cv2.rectangle(ir_bgr, (50,110,95,60), (255,0,0), thickness=1)   #flame below centroid
 
     # Write the IR image to the video file
     # result.write(ir_bgr)
 
-    # Display the IR image
+    # # Display the IR image
     cv2.imshow("IR Recording", ir_bgr)
 
     # Wait for a specific time (in milliseconds) before displaying the next frame
