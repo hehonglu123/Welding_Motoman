@@ -232,10 +232,10 @@ class WeldSend(object):
 						coolof=True						
 
 			mp.primitive_call_tri(primitives[i],q1_all[i],v1_all[i],target2=['MOVJ',positioner_all 	[i],None],target3=['MOVL',q2_all[i],v2_all[i]])
-		
-        
-        if cool and not coolof:
-			mp.setDO(21,False)			
+       	
+		if cool and not coolof:
+			mp.setDO(21,False)	
+
 		if arc and not arcof:
 			mp.setArc(False)
 		return self.client.execute_motion_program(mp)
