@@ -7,24 +7,11 @@ from robot_def import *
 from lambda_calc import *
 from multi_robot import *
 from flir_toolbox import *
+from traj_manipulation import *
 from dx200_motion_program_exec_client import *
 from StreamingSend import *
 
 
-def warp_traj(rob1_js,rob2_js,positioner_js,rob1_js_x,rob2_js_x,positioner_js_x,reversed=False):
-	if positioner_js_x.shape==(2,) and rob1_js_x.shape==(6,):
-		return rob1_js,rob2_js,positioner_js
-	traj_length_x_half=int(len(rob1_js_x)/2)
-	traj_length_half=int(len(rob1_js)/2)
-	if reversed:
-		rob1_js[:traj_length_half]=spiralize(rob1_js[:traj_length_half],rob1_js_x[:traj_length_x_half],reversed)
-		rob2_js[:traj_length_half]=spiralize(rob2_js[:traj_length_half],rob2_js_x[:traj_length_x_half],reversed)
-		positioner_js[:traj_length_half]=spiralize(positioner_js[:traj_length_half],positioner_js_x[:traj_length_x_half],reversed)
-	else:
-		rob1_js[traj_length_half:]=spiralize(rob1_js[traj_length_half:],rob1_js_x[traj_length_x_half:],reversed)
-		rob2_js[traj_length_half:]=spiralize(rob2_js[traj_length_half:],rob2_js_x[traj_length_x_half:],reversed)
-		positioner_js[traj_length_half:]=spiralize(positioner_js[traj_length_half:],positioner_js_x[traj_length_x_half:],reversed)
-	return rob1_js,rob2_js,positioner_js
 
 
 timestamp=[]
@@ -32,6 +19,22 @@ voltage=[]
 current=[]
 feedrate=[]
 energy=[]
+
+def blending(q_cmd_prev,q_cmd_next,max_displacement=np.radians(1)):
+	if np.any(np.abs(q_cmd_prev-q_cmd_next)>max_displacement):
+		weight=max_displacement/np.max(np.abs(q_cmd_prev-q_cmd_next))
+		q_cmd=q_cmd_prev+weight*(q_cmd_next-q_cmd_prev)
+		return q_cmd
+	else:
+		return q_cmd_next
+	
+def my_handler(exp):
+	if (exp is not None):
+		# If "err" is not None it means that an exception occurred.
+		# "err" contains the exception object
+		print ("An error occured! " + str(exp))
+		return
+
 
 def wire_cb(sub, value, ts):
 	global timestamp, voltage, current, feedrate, energy
@@ -156,12 +159,12 @@ SS=StreamingSend(RR_robot,RR_robot_state,RobotJointCommand,streaming_rate)
 
 ###set up control parameters
 job_offset=200
-nominal_feedrate=210
+nominal_feedrate=170
 nominal_vd_relative=0.5
 nominal_wire_length=25 #pixels
 nominal_temp_below=500
-base_feedrate_cmd=270
-base_vd=5
+base_feedrate_cmd=300
+base_vd=10
 feedrate_cmd=nominal_feedrate
 vd_relative=nominal_vd_relative
 feedrate_gain=0.5
@@ -199,8 +202,8 @@ welding_started=False
 # 			rob1_js,rob2_js,positioner_js=warp_traj(rob1_js,rob2_js,positioner_js,rob1_js_next,rob2_js_next,positioner_js_next,reversed=False)
 	
 # 	###find closest %2pi
-# 	num2p=np.round((q14[-2:]-positioner_js[0])/(2*np.pi))
-# 	positioner_js+=num2p*2*np.pi
+# 	num2p=np.round((q14[-1]-positioner_js[0,1])/(2*np.pi))
+# 	positioner_js[:,1]=positioner_js[:,1]+num2p*2*np.pi
 
 # 	lam_relative=calc_lam_cs(curve_sliced_relative)
 # 	lam_relative_dense=np.linspace(0,lam_relative[-1],num=int(lam_relative[-1]/point_distance))
@@ -232,17 +235,16 @@ for i in range(0,slicing_meta['num_layers']-1):
 	lam_relative_all_slices.append(lam_relative)
 	lam_relative_dense_all_slices.append(np.linspace(0,lam_relative[-1],num=int(lam_relative[-1]/point_distance)))
 
-slice_num=1
-# while slice_num<slicing_meta['num_layers']:
-while slice_num<13:
+slice_num=10
+while slice_num<slicing_meta['num_layers']:
+	###change feedrate
+	fronius_client.async_set_job_number(int(feedrate_cmd/10)+job_offset, my_handler)
 	x=0
-	
 	rob1_js=copy.deepcopy(rob1_js_all_slices[slice_num])
 	rob2_js=copy.deepcopy(rob2_js_all_slices[slice_num])
 	positioner_js=copy.deepcopy(positioner_js_all_slices[slice_num])
-	if positioner_js.shape==(2,) and rob1_js.shape==(6,):
+	if positioner_js.shape==(2,) and rob1_js.shape==(6,):	###if only a single point
 		continue
-	
 	###TRJAECTORY WARPING
 	if slice_num>10:
 		rob1_js_prev=copy.deepcopy(rob1_js_all_slices[slice_num-layer_height_num])
@@ -254,13 +256,12 @@ while slice_num<13:
 		rob2_js_next=copy.deepcopy(rob2_js_all_slices[slice_num+layer_height_num])
 		positioner_js_next=copy.deepcopy(positioner_js_all_slices[slice_num+layer_height_num])
 		rob1_js,rob2_js,positioner_js=warp_traj(rob1_js,rob2_js,positioner_js,rob1_js_next,rob2_js_next,positioner_js_next,reversed=False)
+	
 	###find closest %2pi
-	num2p=np.round((q14[-2:]-positioner_js[0])/(2*np.pi))
-	positioner_js+=num2p*2*np.pi
-
+	num2p=np.round((q14[-1]-positioner_js[0,1])/(2*np.pi))
+	positioner_js[:,1]=positioner_js[:,1]+num2p*2*np.pi
 	curve_js_all_dense=interp1d(lam_relative_all_slices[slice_num],np.hstack((rob1_js,rob2_js,positioner_js)),kind='cubic',axis=0)(lam_relative_dense_all_slices[slice_num])
 	breakpoints=SS.get_breakpoints(lam_relative_dense_all_slices[slice_num],vd_relative)
-
 	###monitoring parameters
 	wire_length=[]
 	temp_below=[]
@@ -270,7 +271,8 @@ while slice_num<13:
 	flir_logging=[]
 	flir_ts=[]
 
-	fronius_client.job_number = int(feedrate_cmd/10)+job_offset
+	
+	
 	###start welding at the first layer, then non-stop
 	if not welding_started:
 		#jog above
@@ -279,18 +281,19 @@ while slice_num<13:
 		waypoint_q=robot.inv(waypoint_pose.p,waypoint_pose.R,curve_js_all_dense[breakpoints[0],:6])[0]
 		SS.jog2q(np.hstack((waypoint_q,curve_js_all_dense[0,6:])))
 		SS.jog2q(curve_js_all_dense[breakpoints[0]])
+		q_cmd_prev=curve_js_all_dense[breakpoints[0]]
 		welding_started=True
 		fronius_client.start_weld()
 		time.sleep(0.2)
 	
 	try:
 		for bp_idx in range(len(breakpoints)):
-			
+			q_cmd=blending(q_cmd_prev,curve_js_all_dense[breakpoints[bp_idx]])	###joint blending
+
 			if bp_idx<10:	###streaming 10 points before process FLIR monitoring
-				robot_timestamp,q14=SS.position_cmd(curve_js_all_dense[breakpoints[bp_idx]],time.time())
-			else:
+				robot_timestamp,q14=SS.position_cmd(q_cmd,time.time())
 				point_stream_start_time=time.time()
-				robot_timestamp,q14=SS.position_cmd(curve_js_all_dense[breakpoints[bp_idx]])
+			else:
 				####################################FLIR PROCESSING####################################
 				#TODO: make sure processing time within 8ms
 				centroid, bbox=flame_detection(flir_logging[-1])
@@ -305,8 +308,14 @@ while slice_num<13:
 					###busy wait for accurate 8ms streaming
 					while time.time()-point_stream_start_time<1/SS.streaming_rate-0.0005:
 						continue
+					
+				
+				point_stream_start_time=time.time()
+				robot_timestamp,q14=SS.position_cmd(q_cmd)				
 				robot_ts.append(robot_timestamp)
 				robot_js.append(q14)
+			
+			q_cmd_prev=copy.deepcopy(q_cmd)
 	
 		###LOGGING
 		# local_recorded_dir='recorded_data/cup_recording_spiral/'
@@ -339,7 +348,7 @@ while slice_num<13:
 		
 		feedrate_cmd-=20
 		vd_relative+=1
-		vd_relative=min(10,vd_relative)
+		vd_relative=min(6,vd_relative)
 		feedrate_cmd=max(feedrate_cmd,100)
 		slice_num+=int(nominal_slice_increment)
 		print('FEEDRATE: ',feedrate_cmd,'VD: ',vd_relative)
@@ -348,7 +357,4 @@ while slice_num<13:
 	except:
 		traceback.print_exc()
 		fronius_client.stop_weld()
-
-
-
 fronius_client.stop_weld()
