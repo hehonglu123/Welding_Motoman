@@ -15,10 +15,13 @@ positioner=positioner_obj('D500B',def_path='../config/D500B_robot_default_config
 
 q1=np.array([-15,0])
 q2=np.array([-15,90])
-q3=np.array([-15,190])
-q4=np.array([43.5893,72.1362,45.2749,-84.0966,24.3644,94.2091])
-q5=np.array([34.6291,55.5756,15.4033,-28.8363,24.0298,3.6855])
-q6=np.array([27.3821,51.3582,-19.8428,-21.2525,71.6314,-62.8669])
+q3=np.array([-15,180])
+q1_1=np.array([-15,360])
+q2_1=np.array([-15,270])
+
+q4=np.array([35.521,65.7516,21.1823,-78.2675,33.4785,100.7489])
+q5=np.array([26.1197,32.5243,-25.0171,-19.9194,47.7077,12.1999])
+q6=np.array([7.78,39.94,-46.4878,-13.8057,81.5178,-62.1720])
 
 
 mp=MotionProgram(ROBOT_CHOICE='RB2',ROBOT_CHOICE2='ST1',pulse2deg=robot.pulse2deg,pulse2deg_2=positioner.pulse2deg)
@@ -26,8 +29,10 @@ client=MotionProgramExecClient()
 
 target2_1=['MOVJ',q1,1,0]
 target2_2=['MOVJ',q1,q2,q3,1,0]
-mp.MoveJ(q4,1,0,target2=target2_1)
-mp.MoveC(q4, q5, q6, 5,1,target2=target2_2)
-
+mp.MoveJ(q4,10,0,target2=target2_1)
+mp.MoveC(q4, q5, q6, 10,1,target2=target2_2)
+mp.MoveJ(q6,10,0,target2=['MOVJ',q3,1,0])
+target2_2=['MOVJ',q3,q2_1,q1_1,1,0]
+mp.MoveC(q6, q5, q4, 10,1,target2=target2_2)
 
 client.execute_motion_program(mp)
