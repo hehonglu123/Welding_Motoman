@@ -75,13 +75,13 @@ zero_config=np.zeros(6)
 config_dir='../config/'
 robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',d=15,tool_file_path=config_dir+'torch.csv',\
 	pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',\
-    base_marker_config_file=config_dir+'MA2010_marker_config.yaml',tool_marker_config_file=config_dir+'weldgun_marker_config.yaml')
+    base_marker_config_file=config_dir+'MA2010_marker_config/MA2010_marker_config.yaml',tool_marker_config_file=config_dir+'weldgun_marker_config/weldgun_marker_config.yaml')
 robot_scan=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.yml',tool_file_path=config_dir+'mti.csv',\
 	base_transformation_file=config_dir+'MA1440_pose.csv',pulse2deg_file_path=config_dir+'MA1440_A0_pulse2deg_real.csv',\
-    base_marker_config_file=config_dir+'MA1440_marker_config.yaml')
+    base_marker_config_file=config_dir+'MA1440_marker_config/MA1440_marker_config.yaml')
 positioner=positioner_obj('D500B',def_path=config_dir+'D500B_robot_default_config.yml',tool_file_path=config_dir+'positioner_tcp.csv',\
     base_transformation_file=config_dir+'D500B_pose.csv',pulse2deg_file_path=config_dir+'D500B_pulse2deg_real.csv',\
-    base_marker_config_file=config_dir+'D500B_marker_config.yaml',tool_marker_config_file=config_dir+'positioner_tcp_marker_config.yaml')
+    base_marker_config_file=config_dir+'D500B_marker_config/D500B_marker_config.yaml',tool_marker_config_file=config_dir+'positioner_tcp_marker_config/positioner_tcp_marker_config.yaml')
 
 Table_home_T = positioner.fwd(np.radians([-15,180]))
 T_S1TCP_R1Base = np.linalg.inv(np.matmul(positioner.base_H,H_from_RT(Table_home_T.R,Table_home_T.p)))
@@ -100,8 +100,8 @@ R_S1TCP = np.matmul(T_S1TCP_R1Base[:3,:3],path_R)
 
 build_height_profile=False
 plot_correction=True
-show_layer = []
-# show_layer = [12,29,30]
+# show_layer = []
+show_layer = [12]
 
 x_lower = -99999
 x_upper = 999999
@@ -112,10 +112,11 @@ x_upper = 999999
 start_id=75
 end_id=-75
 
-datasets=['baseline','correction']
-# datasets=['baseline']
+# datasets=['baseline','correction']
+datasets=['correction']
 
-datasets=['baseline','correction','repeat 1','repeat 2']
+# datasets=['correction','repeat 1','repeat 2']
+# datasets=['baseline','correction','repeat 1','repeat 2']
 datasets_h_mean={}
 datasets_h_std={}
 for dataset in datasets:
@@ -123,7 +124,9 @@ for dataset in datasets:
     if dataset=='baseline':
         data_dir = '../data/wall_weld_test/moveL_100_baseline_weld_scan_2023_07_07_15_20_56/'
     elif dataset=='correction':
-        data_dir = '../data/wall_weld_test/moveL_100_weld_scan_2023_08_02_15_17_25/'
+        # data_dir = '../data/wall_weld_test/moveL_160_noconstraints_weld_scan_2023_07_05_18_59_53/'
+        data_dir = '../data/wall_weld_test/moveL_100_weld_scan_2023_07_24_11_19_58/'
+        # data_dir = '../data/wall_weld_test/moveL_100_weld_scan_2023_08_02_15_17_25/'
     elif dataset=='repeat 1':
         data_dir = '../data/wall_weld_test/moveL_100_repeat_weld_scan_2023_08_02_16_03_50/'
     elif dataset=='repeat 2':
@@ -156,7 +159,7 @@ for dataset in datasets:
         print("Layer",i)
         print("Forward:",not forward_flag)
 
-        if build_height_profile:
+        if build_height_profile and (i in show_layer):
             curve_x_start=43
             curve_x_end=-41
             crop_extend=10
@@ -171,17 +174,17 @@ for dataset in datasets:
             # visualize_pcd([pcd])
             pcd = scan_process.pcd_noise_remove(pcd,nb_neighbors=40,std_ratio=1.5,\
                                                 min_bound=crop_min,max_bound=crop_max,cluster_based_outlier_remove=True,cluster_neighbor=1,min_points=100)
-            # visualize_pcd([pcd])
+            visualize_pcd([pcd])
             profile_height = scan_process.pcd2height(deepcopy(pcd),-1)
 
         ### ignore x smaller and larger
-        profile_height=np.delete(profile_height,np.where(profile_height[:,0]>x_upper),axis=0)
-        profile_height=np.delete(profile_height,np.where(profile_height[:,0]<x_lower),axis=0)
+        # profile_height=np.delete(profile_height,np.where(profile_height[:,0]>x_upper),axis=0)
+        # profile_height=np.delete(profile_height,np.where(profile_height[:,0]<x_lower),axis=0)
 
         all_profile_height.append(profile_height)
 
         # h_std_thres=0.48
-        h_std_thres=9
+        h_std_thres=0
         h_std = np.std(profile_height[:,1])
         if i>2 and h_std>h_std_thres and dataset != "baseline":
             all_correction_layer.append(i)
@@ -199,11 +202,11 @@ for dataset in datasets:
 
             ## parameters
             noise_h_thres = 3
-            min_v=5
-            max_v=30
+            min_v=-1
+            max_v=9999
             h_std_thres=h_std_thres
-            nominal_v=18
-            input_dh=1.7
+            nominal_v=5
+            input_dh=v2dh_loglog(nominal_v,100)
             num_l=40
             ############
 
@@ -290,12 +293,35 @@ for dataset in datasets:
                 # print("Seg mean h:",seg_mean_h)
                 print("dh:",all_dh)
                 print("v:",this_weld_v)
-
-                # visualize_pcd([pcd])
-                # plt.scatter(profile_height[:,0],profile_height[:,1]-np.mean(profile_height[:,1]))
-                # for p in all_profile:
-                #     plt.scatter(p[:,0],p[:,1]-np.mean(profile_height[:,1]))
-                # plt.show()
+                
+                plt.scatter(profile_height[:,0],profile_height[:,1])
+                plt.xlabel('X-axis (Lambda) (mm)',fontsize=26)
+                plt.xticks(fontsize=26)
+                plt.ylabel("Depoted Height (mm)",fontsize=26)
+                plt.yticks(fontsize=26)
+                plt.title('Deposition Height (mm)',fontsize=32)
+                plt.show()
+                
+                fig, ax1 = plt.subplots()
+                ax2 = ax1.twinx()
+                for v_id in range(len(this_weld_v)):
+                    ax1.scatter(all_profile[v_id][:,0],h_target-all_profile[v_id][:,1])
+                    if v_id==0:
+                        ax2.plot(all_profile[v_id][:,0],np.ones(len(all_profile[v_id][:,0]))*this_weld_v[v_id])
+                    else:
+                        plot_vx = np.append(all_profile[v_id-1][-1,0],all_profile[v_id][:,0])
+                        plot_vy = np.append(this_weld_v[v_id-1],np.ones(len(all_profile[v_id][:,0]))*this_weld_v[v_id])
+                        ax2.plot(plot_vx,plot_vy)
+                ax1.set_xlabel('X-axis (Lambda) (mm)',fontsize=26)
+                ax1.tick_params(axis='x', labelsize=26)
+                ax1.set_ylabel('dh to target (mm)', color='g',fontsize=26)
+                ax1.tick_params(axis='y', labelsize=26)
+                ax2.set_ylabel('Speed (mm/sec)', color='b',fontsize=26)
+                ax2.tick_params(axis='y', labelsize=26)
+                plt.title("Height and Speed, 40 MoveL",fontsize=32)
+                plt.show()
+                
+                
 
             ### plot velocity and actual velocity
             next_weld_dir=data_dir+'layer_'+str(i+1)+'/'
@@ -361,9 +387,9 @@ for dataset in datasets:
             # fig, ax1 = plt.subplots()
             # ax2 = ax1.twinx()
             # ax1.scatter(profile_height[:,0],profile_height[:,1],label='Height Layer'+str(i))
-            # ax1.scatter(next_profile_height[:,0],next_profile_height[:,1],label='Height Layer'+str(i+1))
+            # # ax1.scatter(next_profile_height[:,0],next_profile_height[:,1],label='Height Layer'+str(i+1))
             # ax2.plot(all_profile_v_plot[:,0],all_profile_v_plot[:,1],label='Planned Corrected Speed')
-            # ax2.plot(robot_p_S1TCP[:,0],robot_v_S1TCP,label='Actual Cartesian Speed')
+            # # ax2.plot(robot_p_S1TCP[:,0],robot_v_S1TCP,label='Actual Cartesian Speed')
             # ax1.set_xlabel('X-axis (Lambda) (mm)')
             # ax1.set_ylabel('Height (mm)', color='g')
             # ax2.set_ylabel('Speed (mm/sec)', color='b')
@@ -448,10 +474,12 @@ plt.show()
 for dataset in datasets:
     plt.plot(np.arange(len(datasets_h_std[dataset])),datasets_h_std[dataset],'-o',label=dataset)
 # plt.axhline(y = 0.48, color = 'r', linestyle = '-')
-plt.legend()
-plt.xlabel('Layer')
-plt.ylabel('Height STD (mm)')
-plt.title("Height STD")
+plt.legend(fontsize=12)
+plt.xlabel('Layer',fontsize=15)
+plt.xticks(fontsize=15)
+plt.ylabel('Height STD (mm)',fontsize=15)
+plt.yticks(fontsize=12)
+plt.title("Height STD",fontsize=18)
 plt.tight_layout()
 plt.show()
 

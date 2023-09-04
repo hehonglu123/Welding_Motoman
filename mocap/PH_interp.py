@@ -220,8 +220,10 @@ class PH_Param(object):
         
         print(markdown_str)
         plt.errorbar(np.arange(len(draw_mean)),draw_mean,draw_std)
-        plt.xticks(np.arange(len(draw_mean)),['P1','P2','P3','P4','P5','P6','P7'])
-        plt.title('P Variation')
+        plt.xticks(np.arange(len(draw_mean)),['P1','P2','P3','P4','P5','P6','P7'],fontsize=15)
+        plt.ylabel("Deviation Distance (mm)",fontsize=15)
+        plt.yticks(fontsize=15)
+        plt.title('P Variation',fontsize=18)
         plt.show()
 
         # plot H
@@ -267,8 +269,10 @@ class PH_Param(object):
         
         print(markdown_str)
         plt.errorbar(np.arange(len(draw_mean)),draw_mean,draw_std)
-        plt.xticks(np.arange(len(draw_mean)),['H1','H2','H3','H4','H5','H6'])
-        plt.title('H Variation')
+        plt.xticks(np.arange(len(draw_mean)),['H1','H2','H3','H4','H5','H6'],fontsize=15)
+        plt.ylabel("Deviated Angle (deg)",fontsize=15)
+        plt.yticks(fontsize=15)
+        plt.title('H Variation',fontsize=18)
         plt.show()
 
 if __name__=='__main__':

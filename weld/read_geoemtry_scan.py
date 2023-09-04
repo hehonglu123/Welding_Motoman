@@ -25,7 +25,7 @@ import yaml
 from math import ceil,floor
 
 R1_ph_dataset_date='0801'
-R2_ph_dataset_date='0804'
+R2_ph_dataset_date='0801'
 S1_ph_dataset_date='0801'
 
 zero_config=np.zeros(6)
@@ -63,8 +63,8 @@ positioner.base_H = H_from_RT(positioner_base.R,positioner_base.p)
 # robot_weld.robot.R_tool = deepcopy(robot_weld.T_tool_toolmarker.R)
 # robot_weld.robot.p_tool = deepcopy(robot_weld.T_tool_toolmarker.p)
 
-robot_scan.robot.P=deepcopy(robot_scan.calib_P)
-robot_scan.robot.H=deepcopy(robot_scan.calib_H)
+# robot_scan.robot.P=deepcopy(robot_scan.calib_P)
+# robot_scan.robot.H=deepcopy(robot_scan.calib_H)
 
 #### load R1 kinematic model
 PH_data_dir='../mocap/PH_grad_data/test'+R1_ph_dataset_date+'_R1/train_data_'
@@ -91,13 +91,13 @@ positioner.robot.P=deepcopy(positioner.calib_P)
 positioner.robot.H=deepcopy(positioner.calib_H)
 
 #### data directory
-dataset='cup/'
-sliced_alg='circular_slice_shifted/'
-curve_data_dir = '../data/'+dataset+sliced_alg
-data_dir=curve_data_dir+'weld_scan_'+'2023_07_11_16_25_30'+'/'
-baselayer=False
-layer=367
-x=0
+# dataset='cup/'
+# sliced_alg='circular_slice_shifted/'
+# curve_data_dir = '../data/'+dataset+sliced_alg
+# data_dir=curve_data_dir+'weld_scan_'+'2023_07_11_16_25_30'+'/'
+# baselayer=False
+# layer=367
+# x=0
 
 # dataset='blade0.1/'
 # sliced_alg='auto_slice/'
@@ -107,21 +107,28 @@ x=0
 # layer=1
 # x=0
 
-# dataset='blade0.1/'
-# sliced_alg='auto_slice/'
-# curve_data_dir = '../data/'+dataset+sliced_alg
-# data_dir=curve_data_dir+'weld_scan_'+'2023_07_24_13_13_53'+'/'
-# baselayer=False
-# layer=92
-# x=0
+dataset='blade0.1/'
+sliced_alg='auto_slice/'
+curve_data_dir = '../data/'+dataset+sliced_alg
+data_dir=curve_data_dir+'weld_scan_'+'2023_07_24_13_13_53'+'/'
+baselayer=False
+last_layer=66
+layer=92
+x=0
 
 use_actual = False
 
 if not baselayer:
     layer_data_dir=data_dir+'layer_'+str(layer)+'_'+str(x)+'/'
+    if layer==0:
+        last_layer_data_dir=data_dir+'layer_'+str(layer-1)+'_'+str(x)+'/'
+    else:
+        ast_layer_data_dir=data_dir+'baselayer_'+str(last_layer)+'_'+str(x)+'/'
 else:
     layer_data_dir=data_dir+'baselayer_'+str(layer)+'_'+str(x)+'/'
+    last_layer_data_dir=data_dir+'baselayer_'+str(last_layer)+'_'+str(x)+'/'
 out_scan_dir = layer_data_dir+'scans/'
+last_out_scan_dir = last_layer_data_dir+'scans/'
 
 if not baselayer:
     curve_sliced_relative=np.loadtxt(curve_data_dir+'curve_sliced_relative/slice'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
@@ -176,10 +183,13 @@ pcd = scan_process.pcd_register_mti(mti_recording,q_out_exe,robot_stamps,use_cal
 pcd = scan_process.pcd_noise_remove(pcd,nb_neighbors=40,std_ratio=1.5,\
                                     min_bound=crop_min,max_bound=crop_max,outlier_remove=True,cluster_based_outlier_remove=True,cluster_neighbor=1,min_points=100)
 visualize_pcd([pcd])
+
+last_pcd = o3d.io.read_point_cloud(last_out_scan_dir+'processed_pcd.pcd')
+
 if use_actual:
-    profile_height = scan_process.pcd2dh(pcd,curve_sliced_relative,drawing=True)
+    profile_height = scan_process.pcd2dh(pcd,last_pcd,curve_sliced_relative,drawing=True)
 else:
-    profile_height = scan_process.pcd2dh(pcd,curve_sliced_relative,robot_weld,rob_js_plan,ph_param=ph_param_r1,drawing=True)
+    profile_height = scan_process.pcd2dh(pcd,last_pcd,curve_sliced_relative,robot_weld,rob_js_plan,ph_param=ph_param_r1,drawing=True)
 
 
 curve_i=0
