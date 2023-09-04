@@ -32,28 +32,60 @@ def connect_failed(s, client_id, url, err):
     mti_sub=RRN.SubscribeService(url)
     mti_client=mti_sub.GetDefaultClientWait(1)
 
+R1_ph_dataset_date='0801'
+R2_ph_dataset_date='0804'
+S1_ph_dataset_date='0801'
+
 zero_config=np.zeros(6)
 # 0. robots.
 config_dir='../config/'
+R1_marker_dir=config_dir+'MA2010_marker_config/'
+weldgun_marker_dir=config_dir+'weldgun_marker_config/'
+R2_marker_dir=config_dir+'MA1440_marker_config/'
+mti_marker_dir=config_dir+'mti_marker_config/'
+S1_marker_dir=config_dir+'D500B_marker_config/'
+S1_tcp_marker_dir=config_dir+'positioner_tcp_marker_config/'
 robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',d=15,tool_file_path=config_dir+'torch.csv',\
 	pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',\
-    base_marker_config_file=config_dir+'MA2010_0524_marker_config.yaml',tool_marker_config_file=config_dir+'weldgun_0524_marker_config.yaml')
+    base_marker_config_file=R1_marker_dir+'MA2010_'+R1_ph_dataset_date+'_marker_config.yaml',tool_marker_config_file=weldgun_marker_dir+'weldgun_'+R1_ph_dataset_date+'_marker_config.yaml')
 robot_scan=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.yml',tool_file_path=config_dir+'mti.csv',\
 	base_transformation_file=config_dir+'MA1440_pose.csv',pulse2deg_file_path=config_dir+'MA1440_A0_pulse2deg_real.csv',\
-    base_marker_config_file=config_dir+'MA1440_0524_marker_config.yaml')
+    base_marker_config_file=R2_marker_dir+'MA1440_'+R2_ph_dataset_date+'_marker_config.yaml',tool_marker_config_file=mti_marker_dir+'mti_'+R2_ph_dataset_date+'_marker_config.yaml')
+
 positioner=positioner_obj('D500B',def_path=config_dir+'D500B_robot_default_config.yml',tool_file_path=config_dir+'positioner_tcp.csv',\
     base_transformation_file=config_dir+'D500B_pose.csv',pulse2deg_file_path=config_dir+'D500B_pulse2deg_real.csv',\
-    base_marker_config_file=config_dir+'D500B_0524_marker_config.yaml',tool_marker_config_file=config_dir+'positioner_tcp_marker_config.yaml')
+    base_marker_config_file=S1_marker_dir+'D500B_'+S1_ph_dataset_date+'_marker_config.yaml',tool_marker_config_file=S1_tcp_marker_dir+'positioner_tcp_marker_config.yaml')
 
 #### change base H to calibrated ones ####
 robot_scan_base = robot_weld.T_base_basemarker.inv()*robot_scan.T_base_basemarker
 robot_scan.base_H = H_from_RT(robot_scan_base.R,robot_scan_base.p)
 positioner_base = robot_weld.T_base_basemarker.inv()*positioner.T_base_basemarker
 positioner.base_H = H_from_RT(positioner_base.R,positioner_base.p)
-T_to_base = Transform(np.eye(3),[0,0,-380])
-positioner.base_H = np.matmul(positioner.base_H,H_from_RT(T_to_base.R,T_to_base.p))
-
 # exit()
+
+#### load R1 kinematic model
+PH_data_dir='../mocap/PH_grad_data/test'+R1_ph_dataset_date+'_R1/train_data_'
+with open(PH_data_dir+'calib_PH_q.pickle','rb') as file:
+    PH_q=pickle.load(file)
+nom_P=np.array([[0,0,0],[150,0,0],[0,0,760],\
+                   [1082,0,200],[0,0,0],[0,0,0],[100,0,0]]).T
+nom_H=np.array([[0,0,1],[0,1,0],[0,-1,0],\
+                [-1,0,0],[0,-1,0],[-1,0,0]]).T
+ph_param_r1=PH_Param(nom_P,nom_H)
+ph_param_r1.fit(PH_q,method='FBF')
+#### load R2 kinematic model
+PH_data_dir='../mocap/PH_grad_data/test'+R2_ph_dataset_date+'_R2/train_data_'
+with open(PH_data_dir+'calib_PH_q.pickle','rb') as file:
+    PH_q=pickle.load(file)
+nom_P=np.array([[0,0,0],[155,0,0],[0,0,614],\
+                   [640,0,200],[0,0,0],[0,0,0],[100,0,0]]).T
+nom_H=np.array([[0,0,1],[0,1,0],[0,-1,0],\
+                [-1,0,0],[0,-1,0],[-1,0,0]]).T
+ph_param_r2=PH_Param(nom_P,nom_H)
+ph_param_r2.fit(PH_q,method='FBF')
+#### load S1 kinematic model
+positioner.robot.P=deepcopy(positioner.calib_P)
+positioner.robot.H=deepcopy(positioner.calib_H)
 
 #### data directory
 # dataset='cup/'
@@ -150,12 +182,12 @@ curve_sliced_relative=None
 all_last_curve_relative=None
 
 ## forward/backward, baselayer/regular layers
-forward = True
-baselayer = False
+# forward = True
+# baselayer = False
 
-layer=554
-last_layer=535
-layer_count=28
+layer=-1
+last_layer=-1
+layer_count=-1
 
 # try:
 #     layer_count=len(glob.glob(data_dir+'layer_*_0'))+1
@@ -180,9 +212,24 @@ while True:
     forward=True if layer_count%2==0 else False
 
     ####### Decide which layer to print #######
+    if all_profile_height is None and layer_count!=-1:
+        last_num_sections=len(glob.glob(curve_data_dir+'curve_sliced_relative/slice'+str(layer)+'_*.csv'))
+        all_profile_height=[]
+        last_pcd_layer=o3d.geometry.PointCloud()
+        for x in range(last_num_sections):
+            last_scan_dir=data_dir+'layer_'+str(layer)+'_'+str(x)+'/scans/'
+            this_sec_dh = np.load(last_scan_dir+'height_profile.npy')
+            nanid = np.argwhere(np.isnan(this_sec_dh[:,1]))
+            if len(nanid)>0:
+                nanid=nanid[0]
+                this_sec_dh[nanid,1] = deepcopy(this_sec_dh[nanid+1,1])
+            all_profile_height.extend(this_sec_dh)
+            last_pcd_layer = last_pcd_layer+o3d.io.read_point_cloud(last_scan_dir+'processed_pcd.pcd')
+        all_profile_height=np.array(all_profile_height)
     if baselayer:
+        last_layer = layer
         layer = layer_count
-    if not manual_dh and not baselayer:
+    if not manual_dh and not baselayer and layer>=0:
         # if layer_count!=0 and layer_count<start_feedback:
         #     last_layer=layer
         #     layer+=layer_height_num
@@ -191,17 +238,6 @@ while True:
         if layer_count==total_baselayer:
             layer=0
         else:
-            if all_profile_height is None:
-                last_num_sections=len(glob.glob(curve_data_dir+'curve_sliced_relative/slice'+str(layer)+'_*.csv'))
-                all_profile_height=[]
-                for x in range(last_num_sections):
-                    this_sec_dh = np.load(data_dir+'layer_'+str(layer)+'_'+str(x)+'/scans/height_profile.npy')
-                    nanid = np.argwhere(np.isnan(this_sec_dh[:,1]))
-                    if len(nanid)>0:
-                        nanid=nanid[0]
-                        this_sec_dh[nanid,1] = deepcopy(this_sec_dh[nanid+1,1])
-                    all_profile_height.extend(this_sec_dh)
-                all_profile_height=np.array(all_profile_height)
             # plt.scatter(all_profile_height[:,0],all_profile_height[:,1])
             # plt.show()
             # print(all_profile_height[:,1])
@@ -237,149 +273,147 @@ while True:
     #### welding
     
     start_section=0
-    # if layer==576:
-    #     start_section=1
+    if layer>=0:
+        for x in range(start_section,num_sections):
+            print("Print Layer",layer,"Sec.",x)
 
-    for x in range(start_section,num_sections):
-        print("Print Layer",layer,"Sec.",x)
+            # 1. The curve path in "positioner tcp frame"
+            # Load nominal path given the layer
+            if not baselayer:
+                curve_sliced_js=np.loadtxt(curve_data_dir+'curve_sliced_js/MA2010_js'+str(layer)+'_'+str(x)+'.csv',delimiter=',').reshape((-1,6))
+                if len(curve_sliced_js)<2:
+                    continue
+                positioner_js=np.loadtxt(curve_data_dir+'curve_sliced_js/D500B_js'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
+                curve_sliced_relative=np.loadtxt(curve_data_dir+'curve_sliced_relative/slice'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
+            else: # baselayer
+                curve_sliced_js=np.loadtxt(curve_data_dir+'curve_sliced_js/MA2010_base_js'+str(layer)+'_'+str(x)+'.csv',delimiter=',').reshape((-1,6))
+                if len(curve_sliced_js)<2:
+                    continue
+                positioner_js=np.loadtxt(curve_data_dir+'curve_sliced_js/D500B_base_js'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
+                curve_sliced_relative=np.loadtxt(curve_data_dir+'curve_sliced_relative/baselayer'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
 
-        # 1. The curve path in "positioner tcp frame"
-        # Load nominal path given the layer
-        if not baselayer:
-            curve_sliced_js=np.loadtxt(curve_data_dir+'curve_sliced_js/MA2010_js'+str(layer)+'_'+str(x)+'.csv',delimiter=',').reshape((-1,6))
-            if len(curve_sliced_js)<2:
-                continue
-            positioner_js=np.loadtxt(curve_data_dir+'curve_sliced_js/D500B_js'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
-            curve_sliced_relative=np.loadtxt(curve_data_dir+'curve_sliced_relative/slice'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
-        else: # baselayer
-            curve_sliced_js=np.loadtxt(curve_data_dir+'curve_sliced_js/MA2010_base_js'+str(layer)+'_'+str(x)+'.csv',delimiter=',').reshape((-1,6))
-            if len(curve_sliced_js)<2:
-                continue
-            positioner_js=np.loadtxt(curve_data_dir+'curve_sliced_js/D500B_base_js'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
-            curve_sliced_relative=np.loadtxt(curve_data_dir+'curve_sliced_relative/baselayer'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
+            #### convert to R1 and S1 motion
+            lam1=calc_lam_js(curve_sliced_js,robot_weld)
+            lam2=calc_lam_js(positioner_js,positioner)
+            lam_relative=calc_lam_cs(curve_sliced_relative)
 
-        #### convert to R1 and S1 motion
-        lam1=calc_lam_js(curve_sliced_js,robot_weld)
-        lam2=calc_lam_js(positioner_js,positioner)
-        lam_relative=calc_lam_cs(curve_sliced_relative)
+            num_points_layer=max(2,int(lam_relative[-1]/waypoint_distance))
 
-        num_points_layer=max(2,int(lam_relative[-1]/waypoint_distance))
-
-        ###find which end to start depending on how close to joint limit
-        # q_prev=robot_client.getJointAnglesDB(positioner.pulse2deg)
-        # if positioner.upper_limit[1]-q_prev[1]>q_prev[1]-positioner.lower_limit[1]:
-        #     breakpoints=np.linspace(0,len(curve_sliced_js)-1,num=num_points_layer).astype(int)
-        # else:
-        #     breakpoints=np.linspace(len(curve_sliced_js)-1,0,num=num_points_layer).astype(int)
-        
-        ## using forward/backward techniqu
-        if forward:
-            breakpoints=np.linspace(0,len(curve_sliced_js)-1,num=num_points_layer).astype(int)
-        else:
-            breakpoints=np.linspace(len(curve_sliced_js)-1,0,num=num_points_layer).astype(int)
-
-        #### Correction ####
-        if not correction or (layer_count<start_feedback): # no correction
-            this_weld_v=np.ones(len(breakpoints)-1)*planned_v[layer_count]
-            weld_job=planned_job[layer_count]
-        else: # start correction after "start_feedback"
-            if all_profile_height is None or all_last_curve_relative is None:
-                last_num_sections=len(glob.glob(curve_data_dir+'curve_sliced_relative/slice'+str(last_layer)+'_*.csv'))
-                all_last_curve_relative=[]
-                for x in range(0,last_num_sections):
-                    all_last_curve_relative.extend(np.loadtxt(curve_data_dir+'curve_sliced_relative/slice'+str(last_layer)+'_'+str(x)+'.csv',delimiter=','))
-                    layer_data_dir=data_dir+'layer_'+str(last_layer)+'_'+str(x)+'/'
-                    out_scan_dir = layer_data_dir+'scans/'
-                
-                all_last_curve_relative=np.array(all_last_curve_relative)
-
-            #### correction strategy
-            this_weld_v,all_dh=\
-                strategy_4(all_profile_height,des_dh,curve_sliced_relative,all_last_curve_relative,breakpoints,max_v=weld_max_v,min_v=weld_min_v,ipm_mode=weld_mode)
-            weld_job=des_job
-
-            ####################
-            print("dh:",all_dh)
-            print("Nominal V:",des_v)
-            print("Corrected V:",this_weld_v)
-            print(len(curve_sliced_relative))
-
-            fig, ax1 = plt.subplots()
-            ax2 = ax1.twinx()
-            ax1.scatter(all_profile_height[:,0],all_profile_height[:,1],c='blue',label='Height Layer '+str(layer))
-            for bp_i in range(len(breakpoints)-1):
-                ax2.plot([lam_relative[breakpoints[bp_i]],lam_relative[breakpoints[bp_i+1]]],[this_weld_v[bp_i],this_weld_v[bp_i]],'-o')
-            ax1.set_xlabel('X-axis (Lambda) (mm)')
-            ax1.set_ylabel('Height (mm)', color='g')
-            ax2.set_ylabel('Speed (mm/sec)', color='b')
-            ax1.legend(loc=0)
-            ax2.legend(loc=0)
-            plt.title("Height and Speed, 40 MoveL")
-            plt.legend()
-            plt.show()
-
-            # plt.scatter(all_profile_height[:,0],all_profile_height[:,1],c='blue')
-            # for bp_i in range(len(breakpoints)-1):
-            #     plt.plot([lam_relative[breakpoints[bp_i]],lam_relative[breakpoints[bp_i+1]]],[this_weld_v[bp_i],this_weld_v[bp_i]],'-o')
-            # plt.show()
-
-        ## use vel=1 and times the desired speed
-        s1_all,s2_all=calc_individual_speed(1,lam1,lam2,lam_relative,breakpoints)
-        s1_all=np.multiply(s1_all,this_weld_v)
-        s2_all=np.multiply(s2_all,this_weld_v)
-
-        if layer>=577 and True:
-            go_weld=True
-        else:
-            go_weld=False
-
-        input("Weld Move to Start")
-        ###move to intermidieate waypoint for collision avoidance if multiple section
-        # if num_sections!=num_sections_prev:
-        waypoint_pose=robot_weld.fwd(curve_sliced_js[breakpoints[0]])
-        waypoint_pose.p[-1]+=50
-        q1=robot_weld.inv(waypoint_pose.p,waypoint_pose.R,curve_sliced_js[breakpoints[0]])[0]
-        q2=positioner_js[breakpoints[0]]
-
-        if go_weld:
-            ws.jog_dual(robot_weld,positioner,q1,q2,v=to_start_speed)
-
-        ######################################################
-        ########### Do welding #############
-        q1_all=[curve_sliced_js[breakpoints[0]]]
-        q2_all=[positioner_js[breakpoints[0]]]
-        v1_all=[1]
-        v2_all=[10]
-        primitives=['movej']
-        for j in range(1,len(breakpoints)):
-            q1_all.append(curve_sliced_js[breakpoints[j]])
-            q2_all.append(positioner_js[breakpoints[j]])
-            v1_all.append(max(s1_all[j-1],0.1))
+            ###find which end to start depending on how close to joint limit
+            # q_prev=robot_client.getJointAnglesDB(positioner.pulse2deg)
+            # if positioner.upper_limit[1]-q_prev[1]>q_prev[1]-positioner.lower_limit[1]:
+            #     breakpoints=np.linspace(0,len(curve_sliced_js)-1,num=num_points_layer).astype(int)
+            # else:
+            #     breakpoints=np.linspace(len(curve_sliced_js)-1,0,num=num_points_layer).astype(int)
             
-            positioner_w=this_weld_v[j-1]/np.linalg.norm(curve_sliced_relative[breakpoints[j]][:2])
-            v2_all.append(min(100,100*positioner_w/positioner.joint_vel_limit[1]))
-            primitives.append('movel')
+            ## using forward/backward techniqu
+            if forward:
+                breakpoints=np.linspace(0,len(curve_sliced_js)-1,num=num_points_layer).astype(int)
+            else:
+                breakpoints=np.linspace(len(curve_sliced_js)-1,0,num=num_points_layer).astype(int)
 
-        input("Start Weld")
+            #### Correction ####
+            if not correction or (layer_count<start_feedback): # no correction
+                this_weld_v=np.ones(len(breakpoints)-1)*planned_v[layer_count]
+                weld_job=planned_job[layer_count]
+            else: # start correction after "start_feedback"
+                if all_profile_height is None or all_last_curve_relative is None:
+                    last_num_sections=len(glob.glob(curve_data_dir+'curve_sliced_relative/slice'+str(last_layer)+'_*.csv'))
+                    all_last_curve_relative=[]
+                    for x in range(0,last_num_sections):
+                        all_last_curve_relative.extend(np.loadtxt(curve_data_dir+'curve_sliced_relative/slice'+str(last_layer)+'_'+str(x)+'.csv',delimiter=','))
+                        layer_data_dir=data_dir+'layer_'+str(last_layer)+'_'+str(x)+'/'
+                        out_scan_dir = layer_data_dir+'scans/'
+                    
+                    all_last_curve_relative=np.array(all_last_curve_relative)
 
-        if go_weld:
-            ####DATA LOGGING
-            rr_sensors.start_all_sensors()
-            rob_stamps,rob_js_exe,_,_=ws.weld_segment_dual(primitives,robot_weld,positioner,q1_all,q2_all,v1_all,v2_all,cond_all=[weld_job],arc=arc_on)
-            rr_sensors.stop_all_sensors()
+                #### correction strategy
+                this_weld_v,all_dh=\
+                    strategy_4(all_profile_height,des_dh,curve_sliced_relative,all_last_curve_relative,breakpoints,max_v=weld_max_v,min_v=weld_min_v,ipm_mode=weld_mode)
+                weld_job=des_job
 
-            if save_weld_record:
-                Path(data_dir).mkdir(exist_ok=True)
-                if not baselayer:
-                    layer_data_dir=data_dir+'layer_'+str(layer)+'_'+str(x)+'/'
-                else:
-                    layer_data_dir=data_dir+'baselayer_'+str(layer)+'_'+str(x)+'/'
-                Path(layer_data_dir).mkdir(exist_ok=True)
-                np.savetxt(layer_data_dir + 'weld_js_exe.csv',rob_js_exe,delimiter=',')
-                np.savetxt(layer_data_dir + 'weld_robot_stamps.csv',rob_stamps,delimiter=',')
-                rr_sensors.save_all_sensors(layer_data_dir)
-        
-        all_curve_relative.append(curve_sliced_relative)
+                ####################
+                print("dh:",all_dh)
+                print("Nominal V:",des_v)
+                print("Corrected V:",this_weld_v)
+                print(len(curve_sliced_relative))
+
+                fig, ax1 = plt.subplots()
+                ax2 = ax1.twinx()
+                ax1.scatter(all_profile_height[:,0],all_profile_height[:,1],c='blue',label='Height Layer '+str(layer))
+                for bp_i in range(len(breakpoints)-1):
+                    ax2.plot([lam_relative[breakpoints[bp_i]],lam_relative[breakpoints[bp_i+1]]],[this_weld_v[bp_i],this_weld_v[bp_i]],'-o')
+                ax1.set_xlabel('X-axis (Lambda) (mm)')
+                ax1.set_ylabel('Height (mm)', color='g')
+                ax2.set_ylabel('Speed (mm/sec)', color='b')
+                ax1.legend(loc=0)
+                ax2.legend(loc=0)
+                plt.title("Height and Speed, 40 MoveL")
+                plt.legend()
+                plt.show()
+
+                # plt.scatter(all_profile_height[:,0],all_profile_height[:,1],c='blue')
+                # for bp_i in range(len(breakpoints)-1):
+                #     plt.plot([lam_relative[breakpoints[bp_i]],lam_relative[breakpoints[bp_i+1]]],[this_weld_v[bp_i],this_weld_v[bp_i]],'-o')
+                # plt.show()
+
+            ## use vel=1 and times the desired speed
+            s1_all,s2_all=calc_individual_speed(1,lam1,lam2,lam_relative,breakpoints)
+            s1_all=np.multiply(s1_all,this_weld_v)
+            s2_all=np.multiply(s2_all,this_weld_v)
+
+            if layer>=577 and True:
+                go_weld=True
+            else:
+                go_weld=False
+
+            input("Weld Move to Start")
+            ###move to intermidieate waypoint for collision avoidance if multiple section
+            # if num_sections!=num_sections_prev:
+            waypoint_pose=robot_weld.fwd(curve_sliced_js[breakpoints[0]])
+            waypoint_pose.p[-1]+=50
+            q1=robot_weld.inv(waypoint_pose.p,waypoint_pose.R,curve_sliced_js[breakpoints[0]])[0]
+            q2=positioner_js[breakpoints[0]]
+
+            if go_weld:
+                ws.jog_dual(robot_weld,positioner,q1,q2,v=to_start_speed)
+
+            ######################################################
+            ########### Do welding #############
+            q1_all=[curve_sliced_js[breakpoints[0]]]
+            q2_all=[positioner_js[breakpoints[0]]]
+            v1_all=[1]
+            v2_all=[10]
+            primitives=['movej']
+            for j in range(1,len(breakpoints)):
+                q1_all.append(curve_sliced_js[breakpoints[j]])
+                q2_all.append(positioner_js[breakpoints[j]])
+                v1_all.append(max(s1_all[j-1],0.1))
+                
+                positioner_w=this_weld_v[j-1]/np.linalg.norm(curve_sliced_relative[breakpoints[j]][:2])
+                v2_all.append(min(100,100*positioner_w/positioner.joint_vel_limit[1]))
+                primitives.append('movel')
+
+            input("Start Weld")
+
+            if go_weld:
+                ####DATA LOGGING
+                rr_sensors.start_all_sensors()
+                rob_stamps,rob_js_exe,_,_=ws.weld_segment_dual(primitives,robot_weld,positioner,q1_all,q2_all,v1_all,v2_all,cond_all=[weld_job],arc=arc_on)
+                rr_sensors.stop_all_sensors()
+
+                if save_weld_record:
+                    Path(data_dir).mkdir(exist_ok=True)
+                    if not baselayer:
+                        layer_data_dir=data_dir+'layer_'+str(layer)+'_'+str(x)+'/'
+                    else:
+                        layer_data_dir=data_dir+'baselayer_'+str(layer)+'_'+str(x)+'/'
+                    Path(layer_data_dir).mkdir(exist_ok=True)
+                    np.savetxt(layer_data_dir + 'weld_js_exe.csv',rob_js_exe,delimiter=',')
+                    np.savetxt(layer_data_dir + 'weld_robot_stamps.csv',rob_stamps,delimiter=',')
+                    rr_sensors.save_all_sensors(layer_data_dir)
+            
+            all_curve_relative.append(curve_sliced_relative)
 
     ## move R1 back to home
     # print(q1_all)
@@ -388,19 +422,24 @@ while True:
 
     #### scanning
     if True:
+        if layer<0:
+            read_layer=0
+        else:
+            read_layer=layer
         if len(all_curve_relative) ==0:
             if not baselayer:
-                num_sections=len(glob.glob(curve_data_dir+'curve_sliced_relative/slice'+str(layer)+'_*.csv'))
+                num_sections=len(glob.glob(curve_data_dir+'curve_sliced_relative/slice'+str(read_layer)+'_*.csv'))
                 all_curve_relative=[]
                 for x in range(0,num_sections):
-                    all_curve_relative.append(np.loadtxt(curve_data_dir+'curve_sliced_relative/slice'+str(layer)+'_'+str(x)+'.csv',delimiter=','))
+                    all_curve_relative.append(np.loadtxt(curve_data_dir+'curve_sliced_relative/slice'+str(read_layer)+'_'+str(x)+'.csv',delimiter=','))
                 q1_all
             else:
-                num_sections=len(glob.glob(curve_data_dir+'curve_sliced_relative/baselayer'+str(layer)+'_*.csv'))
+                num_sections=len(glob.glob(curve_data_dir+'curve_sliced_relative/baselayer'+str(read_layer)+'_*.csv'))
                 all_curve_relative=[]
                 for x in range(0,num_sections):
-                    all_curve_relative.append(np.loadtxt(curve_data_dir+'curve_sliced_relative/baselayer'+str(layer)+'_'+str(x)+'.csv',delimiter=','))
+                    all_curve_relative.append(np.loadtxt(curve_data_dir+'curve_sliced_relative/baselayer'+str(read_layer)+'_'+str(x)+'.csv',delimiter=','))
 
+        pcd_layer=o3d.geometry.PointCloud()
         all_profile_height=[]
         all_last_curve_relative=[]
         section_count=0
@@ -409,36 +448,27 @@ while True:
             spg = ScanPathGen(robot_scan,positioner,scan_stand_off_d,Rz_angle,Ry_angle,bounds_theta)
 
             if not baselayer:
-                curve_sliced_relative=np.loadtxt(curve_data_dir+'curve_sliced_relative/slice'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
-                curve_sliced_js=np.loadtxt(curve_data_dir+'curve_sliced_js/MA2010_js'+str(layer)+'_'+str(x)+'.csv',delimiter=',').reshape((-1,6))
-                positioner_js=np.loadtxt(curve_data_dir+'curve_sliced_js/D500B_js'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
+                curve_sliced_relative=np.loadtxt(curve_data_dir+'curve_sliced_relative/slice'+str(read_layer)+'_'+str(x)+'.csv',delimiter=',')
+                curve_sliced_js=np.loadtxt(curve_data_dir+'curve_sliced_js/MA2010_js'+str(read_layer)+'_'+str(x)+'.csv',delimiter=',').reshape((-1,6))
+                positioner_js=np.loadtxt(curve_data_dir+'curve_sliced_js/D500B_js'+str(read_layer)+'_'+str(x)+'.csv',delimiter=',')
             else:
-                curve_sliced_relative=np.loadtxt(curve_data_dir+'curve_sliced_relative/baselayer'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
-                curve_sliced_js=np.loadtxt(curve_data_dir+'curve_sliced_js/MA2010_base_js'+str(layer)+'_'+str(x)+'.csv',delimiter=',').reshape((-1,6))
-                positioner_js=np.loadtxt(curve_data_dir+'curve_sliced_js/D500B_base_js'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
+                curve_sliced_relative=np.loadtxt(curve_data_dir+'curve_sliced_relative/baselayer'+str(read_layer)+'_'+str(x)+'.csv',delimiter=',')
+                curve_sliced_js=np.loadtxt(curve_data_dir+'curve_sliced_js/MA2010_base_js'+str(read_layer)+'_'+str(x)+'.csv',delimiter=',').reshape((-1,6))
+                positioner_js=np.loadtxt(curve_data_dir+'curve_sliced_js/D500B_base_js'+str(read_layer)+'_'+str(x)+'.csv',delimiter=',')
             rob_js_plan = np.hstack((curve_sliced_js,positioner_js))
-            print(len(curve_sliced_relative),len(rob_js_plan))
 
             # if len(curve_sliced_relative)<2:
             #     continue
             print("Scan Layer",layer,", Sec",x)
             # try:
             if not baselayer:
-                q_out1=np.loadtxt(curve_data_dir+'curve_scan_js/MA1440_js'+str(layer)+'_'+str(x)+'.csv',delimiter=',').reshape((-1,6))
-                q_out2=np.loadtxt(curve_data_dir+'curve_scan_js/D500B_js'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
-                scan_p=np.loadtxt(curve_data_dir+'curve_scan_relative/scan_T'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
+                q_out1=np.loadtxt(curve_data_dir+'curve_scan_js/MA1440_js'+str(read_layer)+'_'+str(x)+'.csv',delimiter=',').reshape((-1,6))
+                q_out2=np.loadtxt(curve_data_dir+'curve_scan_js/D500B_js'+str(read_layer)+'_'+str(x)+'.csv',delimiter=',')
+                scan_p=np.loadtxt(curve_data_dir+'curve_scan_relative/scan_T'+str(read_layer)+'_'+str(x)+'.csv',delimiter=',')
             else:
-                q_out1=np.loadtxt(curve_data_dir+'curve_scan_js/MA1440_base_js'+str(layer)+'_'+str(x)+'.csv',delimiter=',').reshape((-1,6))
-                q_out2=np.loadtxt(curve_data_dir+'curve_scan_js/D500B_base_js'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
-                scan_p=np.loadtxt(curve_data_dir+'curve_scan_relative/scan_base_T'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
-            # except:
-            #     positioner_js=np.loadtxt(curve_data_dir+'curve_sliced_js/D500B_js'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
-            #     ## reverse the welding path
-            #     curve_sliced_relative_reverse=curve_sliced_relative[::-1]
-            #     positioner_js=positioner_js[::-1]
-            #     # generate scan path
-            #     scan_p,scan_R,q_out1,q_out2=spg.gen_scan_path([curve_sliced_relative_reverse],[0],all_scan_angle,\
-            #                         solve_js_method=1,q_init_table=positioner_js[0],R_path=mti_Rpath,scan_path_dir=None)
+                q_out1=np.loadtxt(curve_data_dir+'curve_scan_js/MA1440_base_js'+str(read_layer)+'_'+str(x)+'.csv',delimiter=',').reshape((-1,6))
+                q_out2=np.loadtxt(curve_data_dir+'curve_scan_js/D500B_base_js'+str(read_layer)+'_'+str(x)+'.csv',delimiter=',')
+                scan_p=np.loadtxt(curve_data_dir+'curve_scan_relative/scan_base_T'+str(read_layer)+'_'+str(x)+'.csv',delimiter=',')
             
             ## get breakpoints
             lam_relative=calc_lam_cs(scan_p)
@@ -549,33 +579,36 @@ while True:
 
             #### scanning process: processing point cloud and get h
             curve_sliced_relative=np.array(curve_sliced_relative)
-            crop_extend=10
+            crop_extend=15
             crop_min=tuple(np.min(curve_sliced_relative[:,:3],axis=0)-crop_extend)
             crop_max=tuple(np.max(curve_sliced_relative[:,:3],axis=0)+crop_extend)
-            print(crop_min)
-            print(crop_max)
             scan_process = ScanProcess(robot_scan,positioner)
-            pcd = scan_process.pcd_register_mti(mti_recording,q_out_exe,robot_stamps)
+            pcd = scan_process.pcd_register_mti(mti_recording,q_out_exe,robot_stamps,use_calib=True,ph_param=ph_param_r2)
             pcd = scan_process.pcd_noise_remove(pcd,nb_neighbors=40,std_ratio=1.5,\
-                                                min_bound=crop_min,max_bound=crop_max,cluster_based_outlier_remove=False,cluster_neighbor=1,min_points=25)
+                                                min_bound=crop_min,max_bound=crop_max,cluster_based_outlier_remove=True,cluster_neighbor=1,min_points=100)
             visualize_pcd([pcd])
             
-            profile_height = scan_process.pcd2dh(pcd,deepcopy(curve_sliced_relative),robot_weld,rob_js_plan,drawing=True)
-            plt.scatter(profile_height[:,0],profile_height[:,1])
-            plt.show()
-            all_profile_height.extend(profile_height)
+            if layer!=-1:
+                profile_height = scan_process.pcd2dh(pcd,last_pcd_layer,curve_sliced_relative,robot_weld,rob_js_plan,ph_param=ph_param_r1,drawing=True)
+            
+                plt.scatter(profile_height[:,0],profile_height[:,1])
+                plt.show()
+                all_profile_height.extend(profile_height)
+            pcd_layer = pcd_layer+pcd
 
             # all_profile_height.extend(np.array([[0,1],[1,1]]))
             all_last_curve_relative.extend(curve_sliced_relative)
             
             if save_output_points:
                 o3d.io.write_point_cloud(out_scan_dir+'processed_pcd.pcd',pcd)
-                np.save(out_scan_dir+'height_profile.npy',profile_height)
+                if layer!=-1:
+                    np.save(out_scan_dir+'height_profile.npy',profile_height)
             # exit()
 
             section_count+=1
         all_profile_height=np.array(all_profile_height)
         all_last_curve_relative=np.array(all_last_curve_relative)
+        last_pcd_layer=deepcopy(pcd_layer)
 
     input("Scan Move to Home")
     # move robot to home

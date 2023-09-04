@@ -25,7 +25,7 @@ import yaml
 from math import ceil,floor
 
 R1_ph_dataset_date='0801'
-R2_ph_dataset_date='0801'
+R2_ph_dataset_date='0804'
 S1_ph_dataset_date='0801'
 
 zero_config=np.zeros(6)
@@ -112,18 +112,18 @@ sliced_alg='auto_slice/'
 curve_data_dir = '../data/'+dataset+sliced_alg
 data_dir=curve_data_dir+'weld_scan_'+'2023_07_24_13_13_53'+'/'
 baselayer=False
-last_layer=66
-layer=92
+last_layer=365
+layer=384
 x=0
 
 use_actual = False
 
 if not baselayer:
     layer_data_dir=data_dir+'layer_'+str(layer)+'_'+str(x)+'/'
-    if layer==0:
-        last_layer_data_dir=data_dir+'layer_'+str(layer-1)+'_'+str(x)+'/'
+    if layer!=0:
+        last_layer_data_dir=data_dir+'layer_'+str(last_layer)+'_'+str(x)+'/'
     else:
-        ast_layer_data_dir=data_dir+'baselayer_'+str(last_layer)+'_'+str(x)+'/'
+        last_layer_data_dir=data_dir+'baselayer_'+str(last_layer)+'_'+str(x)+'/'
 else:
     layer_data_dir=data_dir+'baselayer_'+str(layer)+'_'+str(x)+'/'
     last_layer_data_dir=data_dir+'baselayer_'+str(last_layer)+'_'+str(x)+'/'
@@ -174,17 +174,31 @@ curve_sliced_relative=np.array(curve_sliced_relative)
 crop_extend=15
 crop_min=tuple(np.min(curve_sliced_relative[:,:3],axis=0)-crop_extend)
 crop_max=tuple(np.max(curve_sliced_relative[:,:3],axis=0)+crop_extend)
-print(crop_min)
-print(crop_max)
 scan_process = ScanProcess(robot_scan,positioner)
 pcd = scan_process.pcd_register_mti(mti_recording,q_out_exe,robot_stamps,use_calib=True,ph_param=ph_param_r2)
 # pcd = scan_process.pcd_register_mti(mti_recording,q_out_exe,robot_stamps,use_calib=False)
 # visualize_pcd([pcd])
 pcd = scan_process.pcd_noise_remove(pcd,nb_neighbors=40,std_ratio=1.5,\
                                     min_bound=crop_min,max_bound=crop_max,outlier_remove=True,cluster_based_outlier_remove=True,cluster_neighbor=1,min_points=100)
-visualize_pcd([pcd])
+# visualize_pcd([pcd])
 
-last_pcd = o3d.io.read_point_cloud(last_out_scan_dir+'processed_pcd.pcd')
+# last pcd
+with open(last_out_scan_dir+'mti_scans.pickle', 'rb') as file:
+    mti_recording=pickle.load(file)
+q_out_exe=np.loadtxt(last_out_scan_dir+'scan_js_exe.csv',delimiter=',')
+robot_stamps=np.loadtxt(last_out_scan_dir+'scan_robot_stamps.csv',delimiter=',')
+#### scanning process: processing point cloud and get h
+curve_sliced_relative=np.array(curve_sliced_relative)
+crop_extend=15
+crop_min=tuple(np.min(curve_sliced_relative[:,:3],axis=0)-crop_extend)
+crop_max=tuple(np.max(curve_sliced_relative[:,:3],axis=0)+crop_extend)
+scan_process = ScanProcess(robot_scan,positioner)
+last_pcd = scan_process.pcd_register_mti(mti_recording,q_out_exe,robot_stamps,use_calib=True,ph_param=ph_param_r2)
+# pcd = scan_process.pcd_register_mti(mti_recording,q_out_exe,robot_stamps,use_calib=False)
+# visualize_pcd([pcd])
+last_pcd = scan_process.pcd_noise_remove(last_pcd,nb_neighbors=40,std_ratio=1.5,\
+                                    min_bound=crop_min,max_bound=crop_max,outlier_remove=True,cluster_based_outlier_remove=True,cluster_neighbor=1,min_points=100)
+# visualize_pcd([pcd])
 
 if use_actual:
     profile_height = scan_process.pcd2dh(pcd,last_pcd,curve_sliced_relative,drawing=True)
