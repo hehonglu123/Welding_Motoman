@@ -163,7 +163,7 @@ class WeldRRSensor(object):
 
             # Convert the packet to an image and set the global variable
             self.ir_recording.append(copy.deepcopy(display_mat))
-            self.ir_timestamp.append(time.time())
+            self.ir_timestamp.append(rr_img.image_info.data_header.ts['seconds']+rr_img.image_info.data_header.ts['nanoseconds']*1e-9)
     
     def save_ir_file(self,filedir):
 
