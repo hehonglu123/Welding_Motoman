@@ -50,16 +50,35 @@ def new_frame(pipe_ep):
 		flir_logging.append(display_mat)
 		flir_ts.append(rr_img.image_info.data_header.ts['seconds']+rr_img.image_info.data_header.ts['nanoseconds']*1e-9)
 
-def save_data(rr_sensors,recorded_dir,robot_ts,robot_js,flir_logging,flir_ts):
-	robot_ts=np.array(robot_ts)
-	robot_js=np.array(robot_js)
+def save_data(recorded_dir,welding_data,audio_recording,robot_data,flir_logging,flir_ts,slice_num):
+	###MAKING DIR
+	layer_data_dir=recorded_dir+'layer_'+str(slice_num)+'/'
+	Path(layer_data_dir).mkdir(exist_ok=True)
+
+	####AUDIO SAVING
+	first_channel = np.concatenate(audio_recording)
+	first_channel_int16=(first_channel*32767).astype(np.int16)
+	with wave.open(layer_data_dir+'mic_recording.wav', 'wb') as wav_file:
+		# Set the WAV file parameters
+		wav_file.setnchannels(1)
+		wav_file.setsampwidth(2)  # 2 bytes per sample (16-bit)
+		wav_file.setframerate(44100)
+		# Write the audio data to the WAV file
+		wav_file.writeframes(first_channel_int16.tobytes())
+
+	####FRONIUS SAVING
+	np.savetxt(layer_data_dir + 'welding.csv',welding_data, delimiter=',',header='timestamp,voltage,current,feedrate,energy', comments='')
+	
+
+	####ROBOT JOINT SAVING
+	np.savetxt(layer_data_dir+'joint_recording.csv',robot_data,delimiter=',')
+
+	###FLIR SAVING
 	flir_ts=np.array(flir_ts)
-	Path(recorded_dir).mkdir(exist_ok=True)
-	np.savetxt(recorded_dir+'joint_recording.csv',np.hstack((robot_ts.reshape(-1, 1),robot_js)),delimiter=',')
-	rr_sensors.save_all_sensors(recorded_dir)
-	with open(recorded_dir+'ir_recording.pickle','wb') as file:
+	with open(layer_data_dir+'ir_recording.pickle','wb') as file:
 			pickle.dump(np.array(flir_logging),file)
-	np.savetxt(recorded_dir + "ir_stamps.csv",flir_ts-flir_ts[0],delimiter=',')
+	np.savetxt(layer_data_dir + "ir_stamps.csv",flir_ts-flir_ts[0],delimiter=',')
+	
 	return
 
 def main():
@@ -69,6 +88,7 @@ def main():
 	with open(data_dir+'slicing.yml', 'r') as file:
 		slicing_meta = yaml.safe_load(file)
 	recorded_dir='recorded_data/'
+	Path(recorded_dir).mkdir(exist_ok=True)
 
 	layer_height_num=int(1.8/slicing_meta['line_resolution'])
 	layer_width_num=int(4/slicing_meta['line_resolution'])
@@ -97,7 +117,7 @@ def main():
 	flir.setf_param("object_emissivity", RR.VarValue(0.13,"double"))
 	flir.setf_param("scale_limit_low", RR.VarValue(293.15,"double"))
 	flir.setf_param("scale_limit_upper", RR.VarValue(5000,"double"))
-	global image_consts
+	global image_consts, flir_logging, flir_ts
 	image_consts = RRN.GetConstants('com.robotraconteur.image', flir)
 	p=flir.frame_stream.Connect(-1)
 	#Set the callback for when a new pipe packet is received to the
@@ -132,19 +152,19 @@ def main():
 
 
 	###set up control parameters
-	job_offset=200
-	nominal_feedrate=170
-	nominal_vd_relative=0.5
+	job_offset=400 		###200 for Aluminum ER4043, 300 for Steel Alloy ER70S-6, 400 for Stainless Steel ER316L
+	nominal_feedrate=250
+	nominal_vd_relative=0.2
 	nominal_wire_length=25 #pixels
 	nominal_temp_below=500
 	base_feedrate_cmd=300
-	base_vd=10
+	base_vd=5
 	feedrate_cmd=nominal_feedrate
 	vd_relative=nominal_vd_relative
 	feedrate_gain=0.5
 	feedrate_min=60
 	feedrate_max=300
-	nominal_slice_increment=int(1.8/slicing_meta['line_resolution'])
+	nominal_slice_increment=int(1.5/slicing_meta['line_resolution'])
 	slice_inc_gain=3.
 
 	##########################################SENSORS LOGGIGN########################################################
@@ -192,10 +212,22 @@ def main():
 	# 		SS.jog2q(curve_js_all_dense[breakpoints[0]])
 	# 		welding_started=True
 	# 		fronius_client.start_weld()
+
 	# 	SS.traj_streaming(curve_js_all_dense[breakpoints],ctrl_joints=np.ones(14))
 
 	# fronius_client.stop_weld()
+
+
 	######################################################LAYER WELDING##########################################################################################
+	###memory logging
+	robot_logging_all=[]
+	weld_logging_all=[]
+	audio_logging_all=[]
+	flir_logging_all=[]
+	flir_ts_logging_all=[]
+	slice_logging_all=[]
+	# now=None
+
 	####PRELOAD ALL SLICES TO SAVE INPROCESS TIME
 	rob1_js_all_slices=[]
 	rob2_js_all_slices=[]
@@ -249,6 +281,7 @@ def main():
 		
 		###start welding at the first layer, then non-stop
 		if not welding_started:
+			rr_sensors.start_all_sensors()
 			#jog above
 			waypoint_pose=robot.fwd(curve_js_all_dense[0,:6])
 			waypoint_pose.p[-1]+=50
@@ -258,10 +291,13 @@ def main():
 			welding_started=True
 			fronius_client.start_weld()
 			time.sleep(0.2)
+
+		# if now:
+		# 	print(time.time()-now)
 		
 		try:
 			###start logging
-			rr_sensors.start_all_sensors()
+			rr_sensors.clear_all_sensors()
 			for bp_idx in range(len(breakpoints)):
 				
 				if bp_idx<10:	###streaming 10 points before process FLIR monitoring
@@ -289,11 +325,27 @@ def main():
 					robot_ts.append(robot_timestamp)
 					robot_js.append(q14)
 		
-			###end LOGGING, non-blocking saving
-			rr_sensors.stop_all_sensors()
-			process = Process(target=save_data,args=(rr_sensors,recorded_dir,robot_ts,robot_js,flir_logging,flir_ts))
-			process.start()
-			
+			###end LOGGING, non-blocking saving, takes ~1s
+			# rr_sensors.stop_all_sensors()
+			# welding_data=np.array([(rr_sensors.weld_timestamp-rr_sensors.weld_timestamp[0])/1e6, rr_sensors.weld_voltage, rr_sensors.weld_current, rr_sensors.weld_feedrate, rr_sensors.weld_energy]).T
+			# process = Process(target=save_data,args=(recorded_dir,welding_data,rr_sensors.audio_recording,robot_ts,robot_js,flir_logging,flir_ts,slice_num))
+			# process.start()
+
+			###save in memory,
+			# now=time.time()
+			welding_data=np.array([(rr_sensors.weld_timestamp-rr_sensors.weld_timestamp[0])/1e6, rr_sensors.weld_voltage, rr_sensors.weld_current, rr_sensors.weld_feedrate, rr_sensors.weld_energy]).T
+			robot_ts=np.array(robot_ts)
+			robot_ts=robot_ts-robot_ts[0]
+			robot_js=np.array(robot_js)
+			flir_ts=np.array(flir_ts)
+			flir_ts=flir_ts-flir_ts[0]
+			robot_logging_all.append(np.hstack((robot_ts.reshape(-1, 1),robot_js)))
+			weld_logging_all.append(welding_data)
+			audio_logging_all.append(rr_sensors.audio_recording)
+			flir_logging_all.append(flir_logging)
+			flir_ts_logging_all.append(flir_ts)
+			slice_logging_all.append(slice_num)
+
 			
 			####CONTROL PARAMETERS
 			feedrate_cmd-=20
@@ -307,8 +359,15 @@ def main():
 		except:
 			traceback.print_exc()
 			fronius_client.stop_weld()
+			rr_sensors.stop_all_sensors()
+			break
 	fronius_client.stop_weld()
+	rr_sensors.stop_all_sensors()
+
+	for i in range(len(slice_logging_all)):
+		save_data(recorded_dir,weld_logging_all[i],audio_logging_all[i],robot_logging_all[i],flir_logging_all[i],flir_ts_logging_all[i],slice_logging_all[i])
+
 
 
 if __name__ == '__main__':	###GUARANTEED SAFE IMPORT, necessary for Multiprocessing
-    main()
+	main()

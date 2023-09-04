@@ -53,7 +53,7 @@ class WeldRRSensor(object):
         ## microphone service
         self.mic_service=microphone_service
         if microphone_service:
-            self.mic_samplerate = 44000
+            self.mic_samplerate = 44100
             self.mic_channels = 1
             self.mic_service=microphone_service
             self.mic_pipe = self.mic_service.microphone_stream.Connect(-1)
@@ -73,6 +73,14 @@ class WeldRRSensor(object):
             self.clean_mic_record()
             self.start_mic_cb=True
     
+    def clear_all_sensors(self):
+        if self.weld_service:
+            self.clean_weld_record()
+        if self.cam_ser:
+            self.clean_ir_record()
+        if self.mic_service:
+            self.clean_mic_record()
+
     def stop_all_sensors(self):
 
         if self.weld_service:
@@ -90,6 +98,7 @@ class WeldRRSensor(object):
             self.save_ir_file(filedir)
         if self.mic_service:
             self.save_mic_file(filedir)
+
     
     def test_all_sensors(self,t=3):
 

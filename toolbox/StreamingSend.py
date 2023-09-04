@@ -99,7 +99,7 @@ class StreamingSend(object):
 		ts_prev=timestamp_recording[-1]
 		counts=0
 		while True:
-			ts=self.RR_robot_state.InValue.ts['microseconds']/1e6
+			ts=float(self.RR_robot_state.InValue.ts['microseconds'])/1e6
 			js=self.RR_robot_state.InValue.joint_position[ctrl_joints.nonzero()[0]]
 			#only updates when the timestamp changes
 			if ts_prev!=ts:
@@ -114,7 +114,7 @@ class StreamingSend(object):
 				if counts>8:    ###in case getting static stale data 
 					break
 			q_prev=copy.deepcopy(js)
-	
+
 		timestamp_recording=np.array(timestamp_recording)
 		timestamp_recording-=timestamp_recording[0]
 		return timestamp_recording, np.array(joint_recording)
