@@ -183,6 +183,8 @@ class ScanProcess():
             
             ## voxel down sample
             pcd = pcd.voxel_down_sample(voxel_size=voxel_size)
+            # if scan_i==100:
+            #     visualize_pcd([pcd])
 
             if pcd_combined is None:
                 pcd_combined=deepcopy(pcd)
@@ -224,7 +226,7 @@ class ScanProcess():
         
         return pcd_combined
 
-    def pcd2dh(self,scanned_points,curve_relative,robot_weld=None,q_weld=None,ph_param=None,drawing=False):
+    def pcd2dh(self,scanned_points,last_scanned_points,curve_relative,robot_weld=None,q_weld=None,ph_param=None,drawing=False):
 
         ##### cross section parameters
         # resolution_z=0.1
@@ -240,16 +242,6 @@ class ScanProcess():
         if robot_weld is not None:
             origin_P = deepcopy(robot_weld.robot.P)
             origin_H = deepcopy(robot_weld.robot.H)
-            # origin_flange = deepcopy(robot_weld.robot.T_flange)
-            # origin_R_tool = deepcopy(robot_weld.robot.R_tool)
-            # origin_p_tool = deepcopy(robot_weld.robot.p_tool)
-            # robot_weld.robot.P=deepcopy(robot_weld.calib_P)
-            # robot_weld.robot.H=deepcopy(robot_weld.calib_H)
-            # robot_weld.robot.T_flange = deepcopy(robot_weld.T_tool_flange)
-            # robot_weld.robot.R_tool = deepcopy(robot_weld.T_tool_toolmarker.R)
-            # robot_weld.robot.p_tool = deepcopy(robot_weld.T_tool_toolmarker.p)
-            
-            
             
             curve_relative = []
             for q in q_weld:
@@ -269,33 +261,44 @@ class ScanProcess():
             
             robot_weld.robot.P=deepcopy(origin_P)
             robot_weld.robot.H=deepcopy(origin_H)
-            # robot_weld.robot.T_flange = deepcopy(origin_flange)
-            # robot_weld.robot.R_tool = deepcopy(origin_R_tool)
-            # robot_weld.robot.p_tool = deepcopy(origin_p_tool)
         
         curve_relative=np.array(curve_relative)
 
         # create the cropping polygon
-        poly_num=12
-        radius_scale=0.55
+        bounding_polygon=[]
+        # radius_scale=0.55
+        radius_scale=0.3
         radius=np.mean(np.linalg.norm(np.diff(curve_relative[:,:3],axis=0),axis=1))*radius_scale
         print("height neighbor radius:",radius)
-        bounding_polygon=[]
-        for n in range(poly_num):
-            ang=(n/poly_num)*(np.pi*2)
-            bounding_polygon.append(np.array([radius*np.cos(ang),radius*np.sin(ang),0]))
+        
+        # circle        
+        # poly_num=12
+        # for n in range(poly_num):
+        #     ang=(n/poly_num)*(np.pi*2)
+        #     bounding_polygon.append(np.array([radius*np.cos(ang),radius*np.sin(ang),0]))
+        # rectangle
+        y_max=10
+        bounding_polygon.append(np.array([radius,y_max,0]))
+        bounding_polygon.append(np.array([radius,-y_max,0]))
+        bounding_polygon.append(np.array([-radius,-y_max,0]))
+        bounding_polygon.append(np.array([-radius,y_max,0]))
+        ###
+        
         bounding_polygon = np.array(bounding_polygon).astype("float64")
         crop_poly = o3d.visualization.SelectionPolygonVolume()
         crop_poly.bounding_polygon = o3d.utility.Vector3dVector(bounding_polygon)
         crop_poly.orthogonal_axis = 'z'
         crop_poly.axis_max=30
         # crop_poly.axis_min=-15
-        crop_poly.axis_min=-0.1
+        crop_poly.axis_min=-10
 
         if drawing:
             scanned_points_draw = deepcopy(scanned_points)
             scanned_points_draw.paint_uniform_color([0.3,0.3,0.3])
+            last_scanned_points_draw = deepcopy(last_scanned_points)
+            last_scanned_points_draw.paint_uniform_color([0.5,0.5,0.5])
             path_points = o3d.geometry.PointCloud()
+            last_path_points = o3d.geometry.PointCloud()
             curve_R = []
             curve_p = []
         
@@ -317,7 +320,18 @@ class ScanProcess():
             sp_lamx = crop_poly.crop_point_cloud(sp_lamx)
             # visualize_pcd([sp_lamx],origin_size=10)
             ## dh is simply the z height after transform. Average over an radius
-            this_dh = np.mean(np.asarray(sp_lamx.points)[:,2])
+            
+            last_sp_lamx=deepcopy(last_scanned_points)
+            last_sp_lamx.transform(np.linalg.inv(H_from_RT(wp_R,curve_wp[:3])))
+            last_sp_lamx = crop_poly.crop_point_cloud(last_sp_lamx)
+            
+            percentage=0.1
+            this_points_z = np.asarray(sp_lamx.points)[:,2]
+            this_points_z = np.sort(this_points_z)[-1*int(percentage*len(this_points_z)):]
+            last_points_z = np.asarray(last_sp_lamx.points)[:,2]
+            last_points_z = np.sort(last_points_z)[-1*int(percentage*len(last_points_z)):]
+            
+            this_dh = np.mean(this_points_z)-np.mean(last_points_z)
             if np.isnan(this_dh):
                 this_dh=0
 
@@ -329,6 +343,9 @@ class ScanProcess():
                 sp_lamx.paint_uniform_color(color_dist[:3])
                 sp_lamx.transform(H_from_RT(wp_R,curve_wp[:3]))
                 path_points = path_points+sp_lamx
+                last_sp_lamx.paint_uniform_color(color_dist[:3])
+                last_sp_lamx.transform(H_from_RT(wp_R,curve_wp[:3]))
+                last_path_points = last_path_points+last_sp_lamx
                 curve_R.append(wp_R)
                 curve_p.append(curve_wp[:3])
 
@@ -349,10 +366,11 @@ class ScanProcess():
 
         if drawing:
             path_points.transform(H_from_RT(np.eye(3),[0,0,0.0001]))
+            last_path_points.transform(H_from_RT(np.eye(3),[0,0,0.0001]))
             path_viz_frames = visualize_frames(curve_R,curve_p,size=1,visualize=False,frame_obj=True)
             draw_obj = []
             draw_obj.extend(path_viz_frames)
-            draw_obj.extend([scanned_points_draw,path_points])
+            draw_obj.extend([scanned_points_draw,path_points,last_scanned_points_draw,last_path_points])
             visualize_pcd(draw_obj)
         
         return profile_height
