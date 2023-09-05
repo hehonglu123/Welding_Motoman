@@ -6,11 +6,12 @@ from flir_toolbox import *
 
 
 # Load the IR recording data from the pickle file
-with open('../../recorded_data/blade_recording/slice_330_0_flir.pickle', 'rb') as file:
+with open('../../recorded_data/cup_ER316L_spiral/layer_10/ir_recording.pickle', 'rb') as file:
     ir_recording = pickle.load(file)
 
-ir_ts=np.loadtxt('../../recorded_data/blade_recording/slice_330_0_flir_ts.csv', delimiter=',')
+ir_ts=np.loadtxt('../../recorded_data/cup_ER316L_spiral/layer_10/ir_stamps.csv', delimiter=',')
 
+print(len(ir_recording), len(ir_ts))
 
 result = cv2.VideoWriter('output.avi', 
                          cv2.VideoWriter_fourcc(*'XVID'),
@@ -29,7 +30,7 @@ for i in range(len(ir_recording)):
     
 
     temp=counts2temp(ir_recording[i].flatten(),6.39661118e+03, 1.40469989e+03, 1.00000008e+00, 8.69393436e+00, 8.40029488e+03,Emiss=0.13).reshape((240,320))
-    temp[temp > 1300] = 1300    ##thresholding
+    # temp[temp > 1300] = 1300    ##thresholding
     # Normalize the data to [0, 255]
     ir_normalized = ((temp - np.min(temp)) / (np.max(temp) - np.min(temp))) * 255
 
@@ -51,7 +52,7 @@ for i in range(len(ir_recording)):
     # Write the IR image to the video file
     # result.write(ir_bgr)
 
-    # # Display the IR image
+    # Display the IR image
     cv2.imshow("IR Recording", ir_bgr)
 
     # Wait for a specific time (in milliseconds) before displaying the next frame
