@@ -28,19 +28,25 @@ SS=StreamingSend(RR_robot,RR_robot_state,RobotJointCommand,streaming_rate)
 ###JOG TO starting pose first
 res, robot_state, _ = SS.RR_robot_state.TryGetInValue()
 q_cur=robot_state.joint_position
-num_points_jogging=SS.streaming_rate*np.max(np.abs(q_cur[-1]))/1
+num_points_jogging=int(SS.streaming_rate*np.max(np.abs(q_cur[-1]))/0.5)
 
 ts_all=[]
 js_all=[]
+# target_all=[]
 try:
     for i in range(num_points_jogging):
-        q_target = (q_cur*(num_points_jogging-i))/num_points_jogging
-        ts,js = SS.position_cmd(np.append(q_cur[:-1],q_target),time.time())
+        q_target = (q_cur[-1]*(num_points_jogging-i))/num_points_jogging
+        q_cmd=np.append(q_cur[:-1],q_target)
+        ts,js = SS.position_cmd(q_cmd,time.time())
         ts_all.append(ts)
-        js_all.append(js[-1])
+        js_all.append(np.append(js,q_cmd))
+        # target_all.append(q_target)
 except:
     traceback.print_exc()
 
 finally:
-    np.savetxt('recorded_data.csv',np.vstack((ts_all,js_all)).T,delimiter=',')
+    ts_all=np.array(ts_all)
+    ts_all=ts_all-ts_all[0]
+    js_all=np.array(js_all)
+    np.savetxt('recorded_data.csv',np.hstack((ts_all.reshape((-1,1)),js_all)),delimiter=',')
 
