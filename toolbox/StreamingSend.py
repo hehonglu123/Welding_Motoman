@@ -53,7 +53,7 @@ class StreamingSend(object):
 		self.RR_robot.position_command.PokeOutValue(joint_cmd1)
 
 		if start_time:
-			while time.time()-start_time<1/self.streaming_rate-0.0005:
+			while time.time()-start_time<1/self.streaming_rate-0.0007:
 				continue
 		
 		return float(robot_state.ts['microseconds'])/1e6, robot_state.joint_position
