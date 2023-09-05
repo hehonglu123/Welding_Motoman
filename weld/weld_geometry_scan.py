@@ -6,11 +6,13 @@ sys.path.append('../toolbox/')
 sys.path.append('../scan/scan_tools/')
 sys.path.append('../scan/scan_plan/')
 sys.path.append('../scan/scan_process/')
+sys.path.append('../mocap/')
 from robot_def import *
 from scan_utils import *
 from scan_continuous import *
 from scanPathGen import *
 from scanProcess import *
+from PH_interp import *
 from weldCorrectionStrategy import *
 from WeldSend import *
 from weldRRSensor import *
@@ -67,21 +69,21 @@ positioner.base_H = H_from_RT(positioner_base.R,positioner_base.p)
 PH_data_dir='../mocap/PH_grad_data/test'+R1_ph_dataset_date+'_R1/train_data_'
 with open(PH_data_dir+'calib_PH_q.pickle','rb') as file:
     PH_q=pickle.load(file)
-nom_P=np.array([[0,0,0],[150,0,0],[0,0,760],\
+r1_nom_P=np.array([[0,0,0],[150,0,0],[0,0,760],\
                    [1082,0,200],[0,0,0],[0,0,0],[100,0,0]]).T
-nom_H=np.array([[0,0,1],[0,1,0],[0,-1,0],\
+r1_nom_H=np.array([[0,0,1],[0,1,0],[0,-1,0],\
                 [-1,0,0],[0,-1,0],[-1,0,0]]).T
-ph_param_r1=PH_Param(nom_P,nom_H)
+ph_param_r1=PH_Param(r1_nom_P,r1_nom_H)
 ph_param_r1.fit(PH_q,method='FBF')
 #### load R2 kinematic model
 PH_data_dir='../mocap/PH_grad_data/test'+R2_ph_dataset_date+'_R2/train_data_'
 with open(PH_data_dir+'calib_PH_q.pickle','rb') as file:
     PH_q=pickle.load(file)
-nom_P=np.array([[0,0,0],[155,0,0],[0,0,614],\
+r2_nom_P=np.array([[0,0,0],[155,0,0],[0,0,614],\
                    [640,0,200],[0,0,0],[0,0,0],[100,0,0]]).T
-nom_H=np.array([[0,0,1],[0,1,0],[0,-1,0],\
+r2_nom_H=np.array([[0,0,1],[0,1,0],[0,-1,0],\
                 [-1,0,0],[0,-1,0],[-1,0,0]]).T
-ph_param_r2=PH_Param(nom_P,nom_H)
+ph_param_r2=PH_Param(r2_nom_P,r2_nom_H)
 ph_param_r2.fit(PH_q,method='FBF')
 #### load S1 kinematic model
 positioner.robot.P=deepcopy(positioner.calib_P)
@@ -168,7 +170,8 @@ planned_layer=999
 # planned_v=np.ones(planned_layer)*8
 planned_v=np.array([8,8,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5])
 # planned_job=np.ones(planned_layer)*215
-planned_job=np.array([218,218,200,200,200,200,200,200,200,200,200,200,200,200,200])
+# base ipm: 250
+planned_job=np.array([225,225,200,200,200,200,200,200,200,200,200,200,200,200,200])
 planned_job=np.append(planned_job,np.ones(planned_layer)*200)
 planned_job=planned_job.astype(int)
 
@@ -185,9 +188,10 @@ all_last_curve_relative=None
 # forward = True
 # baselayer = False
 
-layer=-1
-last_layer=-1
-layer_count=-1
+layer=66
+last_layer=40
+layer_count=6
+start_weld_layer=98
 
 # try:
 #     layer_count=len(glob.glob(data_dir+'layer_*_0'))+1
@@ -213,18 +217,28 @@ while True:
 
     ####### Decide which layer to print #######
     if all_profile_height is None and layer_count!=-1:
-        last_num_sections=len(glob.glob(curve_data_dir+'curve_sliced_relative/slice'+str(layer)+'_*.csv'))
+        read_layer=0 if layer<0 else layer
+        if baselayer:
+            last_num_sections=len(glob.glob(curve_data_dir+'curve_sliced_relative/baselayer'+str(read_layer)+'_*.csv'))
+        else:
+            last_num_sections=len(glob.glob(curve_data_dir+'curve_sliced_relative/slice'+str(read_layer)+'_*.csv'))
         all_profile_height=[]
         last_pcd_layer=o3d.geometry.PointCloud()
+        print(last_num_sections)
         for x in range(last_num_sections):
-            last_scan_dir=data_dir+'layer_'+str(layer)+'_'+str(x)+'/scans/'
-            this_sec_dh = np.load(last_scan_dir+'height_profile.npy')
-            nanid = np.argwhere(np.isnan(this_sec_dh[:,1]))
-            if len(nanid)>0:
-                nanid=nanid[0]
-                this_sec_dh[nanid,1] = deepcopy(this_sec_dh[nanid+1,1])
-            all_profile_height.extend(this_sec_dh)
+            if baselayer:
+                last_scan_dir=data_dir+'baselayer_'+str(layer)+'_'+str(x)+'/scans/'
+            else:
+                last_scan_dir=data_dir+'layer_'+str(layer)+'_'+str(x)+'/scans/'
+            if layer!=-1:
+                this_sec_dh = np.load(last_scan_dir+'height_profile.npy')
+                nanid = np.argwhere(np.isnan(this_sec_dh[:,1]))
+                if len(nanid)>0:
+                    nanid=nanid[0]
+                    this_sec_dh[nanid,1] = deepcopy(this_sec_dh[nanid+1,1])
+                all_profile_height.extend(this_sec_dh)
             last_pcd_layer = last_pcd_layer+o3d.io.read_point_cloud(last_scan_dir+'processed_pcd.pcd')
+        visualize_pcd([last_pcd_layer])
         all_profile_height=np.array(all_profile_height)
     if baselayer:
         last_layer = layer
@@ -273,7 +287,7 @@ while True:
     #### welding
     
     start_section=0
-    if layer>=0:
+    if layer>=start_weld_layer and not baselayer:
         for x in range(start_section,num_sections):
             print("Print Layer",layer,"Sec.",x)
 
@@ -362,7 +376,7 @@ while True:
             s1_all=np.multiply(s1_all,this_weld_v)
             s2_all=np.multiply(s2_all,this_weld_v)
 
-            if layer>=577 and True:
+            if layer>=0 and True:
                 go_weld=True
             else:
                 go_weld=False
@@ -432,7 +446,6 @@ while True:
                 all_curve_relative=[]
                 for x in range(0,num_sections):
                     all_curve_relative.append(np.loadtxt(curve_data_dir+'curve_sliced_relative/slice'+str(read_layer)+'_'+str(x)+'.csv',delimiter=','))
-                q1_all
             else:
                 num_sections=len(glob.glob(curve_data_dir+'curve_sliced_relative/baselayer'+str(read_layer)+'_*.csv'))
                 all_curve_relative=[]
@@ -507,6 +520,8 @@ while True:
             ## move to mid point and start 
             waypoint_pose=robot_scan.fwd(q_bp1[0][0])
             waypoint_pose.p[-1]+=50
+            robot_scan.robot.P=deepcopy(r2_nom_P)
+            robot_scan.robot.H=deepcopy(r2_nom_H)
             q1=robot_scan.inv(waypoint_pose.p,waypoint_pose.R,q_bp1[0][0])[0]
             q2=q_bp2[0][0]
             if x==0:
@@ -566,6 +581,8 @@ while True:
                     layer_data_dir=data_dir+'layer_'+str(layer)+'_'+str(x)+'/'
                 else:
                     layer_data_dir=data_dir+'baselayer_'+str(layer)+'_'+str(x)+'/'
+                Path(data_dir).mkdir(exist_ok=True)
+                Path(layer_data_dir).mkdir(exist_ok=True)
                 out_scan_dir = layer_data_dir+'scans/'
                 Path(out_scan_dir).mkdir(exist_ok=True)
                 ## save traj
