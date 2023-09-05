@@ -114,7 +114,7 @@ class CalibRobotPH:
 
         mp=MotionProgram(ROBOT_CHOICE=ROBOT_CHOICE,pulse2deg=self.robot.pulse2deg)
         start_q = paths[0]+np.array([1,1,1,1,1,1])
-        mp.MoveJ(start_q,1,0)
+        mp.MoveJ(start_q,rob_speed,0)
         robot_client.execute_motion_program(mp)
 
         mp=MotionProgram(ROBOT_CHOICE=ROBOT_CHOICE,pulse2deg=self.robot.pulse2deg)
@@ -311,9 +311,11 @@ def calib_R1():
     print("Dataset Date:",dataset_date)
 
     config_dir='../config/'
+    robot_marker_dir=config_dir+'MA2010_marker_config/'
+    tool_marker_dir=config_dir+'weldgun_marker_config/'
     robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path=config_dir+'torch.csv',\
 	pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',\
-    base_marker_config_file=config_dir+'MA2010_'+dataset_date+'_marker_config.yaml',tool_marker_config_file=config_dir+'weldgun_'+dataset_date+'_marker_config.yaml')
+    base_marker_config_file=robot_marker_dir+'MA2010_'+dataset_date+'_marker_config.yaml',tool_marker_config_file=tool_marker_dir+'weldgun_'+dataset_date+'_marker_config.yaml')
 
     mocap_url = 'rr+tcp://localhost:59823?service=optitrack_mocap'
     mocap_cli = RRN.ConnectService(mocap_url)
@@ -349,16 +351,20 @@ def calib_R1():
     target_q_zero = np.array([1,0,0,1,1,1])
 
     # speed
-    rob_speed=3
-    waittime=0.5 # stop 0.5 sec for sync
+    rob_speed=10
+    waittime=0.1 # stop 0.5 sec for sync
+
+    # qdummy={-55:-55,-40:-40,-25:-25,-10:-10,15:15,30:25,40:35,50:45}
 
     q_paths = []
     forward=True
     for q2 in np.append(np.arange(q2_low,q2_up,d_angle),q2_up):
+    # for q2 in qdummy.keys():
         q3_low = np.interp(q2,q3_low_sample[:,0],q3_low_sample[:,1])
         q3_up = np.interp(q2,q3_up_sample[:,0],q3_up_sample[:,1])
         this_q_paths=[]
         for q3 in np.append(np.arange(q3_low,q3_up,d_angle),q3_up):
+        # for q3 in [qdummy[q2]]:
             target_q = deepcopy(target_q_zero)
             target_q[1]=q2
             target_q[2]=q3
@@ -390,6 +396,6 @@ def calib_R1():
 
 if __name__=='__main__':
 
-    # calib_R1()
-    calib_R2()
+    calib_R1()
+    # calib_R2()
     # calib_S1()
