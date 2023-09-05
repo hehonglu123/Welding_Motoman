@@ -151,10 +151,26 @@ def main():
 	SS=StreamingSend(RR_robot,RR_robot_state,RobotJointCommand,streaming_rate)
 
 
+	# ###set up control parameters for AL ER4043
+	# job_offset=200
+	# nominal_feedrate=170
+	# nominal_vd_relative=0.5
+	# nominal_wire_length=25 #pixels
+	# nominal_temp_below=500
+	# base_feedrate_cmd=300
+	# base_vd=10
+	# feedrate_cmd=nominal_feedrate
+	# vd_relative=nominal_vd_relative
+	# feedrate_gain=0.5
+	# feedrate_min=60
+	# feedrate_max=300
+	# nominal_slice_increment=int(1.8/slicing_meta['line_resolution'])
+	# slice_inc_gain=3.
+
 	###set up control parameters
 	job_offset=400 		###200 for Aluminum ER4043, 300 for Steel Alloy ER70S-6, 400 for Stainless Steel ER316L
-	nominal_feedrate=250
-	nominal_vd_relative=0.2
+	nominal_feedrate=80
+	nominal_vd_relative=0.1
 	nominal_wire_length=25 #pixels
 	nominal_temp_below=500
 	base_feedrate_cmd=300
@@ -164,7 +180,7 @@ def main():
 	feedrate_gain=0.5
 	feedrate_min=60
 	feedrate_max=300
-	nominal_slice_increment=int(1.5/slicing_meta['line_resolution'])
+	nominal_slice_increment=int(1.2/slicing_meta['line_resolution'])
 	slice_inc_gain=3.
 
 	##########################################SENSORS LOGGIGN########################################################

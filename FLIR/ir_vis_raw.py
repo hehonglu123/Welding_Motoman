@@ -2,8 +2,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pickle, sys
 
-with open('../../recorded_data/wall_recording_streaming/slice_870_0_flir.pickle', 'rb') as file:
-    ir_recording=pickle.load(file)
+with open('../../recorded_data/cup_ER316L_spiral/layer_40/ir_recording.pickle', 'rb') as file:
+    ir_recording = pickle.load(file)
 freq=13
 
 fig = plt.figure(1)
