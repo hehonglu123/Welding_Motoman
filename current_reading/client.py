@@ -6,7 +6,7 @@ def my_handler(sub, value, ts):
    # Handle new value
    print(value,ts)
 
-url='rr+tcp://localhost:12182/?service=Current'
+url='rr+tcp://192.168.55.21:12182/?service=Current'
 #take url from command line
 if (len(sys.argv)>=2):
 		url=sys.argv[1]
