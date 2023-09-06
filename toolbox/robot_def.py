@@ -480,8 +480,7 @@ class positioner_obj(object):
 		q1=np.arctan2(n[0]*np.cos(q2)+n[1]*np.sin(q2),n[2])
 
 		solutions = self.get_eq_solution([q1,q2])
-		for i in range(len(solutions)):
-			solutions[i][0]-=np.radians(15)		###manual adjustment for tilt angle
+		solutions[:,0]=solutions[:,0]-np.radians(15)		###manual adjustment for tilt angle
 
 		if q_seed is not None:
 			theta_dist = np.linalg.norm(np.subtract(solutions,q_seed), axis=1)
@@ -489,6 +488,15 @@ class positioner_obj(object):
 		else:
 			return solutions
 	def get_eq_solution(self,q):
+		###inifinite solution stack
+		# solutions=np.vstack([np.linspace([q[0],q[1]-100*2*np.pi],[q[0],q[1]+100*2*np.pi],num=201),\
+		# 					np.linspace([-q[0],q[1]-np.pi-100*2*np.pi],[-q[0],q[1]-np.pi+100*2*np.pi],num=201)])
+
+		###extended 4pi solution stack
+		# solutions=np.vstack([np.linspace([q[0],q[1]-2*2*np.pi],[q[0],q[1]+2*2*np.pi],num=5),\
+		# 					np.linspace([-q[0],q[1]-np.pi-2*2*np.pi],[-q[0],q[1]-np.pi+2*2*np.pi],num=5)])
+
+		###regular solution stack
 		solutions=[q]
 		if q[1]+2*np.pi<self.upper_limit[1]:
 			solutions.append([q[0],q[1]+2*np.pi])
@@ -506,13 +514,19 @@ class positioner_obj(object):
 
 	###find a continous trajectory given Cartesion tool normal trajectory
 	def find_curve_js(self,normals,q_seed=None):
-		q_inits=self.inv(normals[0])
+		if normals[0][2]==1:# in case normal is already up, infinite solutions
+			q_inits=[self.inv(normals[0],q_seed)]
+		else:
+			q_inits=self.inv(normals[0])
 		curve_js_all=[]
 		for q_init in q_inits:
 			curve_js=np.zeros((len(normals),2))
 			curve_js[0]=q_init
 			for i in range(1,len(normals)):
-				q_all=np.array(self.inv(normals[i]))
+				if normals[i][2]==1:# in case normal is already up, infinite solutions
+					q_all=[np.array(self.inv(normals[i],curve_js[i-1]))]
+				else:
+					q_all=np.array(self.inv(normals[i]))
 				if len(q_all)==0:
 					#if no solution
 					print('no solution available')
@@ -538,11 +552,19 @@ class positioner_obj(object):
 			if len(curve_js_all)==1:
 				return curve_js_all[0]
 			else:
-				diff_min=[]
-				for curve_js in curve_js_all:
-					diff_min.append(np.linalg.norm(curve_js[0]-q_seed))
+				curve_js_all=np.array(curve_js_all)
 
-				return curve_js_all[np.argmin(diff_min)]
+				diff_q0=np.abs(curve_js_all[:,0,0]-q_seed[0])
+				diff_q0_min_ind=np.nonzero(diff_q0==np.min(diff_q0))[0]
+				diff_q1=np.abs(curve_js_all[diff_q0_min_ind,0,1]-q_seed[1])
+				diff_q1_min_ind=np.nonzero(diff_q1==np.min(diff_q1))[0]
+				index=diff_q0_min_ind[diff_q1_min_ind[0]]
+				return curve_js_all[index]
+
+				# diff_min=[]
+				# for curve_js in curve_js_all:
+				# 	diff_min.append(np.linalg.norm(curve_js[0]-q_seed))
+				# return curve_js_all[np.argmin(diff_min)]
 			
 class Transform_all(object):
 	def __init__(self, p_all, R_all):

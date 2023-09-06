@@ -1,0 +1,18 @@
+device_info:
+  device:
+    name: flir_a320
+  manufacturer:
+    name: FLIR_Systems
+    uuid: e786f414-c5dd-4bff-a421-3f75f06abcb0
+  model:
+    name: ThermoVision_A320
+    uuid: 362bb9ac-bc61-4203-aaf1-8252eee6d882
+  serial_number: 123456789
+  device_classes:
+    - class_identifier:
+        name: thermal_camera
+        uuid: b14d5f88-c9ca-4520-817a-998bc37a5e35
+      subclasses:
+        - thermal
+  implemented_types:
+    - com.robotraconteur.imaging.Camera

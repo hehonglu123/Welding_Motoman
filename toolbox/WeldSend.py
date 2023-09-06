@@ -5,13 +5,11 @@ from robot_def import *
 from pandas import read_csv,DataFrame
 from dx200_motion_program_exec_client import *
 
-# from lambda_calc import *
-
 class WeldSend(object):
 	def __init__(self,client) -> None:
 		self.client=client
 		self.ROBOT_CHOICE_MAP={'MA2010_A0':'RB1','MA1440_A0':'RB2','D500B':'ST1'}
-		self.ROBOT_TOOL_MAP={'MA2010_A0':12,'MA1440_A0':2}
+		self.ROBOT_TOOL_MAP={'MA2010_A0':12,'MA1440_A0':2,'D500B':0}
 
 	def jog_single(self,robot,q,v=1):
 		mp=MotionProgram(ROBOT_CHOICE=self.ROBOT_CHOICE_MAP[robot.robot_name],pulse2deg=robot.pulse2deg, tool_num=self.ROBOT_TOOL_MAP[robot.robot_name])
@@ -41,12 +39,19 @@ class WeldSend(object):
 				mp.MoveJ(np.degrees(q1[wp_i]),v,0,target2=['MOVJ',np.degrees(q2[wp_i]),10])
 
 		self.client.execute_motion_program(mp)
+	
+	def jog_tri(self,robot1,positioner,robot2,q1,q_positioner,q2,v=1):
+		mp=MotionProgram(ROBOT_CHOICE=self.ROBOT_CHOICE_MAP[robot1.robot_name],ROBOT_CHOICE2=self.ROBOT_CHOICE_MAP[positioner.robot_name],ROBOT_CHOICE3=self.ROBOT_CHOICE_MAP[robot2.robot_name],pulse2deg=robot1.pulse2deg,pulse2deg_2=positioner.pulse2deg,pulse2deg_3=robot2.pulse2deg, tool_num=self.ROBOT_TOOL_MAP[robot1.robot_name])
+		mp.MoveJ(np.degrees(q1),v,None,target2=['MOVJ',np.degrees(q_positioner),None],target3=['MOVJ',np.degrees(q2),None])
+		self.client.execute_motion_program(mp)
 
-	def weld_segment_single(self,primitives,robot,q_all,v_all,cond_all,arc=False):
+
+	def weld_segment_single(self,primitives,robot,q_all,v_all,cond_all,arc=False,wait=0):
 		###single arm weld segment 
 		#q_all: list of joint angles (N x 6)
 		#v_all: list of segment speed (N x 1)
 		#cond_all: list of job number (N x 1) or (1,), 0 refers to off
+		#wait: wait time after motion, before arcof
 		q_all=np.degrees(q_all)
 		arcof=True
 		
@@ -76,6 +81,9 @@ class WeldSend(object):
 						mp.changeArc(cond_all[i])
 
 			mp.primitive_call(primitives[i],q_all[i],v_all[i])
+		
+		if wait:
+			mp.setWaitTime(wait)
 			
 		if arc and not arcof:
 			mp.setArc(False)
@@ -124,7 +132,54 @@ class WeldSend(object):
 			mp.setArc(False)
 		return self.client.execute_motion_program(mp)
 
+	def weld_segment_tri(self,primitives,robot1,positioner,robot2,q1_all,positioner_all,q2_all,v1_all,v2_all,cond_all,arc=False):
+		###robot+positioner weld segment, MOVEJ + MOVEL x (N-1)
+		#q1_all: list of robot joint angles (N x 6)
+		#positioner_all: list of positioner joint angles (N x 2)
+		#q2_all: list of positioenr joint angles (N x 6)
+		#v1_all: list of robot1segment speed (N x 1)
+		#v2_all: list of robot2segment speed (N x 1)
+		#cond_all: list of job number (N x 1) or (1,), 0 refers to off
 
+		q1_all=np.degrees(q1_all)
+		positioner_all=np.degrees(positioner_all)
+		q2_all=np.degrees(q2_all)
+		arcof=True
+
+		mp=MotionProgram(ROBOT_CHOICE=self.ROBOT_CHOICE_MAP[robot1.robot_name],ROBOT_CHOICE2=self.ROBOT_CHOICE_MAP[positioner.robot_name],
+		   ROBOT_CHOICE3=self.ROBOT_CHOICE_MAP[robot2.robot_name],pulse2deg=robot1.pulse2deg,pulse2deg_2=positioner.pulse2deg,pulse2deg_3=robot2.pulse2deg, 
+		   tool_num=self.ROBOT_TOOL_MAP[robot1.robot_name])
+		
+		mp.primitive_call_tri(primitives[0],q1_all[0],v1_all[0],target2=['MOVJ',positioner_all[0],None],target3=['MOVJ',q2_all[0],v2_all[0]])
+		if arc:
+			if len(cond_all)==1: 
+				mp.setArc(True,cond_num=cond_all[0])
+				arcof=False
+			else:
+				if cond_all[1]!=0:
+					mp.setArc(True,cond_num=cond_all[1])
+					arcof=False
+
+
+		for i in range(1,len(q1_all)):
+			if len(cond_all)>1 and arc and i>1:
+				if arcof:
+					if cond_all[i]!=0:
+						mp.setArc(True, cond_all[i])
+						arcof=False
+				else:
+					if cond_all[i]==0:
+						mp.setArc(False)
+						arcof=True
+					elif cond_all[i]!=cond_all[i-1]:
+						mp.changeArc(cond_all[i])
+
+			mp.primitive_call_tri(primitives[i],q1_all[i],v1_all[i],target2=['MOVJ',positioner_all 	[i],None],target3=['MOVL',q2_all[i],v2_all[i]])
+			
+		if arc and not arcof:
+			mp.setArc(False)
+		return self.client.execute_motion_program(mp)
+	
 	def wire_cut(self,robot,speed=5,q_safe=np.radians([-23.88,37.9,40.66,7.42,-72,-20])):
 		###cut wire, length given in robot standoff d
 		mp=MotionProgram(ROBOT_CHOICE='RB1',pulse2deg=robot.pulse2deg)

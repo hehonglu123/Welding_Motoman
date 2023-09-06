@@ -7,8 +7,8 @@ from robot_def import *
 
 
 def main():
-	dataset='cup/'
-	sliced_alg='circular_slice_shifted/'
+	dataset='diamond/'
+	sliced_alg='cont_sections/'
 	data_dir='../data/'+dataset+sliced_alg
 	with open(data_dir+'slicing.yml', 'r') as file:
 		slicing_meta = yaml.safe_load(file)
@@ -37,12 +37,14 @@ def main():
 	rr=redundancy_resolution(robot,positioner,curve_sliced)
 	# H=rr.baseline_pose(vec=np.array([-0.95,0.31224989992]))
 
-	if slicing_meta['H'] is not None:
+	try:
 		H=np.array(slicing_meta['H'])
-	elif slicing_meta['placing_vector'] is not None:
-		H=rr.baseline_pose(vec=slicing_meta['placing_vector'])
-	else:
-		H=rr.baseline_pose()
+	except KeyError:
+		try:
+			H=rr.baseline_pose(vec=slicing_meta['placing_vector'])
+		except KeyError:
+			H=rr.baseline_pose()
+
 	
 	H[2,-1]+=slicing_meta['num_baselayers']*slicing_meta['baselayer_thickness']
 

@@ -41,8 +41,8 @@ layer_prev=section
 ###CUP LAYERS
 z=0
 layer=1
-magnitude = 0.3*2	###offset start/end position along the circle
-frequency = line_resolution/10		###every 10 mm comes back to same start/end point
+magnitude = np.pi*2	###offset start/end position along the circle
+frequency = line_resolution/50		###every 50 mm comes back to same start/end point
 osc_center=-0.3
 
 while z<total_height:

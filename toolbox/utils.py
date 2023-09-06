@@ -5,6 +5,19 @@ from scipy.interpolate import interp1d
 from scipy import signal
 import scipy, math
 
+
+
+def rotate_vector_at_angle(u, v, theta_rad):
+    ###rotate u to v at angle theta
+    # Compute the unit normal to the plane defined by u and v
+    n = np.cross(u, v)
+    n = n / np.linalg.norm(n)
+    
+    # Compute the vector w that lies at angle theta from u in the plane of u and v
+    w = u * np.cos(theta_rad) + np.cross(n, u) * np.sin(theta_rad)
+    
+    return w / np.linalg.norm(w)  # Return as unit vector
+
 def H_inv(H):
 	R=H[:3,:3].T
 	p=-R@H[:3,-1]
