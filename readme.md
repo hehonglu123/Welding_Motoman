@@ -1,5 +1,17 @@
 Convergent Manufacturing for WAAM Process
 
+# Usage
+## INFORM 
+* [DX200 Driver](https://github.com/hehonglu123/dx200_motion_progam_exec):   Create Motoman INFORM code (*.JBI) and upload it to the robot controller
+* Helper Functions:   `toolbox/WeldSend.py`
+## MotoPlus Streaming with RobotRaconteur
+* MotoPlus File (.out): Loaded into DX200 Motoplus Functions, started automatically 
+* MotoPlus RR Driver: Running on separate Ubuntu computer (ubuntu-motoman@ubuntu-motoman (192.168.55.15))
+`./run_RR_robot.bat` or `python311 -m motoman_robotraconteur_driver --robot-info-file=../config/rpi_waam_testbed.yml --robot-ip-address=192.168.1.31`
+* [Fronius RR Driver](https://github.com/johnwason/fronius_robotraconteur_driver): controls the Fronius welding parameter separately on a raspberry pi (fronius-pi@fronius-pi (192.168.55.21)) with wired E-stop 
+     `./run_fronius_control.bat` or `python310 -m fronius_robotraconteur_driver --welder-ip=192.168.1.51 --welder-info=../config/fronius_tps_500i_default_config.yml`
+* Helper Functions: `toolbox/StreamingSend.py`
+
 # Slicing
 
 Non-planar slicing from CAD with uniform deposition rate.

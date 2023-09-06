@@ -16,13 +16,13 @@
   <joint name="D500B_pose" type="fixed">
     <parent link="world"/>
     <child link="D500B_base_link"/>
-    <origin rpy="0.0 -0.261799 -1.5708" xyz="1.6438 -0.911639 0.472054"/><!--MA2010 pedestal-->
+    <origin rpy="0.0 -0.261799 -1.5708" xyz="1.6438 -0.911639 0.472054"/><!--D500B pedestal-->
   </joint>
 
   <joint name="MA1440_pose" type="fixed">
     <parent link="world"/>
     <child link="MA1440_base_link"/>
-    <origin rpy="0.0 0.0 3.14159" xyz="2.689552 -0.39515 0.908"/><!--MA2010 pedestal-->
+    <origin rpy="0.0 0.0 3.14159" xyz="2.689552 -0.39515 0.908"/><!--MA1440 pedestal-->
   </joint>
 
   <link name="Ground">
@@ -244,10 +244,10 @@
     <origin rpy="0 0 0" xyz="0.0 -0.36 0.4"/>
     <axis xyz="0 0 0"/>
   </joint>
-  <link name="weldgun">
+  <link name="torch">
     <visual>
       <geometry>
-        <mesh filename="model://MA_2010_A0/meshes/visual/weldgun.stl" scale="0.001 0.001 0.001"/>
+        <mesh filename="model://MA_2010_A0/meshes/visual/torch.stl" scale="0.001 0.001 0.001"/>
       </geometry>
       <material name="">
         <color rgba="0.12941176470588237 0.88 0.7490196078431373 1.0"/>
@@ -255,13 +255,13 @@
     </visual>
     <collision>
       <geometry>
-        <mesh filename="model://MA_2010_A0/meshes/collision/weldgun.stl" scale="0.001 0.001 0.001"/>
+        <mesh filename="model://MA_2010_A0/meshes/collision/torch.stl" scale="0.001 0.001 0.001"/>
       </geometry>
     </collision>
   </link>
-  <joint name="weldgun_joint" type="fixed">
+  <joint name="torch_joint" type="fixed">
     <parent link="MA2010_link_6_t"/>
-    <child link="weldgun"/>
+    <child link="torch"/>
     <origin rpy="0 1.57 0" xyz="0.1 0 0"/>
     <axis xyz="0 0 0"/>
   </joint>
@@ -458,7 +458,6 @@
       </geometry>
     </collision>
   </link>
-  <link name="MA1440_tool0"/>
   <!-- end of link list -->
   <!-- joint list -->
   <joint name="MA1440_joint_pedestal" type="fixed">
@@ -510,10 +509,27 @@
     <axis xyz="-1 0 0"/>
     <limit effort="14.80" lower="-6.2832" upper="6.2832" velocity="10.6465"/>
   </joint>
-  <joint name="MA1440_joint_6_t-tool0" type="fixed">
-    <origin rpy="0 0 0" xyz="0 0 0"/>
+
+  <link name="flir_mti">
+    <visual>
+      <geometry>
+        <mesh filename="model://MA_1440_A0/meshes/visual/flir_mti.stl" scale="0.001 0.001 0.001"/>
+      </geometry>
+      <material name="">
+        <color rgba="0.12941176470588237 0.88 0.7490196078431373 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="model://MA_1440_A0/meshes/collision/flir_mti.stl" scale="0.001 0.001 0.001"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="flir_mti_joint" type="fixed">
     <parent link="MA1440_link_6_t"/>
-    <child link="MA1440_tool0"/>
+    <child link="flir_mti"/>
+    <origin rpy="-1.57 0 3.14149" xyz="0.08 0.04 -0.04"/>
+    <axis xyz="0 0 0"/>
   </joint>
 
 

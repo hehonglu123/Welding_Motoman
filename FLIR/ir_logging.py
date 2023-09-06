@@ -26,16 +26,16 @@ def main():
     c1.setf_param("ext_optics_temperature", RR.VarValue(293.15,"double"))
     c1.setf_param("ext_optics_transmission", RR.VarValue(0.99,"double"))
 
-    c1.setf_param("current_case", RR.VarValue(2,"int32"))
-    # c1.setf_param("ir_format", RR.VarValue("temperature_linear_100mK","string"))
-    c1.setf_param("ir_format", RR.VarValue("radiometric","string"))
+    # c1.setf_param("current_case", RR.VarValue(2,"int32"))
+    c1.setf_param("ir_format", RR.VarValue("temperature_linear_100mK","string"))
+    # c1.setf_param("ir_format", RR.VarValue("radiometric","string"))
 
-    c1.setf_param("object_emissivity", RR.VarValue(0.9,"double"))    
+    c1.setf_param("object_emissivity", RR.VarValue(0.7,"double"))    
     
     c1.setf_param("scale_limit_low", RR.VarValue(293.15,"double"))
     c1.setf_param("scale_limit_upper", RR.VarValue(5000,"double"))
 
-    time.sleep(10)
+    time.sleep(1)
 
 
     # print(print(c1.getf_param('atmospheric_temperature').data[0]))

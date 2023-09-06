@@ -1,0 +1,18 @@
+device_info:
+  device:
+    name: fronius_welder
+  manufacturer:
+    name: Fronius
+    uuid: 4249f781-2a19-4816-8c10-cb26bac414cb
+  model:
+    name: TPS_500i_PULSE
+    uuid: 60e9a6a8-bd1d-4b81-b22f-23478b1eff1d
+  serial_number: 123456789
+  device_classes:
+    - class_identifier:
+        name: welder_power_source
+        uuid: b1add19d-9285-46e9-a0e9-7691764882e7
+      subclasses:
+        - power_source
+  implemented_types:
+    - experimental.fronius.FroniusWelder

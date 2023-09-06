@@ -1,0 +1,334 @@
+device_info:
+  device:
+    name: motoman_robot
+  manufacturer:
+    name: Motoman
+    uuid: 5b85084f-9bfd-4571-b37d-0ff18b52e9f8
+  model:
+    name: Motoman_Multi_Robot
+    uuid: 03252fb5-1b41-4a03-83b1-b04453494c3b
+  user_description: RPI Motoman WAAM Testbed
+  serial_number: 123456789
+  device_classes:
+    - class_identifier:
+        name: robot
+        uuid: 39b513e7-21b9-4b49-8654-7537473030eb
+      subclasses: 
+        - multi_robot        
+  implemented_types:
+    - com.robotraconteur.robotics.robot.Robot
+robot_type: other
+robot_capabilities:
+- jog_command
+- trajectory_command
+- position_command
+
+chains:
+- kin_chain_identifier: robot1
+  flange_identifier: robot1_tool
+  flange_pose:
+    orientation:
+      w: 0.7071067811882787
+      x: 0.0
+      y: 0.7071067811848163
+      z: 0.0
+    position:
+      x: 0.0
+      y: 0.0
+      z: 0.0
+  joint_numbers:
+    - 0
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
+  H:
+    - x: 0.0
+      y: 0.0
+      z: 1.0
+    - x: 0.0
+      y: -1.0
+      z: 0.0
+    - x: 0.0
+      y: -1.0
+      z: 0.0
+    - x: 1.0
+      y: 0.0
+      z: 0.0
+    - x: 0.0
+      y: -1.0
+      z: 0.0
+    - x: 1.0
+      y: 0.0
+      z: 0.0
+  P:
+    - x: 0.0
+      y: 0.0
+      z: 0.0
+    - x: 0.15
+      y: 0.0
+      z: 0.0
+    - x: 0.0
+      y: 0.0
+      z: 0.76
+    - x: 0.0
+      y: 0.0
+      z: 0.2
+    - x: 1.082
+      y: 0.0
+      z: 0.0
+    - x: 0.0
+      y: 0.0
+      z: 0.0
+    - x: 0.1
+      y: 0.0
+      z: 0.0
+- kin_chain_identifier: robot2
+  flange_identifier: robot2_tool
+  flange_pose:
+    orientation:
+      w: 0.7071067811882787
+      x: 0.0
+      y: 0.7071067811848163
+      z: 0.0
+    position:
+      x: 0.0
+      y: 0.0
+      z: 0.0
+  joint_numbers:
+    - 6
+    - 7
+    - 8
+    - 9
+    - 10
+    - 11
+  H:
+    - x: 0.0
+      y: 0.0
+      z: 1.0
+    - x: 0.0
+      y: -1.0
+      z: 0.0
+    - x: 0.0
+      y: -1.0
+      z: 0.0
+    - x: 1.0
+      y: 0.0
+      z: 0.0
+    - x: 0.0
+      y: -1.0
+      z: 0.0
+    - x: 1.0
+      y: 0.0
+      z: 0.0
+  P:
+    - x: 0.0
+      y: 0.0
+      z: 0.0
+    - x: 0.155
+      y: 0.0
+      z: 0.0
+    - x: 0.0
+      y: 0.0
+      z: 0.614
+    - x: 0.0
+      y: 0.0
+      z: 0.2
+    - x: 0.64
+      y: 0.0
+      z: 0.0
+    - x: 0.0
+      y: 0.0
+      z: 0.0
+    - x: 0.1
+      y: 0.0
+      z: 0.0
+- kin_chain_identifier: station
+  flange_identifier: station_tool
+  flange_pose:
+    orientation:
+      w: 0.7071067811882787
+      x: 0.0
+      y: 0.7071067811848163
+      z: 0.0
+    position:
+      x: 0.0
+      y: 0.0
+      z: 0.0
+  joint_numbers:
+    - 12
+    - 13
+  H:
+    - x: 0.0
+      y: 0.0
+      z: 1.0
+    - x: 0.0
+      y: 0.0
+      z: 1.0
+  P:
+    - x: 0.0
+      y: 0.0
+      z: 0.0
+    - x: 0.0
+      y: 0.0
+      z: 0.0
+    - x: 0.0
+      y: 0.0
+      z: 0.0
+
+joint_info:
+- joint_identifier: robot1_joint_1
+  default_units: radian
+  default_effort_units: newton_meter
+  passive: false
+  joint_type: revolute
+  joint_limits:
+   lower: -3.141600405713122
+   upper: 3.141600405713122
+   effort: 1000.0
+   velocity: 100
+   acceleration: 10.0
+- joint_identifier: robot1_joint_2
+  default_units: radian
+  default_effort_units: newton_meter
+  passive: false
+  joint_type: revolute
+  joint_limits:
+   lower: -1.8325977687612567
+   upper: 2.705265115598215
+   effort: 1000.0
+   velocity: 100
+   acceleration: 10.0
+- joint_identifier: robot1_joint_3
+  default_units: radian
+  default_effort_units: newton_meter
+  passive: false
+  joint_type: revolute
+  joint_limits:
+   lower: -1.5009892121433752
+   upper: 2.792535266149085
+   effort: 1000.0
+   velocity: 100
+   acceleration: 10.0
+- joint_identifier: robot1_joint_4
+  default_units: radian
+  default_effort_units: newton_meter
+  passive: false
+  joint_type: revolute
+  joint_limits:
+   lower: -2.6180052917218997
+   upper: 2.6180052917218997
+   effort: 1000.0
+   velocity: 100
+   acceleration: 10.0
+- joint_identifier: robot1_joint_5
+  default_units: radian
+  default_effort_units: newton_meter
+  passive: false
+  joint_type: revolute
+  joint_limits:
+   lower: -2.356206880363058
+   upper: 1.5708045869087053
+   effort: 1000.0
+   velocity: 100
+   acceleration: 10.0
+- joint_identifier: robot1_joint_6
+  default_units: radian
+  default_effort_units: newton_meter
+  passive: false
+  joint_type: revolute
+  joint_limits:
+   lower: -3.665215462219948
+   upper: 3.665215462219948
+   effort: 1000.0
+   velocity: 100
+   acceleration: 10.0
+- joint_identifier: robot2_joint_1
+  default_units: radian
+  default_effort_units: newton_meter
+  passive: false
+  joint_type: revolute
+  joint_limits:
+   lower: -2.9670648588502773
+   upper: 2.9670648588502773
+   effort: 1000.0
+   velocity: 100
+   acceleration: 10.0
+- joint_identifier: robot2_joint_2
+  default_units: radian
+  default_effort_units: newton_meter
+  passive: false
+  joint_type: revolute
+  joint_limits:
+   lower: -1.5708020661163091
+   upper: 2.705270970663187
+   effort: 1000.0
+   velocity: 100
+   acceleration: 10.0
+- joint_identifier: robot2_joint_3
+  default_units: radian
+  default_effort_units: newton_meter
+  passive: false
+  joint_type: revolute
+  joint_limits:
+   lower: -1.4835312775816945
+   upper: 2.61800214718968
+   effort: 1000.0
+   velocity: 100
+   acceleration: 10.0
+- joint_identifier: robot2_joint_4
+  default_units: radian
+  default_effort_units: newton_meter
+  passive: false
+  joint_type: revolute
+  joint_limits:
+   lower: -2.6180058868199954
+   upper: 2.6180058868199954
+   effort: 1000.0
+   velocity: 100
+   acceleration: 10.0
+- joint_identifier: robot2_joint_5
+  default_units: radian
+  default_effort_units: newton_meter
+  passive: false
+  joint_type: revolute
+  joint_limits:
+   lower: -2.356206880363058
+   upper: 1.5708045869087053
+   effort: 1000.0
+   velocity: 100
+   acceleration: 10.0
+- joint_identifier: robot2_joint_6
+  default_units: radian
+  default_effort_units: newton_meter
+  passive: false
+  joint_type: revolute
+  joint_limits:
+   lower: -3.665215462219948
+   upper: 3.665215462219948
+   effort: 1000.0
+   velocity: 100
+   acceleration: 10.0
+- joint_identifier: station_joint_1
+  default_units: radian
+  default_effort_units: newton_meter
+  passive: false
+  joint_type: revolute
+  joint_limits:
+   lower: -875.1601694911777
+   upper: 875.1601694911777
+   effort: 1000.0
+   velocity: 100
+   acceleration: 10.0
+- joint_identifier: station_joint_2
+  default_units: radian
+  default_effort_units: newton_meter
+  passive: false
+  joint_type: revolute
+  joint_limits:
+   lower: -1267.7526095647775
+   upper: 1267.7526095647775
+   effort: 1000.0
+   velocity: 100
+   acceleration: 10.0
