@@ -172,8 +172,24 @@ def main():
 	# nominal_slice_increment=int(1.8/slicing_meta['line_resolution'])
 	# slice_inc_gain=3.
 
+	# ###set up control parameters
+	# job_offset=400 		###200 for Aluminum ER4043, 300 for Steel Alloy ER70S-6, 400 for Stainless Steel ER316L
+	# nominal_feedrate=80
+	# nominal_vd_relative=0.1
+	# nominal_wire_length=25 #pixels
+	# nominal_temp_below=500
+	# base_feedrate_cmd=300
+	# base_vd=3
+	# feedrate_cmd=nominal_feedrate
+	# vd_relative=nominal_vd_relative
+	# feedrate_gain=0.5
+	# feedrate_min=60
+	# feedrate_max=300
+	# nominal_slice_increment=int(1.45/slicing_meta['line_resolution'])
+	# slice_inc_gain=3.
+
 	###set up control parameters
-	job_offset=400 		###200 for Aluminum ER4043, 300 for Steel Alloy ER70S-6, 400 for Stainless Steel ER316L
+	job_offset=300 		###200 for Aluminum ER4043, 300 for Steel Alloy ER70S-6, 400 for Stainless Steel ER316L
 	nominal_feedrate=80
 	nominal_vd_relative=0.1
 	nominal_wire_length=25 #pixels
