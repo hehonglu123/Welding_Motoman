@@ -25,7 +25,7 @@ import yaml
 from math import ceil,floor
 
 R1_ph_dataset_date='0801'
-R2_ph_dataset_date='0804'
+R2_ph_dataset_date='0801'
 S1_ph_dataset_date='0801'
 
 zero_config=np.zeros(6)
@@ -53,8 +53,8 @@ robot_scan_base = robot_weld.T_base_basemarker.inv()*robot_scan.T_base_basemarke
 robot_scan.base_H = H_from_RT(robot_scan_base.R,robot_scan_base.p)
 positioner_base = robot_weld.T_base_basemarker.inv()*positioner.T_base_basemarker
 positioner.base_H = H_from_RT(positioner_base.R,positioner_base.p)
-# T_to_base = Transform(np.eye(3),[0,0,-380])
-# positioner.base_H = np.matmul(positioner.base_H,H_from_RT(T_to_base.R,T_to_base.p))
+T_to_base = Transform(np.eye(3),[0,0,-380])
+positioner.base_H = np.matmul(positioner.base_H,H_from_RT(T_to_base.R,T_to_base.p))
 # input(positioner.base_H)
 
 # robot_weld.robot.P=deepcopy(robot_weld.calib_P)
@@ -76,6 +76,7 @@ nom_H=np.array([[0,0,1],[0,1,0],[0,-1,0],\
                 [-1,0,0],[0,-1,0],[-1,0,0]]).T
 ph_param_r1=PH_Param(nom_P,nom_H)
 ph_param_r1.fit(PH_q,method='FBF')
+ph_param_r1=None
 #### load R2 kinematic model
 PH_data_dir='../mocap/PH_grad_data/test'+R2_ph_dataset_date+'_R2/train_data_'
 with open(PH_data_dir+'calib_PH_q.pickle','rb') as file:
@@ -86,9 +87,10 @@ nom_H=np.array([[0,0,1],[0,1,0],[0,-1,0],\
                 [-1,0,0],[0,-1,0],[-1,0,0]]).T
 ph_param_r2=PH_Param(nom_P,nom_H)
 ph_param_r2.fit(PH_q,method='FBF')
+ph_param_r2=None
 #### load S1 kinematic model
-positioner.robot.P=deepcopy(positioner.calib_P)
-positioner.robot.H=deepcopy(positioner.calib_H)
+# positioner.robot.P=deepcopy(positioner.calib_P)
+# positioner.robot.H=deepcopy(positioner.calib_H)
 
 #### data directory
 # dataset='cup/'
@@ -107,13 +109,22 @@ positioner.robot.H=deepcopy(positioner.calib_H)
 # layer=1
 # x=0
 
+# dataset='blade0.1/'
+# sliced_alg='auto_slice/'
+# curve_data_dir = '../data/'+dataset+sliced_alg
+# data_dir=curve_data_dir+'weld_scan_'+'2023_07_24_13_13_53'+'/'
+# baselayer=False
+# last_layer=365
+# layer=384
+# x=0
+
 dataset='blade0.1/'
 sliced_alg='auto_slice/'
 curve_data_dir = '../data/'+dataset+sliced_alg
-data_dir=curve_data_dir+'weld_scan_'+'2023_07_24_13_13_53'+'/'
-baselayer=False
-last_layer=365
-layer=384
+data_dir=curve_data_dir+'weld_scan_2023_09_05_18_32_02'+'/'
+baselayer=True
+last_layer=0
+layer=1
 x=0
 
 use_actual = False
