@@ -35,7 +35,7 @@ def connect_failed(s, client_id, url, err):
     mti_client=mti_sub.GetDefaultClientWait(1)
 
 R1_ph_dataset_date='0801'
-R2_ph_dataset_date='0804'
+R2_ph_dataset_date='0801'
 S1_ph_dataset_date='0801'
 
 zero_config=np.zeros(6)

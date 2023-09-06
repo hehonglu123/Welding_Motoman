@@ -13,38 +13,38 @@ from PH_interp import *
 from matplotlib import pyplot as plt
 from dx200_motion_program_exec_client import *
 
-# data_dir='tool_data/'+'R1_weldgun_0809/'
-data_dir='tool_data/'+'R2_mti_0809/'
+data_dir='tool_data/'+'R1_weldgun_0809/'
+# data_dir='tool_data/'+'R2_mti_0809/'
 
-ph_dataset_date='0804'
+ph_dataset_date='0801'
 
 config_dir='../config/'
-R1_marker_dir=config_dir+'MA2010_marker_config/'
-weldgun_marker_dir=config_dir+'weldgun_marker_config/'
-R2_marker_dir=config_dir+'MA1440_marker_config/'
-mti_marker_dir=config_dir+'mti_marker_config/'
 
-robot_type = 'R2'
+robot_type = 'R1'
 
 PH_data_dir='../mocap/PH_grad_data/test'+ph_dataset_date+'_'+robot_type+'/'
 
 if robot_type == 'R1':
+    robot_marker_dir=config_dir+'MA2010_marker_config/'
+    tool_marker_dir=config_dir+'weldgun_marker_config/'
     robot=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',\
                         tool_file_path=config_dir+'torch.csv',d=15,\
                         #  tool_file_path='',d=0,\
                         pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',\
-                        base_marker_config_file=R1_marker_dir+'MA2010_'+ph_dataset_date+'_marker_config.yaml',\
-                        tool_marker_config_file=weldgun_marker_dir+'weldgun_'+ph_dataset_date+'_marker_config.yaml')
+                        base_marker_config_file=robot_marker_dir+'MA2010_'+ph_dataset_date+'_marker_config.yaml',\
+                        tool_marker_config_file=tool_marker_dir+'weldgun_'+ph_dataset_date+'_marker_config.yaml')
     nom_P=np.array([[0,0,0],[150,0,0],[0,0,760],\
                    [1082,0,200],[0,0,0],[0,0,0],[100,0,0]]).T
     nom_H=np.array([[0,0,1],[0,1,0],[0,-1,0],\
                    [-1,0,0],[0,-1,0],[-1,0,0]]).T
 elif robot_type == 'R2':
+    robot_marker_dir=config_dir+'MA1440_marker_config/'
+    tool_marker_dir=config_dir+'mti_marker_config/'
     robot=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.yml',\
                         tool_file_path=config_dir+'mti.csv',\
                         pulse2deg_file_path=config_dir+'MA1440_A0_pulse2deg_real.csv',\
-                        base_marker_config_file=R2_marker_dir+'MA1440_'+ph_dataset_date+'_marker_config.yaml',\
-                        tool_marker_config_file=mti_marker_dir+'mti_'+ph_dataset_date+'_marker_config.yaml')
+                        base_marker_config_file=robot_marker_dir+'MA1440_'+ph_dataset_date+'_marker_config.yaml',\
+                        tool_marker_config_file=tool_marker_dir+'mti_'+ph_dataset_date+'_marker_config.yaml')
     nom_P=np.array([[0,0,0],[155,0,0],[0,0,614],\
                    [640,0,200],[0,0,0],[0,0,0],[100,0,0]]).T
     nom_H=np.array([[0,0,1],[0,1,0],[0,-1,0],\
