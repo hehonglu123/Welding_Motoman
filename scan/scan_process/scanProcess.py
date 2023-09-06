@@ -150,9 +150,10 @@ class ScanProcess():
 
             if len(rob_js_exe[scan_i])<=6:
                 if use_calib:
-                    opt_P,opt_H = ph_param.predict(rob_js_exe[scan_i][1:3])
-                    self.robot.robot.P=opt_P
-                    self.robot.robot.H=opt_H
+                    if ph_param is not None:
+                        opt_P,opt_H = ph_param.predict(rob_js_exe[scan_i][1:3])
+                        self.robot.robot.P=opt_P
+                        self.robot.robot.H=opt_H
                     robt_T = self.robot.fwd(rob_js_exe[scan_i][:6],world=True) # T_world^r2tool
                 else:
                     robt_T = self.robot.fwd(rob_js_exe[scan_i][:6],world=True) # T_world^r2tool
@@ -162,9 +163,10 @@ class ScanProcess():
                 # print(np.degrees(self.robot.robot.joint_lower_limit))
                 # print("===============")
                 if use_calib:
-                    opt_P,opt_H = ph_param.predict(rob_js_exe[scan_i][1:3])
-                    self.robot.robot.P=opt_P
-                    self.robot.robot.H=opt_H
+                    if ph_param is not None:
+                        opt_P,opt_H = ph_param.predict(rob_js_exe[scan_i][1:3])
+                        self.robot.robot.P=opt_P
+                        self.robot.robot.H=opt_H
                     robt_T = self.robot.fwd(rob_js_exe[scan_i][:6],world=True) # T_world^r2tool
                 else:
                     robt_T = self.robot.fwd(rob_js_exe[scan_i][:6],world=True) # T_world^r2tool
@@ -250,9 +252,10 @@ class ScanProcess():
                 T_R1Base_S1TCP = np.linalg.inv(T_S1TCP_R1Base)
                 
                 ### R1 fwd
-                opt_P,opt_H = ph_param.predict(q[1:3])
-                robot_weld.robot.P=opt_P
-                robot_weld.robot.H=opt_H
+                if ph_param is not None:
+                    opt_P,opt_H = ph_param.predict(q[1:3])
+                    robot_weld.robot.P=opt_P
+                    robot_weld.robot.H=opt_H
                 robot_T = robot_weld.fwd(q[:6])
                 ###
                 
