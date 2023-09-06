@@ -9,21 +9,34 @@ class StreamingSend(object):
 		self.streaming_rate=streaming_rate
 		self.command_seqno=0
 
-	def get_breakpoints(self,lam,vd):
-		###get breakpoints indices with dense lam and vd
-		lam_diff=np.diff(lam)
-		displacement=vd/self.streaming_rate
-		breakpoints=[0]
-		for i in range(1,len(lam)):
-			if np.sum(lam_diff[breakpoints[-1]:i])>displacement:
-				breakpoints.append(i)
+	# def get_breakpoints(self,lam,vd):
+	# 	###get breakpoints indices with dense lam and vd
+	# 	lam_diff=np.diff(lam)
+	# 	displacement=vd/self.streaming_rate
+	# 	breakpoints=[0]
+	# 	for i in range(1,len(lam)):
+	# 		if np.sum(lam_diff[breakpoints[-1]:i])>displacement:
+	# 			breakpoints.append(i)
 		
-		return np.array(breakpoints)
+	# 	return np.array(breakpoints)
+
+	def get_breakpoints(self, lam, vd):
+		lam_diff = np.diff(lam)
+		displacement = vd / self.streaming_rate
+		cumulative_lam_diff = np.cumsum(lam_diff)
+
+		# The mask gives True wherever the cumulative sum exceeds a multiple of displacement
+		mask = np.diff(np.floor(cumulative_lam_diff / displacement))
+
+		# Getting the indices where mask is True
+		breakpoints = np.insert(np.where(mask)[0] + 1, 0, 0)
+
+		return breakpoints
 
 	def position_cmd(self,qd,start_time=None):
 		###qd: joint position command
 		###start_time: loop start time to make sure 8ms streaming rate, if None, then no wait
-		res, robot_state, _ = self.RR_robot_state.TryGetInValue()
+		robot_state = self.RR_robot_state.InValue
 
 		# Increment command_seqno
 		self.command_seqno += 1
@@ -33,7 +46,6 @@ class StreamingSend(object):
 		joint_cmd1.seqno = self.command_seqno # Strictly increasing command_seqno
 		joint_cmd1.state_seqno = robot_state.seqno # Send current robot_state.seqno as failsafe
 		
-		
 		# Set the joint command
 		joint_cmd1.command = qd
 
@@ -41,7 +53,7 @@ class StreamingSend(object):
 		self.RR_robot.position_command.PokeOutValue(joint_cmd1)
 
 		if start_time:
-			while time.time()-start_time<1/self.streaming_rate-0.0005:
+			while time.time()-start_time<1/self.streaming_rate-0.0007:
 				continue
 		
 		return float(robot_state.ts['microseconds'])/1e6, robot_state.joint_position
@@ -87,7 +99,7 @@ class StreamingSend(object):
 		ts_prev=timestamp_recording[-1]
 		counts=0
 		while True:
-			ts=self.RR_robot_state.InValue.ts['microseconds']/1e6
+			ts=float(self.RR_robot_state.InValue.ts['microseconds'])/1e6
 			js=self.RR_robot_state.InValue.joint_position[ctrl_joints.nonzero()[0]]
 			#only updates when the timestamp changes
 			if ts_prev!=ts:
@@ -102,7 +114,7 @@ class StreamingSend(object):
 				if counts>8:    ###in case getting static stale data 
 					break
 			q_prev=copy.deepcopy(js)
-	
+
 		timestamp_recording=np.array(timestamp_recording)
 		timestamp_recording-=timestamp_recording[0]
 		return timestamp_recording, np.array(joint_recording)
