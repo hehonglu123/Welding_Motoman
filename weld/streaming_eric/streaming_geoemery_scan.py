@@ -119,8 +119,8 @@ mti_client.setExposureTime("25")
 
 ###set up control parameters
 job_offset=300 		###200 for Aluminum ER4043, 300 for Steel Alloy ER70S-6, 400 for Stainless Steel ER316L
-nominal_feedrate=100
-nominal_vd_relative=5
+nominal_feedrate=300
+nominal_vd_relative=3
 base_feedrate_cmd=300
 base_vd=3
 feedrate_cmd=nominal_feedrate
