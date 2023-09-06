@@ -159,7 +159,7 @@ class WeldRRSensor(object):
 	def current_cb(self, sub, value, ts):
 
 		if self.start_current_cb:
-			self.current_timestamp.append(ts)
+			self.current_timestamp.append(ts.seconds+ts.nanoseconds*1e-9)
 			self.current.append(value)
 
 	

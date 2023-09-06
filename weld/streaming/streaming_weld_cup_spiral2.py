@@ -93,7 +93,6 @@ def main():
 	recorded_dir='recorded_data/'
 	Path(recorded_dir).mkdir(exist_ok=True)
 
-	layer_height_num=int(1.8/slicing_meta['line_resolution'])
 	layer_width_num=int(4/slicing_meta['line_resolution'])
 
 	robot=robot_obj('MA2010_A0',def_path='../../config/MA2010_A0_robot_default_config.yml',tool_file_path='../../config/torch.csv',\
@@ -216,43 +215,48 @@ def main():
 	######################################################BASE LAYER##########################################################################################
 	# slice_num=0
 	# num_sections=len(glob.glob(data_dir+'curve_sliced_relative/slice'+str(slice_num)+'_*.csv'))
-	# for x in range(0,num_sections,layer_width_num):
-	# 	rob1_js=np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(slice_num)+'_'+str(x)+'.csv',delimiter=',')
-	# 	rob2_js=np.loadtxt(data_dir+'curve_sliced_js/MA1440_js'+str(slice_num)+'_'+str(x)+'.csv',delimiter=',')
-	# 	positioner_js=np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(slice_num)+'_'+str(x)+'.csv',delimiter=',')
-	# 	curve_sliced_relative=np.loadtxt(data_dir+'curve_sliced_relative/slice'+str(slice_num)+'_'+str(x)+'.csv',delimiter=',')
-	# 	if positioner_js.shape==(2,) and rob1_js.shape==(6,):
-	# 		continue
-	# 	if x>0:
-	# 		rob1_js_prev=np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(slice_num)+'_'+str(x-layer_width_num)+'.csv',delimiter=',')
-	# 		rob2_js_prev=np.loadtxt(data_dir+'curve_sliced_js/MA1440_js'+str(slice_num)+'_'+str(x-layer_width_num)+'.csv',delimiter=',')
-	# 		positioner_js_prev=np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(slice_num)+'_'+str(x-layer_width_num)+'.csv',delimiter=',')
-	# 		rob1_js,rob2_js,positioner_js=warp_traj(rob1_js,rob2_js,positioner_js,rob1_js_prev,rob2_js_prev,positioner_js_prev,reversed=True)
-	# 		if x<num_sections-layer_width_num:
-	# 			rob1_js_next=np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(slice_num)+'_'+str(x+layer_width_num)+'.csv',delimiter=',')
-	# 			rob2_js_next=np.loadtxt(data_dir+'curve_sliced_js/MA1440_js'+str(slice_num)+'_'+str(x+layer_width_num)+'.csv',delimiter=',')
-	# 			positioner_js_next=np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(slice_num)+'_'+str(x+layer_width_num)+'.csv',delimiter=',')
-	# 			rob1_js,rob2_js,positioner_js=warp_traj(rob1_js,rob2_js,positioner_js,rob1_js_next,rob2_js_next,positioner_js_next,reversed=False)
-		
-	# 	###find closest %2pi
-	# 	num2p=np.round((q14[-1]-positioner_js[0,1])/(2*np.pi))
-	# 	positioner_js[:,1]=positioner_js[:,1]+num2p*2*np.pi
+	# try:
+	# 	for x in range(0,num_sections,layer_width_num):
+	# 		rob1_js=np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(slice_num)+'_'+str(x)+'.csv',delimiter=',')
+	# 		rob2_js=np.loadtxt(data_dir+'curve_sliced_js/MA1440_js'+str(slice_num)+'_'+str(x)+'.csv',delimiter=',')
+	# 		positioner_js=np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(slice_num)+'_'+str(x)+'.csv',delimiter=',')
+	# 		curve_sliced_relative=np.loadtxt(data_dir+'curve_sliced_relative/slice'+str(slice_num)+'_'+str(x)+'.csv',delimiter=',')
+	# 		if positioner_js.shape==(2,) and rob1_js.shape==(6,):
+	# 			continue
+	# 		if x>0:
+	# 			rob1_js_prev=np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(slice_num)+'_'+str(x-layer_width_num)+'.csv',delimiter=',')
+	# 			rob2_js_prev=np.loadtxt(data_dir+'curve_sliced_js/MA1440_js'+str(slice_num)+'_'+str(x-layer_width_num)+'.csv',delimiter=',')
+	# 			positioner_js_prev=np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(slice_num)+'_'+str(x-layer_width_num)+'.csv',delimiter=',')
+	# 			rob1_js,rob2_js,positioner_js=warp_traj(rob1_js,rob2_js,positioner_js,rob1_js_prev,rob2_js_prev,positioner_js_prev,reversed=True)
+	# 			if x<num_sections-layer_width_num:
+	# 				rob1_js_next=np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(slice_num)+'_'+str(x+layer_width_num)+'.csv',delimiter=',')
+	# 				rob2_js_next=np.loadtxt(data_dir+'curve_sliced_js/MA1440_js'+str(slice_num)+'_'+str(x+layer_width_num)+'.csv',delimiter=',')
+	# 				positioner_js_next=np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(slice_num)+'_'+str(x+layer_width_num)+'.csv',delimiter=',')
+	# 				rob1_js,rob2_js,positioner_js=warp_traj(rob1_js,rob2_js,positioner_js,rob1_js_next,rob2_js_next,positioner_js_next,reversed=False)
+			
+	# 		###find closest %2pi
+	# 		num2p=np.round((q14[-1]-positioner_js[0,1])/(2*np.pi))
+	# 		positioner_js[:,1]=positioner_js[:,1]+num2p*2*np.pi
 
-	# 	lam_relative=calc_lam_cs(curve_sliced_relative)
-	# 	lam_relative_dense=np.linspace(0,lam_relative[-1],num=int(lam_relative[-1]/point_distance))
-	# 	curve_js_all_dense=interp1d(lam_relative,np.hstack((rob1_js,rob2_js,positioner_js)),kind='cubic',axis=0)(lam_relative_dense)
-	# 	breakpoints=SS.get_breakpoints(lam_relative_dense,base_vd)
+	# 		lam_relative=calc_lam_cs(curve_sliced_relative)
+	# 		lam_relative_dense=np.linspace(0,lam_relative[-1],num=int(lam_relative[-1]/point_distance))
+	# 		curve_js_all_dense=interp1d(lam_relative,np.hstack((rob1_js,rob2_js,positioner_js)),kind='cubic',axis=0)(lam_relative_dense)
+	# 		breakpoints=SS.get_breakpoints(lam_relative_dense,base_vd)
 
-	# 	###start welding at the first layer, then non-stop
-	# 	fronius_client.job_number = int(base_feedrate_cmd/10)+job_offset
-	# 	if not welding_started:
-	# 		SS.jog2q(curve_js_all_dense[breakpoints[0]])
-	# 		welding_started=True
-	# 		fronius_client.start_weld()
+	# 		###start welding at the first layer, then non-stop
+	# 		fronius_client.job_number = int(base_feedrate_cmd/10)+job_offset
+	# 		if not welding_started:
+	# 			SS.jog2q(curve_js_all_dense[breakpoints[0]])
+	# 			welding_started=True
+	# 			fronius_client.start_weld()
 
-	# 	SS.traj_streaming(curve_js_all_dense[breakpoints],ctrl_joints=np.ones(14))
-
-	# fronius_client.stop_weld()
+	# 		SS.traj_streaming(curve_js_all_dense[breakpoints],ctrl_joints=np.ones(14))
+	# except:
+	# 	traceback.print_exc()
+	# finally:
+	# 	print('stop welding')
+	# 	fronius_client.stop_weld()
+	# 	print('welding stop')
 
 
 	######################################################LAYER WELDING##########################################################################################
@@ -294,14 +298,14 @@ def main():
 			continue
 		###TRJAECTORY WARPING
 		if slice_num>10:
-			rob1_js_prev=copy.deepcopy(rob1_js_all_slices[slice_num-layer_height_num])
-			rob2_js_prev=copy.deepcopy(rob2_js_all_slices[slice_num-layer_height_num])
-			positioner_js_prev=copy.deepcopy(positioner_js_all_slices[slice_num-layer_height_num])
+			rob1_js_prev=copy.deepcopy(rob1_js_all_slices[slice_num-nominal_slice_increment])
+			rob2_js_prev=copy.deepcopy(rob2_js_all_slices[slice_num-nominal_slice_increment])
+			positioner_js_prev=copy.deepcopy(positioner_js_all_slices[slice_num-nominal_slice_increment])
 			rob1_js,rob2_js,positioner_js=warp_traj(rob1_js,rob2_js,positioner_js,rob1_js_prev,rob2_js_prev,positioner_js_prev,reversed=True)
-		if slice_num<slicing_meta['num_layers']-layer_height_num:
-			rob1_js_next=copy.deepcopy(rob1_js_all_slices[slice_num+layer_height_num])
-			rob2_js_next=copy.deepcopy(rob2_js_all_slices[slice_num+layer_height_num])
-			positioner_js_next=copy.deepcopy(positioner_js_all_slices[slice_num+layer_height_num])
+		if slice_num<slicing_meta['num_layers']-nominal_slice_increment:
+			rob1_js_next=copy.deepcopy(rob1_js_all_slices[slice_num+nominal_slice_increment])
+			rob2_js_next=copy.deepcopy(rob2_js_all_slices[slice_num+nominal_slice_increment])
+			positioner_js_next=copy.deepcopy(positioner_js_all_slices[slice_num+nominal_slice_increment])
 			rob1_js,rob2_js,positioner_js=warp_traj(rob1_js,rob2_js,positioner_js,rob1_js_next,rob2_js_next,positioner_js_next,reversed=False)
 		
 		###find closest %2pi
@@ -371,8 +375,14 @@ def main():
 
 			###save in memory,
 			# now=time.time()
-			welding_data=np.array([(rr_sensors.weld_timestamp-rr_sensors.weld_timestamp[0])/1e6, rr_sensors.weld_voltage, rr_sensors.weld_current, rr_sensors.weld_feedrate, rr_sensors.weld_energy]).T
-			current_data=np.array([(rr_sensors.current_timestamp-rr_sensors.current_timestamp[0]), rr_sensors.current]).T
+			current_timestamp=np.array(rr_sensors.current_timestamp).flatten()-rr_sensors.current_timestamp[0]
+			min_length=min(len(current_timestamp),len(rr_sensors.current))
+			current_data=np.array([current_timestamp[:min_length], rr_sensors.current[:min_length]]).T
+
+			weld_timestamp=np.array(rr_sensors.weld_timestamp).flatten()-rr_sensors.weld_timestamp[0]
+			min_length=min(len(current_timestamp),len(rr_sensors.weld_voltage),len(rr_sensors.weld_current),len(rr_sensors.weld_feedrate),len(rr_sensors.weld_energy))
+			welding_data=np.array([weld_timestamp[:min_length], rr_sensors.weld_voltage[:min_length], rr_sensors.weld_current[:min_length], rr_sensors.weld_feedrate[:min_length], rr_sensors.weld_energy[:min_length]]).T
+			
 			robot_ts=np.array(robot_ts)
 			robot_ts=robot_ts-robot_ts[0]
 			robot_js=np.array(robot_js)
