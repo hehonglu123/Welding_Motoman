@@ -50,7 +50,7 @@ def new_frame(pipe_ep):
 		flir_logging.append(display_mat)
 		flir_ts.append(rr_img.image_info.data_header.ts['seconds']+rr_img.image_info.data_header.ts['nanoseconds']*1e-9)
 
-def save_data(recorded_dir,welding_data,audio_recording,robot_data,flir_logging,flir_ts,slice_num):
+def save_data(recorded_dir,current_data,welding_data,audio_recording,robot_data,flir_logging,flir_ts,slice_num):
 	###MAKING DIR
 	layer_data_dir=recorded_dir+'layer_'+str(slice_num)+'/'
 	Path(layer_data_dir).mkdir(exist_ok=True)
@@ -65,6 +65,9 @@ def save_data(recorded_dir,welding_data,audio_recording,robot_data,flir_logging,
 		wav_file.setframerate(44100)
 		# Write the audio data to the WAV file
 		wav_file.writeframes(first_channel_int16.tobytes())
+
+	####CURRENT SAVING
+	np.savetxt(layer_data_dir + 'current.csv',current_data, delimiter=',',header='timestamp,current', comments='')
 
 	####FRONIUS SAVING
 	np.savetxt(layer_data_dir + 'welding.csv',welding_data, delimiter=',',header='timestamp,voltage,current,feedrate,energy', comments='')
@@ -133,6 +136,8 @@ def main():
 	fronius_client = fronius_sub.GetDefaultClientWait(1)      #connect, timeout=30s
 	hflags_const = RRN.GetConstants("experimental.fronius", fronius_client)["WelderStateHighFlags"]
 	fronius_client.prepare_welder()
+	########################################################RR CURRENT########################################################
+	current_sub=RRN.SubscribeService('rr+tcp://192.168.55.21:12182?service=Current')
 	########################################################RR STREAMING########################################################
 	RR_robot_sub = RRN.SubscribeService('rr+tcp://192.168.55.15:59945?service=robot')
 	RR_robot_state = RR_robot_sub.SubscribeWire('robot_state')
@@ -184,7 +189,7 @@ def main():
 	slice_inc_gain=3.
 
 	##########################################SENSORS LOGGIGN########################################################
-	rr_sensors = WeldRRSensor(weld_service=fronius_sub,cam_service=None,microphone_service=microphone)
+	rr_sensors = WeldRRSensor(weld_service=fronius_sub,cam_service=None,microphone_service=microphone,current_service=current_sub)
 	###########################################layer welding############################################
 
 	res, robot_state, _ = RR_robot_state.TryGetInValue()
@@ -238,6 +243,7 @@ def main():
 	###memory logging
 	robot_logging_all=[]
 	weld_logging_all=[]
+	current_logging_all=[]
 	audio_logging_all=[]
 	flir_logging_all=[]
 	flir_ts_logging_all=[]
@@ -350,6 +356,7 @@ def main():
 			###save in memory,
 			# now=time.time()
 			welding_data=np.array([(rr_sensors.weld_timestamp-rr_sensors.weld_timestamp[0])/1e6, rr_sensors.weld_voltage, rr_sensors.weld_current, rr_sensors.weld_feedrate, rr_sensors.weld_energy]).T
+			current_data=np.array([(rr_sensors.current_timestamp-rr_sensors.current_timestamp[0]), rr_sensors.current]).T
 			robot_ts=np.array(robot_ts)
 			robot_ts=robot_ts-robot_ts[0]
 			robot_js=np.array(robot_js)
@@ -357,6 +364,7 @@ def main():
 			flir_ts=flir_ts-flir_ts[0]
 			robot_logging_all.append(np.hstack((robot_ts.reshape(-1, 1),robot_js)))
 			weld_logging_all.append(welding_data)
+			current_logging_all.append(current_data)
 			audio_logging_all.append(rr_sensors.audio_recording)
 			flir_logging_all.append(flir_logging)
 			flir_ts_logging_all.append(flir_ts)
@@ -381,7 +389,7 @@ def main():
 	rr_sensors.stop_all_sensors()
 
 	for i in range(len(slice_logging_all)):
-		save_data(recorded_dir,weld_logging_all[i],audio_logging_all[i],robot_logging_all[i],flir_logging_all[i],flir_ts_logging_all[i],slice_logging_all[i])
+		save_data(recorded_dir,current_logging_all[i],weld_logging_all[i],audio_logging_all[i],robot_logging_all[i],flir_logging_all[i],flir_ts_logging_all[i],slice_logging_all[i])
 
 
 
