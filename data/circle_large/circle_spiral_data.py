@@ -22,10 +22,10 @@ robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_co
     base_marker_config_file=R1_marker_dir+'MA2010_'+R1_ph_dataset_date+'_marker_config.yaml',tool_marker_config_file=weldgun_marker_dir+'weldgun_'+R1_ph_dataset_date+'_marker_config.yaml')
 robot_scan=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.yml',tool_file_path=config_dir+'mti.csv',\
 	base_transformation_file=config_dir+'MA1440_pose.csv',pulse2deg_file_path=config_dir+'MA1440_A0_pulse2deg_real.csv',\
-    base_marker_config_file=R2_marker_dir+'MA1440_'+R2_ph_dataset_date+'_marker_config.yaml',tool_marker_config_file=mti_marker_dir+'mti_'+R2_ph_dataset_date+'_marker_config.yaml')
+    base_marker_config_file=R2_marker_dir+'MA1440_marker_config.yaml',tool_marker_config_file=mti_marker_dir+'mti_'+R2_ph_dataset_date+'_marker_config.yaml')
 positioner=positioner_obj('D500B',def_path=config_dir+'D500B_robot_default_config.yml',tool_file_path=config_dir+'positioner_tcp.csv',\
     base_transformation_file=config_dir+'D500B_pose.csv',pulse2deg_file_path=config_dir+'D500B_pulse2deg_real.csv',\
-    base_marker_config_file=S1_marker_dir+'D500B_'+S1_ph_dataset_date+'_marker_config.yaml',tool_marker_config_file=S1_tcp_marker_dir+'positioner_tcp_marker_config.yaml')
+    base_marker_config_file=S1_marker_dir+'D500B_marker_config.yaml',tool_marker_config_file=S1_tcp_marker_dir+'positioner_tcp_marker_config.yaml')
 
 robot_scan_positioner_base = robot_scan.T_base_basemarker.inv()*positioner.T_base_basemarker*Transform(np.eye(3),[0,0,-380])
 
@@ -39,7 +39,7 @@ circle_offset=0
 path_dlambda = 0.1 # mm
 layer_dh = 0.1 # mm
 total_layers = 500
-torch_lambda = 55
+torch_lambda = 0
 scanner_distance=110
 
 ## start generating
@@ -51,6 +51,7 @@ js_dir=algo_dir+'curve_sliced_js/'
 Path(js_dir).mkdir(exist_ok=True)
 
 ## generate path and js
+total_layers=1
 for l in range(total_layers):
     path_dangle=path_dlambda/circle_radius
     curve_relative = []
@@ -66,12 +67,13 @@ for l in range(total_layers):
     positioner_js=np.array(positioner_js)
     
     torch_bp = int(torch_lambda/path_dlambda)
-    # print(torch_bp)
-    # print(len(angle_range))
+    print(torch_bp)
+    print(len(angle_range))
     # exit()
     torch_p_S1TCP = Transform(np.array([[1,0,0],[0,-1,0],curve_relative[torch_bp][3:]]).T,curve_relative[torch_bp][:3])
     torch_p = positioner.fwd(positioner_js[0],world=True)*torch_p_S1TCP
-    torch_Rx=[-1,0,0]
+    torch_Rx=np.array([-1,0,0])
+    torch_Rx=torch_Rx/np.linalg.norm(torch_Rx)
     torch_Ry=np.cross(torch_p.R[:,-1],torch_Rx)
     torch_Ry=torch_Ry/np.linalg.norm(torch_Ry)
     torch_R=np.array([torch_Rx,torch_Ry,curve_relative[torch_bp][3:]]).T
@@ -80,14 +82,15 @@ for l in range(total_layers):
     r1_js = np.tile(r1_js,(len(curve_relative),1))
     
     scanner_bp = int((torch_lambda-scanner_distance)/path_dlambda)
+    print(scanner_bp)
     scanner_p_S1TCP=curve_relative[scanner_bp][:3]+np.array([0,0,95])
-    # print(scanner_p_S1TCP)
     # exit()
     Ry=np.array(curve_relative[scanner_bp+1][:3]-scanner_p_S1TCP)*(-1)
     Ry=Ry/np.linalg.norm(Ry)
-    Rx=np.cross(Ry,curve_relative[scanner_bp+1][3:])
+    Rx=np.cross(Ry,curve_relative[scanner_bp][3:])
     Rx=Rx/np.linalg.norm(Rx)
     scanner_p_S1TCP = Transform(np.array([Rx,Ry,curve_relative[scanner_bp][3:]]).T,scanner_p_S1TCP)
+    print(scanner_p_S1TCP)
     scanner_p = robot_scan_positioner_base*positioner.fwd(positioner_js[0])*scanner_p_S1TCP
     r2_js = robot_scan.inv(scanner_p.p,scanner_p.R,last_joints=zero_config)
     r2_js = np.tile(r2_js,(len(curve_relative),1))
