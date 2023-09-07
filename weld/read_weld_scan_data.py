@@ -109,19 +109,19 @@ x_upper = 999999
 # start_id=0
 # end_id=-1
 
-start_id=75
-end_id=-75
+start_id=0
+end_id=-1
 
-datasets=['baseline','correction']
-# datasets=['baseline']
+# datasets=['baseline','correction']
+datasets=['repeat 2']
 
-datasets=['baseline','correction','repeat 1','repeat 2']
+# datasets=['baseline','correction','repeat 1','repeat 2']
 datasets_h_mean={}
 datasets_h_std={}
 for dataset in datasets:
 
     if dataset=='baseline':
-        data_dir = '../data/wall_weld_test/moveL_100_baseline_weld_scan_2023_07_07_15_20_56/'
+        data_dir = '../data/wall_weld_test/weld_scan_2023_07_17_16_30_34/'
     elif dataset=='correction':
         data_dir = '../data/wall_weld_test/moveL_100_weld_scan_2023_08_02_15_17_25/'
     elif dataset=='repeat 1':
@@ -418,19 +418,43 @@ for dataset in datasets:
                 plt.scatter(profile_height[start_id:end_id,0],profile_height[start_id:end_id,1],s=3,c='tab:green')
         else:
             if i==0:
-                plt.scatter(profile_height[start_id:end_id,0],profile_height[start_id:end_id,1],s=3,c='tab:blue',label='Forward (Right to Left)')
+                Forward = plt.scatter(profile_height[start_id:end_id,0],profile_height[start_id:end_id,1],s=3,c='tab:blue',label='Forward')
             elif i==1:
-                plt.scatter(profile_height[start_id:end_id,0],profile_height[start_id:end_id,1],s=3,c='tab:orange',label='Backward (Left to Right)')
+                Backward = plt.scatter(profile_height[start_id:end_id,0],profile_height[start_id:end_id,1],s=3,c='tab:orange',label='Backward')
             elif i%2==0:
                 plt.scatter(profile_height[start_id:end_id,0],profile_height[start_id:end_id,1],s=3,c='tab:blue')
             else:
                 plt.scatter(profile_height[start_id:end_id,0],profile_height[start_id:end_id,1],s=3,c='tab:orange')
         i+=1
-    plt.xlabel('x-axis')
-    plt.ylabel('z-axis')
-    plt.legend()
-    plt.title("Height Profile")
+    
+    plt.xlabel('x-axis (mm)', fontsize=20)
+    plt.ylabel('height (mm)', fontsize=20)
+    
+    plt.title("Height Profile of 100ipm Model Test", fontsize=20)
     plt.tight_layout()
+    
+
+    # Set finer grid
+    ax = plt.gca()
+    ax.xaxis.set_ticks(np.arange(-40, 40, 10))  # Change 0.1 to any value for desired grid size on x-axis
+    ax.yaxis.set_ticks(np.arange(0, 50, 10))   # Change 0.05 to any value for desired grid size on y-axis
+
+    # Adjust grid line thickness
+    ax.xaxis.grid(True, linewidth=1)  # Increase linewidth for thicker grid lines
+    ax.yaxis.grid(True, linewidth=1)  # Increase linewidth for thicker grid lines
+
+
+    plt.grid(True)
+    # # Customize legend
+    # legend = plt.legend(handles=[Forward, Backward],fontsize = 15,loc="upper right")  # Adjust fontsize as needed and specify location
+    # # 调整图例中的散点大小
+    # legend.legendHandles[0]._sizes = [100]
+    # legend.legendHandles[1]._sizes = [100]
+    # frame = legend.get_frame()
+    # frame.set_linewidth(1.0)  # Adjust legend box border thickness
+
+    # Adjust tick label fontsize
+    ax.tick_params(axis="both", labelsize=18)  # Adjust fontsize as needed
     plt.show()
 
     datasets_h_mean[dataset]=np.array(all_h_mean)
@@ -439,9 +463,9 @@ for dataset in datasets:
 for dataset in datasets:
     plt.plot(np.arange(len(datasets_h_mean[dataset])),datasets_h_mean[dataset],'-o',label=dataset)
 plt.legend()
-plt.xlabel('Layer')
-plt.ylabel('Mean Height (mm)')
-plt.title("Mean Height")
+plt.xlabel('Layer', fontsize=20)
+plt.ylabel('Mean Height (mm)', fontsize=20)
+plt.title("Mean Height", fontsize=20)
 plt.tight_layout()
 plt.show()
 

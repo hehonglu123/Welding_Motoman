@@ -31,9 +31,9 @@ for label, (a, b) in models.items():
     plt.plot(logV, logDh, label=label)
 
 # Customize the plot
-plt.xlabel("log(V) (log(mm/s))")
-plt.ylabel("log(Δh) (log(mm))")
-plt.title("Al 4043 Deposition Model")
+plt.xlabel("log(V) (log(mm/s))", fontsize=20)
+plt.ylabel("log(Δh) (log(mm))", fontsize=20)
+plt.title("Al 4043 Deposition Model", fontsize=20)
 plt.xlim(1.5, 3.5)
 plt.ylim(0, 1.2)
 # Set finer grid
@@ -41,9 +41,19 @@ ax = plt.gca()
 ax.xaxis.set_ticks(np.arange(1.5, 3.6, 0.5))  # Change 0.1 to any value for desired grid size on x-axis
 ax.yaxis.set_ticks(np.arange(0, 1.3, 0.25))   # Change 0.05 to any value for desired grid size on y-axis
 
-plt.grid(True)
-plt.legend()
+# Adjust grid line thickness
+ax.xaxis.grid(True, linewidth=1.8)  # Increase linewidth for thicker grid lines
+ax.yaxis.grid(True, linewidth=1.8)  # Increase linewidth for thicker grid lines
 
+
+plt.grid(True)
+# Customize legend
+legend = plt.legend(fontsize=18, loc="upper right")  # Adjust fontsize as needed and specify location
+frame = legend.get_frame()
+frame.set_linewidth(1.0)  # Adjust legend box border thickness
+
+# Adjust tick label fontsize
+ax.tick_params(axis="both", labelsize=18)  # Adjust fontsize as needed
 
 # Display the plot
 plt.tight_layout()

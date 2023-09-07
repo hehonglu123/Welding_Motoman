@@ -23,6 +23,7 @@ import datetime
 import numpy as np
 import open3d as o3d
 import math
+from scipy.optimize import curve_fit
 # def moving_average(a,w=3):
     
 #     if w%2==0:
@@ -36,6 +37,8 @@ import math
 #     ret = np.cumsum(a, dtype=float)
 #     ret[w:] = ret[w:] - ret[:-w]
 #     return ret[w - 1:] / w
+def power_law(x, a, b):
+    return np.log(a) + b * np.log(x)
 def func(x, a, b):
     return a * x**b
 def is_odd(num):
@@ -477,11 +480,42 @@ print(a_fit,b_fit)
 plt.plot(x, y, 'o')
 plt.plot(x_fit, y_fit, '-')
 plt.show()
-for dataset in datasets:
-    plt.plot(np.arange(len(datasets_h_std[dataset])),datasets_h_std[dataset],'-o',label=dataset)
-plt.axhline(y = 0.48, color = 'r', linestyle = '-')
-plt.legend()
-plt.xlabel('Layer')
-plt.ylabel('Height STD (mm)')
-plt.title("Height STD")
+# for dataset in datasets:
+#     plt.plot(np.arange(len(datasets_h_std[dataset])),datasets_h_std[dataset],'-o',label=dataset)
+# plt.axhline(y = 0.48, color = 'r', linestyle = '-')
+# plt.legend()
+# plt.xlabel('Layer')
+# plt.ylabel('Height STD (mm)')
+# plt.title("Height STD")
+# plt.show()
+
+m = -0.62015
+c = 1.84913
+
+# Generate x values
+x = np.linspace(1, 100, 400)  # 从1到100的400个值
+y = m * np.log(x) + c  # 使用公式计算y值
+
+# Plot
+plt.plot(log_x, log_y, 'o',label = 'Log(delta_h_mean) Vs. Log(Velocity) Scatter')
+plt.plot(np.log(x), y, '-',label = '100ipm_Model Fit Curve')  # 使用loglog函数绘制双对数图
+plt.xlabel('Log(V) (log(mm/s))',fontsize=18)
+plt.ylabel('Log(delta_h) (log(mm))',fontsize=18)
+plt.title('Log-Log Model Plot of 100ipm',fontsize=18)
+# Set finer grid
+ax = plt.gca()
+
+# Adjust grid line thickness
+ax.xaxis.grid(True, linewidth=1)  # Increase linewidth for thicker grid lines
+ax.yaxis.grid(True, linewidth=1)  # Increase linewidth for thicker grid lines
+
+plt.grid(True)
+# Customize legend
+legend = plt.legend(fontsize = 15, loc="upper right")  # Adjust fontsize as needed and specify location
+frame = legend.get_frame()
+frame.set_linewidth(1.5)  # Adjust legend box border thickness
+
+# Adjust tick label fontsize
+ax.tick_params(axis="both", labelsize=18)  # Adjust fontsize as needed
 plt.show()
+
