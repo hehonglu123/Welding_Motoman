@@ -167,29 +167,28 @@ while slice_num<len(lam_relative_all_slices):
     curve_js_all_dense=interp1d(lam_relative_all_slices[slice_num],np.hstack((rob1_js,rob2_js,positioner_js)),kind='cubic',axis=0)(lam_relative_dense_all_slices[slice_num])
     ### get breakpoints for vd
     breakpoints=SS.get_breakpoints(lam_relative_dense_all_slices[slice_num],vd_relative)
+    print(breakpoints[0])
     
     ###start welding at the first layer, then non-stop
     if not welding_started:
         #jog above
         waypoint_pose=robot_weld.fwd(curve_js_all_dense[breakpoints[0],:6])
         waypoint_pose.p[-1]+=50
-        waypoint_q=robot_weld.inv(waypoint_pose.p,waypoint_pose.R,curve_js_all_dense[breakpoints[0],:6])[0]
+        waypoint_q=robot_weld.inv(waypoint_pose.p,waypoint_pose.R,curve_js_all_dense[0,:6])[0]
         # SS.jog2q(np.hstack((waypoint_q,np.radians([21,5,-39,0,-47,49]),curve_js_all_dense[0,12:])))
         SS.jog2q(np.hstack((np.radians([21,5,-39,0,-47,49]),curve_js_all_dense[0,6:])))
-        # SS.jog2q(np.hstack((waypoint_q,curve_js_all_dense[0,6:])))
-        exit()
+        SS.jog2q(np.hstack((waypoint_q,curve_js_all_dense[0,6:])))
         SS.jog2q(curve_js_all_dense[breakpoints[0]])
-        exit()
-    exit()
-    if arc_on:
         welding_started=True
-    fronius_client.start_weld()
+        # if arc_on:
+        #     fronius_client.start_weld()
     time.sleep(0.2)
 
     ## streaming
     robot_ts=[]
     robot_js=[]
     mti_recording=[]
+    point_stream_start_time=time.time()
     try:
         ###start logging
         for bp_idx in range(len(breakpoints)):
@@ -216,9 +215,11 @@ while slice_num<len(lam_relative_all_slices):
         traceback.print_exc()
         fronius_client.stop_weld()
         break
+# if arc_on:
+#     fronius_client.stop_weld()
 
-fronius_client.stop_weld()
-
+exit()
+Path(recorded_data_dir).mkdir(exist_ok=True)
 np.savetxt(recorded_data_dir+'robot_js_exe.csv',robot_js,delimiter=',')
 np.savetxt(recorded_data_dir+'robot_stamps.csv',robot_ts,delimiter=',')
 with open(recorded_data_dir + 'mti_scans.pickle', 'wb') as file:
