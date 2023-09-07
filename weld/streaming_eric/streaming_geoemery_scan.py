@@ -48,7 +48,7 @@ S1_ph_dataset_date='0801'
 
 zero_config=np.zeros(6)
 # 0. robots.
-config_dir='../config/'
+config_dir='../../config/'
 R1_marker_dir=config_dir+'MA2010_marker_config/'
 weldgun_marker_dir=config_dir+'weldgun_marker_config/'
 R2_marker_dir=config_dir+'MA1440_marker_config/'
@@ -153,6 +153,7 @@ for i in range(0,1):
     lam_relative_all_slices.append(lam_relative)
     lam_relative_dense_all_slices.append(np.linspace(0,lam_relative[-1],num=int(lam_relative[-1]/point_distance)))
 
+input("Enter to start")
 slice_num=0
 while slice_num<len(lam_relative_all_slices):
     print('FEEDRATE: ',feedrate_cmd,'VD: ',vd_relative)
@@ -173,12 +174,17 @@ while slice_num<len(lam_relative_all_slices):
         waypoint_pose=robot_weld.fwd(curve_js_all_dense[breakpoints[0],:6])
         waypoint_pose.p[-1]+=50
         waypoint_q=robot_weld.inv(waypoint_pose.p,waypoint_pose.R,curve_js_all_dense[breakpoints[0],:6])[0]
-        SS.jog2q(np.hstack((waypoint_q,curve_js_all_dense[0,6:])))
+        # SS.jog2q(np.hstack((waypoint_q,np.radians([21,5,-39,0,-47,49]),curve_js_all_dense[0,12:])))
+        SS.jog2q(np.hstack((np.radians([21,5,-39,0,-47,49]),curve_js_all_dense[0,6:])))
+        # SS.jog2q(np.hstack((waypoint_q,curve_js_all_dense[0,6:])))
+        exit()
         SS.jog2q(curve_js_all_dense[breakpoints[0]])
-        if arc_on:
-            welding_started=True
-        fronius_client.start_weld()
-        time.sleep(0.2)
+        exit()
+    exit()
+    if arc_on:
+        welding_started=True
+    fronius_client.start_weld()
+    time.sleep(0.2)
 
     ## streaming
     robot_ts=[]
