@@ -116,7 +116,7 @@ formatted_time = current_time.strftime('%Y_%m_%d_%H_%M_%S.%f')[:-7]
 data_dir='../data/wall_weld_test/weld_scan_'+formatted_time+'/'
 
 ### read cmd
-use_previous_cmd=True
+use_previous_cmd=False
 cmd_dir = '../data/wall_weld_test/'+'moveL_100_weld_scan_2023_08_02_15_17_25/'
 
 ## rr drivers and all other drivers
@@ -142,11 +142,11 @@ mti_client.setExposureTime("25")
 ###################################
 base_layer = True
 profile_height=None
-# Transz0_H=None
-Transz0_H=np.array([[ 9.99997540e-01,  2.06703673e-06, -2.21825071e-03, -3.46701381e-03],
- [ 2.06703673e-06,  9.99998263e-01,  1.86365986e-03,  2.91280622e-03],
- [ 2.21825071e-03, -1.86365986e-03,  9.99995803e-01,  1.56294293e+00],
- [ 0.00000000e+00,  0.00000000e+00,  0.00000000e+00,  1.00000000e+00]])
+Transz0_H=None
+# Transz0_H=np.array([[ 9.99997540e-01,  2.06703673e-06, -2.21825071e-03, -3.46701381e-03],
+#  [ 2.06703673e-06,  9.99998263e-01,  1.86365986e-03,  2.91280622e-03],
+#  [ 2.21825071e-03, -1.86365986e-03,  9.99995803e-01,  1.56294293e+00],
+#  [ 0.00000000e+00,  0.00000000e+00,  0.00000000e+00,  1.00000000e+00]])
 curve_sliced_relative=None
 last_mean_h = 0
 
@@ -155,7 +155,7 @@ r2_ir_q = np.radians([43.3469,36.0996,-63.0900,142.5838,-83.0429,-96.0737])
 r2_mid = np.radians([43.7851,20,-10,0,0,0])
 # r2_ir_q = np.zeros(6)
 
-weld_arcon=True
+weld_arcon=False
 
 end_layer = len(weld_z_height)
 if use_previous_cmd:
@@ -165,7 +165,7 @@ input("Start?")
 # move robot to ready position
 ws.jog_dual(robot_scan,positioner,[r2_mid,r2_ir_q],np.radians([-15,180]),to_start_speed)
 
-for i in range(18,end_layer):
+for i in range(0,end_layer):
     cycle_st = time.time()
     print("==================================")
     print("Layer:",i)
@@ -175,7 +175,7 @@ for i in range(18,end_layer):
         forward_flag = False
     #### welding
     weld_st = time.time()
-    if i>=19 and True:
+    if i>=0 and True:
         weld_plan_st = time.time()
         if i>=2:
             base_layer=False
