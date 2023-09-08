@@ -63,8 +63,8 @@ positioner.base_H = H_from_RT(positioner_base.R,positioner_base.p)
 # robot_weld.robot.R_tool = deepcopy(robot_weld.T_tool_toolmarker.R)
 # robot_weld.robot.p_tool = deepcopy(robot_weld.T_tool_toolmarker.p)
 
-# robot_scan.robot.P=deepcopy(robot_scan.calib_P)
-# robot_scan.robot.H=deepcopy(robot_scan.calib_H)
+robot_scan.robot.P=deepcopy(robot_scan.calib_P)
+robot_scan.robot.H=deepcopy(robot_scan.calib_H)
 
 #### load R1 kinematic model
 PH_data_dir='../mocap/PH_grad_data/test'+R1_ph_dataset_date+'_R1/train_data_'
@@ -123,8 +123,8 @@ sliced_alg='auto_slice/'
 curve_data_dir = '../data/'+dataset+sliced_alg
 data_dir=curve_data_dir+'weld_scan_2023_09_05_18_32_02'+'/'
 baselayer=False
-last_layer=0
-layer=30
+last_layer=1
+layer=0
 x=0
 
 use_actual = False
