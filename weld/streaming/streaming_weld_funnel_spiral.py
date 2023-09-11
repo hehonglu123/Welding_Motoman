@@ -85,7 +85,7 @@ def save_data(recorded_dir,current_data,welding_data,audio_recording,robot_data,
 	return
 
 def main():
-	dataset='cup/'
+	dataset='funnel/'
 	sliced_alg='circular_slice/'
 	data_dir='../../data/'+dataset+sliced_alg
 	with open(data_dir+'slicing.yml', 'r') as file:
@@ -191,8 +191,8 @@ def main():
 
 	###set up control parameters
 	job_offset=300 		###200 for Aluminum ER4043, 300 for Steel Alloy ER70S-6, 400 for Stainless Steel ER316L
-	nominal_feedrate=150
-	nominal_vd_relative=0.1
+	nominal_feedrate=130
+	nominal_vd_relative=6
 	nominal_wire_length=25 #pixels
 	nominal_temp_below=500
 	base_feedrate_cmd=300
@@ -200,11 +200,11 @@ def main():
 	feedrate_cmd=nominal_feedrate
 	vd_relative=nominal_vd_relative
 	feedrate_gain=0.5
-	feedrate_min=120
+	feedrate_min=130
 	feedrate_max=300
 	nominal_slice_increment=int(1.3/slicing_meta['line_resolution'])
 	slice_inc_gain=3.
-	vd_max=5
+	vd_max=6
 
 	##########################################SENSORS LOGGIGN########################################################
 	rr_sensors = WeldRRSensor(weld_service=fronius_sub,cam_service=None,microphone_service=microphone,current_service=current_sub)
@@ -226,14 +226,14 @@ def main():
 	slice_logging_all=[]
 	# now=None
 
-	layer_start=0
-	layer_end=30
+	layer_start=60
+	layer_end=80
 	####PRELOAD ALL SLICES TO SAVE INPROCESS TIME
-	rob1_js_all_slices=[]
-	rob2_js_all_slices=[]
-	positioner_js_all_slices=[]
-	lam_relative_all_slices=[]
-	lam_relative_dense_all_slices=[]
+	rob1_js_all_slices=[[]]*layer_start
+	rob2_js_all_slices=[[]]*layer_start
+	positioner_js_all_slices=[[]]*layer_start
+	lam_relative_all_slices=[[]]*layer_start
+	lam_relative_dense_all_slices=[[]]*layer_start
 	for i in range(layer_start,layer_end):
 		rob1_js_all_slices.append(np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(i)+'_0.csv',delimiter=','))
 		rob2_js_all_slices.append(np.loadtxt(data_dir+'curve_sliced_js/MA1440_js'+str(i)+'_0.csv',delimiter=','))
@@ -255,12 +255,12 @@ def main():
 		if positioner_js.shape==(2,) and rob1_js.shape==(6,):	###if only a single point
 			continue
 		###TRJAECTORY WARPING
-		if slice_num>0:
+		if slice_num>layer_start:
 			rob1_js_prev=copy.deepcopy(rob1_js_all_slices[slice_num-nominal_slice_increment])
 			rob2_js_prev=copy.deepcopy(rob2_js_all_slices[slice_num-nominal_slice_increment])
 			positioner_js_prev=copy.deepcopy(positioner_js_all_slices[slice_num-nominal_slice_increment])
 			rob1_js,rob2_js,positioner_js=warp_traj(rob1_js,rob2_js,positioner_js,rob1_js_prev,rob2_js_prev,positioner_js_prev,reversed=True)
-		if slice_num<slicing_meta['num_layers']-nominal_slice_increment:
+		if slice_num<layer_end-nominal_slice_increment:
 			rob1_js_next=copy.deepcopy(rob1_js_all_slices[slice_num+nominal_slice_increment])
 			rob2_js_next=copy.deepcopy(rob2_js_all_slices[slice_num+nominal_slice_increment])
 			positioner_js_next=copy.deepcopy(positioner_js_all_slices[slice_num+nominal_slice_increment])
@@ -348,7 +348,7 @@ def main():
 			
 			####CONTROL PARAMETERS
 			feedrate_cmd-=20
-			vd_relative+=1
+			vd_relative+=2
 			vd_relative=min(vd_max,vd_relative)
 			feedrate_cmd=max(feedrate_cmd,feedrate_min)
 			slice_num+=int(nominal_slice_increment)

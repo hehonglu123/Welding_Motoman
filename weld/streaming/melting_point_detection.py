@@ -89,21 +89,22 @@ streaming_rate=125.
 point_distance=0.04		###STREAMING POINT INTERPOLATED DISTANCE
 SS=StreamingSend(RR_robot,RR_robot_state,RobotJointCommand,streaming_rate)
 
+print(RR_robot_state.InValue.joint_position)
 ###########################################layer welding############################################
-q=[]
+q=[-0.4817227,   0.66238693,  0.20461112, -0.24844005, -0.78522422,  0.62861982, -0.27838197,  0.96177719, -0.25688656, -1.21579449, -1.42492708, -0.34391979,  0.26236427,  0.00777132]
 SS.jog2q(q)
 flir_logging=[]
 flir_ts=[]
-fronius_client.job_number = 320
+fronius_client.job_number = 330
 fronius_client.start_weld()
-time.sleep(10)
+time.sleep(20)
 fronius_client.stop_weld()
-time.sleep(10)
-local_recorded_dir='recorded_data/wall_recording/'
+time.sleep(20)
+local_recorded_dir='recorded_data/melt_point/'
 os.makedirs(local_recorded_dir,exist_ok=True)
 flir_ts_rec=np.array(flir_ts)-flir_ts[0]
-np.savetxt(local_recorded_dir+'slice_%i_%i_flir_ts.csv'%(slice_num,x),flir_ts_rec,delimiter=',')
-with open(local_recorded_dir+'slice_%i_%i_flir.pickle'%(slice_num,x), 'wb') as file:
+np.savetxt(local_recorded_dir+'ir_stamps.csv',flir_ts_rec,delimiter=',')
+with open(local_recorded_dir+'ir_recording.pickle', 'wb') as file:
 	pickle.dump(flir_logging, file)
 			
 	
