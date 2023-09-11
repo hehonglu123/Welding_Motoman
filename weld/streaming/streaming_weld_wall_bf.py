@@ -6,13 +6,7 @@ from robot_def import *
 from lambda_calc import *
 from multi_robot import *
 from flir_toolbox import *
-from dx200_motion_program_exec_client import *
 from StreamingSend import *
-
-def traj_warp():
-	return
-
-
 	
 ############################################################WELDING PARAMETERS########################################################
 

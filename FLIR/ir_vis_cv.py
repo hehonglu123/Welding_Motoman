@@ -6,10 +6,10 @@ from flir_toolbox import *
 
 
 # Load the IR recording data from the pickle file
-with open('../../recorded_data/cup_ER316L_spiral/layer_10/ir_recording.pickle', 'rb') as file:
+with open('../../recorded_data/70s6_debug/layer_24/ir_recording.pickle', 'rb') as file:
     ir_recording = pickle.load(file)
 
-ir_ts=np.loadtxt('../../recorded_data/cup_ER316L_spiral/layer_10/ir_stamps.csv', delimiter=',')
+ir_ts=np.loadtxt('../../recorded_data/70s6_debug/layer_24/ir_stamps.csv', delimiter=',')
 
 print(len(ir_recording), len(ir_ts))
 
@@ -50,13 +50,13 @@ for i in range(len(ir_recording)):
     # cv2.rectangle(ir_bgr, (50,110,95,60), (255,0,0), thickness=1)   #flame below centroid
 
     # Write the IR image to the video file
-    # result.write(ir_bgr)
+    result.write(ir_bgr)
 
-    # Display the IR image
-    cv2.imshow("IR Recording", ir_bgr)
+    # # Display the IR image
+    # cv2.imshow("IR Recording", ir_bgr)
 
-    # Wait for a specific time (in milliseconds) before displaying the next frame
-    cv2.waitKey(int(1000*(ir_ts[i+1]-ir_ts[i])))
+    # # Wait for a specific time (in milliseconds) before displaying the next frame
+    # cv2.waitKey(int(1000*(ir_ts[i+1]-ir_ts[i])))
 
 result.release()
 # Close the window after the loop is completed
