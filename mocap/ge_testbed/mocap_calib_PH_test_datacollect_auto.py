@@ -33,6 +33,7 @@ class CalibRobotPH:
         all_ids.extend(self.base_markers_ids)
         all_ids.append(self.base_rigid_id)
         all_ids.append(robot.tool_rigid_id)
+        all_ids.append("marker10_rigid0")
         self.mpl_obj = MocapFrameListener(self.mocap_cli,all_ids,'world',use_quat=True)
     
     def run_datacollect_sync(self,rob_IP=None,paths=[],rob_speed=3,waittime=1,
@@ -48,8 +49,9 @@ class CalibRobotPH:
         for q in paths:
             jt = jointtarget(robot_group,uframe_num,utool_num,q,[0]*6)
             tp.moveJ(jt,rob_speed,'%',-1) # moveJ does not support coordinated motion
-            tp.setIO('DO',10,True)
-            tp.waitIO('DO',10,False)
+            # tp.moveJ(jt,rob_speed,'%',-1) # moveJ does not support coordinated motion
+            # tp.setIO('DO',10,True)
+            # tp.waitIO('DO',10,False)
         client.execute_motion_program(tp,record_joint=False,non_block=True)
         
         pose_cnt=0
@@ -216,7 +218,8 @@ def calib_R1():
     mocap_url = 'rr+tcp://localhost:59823?service=phasespace_mocap'
     mocap_cli = RRN.ConnectService(mocap_url)
     
-    rob_ip='127.0.0.1'
+    # rob_ip='127.0.0.1'
+    rob_ip='192.168.0.1'
 
     calib_obj = CalibRobotPH(mocap_cli,robot)
     
@@ -225,11 +228,11 @@ def calib_R1():
     waittime=0.5 # stop 0.5 sec for sync
 
     test_qs = []
-    sample_q = np.radians([[-8,-13,-42,0,-58,-2],[-51,-5,-33,4,-56,37],\
-                        [-24,-30,-60,4,-42,38],[-24,-12,-41,4,-58,38],\
-                        [-8,-13,-42,0,-58,-2]])
-    # sample_N = [100,100,100,100] # len(sample_q)-1
-    sample_N = [2,2,2,2] # len(sample_q)-1
+    sample_q = np.radians([[-10,-31,-72,2,-38,-13],[-70,-8,-61,-6,-28,13],\
+                        [-70,-22,-26,-3,-79,9],[-5,-43,-36,6,-91,-22],\
+                        [-10,-31,-72,2,-38,-13]])
+    sample_N = [100,100,100,100] # len(sample_q)-1
+    # sample_N = [2,2,2,2] # len(sample_q)-1
     for i in range(len(sample_N)):
         start_T = robot.fwd(sample_q[i])
         end_T = robot.fwd(sample_q[i+1])
@@ -243,6 +246,7 @@ def calib_R1():
     q_paths=test_qs
     print("total pose:",len(q_paths))
     print("Data Base:",dataset_date)
+    # exit()
 
     # collecting raw data
     raw_data_dir='testing_data/test_data'

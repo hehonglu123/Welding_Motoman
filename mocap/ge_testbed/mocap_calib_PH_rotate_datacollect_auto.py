@@ -32,6 +32,7 @@ class CalibRobotPH:
         all_ids.extend(self.base_markers_ids)
         all_ids.append(self.base_rigid_id)
         all_ids.append(robot.tool_rigid_id)
+        all_ids.append("marker10_rigid0")
         print('Calib ID:',all_ids)
         self.mpl_obj = MocapFrameListener(self.mocap_cli,all_ids,'world')
 
@@ -91,7 +92,15 @@ class CalibRobotPH:
         tp= TPMotionProgram(tool_num=utool_num,uframe_num=uframe_num)
         jtend = jointtarget(robot_group,uframe_num,utool_num,start_p[0],[0]*6)
         tp.moveJ(jtend,rob_speed,'%',-1)
-        client.execute_motion_program(tp,record_joint=False)
+        tp.setIO('DO',10,False)
+        
+        client.set_ioport('DOUT',10,True)
+        client.execute_motion_program(tp,record_joint=False,non_block=True)
+        while True:
+            io_res=client.read_ioport('DOUT',10)
+            if not io_res:
+                break
+        
         print("Reading Zero Config")
         self.mpl_obj.run_pose_listener()
         curve_exe = client.get_joint_angle(read_N=3)
@@ -182,8 +191,8 @@ def calib_R1():
     mocap_url = 'rr+tcp://localhost:59823?service=phasespace_mocap'
     mocap_cli = RRN.ConnectService(mocap_url)
     
-    rob_ip='127.0.0.2'
-    # rob_ip='192.168.0.1'
+    # rob_ip='127.0.0.2'
+    rob_ip='192.168.0.1'
     rob_speed=3
 
     calib_obj = CalibRobotPH(mocap_cli,robot)

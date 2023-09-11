@@ -76,10 +76,16 @@ def detect_axis(points,rough_axis_direction,calib_marker_ids,cut_edge=False,cut_
     all_normals=[]
     all_centers=[]
     for i in range(len(calib_marker_ids)):
+        # if i==0:
+        #     points[calib_marker_ids[i]]=np.array(points[calib_marker_ids[i]])
+        #     ax = plt.figure().add_subplot(projection='3d')
+        #     ax.scatter(points[calib_marker_ids[i]][::100][:,2], points[calib_marker_ids[i]][::100][:,0], points[calib_marker_ids[i]][::100][:,1])
+        #     plt.show()
         
         center, normal = fitting_3dcircle(points[calib_marker_ids[i]])
         if cut_edge:
             points[calib_marker_ids[i]]=cut_adge(points[calib_marker_ids[i]],center,normal,cut_edge_angle)
+            center, normal = fitting_3dcircle(points[calib_marker_ids[i]])
 
         if calib_marker_ids[i]=='marker8_rigid4':
             print("Radius:",np.mean(np.linalg.norm(points[calib_marker_ids[i]]-center,axis=1)))
@@ -120,9 +126,9 @@ def to_frame(curve_p,curve_R,mocap_stamps,target_frame,markers_id):
 
 config_dir='../config/'
 
-# robot_type='R1'
+robot_type='R1'
 # robot_type='R2'
-robot_type='S1'
+# robot_type='S1'
 
 # all_datasets=['train_data','valid_data_1','valid_data_2']
 dataset_date='0801'

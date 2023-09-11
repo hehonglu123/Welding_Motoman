@@ -32,6 +32,7 @@ class CalibRobotPH:
         all_ids.extend(self.base_markers_ids)
         all_ids.append(self.base_rigid_id)
         all_ids.append(robot.tool_rigid_id)
+        all_ids.append("marker10_rigid0")
         print('Calib ID:',all_ids)
         self.mpl_obj = MocapFrameListener(self.mocap_cli,all_ids,'world',use_quat=True)
     
@@ -219,15 +220,16 @@ def calib_R1():
     mocap_url = 'rr+tcp://localhost:59823?service=phasespace_mocap'
     mocap_cli = RRN.ConnectService(mocap_url)
     
-    rob_ip='127.0.0.1'
+    # rob_ip='127.0.0.1'
+    rob_ip='192.168.0.1'
 
     calib_obj = CalibRobotPH(mocap_cli,robot)
 
     # calibration
-    q2_up=-40
-    q2_low=-40
-    q3_up_sample = np.array([[-40,-45],[-20,10],[10,0]]) #[[q2 q3]]
-    q3_low_sample = np.array([[-40,-70],[-20,-65],[10,-60]]) #[[q2 q3]]
+    q2_up=-50
+    q2_low=-20
+    q3_up_sample = np.array([[-50,-45],[-35,-30],[-20,-20]]) #[[q2 q3]]
+    q3_low_sample = np.array([[-50,-80],[-35,-75],[-20,-70]]) #[[q2 q3]]
     d_angle = 5 # 5 degree
     dq_sample = [[0,0,0,0,0,0],\
           [1,0,0,-0,-0,0],[0,1,0,0,0,0],\
@@ -236,7 +238,7 @@ def calib_R1():
     scale=1
     dq_sample = np.array(dq_sample)*scale
 
-    target_q_zero = np.array([-23,0,0,1,-58,37])
+    target_q_zero = np.array([-35,0,0,1.6,-56,-33])
 
     # speed
     rob_speed=10
@@ -266,6 +268,7 @@ def calib_R1():
         forward = not forward
     print("total pose:",len(q_paths))
     print("Data Base:",dataset_date)
+    # exit()
 
     # collecting raw data
     raw_data_dir='PH_grad_data/train_data'
@@ -278,6 +281,6 @@ def calib_R1():
 
 if __name__=='__main__':
 
-    # calib_R1()
-    calib_R2()
+    calib_R1()
+    # calib_R2()
     # calib_S1()
