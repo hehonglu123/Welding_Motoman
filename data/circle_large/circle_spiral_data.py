@@ -31,6 +31,10 @@ positioner=positioner_obj('D500B',def_path=config_dir+'D500B_robot_default_confi
     base_marker_config_file=S1_marker_dir+'D500B_marker_config.yaml',tool_marker_config_file=S1_tcp_marker_dir+'positioner_tcp_marker_config.yaml')
 
 robot_scan_positioner_base = robot_scan.T_base_basemarker.inv()*positioner.T_base_basemarker*Transform(np.eye(3),[0,0,-380])
+positioner.upper_limit=np.radians(40000)
+positioner.robot.joint_upper_limit=positioner.upper_limit
+positioner.lower_limit=np.radians(-40000)
+positioner.robot.joint_lower_limit=positioner.lower_limit
 
 zero_config=np.zeros(6)
 # print(robot_weld.fwd(zero_config))
@@ -43,7 +47,7 @@ path_dlambda = 0.1 # mm
 layer_dh = 0.1 # mm
 baselayer_dh=3 # mm
 total_layers = 500
-total_base_layers=2
+total_base_layers=0
 torch_lambda = 0
 scanner_distance=110
 torch_bp = int(torch_lambda/path_dlambda)
@@ -120,7 +124,7 @@ for l in range(total_layers+total_base_layers):
         np.savetxt(js_dir+'D500B_js'+str(l-total_base_layers)+'_0.csv',positioner_js,delimiter=',')
 
 slicing_meta={}
-slicing_meta['num_layer']=total_layers
+slicing_meta['num_layers']=total_layers
 slicing_meta['num_baselayers']=0
 slicing_meta['line_resolution']=0.1
 slicing_meta['baselayer_thickness']=0

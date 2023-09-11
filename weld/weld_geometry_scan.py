@@ -92,8 +92,10 @@ positioner.robot.H=deepcopy(positioner.calib_H)
 #### data directory
 # dataset='cup/'
 # sliced_alg='circular_slice_shifted/'
-dataset='blade0.1/'
-sliced_alg='auto_slice/'
+# dataset='blade0.1/'
+# sliced_alg='auto_slice/'
+dataset='circle_large/'
+sliced_alg='static_stepwise/'
 curve_data_dir = '../data/'+dataset+sliced_alg
 
 current_time = datetime.datetime.now()
@@ -176,7 +178,7 @@ planned_job=np.append(planned_job,np.ones(planned_layer)*200)
 planned_job=planned_job.astype(int)
 
 print_min_dh = 0.5 # mm
-arc_on=True
+arc_on=False
 save_weld_record=True
 save_output_points=True
 
@@ -188,10 +190,10 @@ all_last_curve_relative=None
 # forward = True
 # baselayer = False
 
-layer=66
-last_layer=40
-layer_count=6
-start_weld_layer=98
+layer=-1
+last_layer=-1
+layer_count=-1
+start_weld_layer=0
 
 # try:
 #     layer_count=len(glob.glob(data_dir+'layer_*_0'))+1

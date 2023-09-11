@@ -43,7 +43,7 @@ path_dlambda = 0.1 # mm
 layer_dh = 0.1 # mm
 baselayer_dh=3 # mm
 total_layers = 500
-total_base_layers=2
+total_base_layers=0
 torch_lambda = 0
 scanner_distance=0
 torch_bp = int(torch_lambda/path_dlambda)
@@ -80,9 +80,9 @@ for l in range(total_layers+total_base_layers):
     curve_scan_relative=[]
     for curve_p_i in range(len(curve_relative)):
         if curve_p_i<len(curve_relative)-1:
-            Ry=np.array(curve_relative[curve_p_i+1][:3]-curve_relative[curve_p_i][:3])
+            Ry=np.array(curve_relative[curve_p_i+1][:3]-curve_relative[curve_p_i][:3])*(-1)
         else:
-            Ry=np.array(curve_relative[curve_p_i][:3]-curve_relative[curve_p_i-1][:3])
+            Ry=np.array(curve_relative[curve_p_i][:3]-curve_relative[curve_p_i-1][:3])*(-1)
         Ry=Ry/np.linalg.norm(Ry)
         Rx=np.cross(Ry,curve_relative[curve_p_i][3:])
         Rx=Rx/np.linalg.norm(Rx)
@@ -135,7 +135,7 @@ for l in range(total_layers+total_base_layers):
         
 
 slicing_meta={}
-slicing_meta['num_layer']=total_layers
+slicing_meta['num_layers']=total_layers
 slicing_meta['num_baselayers']=0
 slicing_meta['line_resolution']=0.1
 slicing_meta['baselayer_thickness']=0
