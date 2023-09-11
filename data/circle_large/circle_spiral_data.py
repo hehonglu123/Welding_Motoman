@@ -36,14 +36,18 @@ zero_config=np.zeros(6)
 # print(robot_weld.fwd(zero_config))
 # print(robot_scan.fwd(zero_config))
 ## generate circle path and positioner js
-algo_name = 'static'
+algo_name = 'static_spiral'
 circle_radius=35
-circle_offset=0
+circle_offset=-np.pi/2
 path_dlambda = 0.1 # mm
 layer_dh = 0.1 # mm
+baselayer_dh=3 # mm
 total_layers = 500
-torch_lambda = 55
+total_base_layers=2
+torch_lambda = 0
 scanner_distance=110
+torch_bp = int(torch_lambda/path_dlambda)
+scanner_bp = int((torch_lambda-scanner_distance)/path_dlambda)
 
 ## start generating
 algo_dir=algo_name+'/'
@@ -55,21 +59,23 @@ Path(js_dir).mkdir(exist_ok=True)
 
 ## generate path and js
 # total_layers=1
-for l in range(total_layers):
+for l in range(total_layers+total_base_layers):
+    baselayer_l = min(l,total_base_layers)
+    toplayer_l = max(0,l-total_base_layers)
     path_dangle=path_dlambda/circle_radius
     curve_relative = []
     positioner_js = []
     angle_range=np.append(np.arange(circle_offset+2*np.pi,circle_offset+0,-1*path_dangle),circle_offset+0)
     for theta in angle_range:
-        position=np.array([circle_radius*np.cos(theta),circle_radius*np.sin(theta),l*layer_dh])
+        layer_height = baselayer_l*baselayer_dh+toplayer_l*layer_dh
+        position=np.array([circle_radius*np.cos(theta),circle_radius*np.sin(theta),layer_height])
         pos_normal=np.append(position,[0,0,-1])
         curve_relative.append(pos_normal)
-        positioner_js.append([np.radians(-15),theta])
+        positioner_js.append([np.radians(-15),theta-circle_offset])
         
     curve_relative=np.array(curve_relative)
     positioner_js=np.array(positioner_js)
     
-    torch_bp = int(torch_lambda/path_dlambda)
     # exit()
     torch_p_S1TCP = Transform(np.array([[1,0,0],[0,-1,0],curve_relative[torch_bp][3:]]).T,curve_relative[torch_bp][:3])
     torch_p = positioner.fwd(positioner_js[0],world=True)*torch_p_S1TCP
@@ -82,7 +88,6 @@ for l in range(total_layers):
     r1_js = robot_weld.inv(torch_p.p,torch_p.R,last_joints=zero_config)
     r1_js = np.tile(r1_js,(len(curve_relative),1))
     
-    scanner_bp = int((torch_lambda-scanner_distance)/path_dlambda)
     scanner_p_S1TCP=curve_relative[scanner_bp][:3]+np.array([0,0,95])
 
     # exit()
@@ -103,10 +108,16 @@ for l in range(total_layers):
     # print(len(r1_js))
     # print(len(r2_js))
     
-    np.savetxt(path_dir+'slice'+str(l)+'_0.csv',curve_relative,delimiter=',')
-    np.savetxt(js_dir+'MA2010_js'+str(l)+'_0.csv',r1_js,delimiter=',')
-    np.savetxt(js_dir+'MA1440_js'+str(l)+'_0.csv',r2_js,delimiter=',')
-    np.savetxt(js_dir+'D500B_js'+str(l)+'_0.csv',positioner_js,delimiter=',')
+    if l<total_base_layers:
+        np.savetxt(path_dir+'baselayer'+str(l)+'_0.csv',curve_relative,delimiter=',')
+        np.savetxt(js_dir+'MA2010_base_js'+str(l)+'_0.csv',r1_js,delimiter=',')
+        np.savetxt(js_dir+'MA1440_base_js'+str(l)+'_0.csv',r2_js,delimiter=',')
+        np.savetxt(js_dir+'D500B_base_js'+str(l)+'_0.csv',positioner_js,delimiter=',')
+    else:
+        np.savetxt(path_dir+'slice'+str(l-total_base_layers)+'_0.csv',curve_relative,delimiter=',')
+        np.savetxt(js_dir+'MA2010_js'+str(l-total_base_layers)+'_0.csv',r1_js,delimiter=',')
+        np.savetxt(js_dir+'MA1440_js'+str(l-total_base_layers)+'_0.csv',r2_js,delimiter=',')
+        np.savetxt(js_dir+'D500B_js'+str(l-total_base_layers)+'_0.csv',positioner_js,delimiter=',')
 
 slicing_meta={}
 slicing_meta['num_layer']=total_layers
@@ -114,5 +125,7 @@ slicing_meta['num_baselayers']=0
 slicing_meta['line_resolution']=0.1
 slicing_meta['baselayer_thickness']=0
 slicing_meta['point_distance']=0.5
+slicing_meta['scanner_lag']=scanner_distance
+slicing_meta['scanner_lag_breakpoints']=scanner_bp
 with open(algo_dir+'slicing.yml','w') as file:
     yaml.safe_dump(slicing_meta,file)
