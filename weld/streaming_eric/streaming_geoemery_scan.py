@@ -176,7 +176,8 @@ while slice_num<len(lam_relative_all_slices):
         waypoint_pose.p[-1]+=50
         waypoint_q=robot_weld.inv(waypoint_pose.p,waypoint_pose.R,curve_js_all_dense[0,:6])[0]
         # SS.jog2q(np.hstack((waypoint_q,np.radians([21,5,-39,0,-47,49]),curve_js_all_dense[0,12:])))
-        SS.jog2q(np.hstack((np.radians([21,5,-39,0,-47,49]),curve_js_all_dense[0,6:])))
+        SS.jog2q(np.hstack((np.radians([-50,28,7,0,-47,0]),curve_js_all_dense[0,6:])))
+        # exit()
         SS.jog2q(np.hstack((waypoint_q,curve_js_all_dense[0,6:])))
         SS.jog2q(curve_js_all_dense[breakpoints[0]])
         welding_started=True
