@@ -74,7 +74,7 @@ positioner.base_H = H_from_RT(positioner_base.R,positioner_base.p)
 
 #### data ####
 dataset='circle_large/'
-sliced_alg='static/'
+sliced_alg='static_spiral/'
 data_dir='../../data/'+dataset+sliced_alg
 with open(data_dir+'slicing.yml', 'r') as file:
     slicing_meta = yaml.safe_load(file)
@@ -118,11 +118,11 @@ mti_client.setExposureTime("25")
 #############################
 
 ###set up control parameters
-job_offset=300 		###200 for Aluminum ER4043, 300 for Steel Alloy ER70S-6, 400 for Stainless Steel ER316L
-nominal_feedrate=300
-nominal_vd_relative=3
-base_feedrate_cmd=300
-base_vd=3
+job_offset=200 		###200 for Aluminum ER4043 (215,100 ipm), 300 for Steel Alloy ER70S-6 (300 ipm, 3 mm/sec), 400 for Stainless Steel ER316L
+nominal_feedrate=250
+nominal_vd_relative=8
+base_feedrate_cmd=250
+base_vd=8
 feedrate_cmd=nominal_feedrate
 vd_relative=nominal_vd_relative
 feedrate_gain=0.5
@@ -130,9 +130,10 @@ feedrate_min=60
 feedrate_max=300
 nominal_slice_increment=int(1.45/slicing_meta['line_resolution'])
 scanner_lag_bp=int(slicing_meta['scanner_lag_breakpoints'])
+scanner_lag=slicing_meta['scanner_lag']
 slice_inc_gain=3.
 
-arc_on=False
+arc_on=True
 
 res, robot_state, _ = RR_robot_state.TryGetInValue()
 q14=robot_state.joint_position
@@ -145,7 +146,7 @@ rob2_js_all_slices=[]
 positioner_js_all_slices=[]
 lam_relative_all_slices=[]
 lam_relative_dense_all_slices=[]
-for i in range(0,1):
+for i in range(30,31):
     rob1_js_all_slices.append(np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(i)+'_0.csv',delimiter=','))
     rob2_js_all_slices.append(np.loadtxt(data_dir+'curve_sliced_js/MA1440_js'+str(i)+'_0.csv',delimiter=','))
     positioner_js_all_slices.append(np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(i)+'_0.csv',delimiter=','))
@@ -172,6 +173,10 @@ while slice_num<len(lam_relative_all_slices):
     ### get breakpoints for vd
     breakpoints=SS.get_breakpoints(lam_relative_dense_all_slices[slice_num],vd_relative)
     print(breakpoints[0])
+    lag_scan_bp=np.argmin(lam_relative_dense_all_slices[0]<scanner_lag)
+    lag_scan_bp_bp=np.argmin(breakpoints<lag_scan_bp)
+
+    curve_js_all_dense=np.array(curve_js_all_dense)
     
     ###start welding at the first layer, then non-stop
     if not welding_started:
@@ -185,15 +190,15 @@ while slice_num<len(lam_relative_all_slices):
         SS.jog2q(np.hstack((waypoint_q,curve_js_all_dense[0,6:])))
         SS.jog2q(curve_js_all_dense[breakpoints[0]])
         welding_started=True
-        # if arc_on:
-        #     fronius_client.start_weld()
+        point_stream_start_time=time.time()
+        if arc_on:
+            fronius_client.start_weld()
     time.sleep(0.2)
 
     ## streaming
     robot_ts=[]
     robot_js=[]
     mti_recording=[]
-    point_stream_start_time=time.time()
     try:
         ###start logging
         for bp_idx in range(len(breakpoints)):
@@ -216,6 +221,7 @@ while slice_num<len(lam_relative_all_slices):
         mti_logging_all.append(mti_recording)
         
         ####CONTROL PARAMETERS
+        last_slice_num=slice_num
         slice_num+=int(nominal_slice_increment)
         
     except:
@@ -223,14 +229,20 @@ while slice_num<len(lam_relative_all_slices):
         fronius_client.stop_weld()
         break
 
+if arc_on:
+    fronius_client.stop_weld()
+
 ## streaming final for scanner lagging
 robot_ts=[]
 robot_js=[]
 mti_recording=[]
-point_stream_start_time=time.time()
+# point_stream_start_time=time.time()
+lag_scan_bp=np.argmin(lam_relative_dense_all_slices[last_slice_num]<scanner_lag)
+lag_scan_bp_bp=np.argmin(breakpoints<lag_scan_bp)
+curve_js_all_dense[:,13]=curve_js_all_dense[:,13]-(curve_js_all_dense[0,13]-curve_js_all_dense[-1,13])
 try:
     ###start logging
-    for bp_idx in range(0,int(-1*scanner_lag_bp)):
+    for bp_idx in range(0,lag_scan_bp):
         ####################################MTI PROCESSING####################################
         if bp_idx<len(breakpoints)-1: ###no wait at last point
             ###busy wait for accurate 8ms streaming
@@ -251,9 +263,6 @@ try:
 except:
     traceback.print_exc()
     fronius_client.stop_weld()
-
-# if arc_on:
-#     fronius_client.stop_weld()
 
 # exit()
 Path(recorded_data_dir).mkdir(exist_ok=True)
