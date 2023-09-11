@@ -1,0 +1,7 @@
+baselayer_thickness: 0
+line_resolution: 0.1
+num_baselayers: 0
+num_layer: 500
+point_distance: 0.5
+scanner_lag: 110
+scanner_lag_breakpoints: -1100

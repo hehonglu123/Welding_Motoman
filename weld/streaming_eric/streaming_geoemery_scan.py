@@ -129,6 +129,7 @@ feedrate_gain=0.5
 feedrate_min=60
 feedrate_max=300
 nominal_slice_increment=int(1.45/slicing_meta['line_resolution'])
+scanner_lag_bp=int(slicing_meta['scanner_lag_breakpoints'])
 slice_inc_gain=3.
 
 arc_on=False
@@ -155,6 +156,9 @@ for i in range(0,1):
 
 input("Enter to start")
 slice_num=0
+robot_logging_all=[]
+weld_logging_all=[]
+mti_logging_all=[]
 while slice_num<len(lam_relative_all_slices):
     print('FEEDRATE: ',feedrate_cmd,'VD: ',vd_relative)
     ###change feedrate
@@ -208,6 +212,8 @@ while slice_num<len(lam_relative_all_slices):
         robot_ts=np.array(robot_ts)
         robot_ts=robot_ts-robot_ts[0]
         robot_js=np.array(robot_js)
+        robot_logging_all.append(np.hstack((robot_ts.reshape(-1, 1),robot_js)))
+        mti_logging_all.append(mti_recording)
         
         ####CONTROL PARAMETERS
         slice_num+=int(nominal_slice_increment)
@@ -216,13 +222,43 @@ while slice_num<len(lam_relative_all_slices):
         traceback.print_exc()
         fronius_client.stop_weld()
         break
+
+## streaming final for scanner lagging
+robot_ts=[]
+robot_js=[]
+mti_recording=[]
+point_stream_start_time=time.time()
+try:
+    ###start logging
+    for bp_idx in range(0,int(-1*scanner_lag_bp)):
+        ####################################MTI PROCESSING####################################
+        if bp_idx<len(breakpoints)-1: ###no wait at last point
+            ###busy wait for accurate 8ms streaming
+            while time.time()-point_stream_start_time<1/SS.streaming_rate-0.0005:
+                continue
+        ###MTI scans YZ point from tool frame
+        mti_recording.append(deepcopy(np.array([mti_client.lineProfile.X_data,mti_client.lineProfile.Z_data])))
+        point_stream_start_time=time.time()
+        robot_timestamp,q14=SS.position_cmd(curve_js_all_dense[breakpoints[bp_idx]])
+        
+        robot_ts.append(robot_timestamp)
+        robot_js.append(q14)
+    robot_ts=np.array(robot_ts)
+    robot_ts=robot_ts-robot_ts[0]
+    robot_js=np.array(robot_js)
+    robot_logging_all.append(np.hstack((robot_ts.reshape(-1, 1),robot_js)))
+    mti_logging_all.append(mti_recording)
+except:
+    traceback.print_exc()
+    fronius_client.stop_weld()
+
 # if arc_on:
 #     fronius_client.stop_weld()
 
-exit()
+# exit()
 Path(recorded_data_dir).mkdir(exist_ok=True)
 np.savetxt(recorded_data_dir+'robot_js_exe.csv',robot_js,delimiter=',')
 np.savetxt(recorded_data_dir+'robot_stamps.csv',robot_ts,delimiter=',')
 with open(recorded_data_dir + 'mti_scans.pickle', 'wb') as file:
-        pickle.dump(mti_recording, file)
+    pickle.dump(mti_recording, file)
 print('Total scans:',len(mti_recording))
