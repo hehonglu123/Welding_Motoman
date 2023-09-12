@@ -75,6 +75,7 @@ r1_nom_H=np.array([[0,0,1],[0,1,0],[0,-1,0],\
                 [-1,0,0],[0,-1,0],[-1,0,0]]).T
 ph_param_r1=PH_Param(r1_nom_P,r1_nom_H)
 ph_param_r1.fit(PH_q,method='FBF')
+ph_param_r1=None
 #### load R2 kinematic model
 PH_data_dir='../mocap/PH_grad_data/test'+R2_ph_dataset_date+'_R2/train_data_'
 with open(PH_data_dir+'calib_PH_q.pickle','rb') as file:
@@ -85,9 +86,10 @@ r2_nom_H=np.array([[0,0,1],[0,1,0],[0,-1,0],\
                 [-1,0,0],[0,-1,0],[-1,0,0]]).T
 ph_param_r2=PH_Param(r2_nom_P,r2_nom_H)
 ph_param_r2.fit(PH_q,method='FBF')
+ph_param_r2=None
 #### load S1 kinematic model
-positioner.robot.P=deepcopy(positioner.calib_P)
-positioner.robot.H=deepcopy(positioner.calib_H)
+# positioner.robot.P=deepcopy(positioner.calib_P)
+# positioner.robot.H=deepcopy(positioner.calib_H)
 
 #### data directory
 # dataset='cup/'
