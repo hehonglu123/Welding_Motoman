@@ -8,8 +8,8 @@ sys.path.append('../../toolbox/')
 from robot_def import *
 
 R1_ph_dataset_date='0801'
-R2_ph_dataset_date='0725'
-S1_ph_dataset_date='0725'
+R2_ph_dataset_date='0801'
+S1_ph_dataset_date='0801'
 config_dir='../../config/'
 R1_marker_dir=config_dir+'MA2010_marker_config/'
 weldgun_marker_dir=config_dir+'weldgun_marker_config/'
