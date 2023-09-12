@@ -63,8 +63,8 @@ positioner.base_H = H_from_RT(positioner_base.R,positioner_base.p)
 # robot_weld.robot.R_tool = deepcopy(robot_weld.T_tool_toolmarker.R)
 # robot_weld.robot.p_tool = deepcopy(robot_weld.T_tool_toolmarker.p)
 
-robot_scan.robot.P=deepcopy(robot_scan.calib_P)
-robot_scan.robot.H=deepcopy(robot_scan.calib_H)
+# robot_scan.robot.P=deepcopy(robot_scan.calib_P)
+# robot_scan.robot.H=deepcopy(robot_scan.calib_H)
 
 #### load R1 kinematic model
 PH_data_dir='../mocap/PH_grad_data/test'+R1_ph_dataset_date+'_R1/train_data_'
@@ -76,7 +76,7 @@ nom_H=np.array([[0,0,1],[0,1,0],[0,-1,0],\
                 [-1,0,0],[0,-1,0],[-1,0,0]]).T
 ph_param_r1=PH_Param(nom_P,nom_H)
 ph_param_r1.fit(PH_q,method='FBF')
-# ph_param_r1=None
+ph_param_r1=None
 #### load R2 kinematic model
 PH_data_dir='../mocap/PH_grad_data/test'+R2_ph_dataset_date+'_R2/train_data_'
 with open(PH_data_dir+'calib_PH_q.pickle','rb') as file:
@@ -87,10 +87,10 @@ nom_H=np.array([[0,0,1],[0,1,0],[0,-1,0],\
                 [-1,0,0],[0,-1,0],[-1,0,0]]).T
 ph_param_r2=PH_Param(nom_P,nom_H)
 ph_param_r2.fit(PH_q,method='FBF')
-# ph_param_r2=None
+ph_param_r2=None
 #### load S1 kinematic model
-positioner.robot.P=deepcopy(positioner.calib_P)
-positioner.robot.H=deepcopy(positioner.calib_H)
+# positioner.robot.P=deepcopy(positioner.calib_P)
+# positioner.robot.H=deepcopy(positioner.calib_H)
 
 #### data directory
 # dataset='cup/'
@@ -118,8 +118,17 @@ positioner.robot.H=deepcopy(positioner.calib_H)
 # layer=384
 # x=0
 
-dataset='blade0.1/'
-sliced_alg='auto_slice/'
+# dataset='blade0.1/'
+# sliced_alg='auto_slice/'
+# curve_data_dir = '../data/'+dataset+sliced_alg
+# data_dir=curve_data_dir+'weld_scan_2023_09_05_18_32_02'+'/'
+# baselayer=False
+# last_layer=1
+# layer=0
+# x=0
+
+dataset='circle_large/'
+sliced_alg='static_stepwise/'
 curve_data_dir = '../data/'+dataset+sliced_alg
 data_dir=curve_data_dir+'weld_scan_2023_09_05_18_32_02'+'/'
 baselayer=False
