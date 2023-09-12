@@ -63,6 +63,8 @@ robot_scan_base = robot_weld.T_base_basemarker.inv()*robot_scan.T_base_basemarke
 robot_scan.base_H = H_from_RT(robot_scan_base.R,robot_scan_base.p)
 positioner_base = robot_weld.T_base_basemarker.inv()*positioner.T_base_basemarker
 positioner.base_H = H_from_RT(positioner_base.R,positioner_base.p)
+T_to_base = Transform(np.eye(3),[0,0,-380])
+positioner.base_H = np.matmul(positioner.base_H,H_from_RT(T_to_base.R,T_to_base.p))
 # exit()
 
 #### load R1 kinematic model
@@ -167,7 +169,7 @@ mti_sub.ClientConnectFailed += connect_failed
 mti_client=mti_sub.GetDefaultClientWait(1)
 mti_client.setExposureTime("25")
 ###################################
-start_feedback=3
+start_feedback=2
 ### preplanned v,height for first few layer
 planned_layer=999
 ## 300 260 250 240 ... 100
@@ -180,7 +182,7 @@ planned_job=np.append(planned_job,np.ones(planned_layer)*200)
 planned_job=planned_job.astype(int)
 
 print_min_dh = 0.5 # mm
-arc_on=False
+arc_on=True
 save_weld_record=True
 save_output_points=True
 
@@ -216,7 +218,10 @@ while True:
     print("Layer Count:",layer_count)
 
     ####### forward/backward, baselayer/regular layers #####
-    baselayer=True if layer_count<total_baselayer else False
+    if total_baselayer >0:
+        baselayer=True if layer_count<total_baselayer else False
+    else:
+        baselayer=False
     forward=True if layer_count%2==0 else False
 
     ####### Decide which layer to print #######
@@ -247,7 +252,7 @@ while True:
     if baselayer:
         last_layer = layer
         layer = layer_count
-    if not manual_dh and not baselayer and layer>=0:
+    if not manual_dh and not baselayer and layer_count>=0:
         # if layer_count!=0 and layer_count<start_feedback:
         #     last_layer=layer
         #     layer+=layer_height_num
@@ -460,6 +465,7 @@ while True:
         all_profile_height=[]
         all_last_curve_relative=[]
         section_count=0
+        print(num_sections)
         for x in range(0,num_sections): 
             ### scanning path module
             spg = ScanPathGen(robot_scan,positioner,scan_stand_off_d,Rz_angle,Ry_angle,bounds_theta)
@@ -480,15 +486,16 @@ while True:
             # try:
             if not baselayer:
                 q_out1=np.loadtxt(curve_data_dir+'curve_scan_js/MA1440_js'+str(read_layer)+'_'+str(x)+'.csv',delimiter=',').reshape((-1,6))
-                q_out2=np.loadtxt(curve_data_dir+'curve_scan_js/D500B_js'+str(read_layer)+'_'+str(x)+'.csv',delimiter=',')
+                q_out2=np.loadtxt(curve_data_dir+'curve_scan_js/D500B_js'+str(read_layer)+'_'+str(x)+'.csv',delimiter=',').reshape((-1,2))
                 scan_p=np.loadtxt(curve_data_dir+'curve_scan_relative/scan_T'+str(read_layer)+'_'+str(x)+'.csv',delimiter=',')
             else:
                 q_out1=np.loadtxt(curve_data_dir+'curve_scan_js/MA1440_base_js'+str(read_layer)+'_'+str(x)+'.csv',delimiter=',').reshape((-1,6))
-                q_out2=np.loadtxt(curve_data_dir+'curve_scan_js/D500B_base_js'+str(read_layer)+'_'+str(x)+'.csv',delimiter=',')
+                q_out2=np.loadtxt(curve_data_dir+'curve_scan_js/D500B_base_js'+str(read_layer)+'_'+str(x)+'.csv',delimiter=',').reshape((-1,2))
                 scan_p=np.loadtxt(curve_data_dir+'curve_scan_relative/scan_base_T'+str(read_layer)+'_'+str(x)+'.csv',delimiter=',')
             
             ## get breakpoints
             lam_relative=calc_lam_cs(scan_p)
+            print(lam_relative)
             scan_waypoint_distance=10 ## mm
             breakpoints=[0]
             for path_i in range(0,len(lam_relative)):
@@ -507,6 +514,7 @@ while True:
 
             # generate motion program
             q_bp1,q_bp2,s1_all,s2_all=spg.gen_motion_program(q_out1,q_out2,scan_p,scan_speed,breakpoints=breakpoints,init_sync_move=0)
+            print(len(q_bp2))
             v1_all=[1]
             v2_all=[1]
             primitives=['movej']
@@ -515,6 +523,7 @@ while True:
                 positioner_w=scan_speed/np.linalg.norm(scan_p[breakpoints[j]][:2])
                 v2_all.append(min(100,100*positioner_w/positioner.joint_vel_limit[1]))
                 primitives.append('movel')
+            print(v1_all)
             #######################################
 
             ######## scanning motion #########
@@ -541,11 +550,8 @@ while True:
 
             ## motion start
             mp = MotionProgram(ROBOT_CHOICE='RB2',ROBOT_CHOICE2='ST1',pulse2deg=robot_scan.pulse2deg,pulse2deg_2=positioner.pulse2deg)
-            # calibration motion
-            target2=['MOVJ',np.degrees(q_bp2[1][0]),v2_all[0]]
-            mp.MoveL(np.degrees(q_bp1[1][0]), scan_speed, 0, target2=target2)
             # routine motion
-            for path_i in range(2,len(q_bp1)-1):
+            for path_i in range(1,len(q_bp1)-1):
                 target2=['MOVJ',np.degrees(q_bp2[path_i][0]),v2_all[path_i]]
                 mp.MoveL(np.degrees(q_bp1[path_i][0]), v1_all[path_i], target2=target2)
             target2=['MOVJ',np.degrees(q_bp2[-1][0]),v2_all[-1]]
@@ -558,24 +564,27 @@ while True:
             state_flag=0
             joint_recording=[]
             robot_stamps=[]
+            mti_recording=None
             mti_recording=[]
             r_pulse2deg = np.append(robot_scan.pulse2deg,positioner.pulse2deg)
             while True:
-                if state_flag & 0x08 == 0 and time.time()-start_time>1.:
-                    break
-                res, data = robot_client.receive_from_robot(0.01)
+                if state_flag & STATUS_RUNNING == 0 and time.time()-start_time>1.:
+                    break 
+                res, fb_data = robot_client.fb.try_receive_state_sync(robot_client.controller_info, 0.001)
                 if res:
-                    joint_angle=np.radians(np.divide(np.array(data[26:34]),r_pulse2deg))
-                    state_flag=data[16]
+                    joint_angle=np.hstack((fb_data.group_state[0].feedback_position,fb_data.group_state[1].feedback_position,fb_data.group_state[2].feedback_position))
+                    state_flag=fb_data.controller_flags
                     joint_recording.append(joint_angle)
-                    timestamp=data[0]+data[1]*1e-9
+                    timestamp=fb_data.time
                     robot_stamps.append(timestamp)
                     ###MTI scans YZ point from tool frame
                     mti_recording.append(deepcopy(np.array([mti_client.lineProfile.X_data,mti_client.lineProfile.Z_data])))
             robot_client.servoMH(False)
             
             mti_recording=np.array(mti_recording)
-            q_out_exe=joint_recording
+            joint_recording=np.array(joint_recording)
+            q_out_exe=joint_recording[:,6:]
+            print(np.degrees(q_out_exe[:10]))
             #####################
             # exit()
 
@@ -610,7 +619,7 @@ while True:
             visualize_pcd([pcd])
             
             if layer!=-1:
-                profile_height = scan_process.pcd2dh(pcd,last_pcd_layer,curve_sliced_relative,robot_weld,rob_js_plan,ph_param=ph_param_r1,drawing=True)
+                profile_height = scan_process.pcd2dh(pcd,last_pcd_layer,curve_sliced_relative,robot_weld,rob_js_plan,ph_param=ph_param_r1,drawing=False)
             
                 plt.scatter(profile_height[:,0],profile_height[:,1])
                 plt.show()

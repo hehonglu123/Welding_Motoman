@@ -263,8 +263,6 @@ try:
 except:
     traceback.print_exc()
     fronius_client.stop_weld()
-robot_logging_all.append(np.hstack((robot_ts.reshape(-1, 1),robot_js)))
-mti_logging_all.append(mti_recording)
 
 # exit()
 Path(recorded_data_dir).mkdir(exist_ok=True)
