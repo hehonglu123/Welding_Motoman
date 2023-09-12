@@ -63,8 +63,8 @@ robot_scan_base = robot_weld.T_base_basemarker.inv()*robot_scan.T_base_basemarke
 robot_scan.base_H = H_from_RT(robot_scan_base.R,robot_scan_base.p)
 positioner_base = robot_weld.T_base_basemarker.inv()*positioner.T_base_basemarker
 positioner.base_H = H_from_RT(positioner_base.R,positioner_base.p)
-T_to_base = Transform(np.eye(3),[0,0,-380])
-positioner.base_H = np.matmul(positioner.base_H,H_from_RT(T_to_base.R,T_to_base.p))
+# T_to_base = Transform(np.eye(3),[0,0,-380])
+# positioner.base_H = np.matmul(positioner.base_H,H_from_RT(T_to_base.R,T_to_base.p))
 # exit()
 
 #### load R1 kinematic model
@@ -89,9 +89,13 @@ r2_nom_H=np.array([[0,0,1],[0,1,0],[0,-1,0],\
 ph_param_r2=PH_Param(r2_nom_P,r2_nom_H)
 ph_param_r2.fit(PH_q,method='FBF')
 ph_param_r2=None
+robot_scan.robot.P=deepcopy(robot_scan.calib_P)
+robot_scan.robot.H=deepcopy(robot_scan.calib_H)
+robot_weld.robot.P=deepcopy(robot_weld.calib_P)
+robot_weld.robot.H=deepcopy(robot_weld.calib_H)
 #### load S1 kinematic model
-# positioner.robot.P=deepcopy(positioner.calib_P)
-# positioner.robot.H=deepcopy(positioner.calib_H)
+positioner.robot.P=deepcopy(positioner.calib_P)
+positioner.robot.H=deepcopy(positioner.calib_H)
 
 #### data directory
 # dataset='cup/'
@@ -99,7 +103,7 @@ ph_param_r2=None
 # dataset='blade0.1/'
 # sliced_alg='auto_slice/'
 dataset='circle_large/'
-sliced_alg='static_stepwise/'
+sliced_alg='static_stepwise_split/'
 curve_data_dir = '../data/'+dataset+sliced_alg
 
 current_time = datetime.datetime.now()
@@ -194,10 +198,10 @@ all_last_curve_relative=None
 # forward = True
 # baselayer = False
 
-layer=-1
-last_layer=-1
-layer_count=-1
-start_weld_layer=0
+layer=266
+last_layer=244
+layer_count=11
+start_weld_layer=222
 
 # try:
 #     layer_count=len(glob.glob(data_dir+'layer_*_0'))+1
@@ -395,7 +399,11 @@ while True:
             # if num_sections!=num_sections_prev:
             waypoint_pose=robot_weld.fwd(curve_sliced_js[breakpoints[0]])
             waypoint_pose.p[-1]+=50
+            robot_weld.robot.P=deepcopy(r1_nom_P)
+            robot_weld.robot.H=deepcopy(r1_nom_H)
             q1=robot_weld.inv(waypoint_pose.p,waypoint_pose.R,curve_sliced_js[breakpoints[0]])[0]
+            robot_weld.robot.P=deepcopy(robot_weld.calib_P)
+            robot_weld.robot.H=deepcopy(robot_weld.calib_H)
             q2=positioner_js[breakpoints[0]]
 
             if go_weld:
@@ -536,6 +544,8 @@ while True:
             robot_scan.robot.P=deepcopy(r2_nom_P)
             robot_scan.robot.H=deepcopy(r2_nom_H)
             q1=robot_scan.inv(waypoint_pose.p,waypoint_pose.R,q_bp1[0][0])[0]
+            robot_scan.robot.P=deepcopy(robot_scan.calib_P)
+            robot_scan.robot.H=deepcopy(robot_scan.calib_H)
             q2=q_bp2[0][0]
             if x==0:
                 ws.jog_dual(robot_scan,positioner,[R2_mid,q1],q2,v=to_start_speed)
@@ -619,9 +629,16 @@ while True:
             visualize_pcd([pcd])
             
             if layer!=-1:
-                profile_height = scan_process.pcd2dh(pcd,last_pcd_layer,curve_sliced_relative,robot_weld,rob_js_plan,ph_param=ph_param_r1,drawing=False)
+                profile_height = scan_process.pcd2dh(pcd,last_pcd_layer,curve_sliced_relative,robot_weld,rob_js_plan,ph_param=ph_param_r1,drawing=True)
             
-                plt.scatter(profile_height[:,0],profile_height[:,1])
+                curve_i=0
+                total_curve_i = len(profile_height)
+                for curve_i in range(total_curve_i):
+                    color_dist = plt.get_cmap("rainbow")(float(curve_i)/total_curve_i)
+                    plt.scatter(profile_height[curve_i,0],profile_height[curve_i,1],c=color_dist)
+                plt.xlabel('Lambda')
+                plt.ylabel('dh to Layer N (mm)')
+                plt.title("Height Profile")
                 plt.show()
                 all_profile_height.extend(profile_height)
             pcd_layer = pcd_layer+pcd

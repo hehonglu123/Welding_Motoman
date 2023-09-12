@@ -280,7 +280,7 @@ class ScanProcess():
         #     ang=(n/poly_num)*(np.pi*2)
         #     bounding_polygon.append(np.array([radius*np.cos(ang),radius*np.sin(ang),0]))
         # rectangle
-        y_max=10
+        y_max=5
         bounding_polygon.append(np.array([radius,y_max,0]))
         bounding_polygon.append(np.array([radius,-y_max,0]))
         bounding_polygon.append(np.array([-radius,-y_max,0]))
@@ -328,15 +328,35 @@ class ScanProcess():
             last_sp_lamx.transform(np.linalg.inv(H_from_RT(wp_R,curve_wp[:3])))
             last_sp_lamx = crop_poly.crop_point_cloud(last_sp_lamx)
             
-            percentage=0.1
+            percentage=0.05
             this_points_z = np.asarray(sp_lamx.points)[:,2]
-            this_points_z = np.sort(this_points_z)[-1*int(percentage*len(this_points_z)):]
-            last_points_z = np.asarray(last_sp_lamx.points)[:,2]
-            last_points_z = np.sort(last_points_z)[-1*int(percentage*len(last_points_z)):]
+            if len(this_points_z>0):
+                height_ids=max(int(percentage*len(this_points_z)),10)
+                this_points_z = np.sort(this_points_z)[-1*height_ids:]
+                bbox = o3d.geometry.AxisAlignedBoundingBox(min_bound=(-1e5,-1e5,this_points_z[0]),max_bound=(1e5,1e5,1e5))
+                sp_lamx=sp_lamx.crop(bbox)
+
+                last_points_z = np.asarray(last_sp_lamx.points)[:,2]
+                if len(last_points_z>0):
+                    height_ids=max(int(percentage*len(last_points_z)),10)
+                    last_points_z = np.sort(last_points_z)[-1*height_ids:]
+                    bbox = o3d.geometry.AxisAlignedBoundingBox(min_bound=(-1e5,-1e5,last_points_z[0]),max_bound=(1e5,1e5,1e5))
+                    last_sp_lamx=last_sp_lamx.crop(bbox)
+                else:
+                    print("not find")
+                    this_points_z=np.nan
+                    last_points_z=np.nan
+            else:
+                print("not find")
+                this_points_z=np.nan
+                last_points_z=np.nan
+            
             
             this_dh = np.mean(this_points_z)-np.mean(last_points_z)
-            if np.isnan(this_dh):
-                this_dh=0
+
+            dh_max=7
+            if this_dh>dh_max:
+                this_dh=np.nan
 
             dh.append(this_dh)
 
@@ -354,14 +374,16 @@ class ScanProcess():
 
             curve_i+=1
 
+        window_nan=3
         for curve_i in range(len(dh)):
             if np.isnan(dh[curve_i]):
-                if curve_i==0:
-                    dh[curve_i]=np.nanmean(dh[curve_i:curve_i+2])
-                elif curve_i!=len(dh)-1:
-                    dh[curve_i]=np.nanmean(dh[curve_i-2:curve_i])
+                if curve_i<window_nan:
+                    dh[curve_i]=np.nanmean(dh[0:2*window_nan])
+                elif curve_i>len(dh)-window_nan:
+                    dh[curve_i]=np.nanmean(dh[-2*window_nan:])
                 else:
-                    dh[curve_i]=np.nanmean(dh[curve_i-1:curve_i+1])
+                    dh[curve_i]=np.nanmean(dh[curve_i-window_nan:curve_i+window_nan])
+        # input(dh)
 
         curve_relative=np.array(curve_relative)
         lam = calc_lam_cs(curve_relative[:,:3])
