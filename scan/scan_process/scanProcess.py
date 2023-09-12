@@ -269,8 +269,8 @@ class ScanProcess():
 
         # create the cropping polygon
         bounding_polygon=[]
-        # radius_scale=0.55
-        radius_scale=0.2
+        radius_scale=0.55
+        # radius_scale=0.2
         radius=np.mean(np.linalg.norm(np.diff(curve_relative[:,:3],axis=0),axis=1))*radius_scale
         print("height neighbor radius:",radius)
         
