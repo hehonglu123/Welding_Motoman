@@ -15,7 +15,7 @@ from weldCorrectionStrategy import *
 from weldRRSensor import *
 from WeldSend import *
 from dx200_motion_program_exec_client import *
-
+import weldmicphone as wm
 from general_robotics_toolbox import *
 from RobotRaconteur.Client import *
 import matplotlib.pyplot as plt
@@ -367,13 +367,16 @@ for i in range(0,end_layer):
         ######################################################
 
         print("Weld Time:",time.time()-weld_st)
+        wm.audio_denoise(layer_data_dir)
+        std_value_co1, std_value_co2, scan_flag = wm.audio_MFCC(layer_data_dir)
     # exit()
-    if True:
+
+    if scan_flag == True:
         ws.jog_single(robot_weld,np.zeros(6),to_home_speed)
 
 
     #### scanning
-    if True:
+    if scan_flag == True:
         scan_st = time.time()
         if curve_sliced_relative is None:
             data_dir='../data/wall_weld_test/weld_scan_2023_08_02_17_07_02/'
