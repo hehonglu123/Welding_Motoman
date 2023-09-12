@@ -328,7 +328,7 @@ class ScanProcess():
             last_sp_lamx.transform(np.linalg.inv(H_from_RT(wp_R,curve_wp[:3])))
             last_sp_lamx = crop_poly.crop_point_cloud(last_sp_lamx)
             
-            percentage=0.1
+            percentage=0.25
             this_points_z = np.asarray(sp_lamx.points)[:,2]
             this_points_z = np.sort(this_points_z)[-1*int(percentage*len(this_points_z)):]
             last_points_z = np.asarray(last_sp_lamx.points)[:,2]

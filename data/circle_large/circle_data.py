@@ -39,6 +39,7 @@ zero_config=np.zeros(6)
 algo_name = 'static_stepwise'
 circle_radius=35
 circle_offset=-np.pi/2
+d_circle_offset = np.radians(0.5)
 path_dlambda = 0.5 # mm
 layer_dh = 0.1 # mm
 baselayer_dh=3 # mm
@@ -70,6 +71,8 @@ for l in range(total_layers+total_base_layers):
     path_dangle=path_dlambda/circle_radius
     curve_relative = []
     positioner_js = []
+    circle_offset=circle_offset+d_circle_offset
+    print(np.degrees(circle_offset))
     angle_range=np.append(np.arange(circle_offset+2*np.pi,circle_offset+0,-1*path_dangle),circle_offset+0)
     for theta in angle_range:
         layer_height = baselayer_l*baselayer_dh+toplayer_l*layer_dh
