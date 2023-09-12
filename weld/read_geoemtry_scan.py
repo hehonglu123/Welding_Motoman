@@ -53,8 +53,8 @@ robot_scan_base = robot_weld.T_base_basemarker.inv()*robot_scan.T_base_basemarke
 robot_scan.base_H = H_from_RT(robot_scan_base.R,robot_scan_base.p)
 positioner_base = robot_weld.T_base_basemarker.inv()*positioner.T_base_basemarker
 positioner.base_H = H_from_RT(positioner_base.R,positioner_base.p)
-# T_to_base = Transform(np.eye(3),[0,0,-380])
-# positioner.base_H = np.matmul(positioner.base_H,H_from_RT(T_to_base.R,T_to_base.p))
+T_to_base = Transform(np.eye(3),[0,0,-380])
+positioner.base_H = np.matmul(positioner.base_H,H_from_RT(T_to_base.R,T_to_base.p))
 # input(positioner.base_H)
 
 # robot_weld.robot.P=deepcopy(robot_weld.calib_P)
@@ -63,8 +63,8 @@ positioner.base_H = H_from_RT(positioner_base.R,positioner_base.p)
 # robot_weld.robot.R_tool = deepcopy(robot_weld.T_tool_toolmarker.R)
 # robot_weld.robot.p_tool = deepcopy(robot_weld.T_tool_toolmarker.p)
 
-# robot_scan.robot.P=deepcopy(robot_scan.calib_P)
-# robot_scan.robot.H=deepcopy(robot_scan.calib_H)
+robot_scan.robot.P=deepcopy(robot_scan.calib_P)
+robot_scan.robot.H=deepcopy(robot_scan.calib_H)
 
 #### load R1 kinematic model
 PH_data_dir='../mocap/PH_grad_data/test'+R1_ph_dataset_date+'_R1/train_data_'
@@ -130,10 +130,10 @@ ph_param_r2=None
 dataset='circle_large/'
 sliced_alg='static_stepwise/'
 curve_data_dir = '../data/'+dataset+sliced_alg
-data_dir=curve_data_dir+'weld_scan_2023_09_05_18_32_02'+'/'
+data_dir=curve_data_dir+'weld_scan_2023_09_12_16_39_10'+'/'
 baselayer=False
-last_layer=1
-layer=0
+last_layer=86
+layer=105
 x=0
 
 use_actual = False
