@@ -263,11 +263,13 @@ try:
 except:
     traceback.print_exc()
     fronius_client.stop_weld()
+robot_logging_all.append(np.hstack((robot_ts.reshape(-1, 1),robot_js)))
+mti_logging_all.append(mti_recording)
 
 # exit()
 Path(recorded_data_dir).mkdir(exist_ok=True)
-np.savetxt(recorded_data_dir+'robot_js_exe.csv',robot_js,delimiter=',')
-np.savetxt(recorded_data_dir+'robot_stamps.csv',robot_ts,delimiter=',')
+with open(recorded_data_dir + 'robot_js.pickle', 'wb') as file:
+    pickle.dump(robot_logging_all, file)
 with open(recorded_data_dir + 'mti_scans.pickle', 'wb') as file:
-    pickle.dump(mti_recording, file)
+    pickle.dump(mti_logging_all, file)
 print('Total scans:',len(mti_recording))
