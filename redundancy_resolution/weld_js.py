@@ -43,17 +43,21 @@ robot_scan.upper_limit[4]=np.radians(82)
 robot_scan.robot.joint_upper_limit[4]=np.radians(82)
 robot_scan.lower_limit[4]=np.radians(-82)
 robot_scan.robot.joint_lower_limit[4]=np.radians(-82)
+positioner.upper_limit[4]=np.radians(-15+0.1)
+positioner.robot.joint_upper_limit[4]=np.radians(-15+0.1)
+positioner.lower_limit[4]=np.radians(-15-0.1)
+positioner.robot.joint_lower_limit[4]=np.radians(-15-0.1)
 
 #### change base H to calibrated ones ####
-robot_scan.base_H = H_from_RT(robot_scan.T_base_basemarker.R,robot_scan.T_base_basemarker.p)
-positioner.base_H = H_from_RT(positioner.T_base_basemarker.R,positioner.T_base_basemarker.p)
-T_to_base = Transform(np.eye(3),[0,0,-380])
-positioner.base_H = np.matmul(positioner.base_H,H_from_RT(T_to_base.R,T_to_base.p))
+# robot_scan.base_H = H_from_RT(robot_scan.T_base_basemarker.R,robot_scan.T_base_basemarker.p)
+# positioner.base_H = H_from_RT(positioner.T_base_basemarker.R,positioner.T_base_basemarker.p)
+# T_to_base = Transform(np.eye(3),[0,0,-380])
+# positioner.base_H = np.matmul(positioner.base_H,H_from_RT(T_to_base.R,T_to_base.p))
 
 #### data directory
 # dataset='cup/'
 # sliced_alg='circular_slice_shifted/'
-dataset='blade0.1/'
+dataset='sine_wave/'
 sliced_alg='auto_slice/'
 curve_data_dir = '../data/'+dataset+sliced_alg
 scan_data_dir = '../data/'+dataset+sliced_alg+'curve_scan_js/'
