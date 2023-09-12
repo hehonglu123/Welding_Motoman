@@ -621,7 +621,14 @@ while True:
             if layer!=-1:
                 profile_height = scan_process.pcd2dh(pcd,last_pcd_layer,curve_sliced_relative,robot_weld,rob_js_plan,ph_param=ph_param_r1,drawing=False)
             
-                plt.scatter(profile_height[:,0],profile_height[:,1])
+                curve_i=0
+                total_curve_i = len(profile_height)
+                for curve_i in range(total_curve_i):
+                    color_dist = plt.get_cmap("rainbow")(float(curve_i)/total_curve_i)
+                    plt.scatter(profile_height[curve_i,0],profile_height[curve_i,1],c=color_dist)
+                plt.xlabel('Lambda')
+                plt.ylabel('dh to Layer N (mm)')
+                plt.title("Height Profile")
                 plt.show()
                 all_profile_height.extend(profile_height)
             pcd_layer = pcd_layer+pcd
