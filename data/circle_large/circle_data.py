@@ -36,10 +36,11 @@ zero_config=np.zeros(6)
 # print(robot_weld.fwd(zero_config))
 # print(robot_scan.fwd(zero_config))
 ## generate circle path and positioner js
-algo_name = 'static_stepwise'
+algo_name = 'static_stepwise_split'
 circle_radius=35
 circle_offset=-np.pi/2
-d_circle_offset = np.radians(0.5)
+# d_circle_offset = np.radians(0.5)
+d_circle_offset = 0
 path_dlambda = 0.5 # mm
 layer_dh = 0.1 # mm
 baselayer_dh=3 # mm
@@ -49,6 +50,9 @@ torch_lambda = 0
 scanner_distance=0
 torch_bp = int(torch_lambda/path_dlambda)
 scanner_bp = int((torch_lambda-scanner_distance)/path_dlambda)
+
+start_angle=np.radians(360)
+end_angle=np.radians(12)
 
 ## start generating
 algo_dir=algo_name+'/'
@@ -72,8 +76,8 @@ for l in range(total_layers+total_base_layers):
     curve_relative = []
     positioner_js = []
     circle_offset=circle_offset+d_circle_offset
-    print(np.degrees(circle_offset))
-    angle_range=np.append(np.arange(circle_offset+2*np.pi,circle_offset+0,-1*path_dangle),circle_offset+0)
+    # angle_range=np.append(np.arange(circle_offset+start_angle,circle_offset+end_angle,-1*path_dangle),circle_offset+0)
+    angle_range=np.arange(circle_offset+start_angle,circle_offset+end_angle,-1*path_dangle)
     for theta in angle_range:
         layer_height = baselayer_l*baselayer_dh+toplayer_l*layer_dh
         position=np.array([circle_radius*np.cos(theta),circle_radius*np.sin(theta),layer_height])
