@@ -130,10 +130,10 @@ ph_param_r2=None
 dataset='circle_large/'
 sliced_alg='static_stepwise/'
 curve_data_dir = '../data/'+dataset+sliced_alg
-data_dir=curve_data_dir+'weld_scan_2023_09_12_13_35_48'+'/'
+data_dir=curve_data_dir+'weld_scan_2023_09_12_16_39_10'+'/'
 baselayer=False
-last_layer=53
-layer=83
+last_layer=86
+layer=105
 x=0
 
 use_actual = False
