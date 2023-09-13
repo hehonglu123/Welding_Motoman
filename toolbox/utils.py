@@ -5,7 +5,12 @@ from scipy.interpolate import interp1d
 from scipy import signal
 import scipy, math
 
-
+def Rx(theta):
+	return np.array([[1,0,0],[0,np.cos(theta),-np.sin(theta)],[0,np.sin(theta),np.cos(theta)]])
+def Ry(theta):
+	return np.array([[np.cos(theta),0,np.sin(theta)],[0,1,0],[-np.sin(theta),0,np.cos(theta)]])
+def Rz(theta):
+	return np.array([[np.cos(theta),-np.sin(theta),0],[np.sin(theta),np.cos(theta),0],[0,0,1]])
 
 def rotate_vector_at_angle(u, v, theta_rad):
     ###rotate u to v at angle theta
