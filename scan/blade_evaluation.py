@@ -4,7 +4,8 @@ import open3d as o3d
 sys.path.append('../toolbox/')
 from utils import *
 from pointcloud_toolbox import *
-
+sys.path.append('../slicing/')
+from slicing import check_boundary
 
 def calc_error(target_points,collapsed_points):
     error_off=[]
@@ -38,6 +39,8 @@ def collapse(left_pc,right_pc,target_points):
     collapsed_surface=[]
     width=[]
     for i in range(len(left_pc)):
+        if not check_boundary(left_pc[i],target_points):
+            continue
         indices=np.argsort(np.linalg.norm(target_points-left_pc[i],axis=1))[:num_points]
         normal, centroid=fit_plane(target_points[indices])
         v1=-vector_to_plane(left_pc[i], centroid, normal)     ###vector from surface to left
@@ -65,7 +68,7 @@ def visualize_pcd(show_pcd_list,point_show_normal=False):
 
     
 data_dir='../data/blade0.1/'
-scanned_dir='../../evaluation/Blade_ER70S6/'
+scanned_dir='../../evaluation/Blade_ER316L/'
 ######## read the scanned stl
 target_mesh = o3d.io.read_triangle_mesh(data_dir+'surface.stl')
 scanned_mesh = o3d.io.read_triangle_mesh(scanned_dir+'no_base_layer.stl')

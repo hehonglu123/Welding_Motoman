@@ -8,20 +8,50 @@ from copy import deepcopy
 import colorsys
 import math
 import pickle
+from utils import *
+from scipy.spatial import KDTree
 
 
 def global_alignment(pc1,pc2):
     ###align pc1 to pc2 with PCA
     pca1 = PCA()
     pca1.fit(np.array(pc1))
-    R1 = pca1.components_
+    R1 = pca1.components_.T
     pca2 = PCA()
     pca2.fit(np.array(pc2))
-    R2 = pca2.components_
-    R=R2.T@R1
+    R2 = pca2.components_.T
+
+    #make sure the rotation matrix is right-handed
+    if np.cross(R1[:,0],R1[:,1])@R1[:,2]<0:
+        R1[:,2]=-R1[:,2]   
+    if np.cross(R2[:,0],R2[:,1])@R2[:,2]<0:
+        R2[:,2]=-R2[:,2]
+
+    R=R2@R1.T
     p=np.mean(np.array(pc2),axis=0)-np.mean(pc1@R.T,axis=0)
 
-    return R,p
+    pc1_transformed=pc1@R.T+p
+    kdtree = KDTree(pc2)
+    distances, indices = kdtree.query(pc1_transformed)
+    rmse = np.sqrt(np.mean(np.square(distances)))
+
+    min_rmse=rmse
+    R_best=R
+    p_best=p
+    ###rotate about x,y,z axis to find minimum rmse
+    for R1 in [R1@Rx(np.pi),R1@Ry(np.pi),R1@Rz(np.pi)]:
+        R=R2@R1.T
+        p=np.mean(np.array(pc2),axis=0)-np.mean(pc1@R.T,axis=0)
+        pc1_transformed=pc1@R.T+p
+        kdtree = KDTree(pc2)
+        distances, indices = kdtree.query(pc1_transformed)
+        rmse = np.sqrt(np.mean(np.square(distances)))
+        if rmse<min_rmse:
+            min_rmse=rmse
+            R_best=R
+            p_best=p
+    
+    return R_best,p_best
 
 
 def colormap(all_h):
