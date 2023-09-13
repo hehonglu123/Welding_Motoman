@@ -68,7 +68,7 @@ def visualize_pcd(show_pcd_list,point_show_normal=False):
 
     
 data_dir='../data/blade0.1/'
-scanned_dir='../../evaluation/Blade_ER316L/'
+scanned_dir='../../evaluation/Blade_ER4043/'
 ######## read the scanned stl
 target_mesh = o3d.io.read_triangle_mesh(data_dir+'surface.stl')
 scanned_mesh = o3d.io.read_triangle_mesh(scanned_dir+'no_base_layer.stl')
@@ -116,17 +116,24 @@ right_pc.points = o3d.utility.Vector3dVector(scanned_points_tranform[right_indic
 right_pc.paint_uniform_color([0.7, 0.7, 0.0])
 
 # Visualize the point cloud
-o3d.visualization.draw_geometries([target_points,left_pc,right_pc])
+o3d.visualization.draw_geometries([target_mesh,left_pc,right_pc])
 
 width,collapsed_surface=collapse(np.array(left_pc.points),np.array(right_pc.points),target_points_transform)
 collapsed_surface_pc=o3d.geometry.PointCloud()
 collapsed_surface_pc.points=o3d.utility.Vector3dVector(collapsed_surface)
 collapsed_surface_pc.paint_uniform_color([0.7, 0.7, 0.0])
-o3d.visualization.draw_geometries([target_points,collapsed_surface_pc])
+# o3d.visualization.draw_geometries([target_mesh,collapsed_surface_pc])
 
 print('\sigma(w): ',np.std(width),'\mu(w): ',np.average(width))
 
 error_off,error_miss=calc_error(target_points_transform,collapsed_surface)
+
+highlight_pc=o3d.geometry.PointCloud()
+highlight_pc.points=o3d.utility.Vector3dVector([collapsed_surface[error_off.argmax()]])
+highlight_pc.paint_uniform_color([1.0, 0.0, 0.0])
+o3d.visualization.draw_geometries([target_mesh,collapsed_surface_pc,highlight_pc])
+
+
 # error_off=np.maximum(error_off-np.average(width),0)
 print('error max: ',error_off.max(),'error avg: ',np.mean(error_off))
 print(error_miss.max(),np.mean(error_miss))

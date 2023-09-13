@@ -72,25 +72,33 @@ with open(data_dir+'slicing.yml', 'r') as file:
 
 ###read target points
 target_points_pc=[]
+target_points_pc_temp=[]
 for i in range(1,slicing_meta['num_layers'],5):
-    target_points_pc.append(np.loadtxt(data_dir+'curve_sliced/slice'+str(i)+'_0.csv',delimiter=',')[:,:3])
+    target_points_pc_temp.append(np.loadtxt(data_dir+'curve_sliced/slice'+str(i)+'_0.csv',delimiter=',')[:,:3])
+target_points_pc=copy.deepcopy(target_points_pc_temp)
+for i in range(0,128,5):
+    target_points_pc.append(np.loadtxt(data_dir+'curve_sliced/slice0_'+str(i)+'.csv',delimiter=',')[:,:3])
+target_points_pc_temp=np.concatenate(target_points_pc_temp,axis=0)
 target_points_pc=np.concatenate(target_points_pc,axis=0)
+
 target_points=o3d.geometry.PointCloud()
 target_points.points=o3d.utility.Vector3dVector(target_points_pc)
 
 
-scanned_dir='../../evaluation/Cup_ER4043/'
+scanned_dir='../../evaluation/Cup_ER70S6/'
 ######## read the scanned stl
-scanned_mesh = o3d.io.read_triangle_mesh(scanned_dir+'no_base_layer.stl')
+scanned_mesh = o3d.io.read_triangle_mesh(scanned_dir+'cup.stl')
 scanned_mesh.compute_vertex_normals()
+scanned_mesh_temp = o3d.io.read_triangle_mesh(scanned_dir+'no_base_layer.stl')
 
 
 
 ## sample as pointclouds
 scanned_points = scanned_mesh.sample_points_uniformly(number_of_points=111000)
+scanned_points_temp = scanned_mesh_temp.sample_points_uniformly(number_of_points=111000)
 
 ## global tranformation
-R_guess,p_guess=global_alignment(scanned_points.points,target_points.points)
+R_guess,p_guess=global_alignment(scanned_points_temp.points,target_points_pc_temp)
 
 ## sample as sparser pointclouds
 scanned_points = scanned_mesh.sample_points_uniformly(number_of_points=10000)
@@ -128,11 +136,15 @@ width,collapsed_surface=collapse(np.array(left_pc.points),np.array(right_pc.poin
 collapsed_surface_pc=o3d.geometry.PointCloud()
 collapsed_surface_pc.points=o3d.utility.Vector3dVector(collapsed_surface)
 collapsed_surface_pc.paint_uniform_color([0.7, 0.7, 0.0])
-o3d.visualization.draw_geometries([target_points,collapsed_surface_pc])
 
 print('\sigma(w): ',np.std(width),'\mu(w): ',np.average(width))
 
 error_off,error_miss=calc_error(target_points_transform,collapsed_surface)
-# error_off=np.maximum(error_off-np.average(width),0)
+
+highlight_pc=o3d.geometry.PointCloud()
+highlight_pc.points=o3d.utility.Vector3dVector([collapsed_surface[error_off.argmax()]])
+highlight_pc.paint_uniform_color([1.0, 0.0, 0.0])
+o3d.visualization.draw_geometries([target_points,collapsed_surface_pc,highlight_pc])
+
 print('error max: ',error_off.max(),'error avg: ',np.mean(error_off))
 print(error_miss.max(),np.mean(error_miss))
