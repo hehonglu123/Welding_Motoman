@@ -127,7 +127,11 @@ ws=WeldSend(robot_client)
 
 # weld state logging
 
+########################################################RR FLIR########################################################
+cam_ser=RRN.ConnectService('rr+tcp://192.168.55.10:60827/?service=camera')
 ### debug ###
+########################################################RR CURRENT########################################################
+current_ser=RRN.SubscribeService('rr+tcp://192.168.55.21:12182?service=Current')
 weld_ser = RRN.SubscribeService('rr+tcp://192.168.55.10:60823?service=welder')
 cam_ser=RRN.ConnectService('rr+tcp://192.168.55.10:60827/?service=camera')
 mic_ser = RRN.ConnectService('rr+tcp://192.168.55.20:60828?service=microphone')
@@ -136,10 +140,9 @@ mic_ser = RRN.ConnectService('rr+tcp://192.168.55.20:60828?service=microphone')
 # print('###连接microphone')
 
 # RR sensor objects
-rr_sensors = WeldRRSensor(weld_service=weld_ser,cam_service=cam_ser,microphone_service=mic_ser)
+rr_sensors = WeldRRSensor(weld_service=weld_ser,cam_service=cam_ser,microphone_service=mic_ser,current_service=current_ser)
 # print('###对传感器赋值')
 ### debug ###
-
 # ## test sensor (camera, microphone)
 # print("Test 3 Sec.")
 # rr_sensors.test_all_sensors()
@@ -182,6 +185,7 @@ ws.jog_dual(robot_scan,positioner,[r2_mid,r2_ir_q],np.radians([-15,180]),to_star
 # print('###R2和positioner正在移动到准备位置')
 ### debug ###
 scan_flag = False
+rr_sensors.clear_all_sensors()
 for i in range(0,end_layer):
     cycle_st = time.time()
     print("==================================")
