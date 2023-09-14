@@ -151,7 +151,6 @@ def point_filtering(curve_p,curve_R,mocap_stamps,mocap_cond,tool_markers_id,cond
     zlower=-1e9
     while True:
         ax = plt.figure().add_subplot(projection='3d')
-        label_str
         for marker_id in tool_markers_id:
             curve_p[marker_id]=curve_p[marker_id][startid:endid]
             xupper_id = curve_p[marker_id][:,2]>=-1*xupper
