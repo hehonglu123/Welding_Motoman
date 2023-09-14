@@ -1,6 +1,6 @@
 from copy import deepcopy
 import sys
-sys.path.append('../../toolbox/')
+sys.path.append('toolbox/')
 from utils import *
 from robot_def import * 
 
@@ -120,7 +120,7 @@ class CalibRobotPH:
 
 def calib_R2():
 
-    config_dir='../../config/'
+    config_dir='config/'
     robot_name='LRMATE200id'
     tool_name='ge_R2_tool'
     robot_marker_dir=config_dir+robot_name+'_marker_config/'
@@ -176,7 +176,7 @@ def calib_R2():
 
 def calib_R1():
 
-    config_dir='../../config/'
+    config_dir='config/'
     robot_name='M10ia'
     tool_name='ge_R1_tool'
     robot_marker_dir=config_dir+robot_name+'_marker_config/'
@@ -193,6 +193,8 @@ def calib_R1():
     
     # rob_ip='127.0.0.2'
     rob_ip='192.168.0.1'
+    
+    
     rob_speed=3
 
     calib_obj = CalibRobotPH(mocap_cli,robot)
