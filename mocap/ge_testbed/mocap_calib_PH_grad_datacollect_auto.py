@@ -1,7 +1,6 @@
 from copy import deepcopy
 import sys
-sys.path.append('../../toolbox/')
-sys.path.append('../../redundancy_resolution/')
+sys.path.append('toolbox/')
 from utils import *
 from robot_def import * 
 
@@ -46,7 +45,7 @@ class CalibRobotPH:
         
         tp= TPMotionProgram(tool_num=utool_num,uframe_num=uframe_num)
         tp.setIO('DO',10,False)
-        for q in paths:
+        for q in paths[0:]:
             jt = jointtarget(robot_group,uframe_num,utool_num,q,[0]*6)
             tp.moveJ(jt,rob_speed,'%',-1) # moveJ does not support coordinated motion
             tp.setIO('DO',10,True)
@@ -96,11 +95,12 @@ class CalibRobotPH:
                 # robot q
                 robot_joint.extend(joint_exe)
                 
-                np.savetxt(raw_data_dir+'_robot_q_raw.csv',robot_joint,delimiter=',')
-                np.savetxt(raw_data_dir+'_tool_T_raw.csv',tool_T,delimiter=',')
-                np.savetxt(raw_data_dir+'_base_T_raw.csv',base_T,delimiter=',')
-                with open(raw_data_dir+'_marker_raw.pickle', 'wb') as handle:
-                    pickle.dump(marker_T, handle, protocol=pickle.HIGHEST_PROTOCOL)
+                if pose_cnt %50==0:
+                    np.savetxt(raw_data_dir+'_robot_q_raw.csv',robot_joint,delimiter=',')
+                    np.savetxt(raw_data_dir+'_tool_T_raw.csv',tool_T,delimiter=',')
+                    np.savetxt(raw_data_dir+'_base_T_raw.csv',base_T,delimiter=',')
+                    with open(raw_data_dir+'_marker_raw.pickle', 'wb') as handle:
+                        pickle.dump(marker_T, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
                 print("Q raw num:",len(robot_joint))
                 print("Tool T raw num:",len(tool_T))
@@ -118,7 +118,7 @@ class CalibRobotPH:
 
 def calib_R2():
 
-    config_dir='../../config/'
+    config_dir='config/'
     robot_name='LRMATE200id'
     tool_name='ge_R2_tool'
     robot_marker_dir=config_dir+robot_name+'_marker_config/'
@@ -198,7 +198,7 @@ def calib_R2():
 
 def calib_R1():
     
-    config_dir='../../config/'
+    config_dir='config/'
     robot_name='M10ia'
     tool_name='ge_R1_tool'
     robot_marker_dir=config_dir+robot_name+'_marker_config/'
@@ -226,8 +226,8 @@ def calib_R1():
     calib_obj = CalibRobotPH(mocap_cli,robot)
 
     # calibration
-    q2_up=-50
-    q2_low=-20
+    q2_up=-20
+    q2_low=-50
     q3_up_sample = np.array([[-50,-45],[-35,-30],[-20,-20]]) #[[q2 q3]]
     q3_low_sample = np.array([[-50,-80],[-35,-75],[-20,-70]]) #[[q2 q3]]
     d_angle = 5 # 5 degree

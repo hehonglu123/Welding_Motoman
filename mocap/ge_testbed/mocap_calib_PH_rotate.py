@@ -61,14 +61,13 @@ def detect_axis(points,rough_axis_direction,calib_marker_ids,cut_edge=False,cut_
 
     all_normals=[]
     all_centers=[]
+    
     for i in range(len(calib_marker_ids)):
-        if len(points[calib_marker_ids[i]])<100:
+        if len(points[calib_marker_ids[i]])<3000:
             continue
         
-        if i==0:
-            ax = plt.figure().add_subplot(projection='3d')
-            ax.scatter(-1*points[calib_marker_ids[i]][::100][:,2], -1*points[calib_marker_ids[i]][::100][:,0], points[calib_marker_ids[i]][::100][:,1])
-            plt.show()
+        # if i==1:  
+        
         
         center, normal = fitting_3dcircle(points[calib_marker_ids[i]])
         if cut_edge:
@@ -83,6 +82,9 @@ def detect_axis(points,rough_axis_direction,calib_marker_ids,cut_edge=False,cut_
             normal = -1*normal
         all_normals.append(normal)
         all_centers.append(center)
+    
+    
+    
     normal_mean = np.mean(all_normals,axis=0)
     normal_mean = normal_mean/np.linalg.norm(normal_mean)
     center_mean = np.mean(all_centers,axis=0)
@@ -138,6 +140,60 @@ def point_filtering(curve_p,curve_R,mocap_stamps,mocap_cond,tool_markers_id,cond
         mocap_stamps[marker_id]=mocap_stamps[marker_id][::skip_ids]
         mocap_cond[marker_id]=mocap_cond[marker_id][::skip_ids]
     
+    
+    startid=0
+    endid=-1
+    xupper=1e9
+    yupper=1e9
+    zupper=1e9
+    xlower=-1e9
+    ylower=-1e9
+    zlower=-1e9
+    while True:
+        ax = plt.figure().add_subplot(projection='3d')
+        label_str
+        for marker_id in tool_markers_id:
+            curve_p[marker_id]=curve_p[marker_id][startid:endid]
+            xupper_id = curve_p[marker_id][:,2]>=-1*xupper
+            xlower_id = curve_p[marker_id][:,2]<=-1*xlower
+            yupper_id = curve_p[marker_id][:,0]>=-1*yupper
+            ylower_id = curve_p[marker_id][:,0]<=-1*ylower
+            zupper_id = curve_p[marker_id][:,1]<=zupper
+            zlower_id = curve_p[marker_id][:,1]>=zlower
+            
+            bbox_id=xupper_id&xlower_id
+            bbox_id&=yupper_id
+            bbox_id&=ylower_id
+            bbox_id&=zupper_id
+            bbox_id&=zlower_id
+            curve_p[marker_id]=curve_p[marker_id][bbox_id]
+            
+            print(len(curve_p[marker_id]))
+            ax.scatter(-1*curve_p[marker_id][::100][:,2], -1*curve_p[marker_id][::100][:,0], curve_p[marker_id][::100][:,1])
+        plt.ion()
+        plt.show(block=False)
+        upperstr = input("xyz upper:")
+        if upperstr!='':
+            upperstr = upperstr.split(',')
+            xupper = float(upperstr[0])
+            yupper = float(upperstr[1])
+            zupper = float(upperstr[2])
+        lowerstr = input("xyz lower:")
+        if lowerstr!='':
+            lowerstr = lowerstr.split(',')
+            xlower = float(lowerstr[0])
+            ylower = float(lowerstr[1])
+            zlower = float(lowerstr[2])
+        startidstr = input("Start index:")
+        if startidstr!='':
+            startid = int(startidstr)
+        endidstr = input("End index:")
+        if endidstr!='':
+            endid = int(endidstr)
+        q=input("Exit")
+        if q=='q':
+            break
+    
     return curve_p,curve_R,mocap_stamps,mocap_cond
 
 config_dir='../config/'
@@ -146,7 +202,7 @@ robot_type='R1'
 # robot_type='R2'
 
 # all_datasets=['train_data','valid_data_1','valid_data_2']
-dataset_date='0908'
+dataset_date='0913'
 # all_datasets=['test'+dataset_date+'_R1_aftercalib/train_data']
 all_datasets=['test'+dataset_date+'_'+robot_type+'/train_data']
 
@@ -205,13 +261,13 @@ for dataset in all_datasets:
     raw_data_dir = 'PH_rotate_data/'+dataset
     for j in range(jN):
         tool_markers_id=deepcopy(robot.tool_markers_id) if True else deepcopy(robot.calib_markers_id)
-        print(tool_markers_id)
+        # print(tool_markers_id)
         # read raw data
         curve_p,curve_R,mocap_stamps,mocap_cond = read_and_convert_frame(raw_data_dir+'_'+str(j+1),'',tool_markers_id)
-        print(mocap_stamps[tool_markers_id[0]][0])
-        print(mocap_stamps[tool_markers_id[0]][-1])
+        # print(mocap_stamps[tool_markers_id[0]][0])
+        # print(mocap_stamps[tool_markers_id[0]][-1])
         print("========")
-        continue
+        # continue
         
         # for mid in tool_markers_id:
         #     print(len(curve_p[mid]))
@@ -225,7 +281,7 @@ for dataset in all_datasets:
         axis_p[:,j] = this_axis_p
         print(H_act.T)
         print("Axis",j+1,"done.")
-    exit()
+    # exit()
 
     H = H_act
     H_point = axis_p
@@ -318,7 +374,7 @@ for dataset in all_datasets:
     print('P',np.round(P,3).T)
     print('H',np.round(H,3).T)
     R = np.eye(3)
-    for j in range(jN,0,-1):
+    for j in range(jN,1,-1):
         R = rot(H[:,j-1],-calib_config_q[j-1])
         for i in range(j,7):
             if i!=6:
@@ -333,7 +389,7 @@ for dataset in all_datasets:
     print("H:",H.T)
     print("====================")
 
-with open(robot_marker_dir,'r') as file:
+with open(robot_marker_dir+robot_name+'_marker_config.yaml','r') as file:
     base_marker_data = yaml.safe_load(file)
 base_marker_data['H']=[]
 base_marker_data['P']=[]
