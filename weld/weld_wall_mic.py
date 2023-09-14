@@ -22,13 +22,14 @@ import matplotlib.pyplot as plt
 import time
 import datetime
 import numpy as np
+import glob
 
 def robot_weld_path_gen(all_layer_z,forward_flag,base_layer):
     R=np.array([[-0.7071, 0.7071, -0.    ],
             [ 0.7071, 0.7071,  0.    ],
             [0.,      0.,     -1.    ]])
     x0 =  1684	# Origin x coordinate
-    y0 = -1179 + 428	# Origin y coordinate
+    y0 = -771	# Origin y coordinate
     z0 = -260   # 10 mm distance to base
 
     weld_p=[]
@@ -84,6 +85,7 @@ final_height=50
 final_h_std_thres=999999999
 weld_z_height=[0,6,7] # two base layer height to first top layer
 weld_z_height=np.append(weld_z_height,np.arange(weld_z_height[-1],final_height,1)+1)
+
 # job_number=[115,115]
 job_number=[215,215]
 job_number=np.append(job_number,np.ones(len(weld_z_height)-2)*200) # 100 ipm
@@ -122,12 +124,21 @@ cmd_dir = '../data/wall_weld_test/'+'moveL_100_weld_scan_2023_08_02_15_17_25/'
 ## rr drivers and all other drivers
 robot_client=MotionProgramExecClient()
 ws=WeldSend(robot_client)
+
 # weld state logging
+
+### debug ###
 weld_ser = RRN.SubscribeService('rr+tcp://192.168.55.10:60823?service=welder')
 cam_ser=RRN.ConnectService('rr+tcp://192.168.55.10:60827/?service=camera')
 mic_ser = RRN.ConnectService('rr+tcp://192.168.55.20:60828?service=microphone')
-## RR sensor objects
+# print('###连接welder')
+# print('###连接camera')
+# print('###连接microphone')
+
+# RR sensor objects
 rr_sensors = WeldRRSensor(weld_service=weld_ser,cam_service=cam_ser,microphone_service=mic_ser)
+# print('###对传感器赋值')
+### debug ###
 
 # ## test sensor (camera, microphone)
 # print("Test 3 Sec.")
@@ -135,10 +146,12 @@ rr_sensors = WeldRRSensor(weld_service=weld_ser,cam_service=cam_ser,microphone_s
 # print(len(rr_sensors.ir_recording))
 # exit()
 ###############
-
+### debug ###
 # MTI connect to RR
 mti_client = RRN.ConnectService("rr+tcp://192.168.55.10:60830/?service=MTI2D")
+# print('###连接scanner')
 mti_client.setExposureTime("25")
+### debug ###
 ###################################
 base_layer = True
 profile_height=None
@@ -160,10 +173,13 @@ weld_arcon=True
 end_layer = len(weld_z_height)
 if use_previous_cmd:
     end_layer = len(glob.glob(cmd_dir+'layer_*'))
-
 input("Start?")
+
 # move robot to ready position
+### debug ###
 ws.jog_dual(robot_scan,positioner,[r2_mid,r2_ir_q],np.radians([-15,180]),to_start_speed)
+# print('###R2和positioner正在移动到准备位置')
+### debug ###
 
 for i in range(0,end_layer):
     cycle_st = time.time()
@@ -188,6 +204,10 @@ for i in range(0,end_layer):
         ######### enter your wanted z height #######
         all_layer_z = [this_z_height]
         ###########################################
+        print("this_z_height:",this_z_height)
+        print("all_layer_z:",all_layer_z)
+        print("forward_flag:",forward_flag)
+        print("base_layer:",base_layer)
         all_path_T = robot_weld_path_gen(all_layer_z,forward_flag,base_layer) # this is your path
         path_T=all_path_T[0]
         curve_sliced_relative=[]
@@ -195,14 +215,17 @@ for i in range(0,end_layer):
             this_p = np.matmul(T_S1TCP_R1Base[:3,:3],path_p.p)+T_S1TCP_R1Base[:3,-1]
             this_n = np.matmul(T_S1TCP_R1Base[:3,:3],path_p.R[:,-1])
             curve_sliced_relative.append(np.append(this_p,this_n))
+        
         curve_sliced_relative=curve_sliced_relative[1:-1] # the start and end is for collision prevention
-        print(path_T[0])
-        print(curve_sliced_relative)
+        print('path_T[0]:',path_T[0])
+        print('curve_sliced_relative:',curve_sliced_relative)
         R_S1TCP = np.matmul(T_S1TCP_R1Base[:3,:3],path_p.R)
-
+        # exit()
         #### Correction ####
         # TODO: Add fitering if near threshold
+        
         h_largest=this_z_height
+        
         if (i<start_correction_layer):
             if (last_mean_h == 0) and (profile_height is not None):
                 last_mean_h=np.mean(profile_height[:,1])
@@ -230,6 +253,7 @@ for i in range(0,end_layer):
 
                 last_mean_h=mean_h
 
+
         else: # start correction from 2nd top layer
             
             if profile_height is None:
@@ -238,7 +262,7 @@ for i in range(0,end_layer):
                 last_profile_height=np.load(data_dir+'layer_21/scans/height_profile.npy')
                 last_mean_h=np.mean(last_profile_height[:,1])
                 profile_height=np.load(data_dir+'layer_22/scans/height_profile.npy')
-                
+             
 
             ## parameters
             # noise_h_thres = 3
@@ -274,9 +298,13 @@ for i in range(0,end_layer):
             curve_sliced_relative,path_T_S1,this_weld_v,all_dh,last_mean_h=\
                 strategy_3(profile_height,input_dh,curve_sliced_relative,R_S1TCP,num_l,noise_h_thres=noise_h_thres,\
                            min_v=min_v,max_v=max_v,h_std_thres=h_std_thres,nominal_v=nominal_v,ipm_mode=ipm_mode)
-            
+            print('curve_sliced_relative',curve_sliced_relative)
+            print('path_T_S1',path_T_S1)
+            print('this_weld_v',this_weld_v)
+            print('all_dh',all_dh)
+            print('last_mean_h',last_mean_h)
             h_largest = np.max(profile_height[:,1])
-
+            # exit()
             # find curve in R1 frame
             path_T=[]
             for tcp_T in path_T_S1:
@@ -290,7 +318,11 @@ for i in range(0,end_layer):
         path_q = []
         for tcp_T in path_T:
             path_q.append(robot_weld.inv(tcp_T.p,tcp_T.R,zero_config)[0])
-
+        print('tcp_T.p',tcp_T.p)
+        print('tcp_T.R',tcp_T.R)
+        print('zero_config',zero_config)
+        print('path_q',path_q)
+        
         if use_previous_cmd:
             cmd_layer_data_dir=cmd_dir+'layer_'+str(i)+'/'
             breakpoints,primitives,q_bp,this_weld_v = ws.load_weld_cmd(cmd_layer_data_dir+'command1.csv')
@@ -319,10 +351,12 @@ for i in range(0,end_layer):
 
         ######################################################
         ########### Do welding #############
-        
+        # exit()
         # input("Press Enter and move to weld starting point.")
+        ### debug ###
         ws.jog_single(robot_weld,path_q[0],to_start_speed)
-        
+        # print('###R1正在移动到准备位置')
+        ### debug ###
         weld_motion_weld_st = time.time()
         # input("Press Enter and start welding.")
         # mp=MotionProgram(ROBOT_CHOICE='RB1',pulse2deg=robot_weld.pulse2deg)
@@ -339,12 +373,16 @@ for i in range(0,end_layer):
         primitives=[]
         for bpi in range(len(this_weld_v)+1):
             primitives.append('movel')
-
+        ### debug ###
         rr_sensors.start_all_sensors()
         rob_stamps,rob_js_exe,_,_=ws.weld_segment_single(primitives,robot_weld,path_q[1:-1],np.append(10,this_weld_v),cond_all=[int(this_job_number)],arc=weld_arcon)
         rr_sensors.stop_all_sensors()
-
+        # print('###所有传感器打开')
+        # print('###焊接一层')
+        # print('###所有传感器关闭')
+        ### debug ###
         if save_weld_record:
+            ### debug ###
             Path(data_dir).mkdir(exist_ok=True)
             layer_data_dir=data_dir+'layer_'+str(i)+'/'
             Path(layer_data_dir).mkdir(exist_ok=True)
@@ -357,7 +395,9 @@ for i in range(0,end_layer):
             np.savetxt(layer_data_dir + 'weld_js_exe.csv',rob_js_exe,delimiter=',')
             np.savetxt(layer_data_dir + 'weld_robot_stamps.csv',rob_stamps,delimiter=',')
             rr_sensors.save_all_sensors(layer_data_dir)
-        
+            # print('###保存所有传感器数据')
+            ### debug ###
+
         print("Weld actual weld time:",time.time()-weld_motion_weld_st)
         weld_to_home_st = time.time()
 
@@ -367,13 +407,17 @@ for i in range(0,end_layer):
         ######################################################
 
         print("Weld Time:",time.time()-weld_st)
+        ### debug ###
+        # print('###声音数据处理')
         wm.audio_denoise(layer_data_dir)
         std_value_co1, std_value_co2, scan_flag = wm.audio_MFCC(layer_data_dir)
+        ### debug ###
     # exit()
-
     if scan_flag == True:
+        ### debug ###
         ws.jog_single(robot_weld,np.zeros(6),to_home_speed)
-
+        # print('###R1移动到原点')
+        ### debug ###
 
     #### scanning
     if scan_flag == True:
@@ -402,6 +446,7 @@ for i in range(0,end_layer):
         save_output_points = True
         ### scanning path module
         spg = ScanPathGen(robot_scan,positioner,scan_stand_off_d,Rz_angle,Ry_angle,bounds_theta)
+        print('spg:',spg)
         mti_Rpath = np.array([[ -1.,0.,0.],   
                     [ 0.,1.,0.],
                     [0.,0.,-1.]])
@@ -452,24 +497,23 @@ for i in range(0,end_layer):
         mti_recording=[]
         r_pulse2deg = np.append(robot_scan.pulse2deg,positioner.pulse2deg)
         while True:
-            if state_flag & 0x08 == 0 and time.time()-start_time>1.:
-                break
-            res, data = ws.client.receive_from_robot(0.01)
+            if state_flag & STATUS_RUNNING == 0 and time.time()-start_time>1.:
+                break 
+            res, fb_data = robot_client.fb.try_receive_state_sync(robot_client.controller_info, 0.001)
             if res:
-                joint_angle=np.radians(np.divide(np.array(data[26:34]),r_pulse2deg))
-                state_flag=data[16]
+                joint_angle=np.hstack((fb_data.group_state[0].feedback_position,fb_data.group_state[1].feedback_position,fb_data.group_state[2].feedback_position))
+                state_flag=fb_data.controller_flags
                 joint_recording.append(joint_angle)
-                timestamp=data[0]+data[1]*1e-9
+                timestamp=fb_data.time
                 robot_stamps.append(timestamp)
                 ###MTI scans YZ point from tool frame
                 mti_recording.append(deepcopy(np.array([mti_client.lineProfile.X_data,mti_client.lineProfile.Z_data])))
-        ws.client.servoMH(False)
-
-        print("Scan motion scan time:",time.time()-scan_motion_scan_st)
+        robot_client.servoMH(False)
         
-        scan_to_home_st = time.time()
         mti_recording=np.array(mti_recording)
-        q_out_exe=joint_recording
+        joint_recording=np.array(joint_recording)
+        q_out_exe=joint_recording[:,6:]
+        print(np.degrees(q_out_exe[:10]))
 
         # input("Press Enter to Move Home")
         # move robot to home
@@ -493,7 +537,7 @@ for i in range(0,end_layer):
                 pickle.dump(mti_recording, file)
             print('Total scans:',len(mti_recording))
         
-        print("Scan to home:",time.time()-scan_to_home_st)
+        # print("Scan to home:",time.time()-scan_to_home_st)
         print("Scan motion time:",time.time()-scan_motion_st)
         
         print("Scan Time:",time.time()-scan_st)
