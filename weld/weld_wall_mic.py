@@ -110,8 +110,8 @@ to_home_speed=5
 
 save_weld_record=True
 
-# start_correction_layer=2
-start_correction_layer=99999999
+start_correction_layer=2
+# start_correction_layer=99999999
 
 current_time = datetime.datetime.now()
 formatted_time = current_time.strftime('%Y_%m_%d_%H_%M_%S.%f')[:-7]
@@ -162,6 +162,7 @@ Transz0_H=np.array([[ 9.99997540e-01,  2.06703673e-06, -2.21825071e-03, -3.46701
  [ 0.00000000e+00,  0.00000000e+00,  0.00000000e+00,  1.00000000e+00]])
 curve_sliced_relative=None
 last_mean_h = 0
+input_dh=v2dh_loglog(weld_v,ipm_mode)
 
 # ir pose
 r2_ir_q = np.radians([43.3469,36.0996,-63.0900,142.5838,-83.0429,-96.0737])
@@ -180,7 +181,7 @@ input("Start?")
 ws.jog_dual(robot_scan,positioner,[r2_mid,r2_ir_q],np.radians([-15,180]),to_start_speed)
 # print('###R2和positioner正在移动到准备位置')
 ### debug ###
-
+scan_flag = False
 for i in range(0,end_layer):
     cycle_st = time.time()
     print("==================================")
@@ -191,6 +192,8 @@ for i in range(0,end_layer):
         forward_flag = False
     #### welding
     weld_st = time.time()
+    if (profile_height is not None) and (i==2):
+        mean_h_base = np.mean(profile_height[:,1])
     if i>=0 and True:
         weld_plan_st = time.time()
         if i>=2:
@@ -225,7 +228,8 @@ for i in range(0,end_layer):
         # TODO: Add fitering if near threshold
         
         h_largest=this_z_height
-        
+
+
         if (i<start_correction_layer):
             if (last_mean_h == 0) and (profile_height is not None):
                 last_mean_h=np.mean(profile_height[:,1])
@@ -255,66 +259,79 @@ for i in range(0,end_layer):
 
 
         else: # start correction from 2nd top layer
-            
-            if profile_height is None:
-                data_dir='../data/wall_weld_test/weld_scan_2023_08_02_15_17_25/'
-                print("Using data:",data_dir)
-                last_profile_height=np.load(data_dir+'layer_21/scans/height_profile.npy')
-                last_mean_h=np.mean(last_profile_height[:,1])
-                profile_height=np.load(data_dir+'layer_22/scans/height_profile.npy')
-             
+            if scan_flag == True:
+                if profile_height is None:
+                    data_dir='../data/wall_weld_test/weld_scan_2023_08_02_15_17_25/'
+                    print("Using data:",data_dir)
+                    last_profile_height=np.load(data_dir+'layer_21/scans/height_profile.npy')
+                    last_mean_h=np.mean(last_profile_height[:,1])
+                    profile_height=np.load(data_dir+'layer_22/scans/height_profile.npy')
+                
 
-            ## parameters
-            # noise_h_thres = 3
-            # peak_threshold=0.25
-            # flat_threshold=2.5
-            # correct_thres = 1.4 # mm
-            # patch_nb = 2 # 2*0.1
-            # start_ramp_ratio = 0.67
-            # end_ramp_ratio = 0.33
-            #############
-            # curve_sliced_relative,path_T_S1,this_weld_v,all_dh,last_mean_h=\
-            #     strategy_2(profile_height,last_mean_h,forward_flag,curve_sliced_relative,R_S1TCP,this_weld_v[0],\
-            #             noise_h_thres=noise_h_thres,peak_threshold=peak_threshold,flat_threshold=flat_threshold,\
-            #             correct_thres=correct_thres,patch_nb=patch_nb,\
-            #             start_ramp_ratio=start_ramp_ratio,end_ramp_ratio=end_ramp_ratio)
+                ## parameters
+                # noise_h_thres = 3
+                # peak_threshold=0.25
+                # flat_threshold=2.5
+                # correct_thres = 1.4 # mm
+                # patch_nb = 2 # 2*0.1
+                # start_ramp_ratio = 0.67
+                # end_ramp_ratio = 0.33
+                #############
+                # curve_sliced_relative,path_T_S1,this_weld_v,all_dh,last_mean_h=\
+                #     strategy_2(profile_height,last_mean_h,forward_flag,curve_sliced_relative,R_S1TCP,this_weld_v[0],\
+                #             noise_h_thres=noise_h_thres,peak_threshold=peak_threshold,flat_threshold=flat_threshold,\
+                #             correct_thres=correct_thres,patch_nb=patch_nb,\
+                #             start_ramp_ratio=start_ramp_ratio,end_ramp_ratio=end_ramp_ratio)
 
-            ## parameters
-            noise_h_thres = 3
-            num_l=40
-            # input_dh=1.1624881529394444
-            # input_dh=1.4018280504260527
-            input_dh=v2dh_loglog(weld_v,ipm_mode)
-            
-            # min_v=10
-            # max_v=75
-            # h_std_thres=0.5
+                ## parameters
+                noise_h_thres = 3
+                num_l=40
+                # input_dh=1.1624881529394444
+                # input_dh=1.4018280504260527
+                
+                
+                # min_v=10
+                # max_v=75
+                # h_std_thres=0.5
 
-            min_v=-1
-            max_v=1000
-            h_std_thres=-1
+                min_v=-1
+                max_v=1000
+                h_std_thres=-1
 
-            nominal_v=weld_v
-            curve_sliced_relative,path_T_S1,this_weld_v,all_dh,last_mean_h=\
-                strategy_3(profile_height,input_dh,curve_sliced_relative,R_S1TCP,num_l,noise_h_thres=noise_h_thres,\
-                           min_v=min_v,max_v=max_v,h_std_thres=h_std_thres,nominal_v=nominal_v,ipm_mode=ipm_mode)
-            print('curve_sliced_relative',curve_sliced_relative)
-            print('path_T_S1',path_T_S1)
-            print('this_weld_v',this_weld_v)
-            print('all_dh',all_dh)
-            print('last_mean_h',last_mean_h)
-            h_largest = np.max(profile_height[:,1])
-            # exit()
-            # find curve in R1 frame
-            path_T=[]
-            for tcp_T in path_T_S1:
-                this_p = T_R1Base_S1TCP[:3,:3]@tcp_T.p+T_R1Base_S1TCP[:3,-1]
-                this_R = T_R1Base_S1TCP[:3,:3]@tcp_T.R
-                path_T.append(Transform(this_R,this_p))
-            # add path collision avoidance
-            path_T.insert(0,Transform(path_T[0].R,path_T[0].p+np.array([0,0,10])))
-            path_T.append(Transform(path_T[-1].R,path_T[-1].p+np.array([0,0,10])))
-        
+                nominal_v=weld_v
+                curve_sliced_relative,path_T_S1,this_weld_v,all_dh,last_mean_h=\
+                    strategy_3(profile_height,input_dh,curve_sliced_relative,R_S1TCP,num_l,noise_h_thres=noise_h_thres,\
+                            min_v=min_v,max_v=max_v,h_std_thres=h_std_thres,nominal_v=nominal_v,ipm_mode=ipm_mode)
+                print('curve_sliced_relative',curve_sliced_relative)
+                print('path_T_S1',path_T_S1)
+                print('this_weld_v',this_weld_v)
+                print('all_dh',all_dh)
+                print('last_mean_h',last_mean_h)
+                h_largest = np.max(profile_height[:,1])
+                # exit()
+                # find curve in R1 frame
+                path_T=[]
+                for tcp_T in path_T_S1:
+                    this_p = T_R1Base_S1TCP[:3,:3]@tcp_T.p+T_R1Base_S1TCP[:3,-1]
+                    this_R = T_R1Base_S1TCP[:3,:3]@tcp_T.R
+                    path_T.append(Transform(this_R,this_p))
+                # add path collision avoidance
+                path_T.insert(0,Transform(path_T[0].R,path_T[0].p+np.array([0,0,10])))
+                path_T.append(Transform(path_T[-1].R,path_T[-1].p+np.array([0,0,10])))
+            else:
+                h_target = mean_h_base + ((i-2) * input_dh)
+
+                dh_direction = np.array([0,0,h_target-curve_sliced_relative[0][2]])
+                dh_direction_R1 = T_R1Base_S1TCP[:3,:3]@dh_direction
+
+                for curve_i in range(len(curve_sliced_relative)):
+                    curve_sliced_relative[curve_i][2]=h_target
+                
+                for path_i in range(len(path_T)):
+                    path_T[path_i].p=path_T[path_i].p+dh_direction_R1
+                # add path collision avoidance
+                path_T.insert(0,Transform(path_T[0].R,path_T[0].p+np.array([0,0,10])))
+                path_T.append(Transform(path_T[-1].R,path_T[-1].p+np.array([0,0,10])))
         path_q = []
         for tcp_T in path_T:
             path_q.append(robot_weld.inv(tcp_T.p,tcp_T.R,zero_config)[0])
@@ -551,54 +568,54 @@ for i in range(0,end_layer):
     # with open(out_scan_dir + 'mti_scans.pickle', 'rb') as file:
     #     mti_recording=pickle.load(file)
     ########################
+    if scan_flag == True:
+        recon_3d_st = time.time()
+        #### scanning process: processing point cloud and get h
+        try:
+            if forward_flag:
+                curve_x_start = deepcopy(curve_sliced_relative[0][0])
+                curve_x_end = deepcopy(curve_sliced_relative[-1][0])
+            else:
+                curve_x_start = deepcopy(curve_sliced_relative[-1][0])
+                curve_x_end = deepcopy(curve_sliced_relative[0][0])
+        except:
+            curve_x_start=43
+            curve_x_end=-41
+        # Transz0_H=np.array([[ 9.99974559e-01, -7.29664987e-06, -7.13309345e-03, -1.06461758e-02],
+        #                     [-7.29664987e-06,  9.99997907e-01, -2.04583032e-03, -3.05341146e-03],
+        #                     [ 7.13309345e-03,  2.04583032e-03,  9.99972466e-01,  1.49246365e+00],
+        #                     [ 0.00000000e+00,  0.00000000e+00,  0.00000000e+00,  1.00000000e+00]])
+        z_height_start=h_largest-3
+        crop_extend=10
+        crop_min=(curve_x_end-crop_extend,-30,-10)
+        crop_max=(curve_x_start+crop_extend,30,z_height_start+30)
+        crop_h_min=(curve_x_end-crop_extend,-20,-10)
+        crop_h_max=(curve_x_start+crop_extend,20,z_height_start+30)
+        scan_process = ScanProcess(robot_scan,positioner)
+        pcd=None
+        pcd = scan_process.pcd_register_mti(mti_recording,q_out_exe,robot_stamps,static_positioner_q=q_init_table)
+        pcd = scan_process.pcd_noise_remove(pcd,nb_neighbors=40,std_ratio=1.5,\
+                                            min_bound=crop_min,max_bound=crop_max,cluster_based_outlier_remove=True,cluster_neighbor=1,min_points=100)
+        print("3D Reconstruction:",time.time()-recon_3d_st)
+        get_h_st = time.time()
+        profile_height,Transz0_H = scan_process.pcd2height(deepcopy(pcd),z_height_start,bbox_min=crop_h_min,bbox_max=crop_h_max,Transz0_H=Transz0_H)
+        print("Transz0_H:",Transz0_H)
+        
+        print("Get Height:",time.time()-get_h_st)
 
-    recon_3d_st = time.time()
-    #### scanning process: processing point cloud and get h
-    try:
-        if forward_flag:
-            curve_x_start = deepcopy(curve_sliced_relative[0][0])
-            curve_x_end = deepcopy(curve_sliced_relative[-1][0])
-        else:
-            curve_x_start = deepcopy(curve_sliced_relative[-1][0])
-            curve_x_end = deepcopy(curve_sliced_relative[0][0])
-    except:
-        curve_x_start=43
-        curve_x_end=-41
-    # Transz0_H=np.array([[ 9.99974559e-01, -7.29664987e-06, -7.13309345e-03, -1.06461758e-02],
-    #                     [-7.29664987e-06,  9.99997907e-01, -2.04583032e-03, -3.05341146e-03],
-    #                     [ 7.13309345e-03,  2.04583032e-03,  9.99972466e-01,  1.49246365e+00],
-    #                     [ 0.00000000e+00,  0.00000000e+00,  0.00000000e+00,  1.00000000e+00]])
-    z_height_start=h_largest-3
-    crop_extend=10
-    crop_min=(curve_x_end-crop_extend,-30,-10)
-    crop_max=(curve_x_start+crop_extend,30,z_height_start+30)
-    crop_h_min=(curve_x_end-crop_extend,-20,-10)
-    crop_h_max=(curve_x_start+crop_extend,20,z_height_start+30)
-    scan_process = ScanProcess(robot_scan,positioner)
-    pcd=None
-    pcd = scan_process.pcd_register_mti(mti_recording,q_out_exe,robot_stamps,static_positioner_q=q_init_table)
-    pcd = scan_process.pcd_noise_remove(pcd,nb_neighbors=40,std_ratio=1.5,\
-                                        min_bound=crop_min,max_bound=crop_max,cluster_based_outlier_remove=True,cluster_neighbor=1,min_points=100)
-    print("3D Reconstruction:",time.time()-recon_3d_st)
-    get_h_st = time.time()
-    profile_height,Transz0_H = scan_process.pcd2height(deepcopy(pcd),z_height_start,bbox_min=crop_h_min,bbox_max=crop_h_max,Transz0_H=Transz0_H)
-    print("Transz0_H:",Transz0_H)
-    
-    print("Get Height:",time.time()-get_h_st)
+        save_output_points=True
+        if save_output_points:
+            o3d.io.write_point_cloud(out_scan_dir+'processed_pcd.pcd',pcd)
+            np.save(out_scan_dir+'height_profile.npy',profile_height)
+        # visualize_pcd([pcd])
+        plt.scatter(profile_height[:,0],profile_height[:,1])
+        plt.show()
+        # exit()
 
-    save_output_points=True
-    if save_output_points:
-        o3d.io.write_point_cloud(out_scan_dir+'processed_pcd.pcd',pcd)
-        np.save(out_scan_dir+'height_profile.npy',profile_height)
-    # visualize_pcd([pcd])
-    plt.scatter(profile_height[:,0],profile_height[:,1])
-    plt.show()
-    # exit()
+        if np.mean(profile_height[:,1])>final_height and np.std(profile_height[:,1])<final_h_std_thres and (not use_previous_cmd):
+            break
 
-    if np.mean(profile_height[:,1])>final_height and np.std(profile_height[:,1])<final_h_std_thres and (not use_previous_cmd):
-        break
-
-    forward_flag=not forward_flag
+        forward_flag=not forward_flag
 
     print("Print Cycle Time:",time.time()-cycle_st)
 
