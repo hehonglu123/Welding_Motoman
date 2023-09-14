@@ -641,10 +641,10 @@ while True:
                 plt.title("Height Profile")
                 plt.show()
                 all_profile_height.extend(profile_height)
-            pcd_layer = pcd_layer+pcd
+                pcd_layer = pcd_layer+pcd
 
-            # all_profile_height.extend(np.array([[0,1],[1,1]]))
-            all_last_curve_relative.extend(curve_sliced_relative)
+                # all_profile_height.extend(np.array([[0,1],[1,1]]))
+                all_last_curve_relative.extend(curve_sliced_relative)
             
             if save_output_points:
                 o3d.io.write_point_cloud(out_scan_dir+'processed_pcd.pcd',pcd)
