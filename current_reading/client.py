@@ -4,7 +4,7 @@ import time, traceback, sys
 
 def my_handler(sub, value, ts):
    # Handle new value
-   print(value,ts)
+   print(value,ts.seconds+ts.nanoseconds*1e-9)
 
 url='rr+tcp://192.168.55.21:12182/?service=Current'
 #take url from command line

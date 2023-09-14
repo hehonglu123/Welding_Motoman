@@ -2,7 +2,6 @@ import numpy as np
 from general_robotics_toolbox import *
 import sys, glob, fnmatch
 from robot_def import *
-from pandas import read_csv,DataFrame
 from dx200_motion_program_exec_client import *
 
 class WeldSend(object):
@@ -13,73 +12,19 @@ class WeldSend(object):
 
 	def jog_single(self,robot,q,v=1):
 		mp=MotionProgram(ROBOT_CHOICE=self.ROBOT_CHOICE_MAP[robot.robot_name],pulse2deg=robot.pulse2deg, tool_num=self.ROBOT_TOOL_MAP[robot.robot_name])
-		
-		if len(np.array(q).shape)==1:
-			mp.MoveJ(np.degrees(q),v,0)
-		else:
-			for q_wp in q:
-				mp.MoveJ(np.degrees(q_wp),v,0)
-
+		mp.MoveJ(np.degrees(q),v,None)
 		self.client.execute_motion_program(mp)
 	
-	def weld_segment_cool(self,primitives,robot,q_all,v_all,cond_all,cool=False,wait=0):
-		###single arm weld segment 
-		#q_all: list of joint angles (N x 6)
-		#v_all: list of segment speed (N x 1)
-		#cond_all: list of job number (N x 1) or (1,), 0 refers to off
-		#wait: wait time after motion, before arcof
-		q_all=np.degrees(q_all)
-		coolof=True
-		
-		mp=MotionProgram(ROBOT_CHOICE=self.ROBOT_CHOICE_MAP[robot.robot_name],pulse2deg=robot.pulse2deg, tool_num=self.ROBOT_TOOL_MAP[robot.robot_name])
-		mp.primitive_call(primitives[0],q_all[0],v_all[0])
-		if cool:
-			if len(cond_all)==1: 
-				mp.setDO(21,True)
-				coolof=False
-			else:
-				if cond_all[1]!=0:
-					mp.setDO(21,True)
-					coolof=False
-
-
-		for i in range(1,len(q_all)):
-			if len(cond_all)>1 and cool and i>1:
-				if coolof:
-					if cond_all[i]!=0:
-						mp.setDO(21,True)
-						coolof=False
-				else:
-					if cond_all[i]==0:
-						mp.setDO(21,False)
-						coolof=True
-
-			mp.primitive_call(primitives[i],q_all[i],v_all[i])
-		
-		if wait:
-			mp.setWaitTime(wait)
-			
-		if cool and not coolof:
-			mp.setDO(21,False)
-		return self.client.execute_motion_program(mp)
-
 	def jog_dual(self,robot1,robot2,q1,q2,v=1):
 		mp=MotionProgram(ROBOT_CHOICE=self.ROBOT_CHOICE_MAP[robot1.robot_name],ROBOT_CHOICE2=self.ROBOT_CHOICE_MAP[robot2.robot_name],pulse2deg=robot1.pulse2deg,pulse2deg_2=robot2.pulse2deg, tool_num=self.ROBOT_TOOL_MAP[robot1.robot_name])
-		
-		if len(np.array(q1).shape)==1 and len(np.array(q2).shape)==1:
-			mp.MoveJ(np.degrees(q1),v,0,target2=['MOVJ',np.degrees(q2),10])
-		elif len(np.array(q1).shape)==2 and len(np.array(q2).shape)==1:
-			for q1_wp in q1:
-				mp.MoveJ(np.degrees(q1_wp),v,0,target2=['MOVJ',np.degrees(q2),10])
-		elif len(np.array(q1).shape)==1 and len(np.array(q2).shape)==2:
-			for q2_wp in q2:
-				mp.MoveJ(np.degrees(q1),v,0,target2=['MOVJ',np.degrees(q2_wp),10])
-		else:
-			wp_length = min(len(q1),len(q2))
-			for wp_i in range(wp_length):
-				mp.MoveJ(np.degrees(q1[wp_i]),v,0,target2=['MOVJ',np.degrees(q2[wp_i]),10])
-
+		mp.MoveJ(np.degrees(q1),v,None,target2=['MOVJ',np.degrees(q2),10])
 		self.client.execute_motion_program(mp)
+	
+	def jog_tri(self,robot1,positioner,robot2,q1,q_positioner,q2,v=1):
+		mp=MotionProgram(ROBOT_CHOICE=self.ROBOT_CHOICE_MAP[robot1.robot_name],ROBOT_CHOICE2=self.ROBOT_CHOICE_MAP[positioner.robot_name],ROBOT_CHOICE3=self.ROBOT_CHOICE_MAP[robot2.robot_name],pulse2deg=robot1.pulse2deg,pulse2deg_2=positioner.pulse2deg,pulse2deg_3=robot2.pulse2deg, tool_num=self.ROBOT_TOOL_MAP[robot1.robot_name])
+		mp.MoveJ(np.degrees(q1),v,None,target2=['MOVJ',np.degrees(q_positioner),None],target3=['MOVJ',np.degrees(q2),None])
+		self.client.execute_motion_program(mp)
+
 
 	def weld_segment_single(self,primitives,robot,q_all,v_all,cond_all,arc=False,wait=0):
 		###single arm weld segment 
@@ -167,7 +112,7 @@ class WeldSend(object):
 			mp.setArc(False)
 		return self.client.execute_motion_program(mp)
 
-	def weld_segment_tri(self,primitives,robot1,positioner,robot2,q1_all,positioner_all,q2_all,v1_all,v2_all,cond_all,arc=False,cool=False,wait=0):
+	def weld_segment_tri(self,primitives,robot1,positioner,robot2,q1_all,positioner_all,q2_all,v1_all,v2_all,cond_all,arc=False):
 		###robot+positioner weld segment, MOVEJ + MOVEL x (N-1)
 		#q1_all: list of robot joint angles (N x 6)
 		#positioner_all: list of positioner joint angles (N x 2)
@@ -180,8 +125,7 @@ class WeldSend(object):
 		positioner_all=np.degrees(positioner_all)
 		q2_all=np.degrees(q2_all)
 		arcof=True
-		coolof=True
-		
+
 		mp=MotionProgram(ROBOT_CHOICE=self.ROBOT_CHOICE_MAP[robot1.robot_name],ROBOT_CHOICE2=self.ROBOT_CHOICE_MAP[positioner.robot_name],
 		   ROBOT_CHOICE3=self.ROBOT_CHOICE_MAP[robot2.robot_name],pulse2deg=robot1.pulse2deg,pulse2deg_2=positioner.pulse2deg,pulse2deg_3=robot2.pulse2deg, 
 		   tool_num=self.ROBOT_TOOL_MAP[robot1.robot_name])
@@ -209,33 +153,9 @@ class WeldSend(object):
 						arcof=True
 					elif cond_all[i]!=cond_all[i-1]:
 						mp.changeArc(cond_all[i])
-						
-		if cool:
-			if len(cond_all)==1: 
-				mp.setDO(21,True)
-				coolof=False
-			else:
-				if cond_all[1]!=0:
-					mp.setDO(21,True)
-					coolof=False
-
-
-		for i in range(1,len(q2_all)):
-			if len(cond_all)>1 and cool and i>1:
-				if coolof:
-					if cond_all[i]!=0:
-						mp.setDO(21,True)
-						coolof=False
-				else:
-					if cond_all[i]==0:
-						mp.setDO(21,False)
-						coolof=True						
 
 			mp.primitive_call_tri(primitives[i],q1_all[i],v1_all[i],target2=['MOVJ',positioner_all 	[i],None],target3=['MOVL',q2_all[i],v2_all[i]])
-       	
-		if cool and not coolof:
-			mp.setDO(21,False)	
-
+			
 		if arc and not arcof:
 			mp.setArc(False)
 		return self.client.execute_motion_program(mp)
@@ -303,163 +223,3 @@ class WeldSend(object):
 
 
 		return  curve_exe_pw[:,:3], curve_exe_pw[:,3:], timestamp
-
-	def save_weld_cmd(self,filename,breakpoints,primitives,q_bp,weld_v):
-
-		q_bp_new=[]
-		weld_v_new=[]
-		for i in range(len(primitives)):
-			if len(q_bp[i])==2:
-				q_bp_new.append([np.array(q_bp[i][0]),np.array(q_bp[i][1])])
-				weld_v_new.append([weld_v[i],weld_v[i]])
-			else:
-				q_bp_new.append([np.array(q_bp[i][0])])
-				weld_v_new.append([weld_v[i]])
-		df=DataFrame({'breakpoints':breakpoints,'primitives':primitives, 'q_bp':q_bp_new, 'weld_v':weld_v_new})
-		df.to_csv(filename,header=True,index=False)
-	
-	def load_weld_cmd(self,filename):
-		
-		data = read_csv(filename)
-		breakpoints=np.array(data['breakpoints'].tolist()).astype(int)
-		primitives=data['primitives'].tolist()
-		qs=data['q_bp'].tolist()
-		weld_v_str=np.array(data['weld_v'].tolist())
-		q_bp=[]
-		for q in qs:
-			endpoint=q[8:-3].split(',')
-			qarr = np.array(list(map(float, endpoint)))
-			q_bp.append([np.array(qarr)])
-		weld_v=[]
-		for v in weld_v_str:
-			weld_v.append(float(v[1:-1]))
-
-		return breakpoints,primitives,q_bp,weld_v
-
-	# def extract_data_from_cmd(self,filename):
-	# 	data = read_csv(filename)
-	# 	breakpoints=np.array(data['breakpoints'].tolist())
-	# 	primitives=data['primitives'].tolist()
-	# 	points=data['p_bp'].tolist()
-	# 	qs=data['q_bp'].tolist()
-
-	# 	p_bp=[]
-	# 	q_bp=[]
-	# 	for i in range(len(breakpoints)):
-	# 		if 'movel' in primitives[i]:
-	# 			point=extract_points(primitives[i],points[i])
-	# 			p_bp.append([point])
-	# 			q=extract_points(primitives[i],qs[i])
-	# 			q_bp.append([q])
-
-
-	# 		elif 'movec' in primitives[i]:
-	# 			point1,point2=extract_points(primitives[i],points[i])
-	# 			p_bp.append([point1,point2])
-	# 			q1,q2=extract_points(primitives[i],qs[i])
-	# 			q_bp.append([q1,q2])
-
-	# 		else:
-	# 			point=extract_points(primitives[i],points[i])
-	# 			p_bp.append([point])
-	# 			q=extract_points(primitives[i],qs[i])
-	# 			q_bp.append([q])
-
-	# 	return breakpoints,primitives, p_bp,q_bp
-
-
-
-	# def form_motion_cmd(self,client,primitives,q_bp,p_bp,speed,zone,arc=False):
-	# 	for i in range(len(primitives)):
-	# 		if 'movel' in primitives[i]:
-	# 			###TODO: fix pose
-	# 			if type(speed) is list:
-	# 				if type(zone) is list:
-	# 					client.MoveL(np.degrees(q_bp[i][0]),speed[i],zone[i])
-	# 				else:
-	# 					client.MoveL(np.degrees(q_bp[i][0]),speed[i],zone)
-	# 			else:
-	# 				if type(zone) is list:
-	# 					client.MoveL(np.degrees(q_bp[i][0]),speed,zone[i])
-	# 				else:
-	# 					client.MoveL(np.degrees(q_bp[i][0]),speed,zone)
-
-	# 		elif 'movec' in primitives[i]:		###moveC needs testing
-	# 			if type(speed) is list:
-	# 				if type(zone) is list:
-	# 					client.MoveC(np.degrees(q_bp[i-1][-1]),np.degrees(q_bp[i][0]),np.degrees(q_bp[i][1]),speed[i],zone[i])
-	# 				else:
-	# 					client.MoveC(np.degrees(q_bp[i-1][-1]),np.degrees(q_bp[i][0]),np.degrees(q_bp[i][1]),speed[i],zone)
-	# 			else:
-	# 				if type(zone) is list:
-	# 					client.MoveC(np.degrees(q_bp[i-1][-1]),np.degrees(q_bp[i][0]),np.degrees(q_bp[i][1]),speed,zone[i])
-	# 				else:
-	# 					client.MoveC(np.degrees(q_bp[i-1][-1]),np.degrees(q_bp[i][0]),np.degrees(q_bp[i][1]),speed,zone)
-
-				
-
-	# 		elif 'movej' in primitives[i]:
-	# 			if type(speed) is list:
-	# 				if type(zone) is list:
-	# 					client.MoveJ(np.degrees(q_bp[i][0]),speed[i],zone[i])
-	# 				else:
-	# 					client.MoveJ(np.degrees(q_bp[i][0]),speed[i],zone)
-	# 			else:
-	# 				if type(zone) is list:
-	# 					client.MoveJ(np.degrees(q_bp[i][0]),speed,zone[i])
-	# 				else:
-	# 					client.MoveJ(np.degrees(q_bp[i][0]),speed,zone)
-	# 			if arc==True and i==0:
-	# 				client.SetArc(True)
-	# 	if arc:
-	# 		client.SetArc(False)
-
-	# 	return client
-
-	# def form_motion_cmd_multimove(self,client,primitives_robot,p_bp_robot,q_bp_robot,primitives_positioner,p_bp_positioner,q_bp_positioner,speed,zone,arc=False):
-	# 	for i in range(len(primitives)):
-	# 		if 'movel' in primitives[i]:
-	# 			###TODO: fix pose
-	# 			if type(speed) is list:
-	# 				if type(zone) is list:
-	# 					client.MoveL(np.degrees(q_bp[i][0]),speed[i],zone[i])
-	# 				else:
-	# 					client.MoveL(np.degrees(q_bp[i][0]),speed[i],zone)
-	# 			else:
-	# 				if type(zone) is list:
-	# 					client.MoveL(np.degrees(q_bp[i][0]),speed,zone[i])
-	# 				else:
-	# 					client.MoveL(np.degrees(q_bp[i][0]),speed,zone)
-
-	# 		elif 'movec' in primitives[i]:		###moveC needs testing
-	# 			if type(speed) is list:
-	# 				if type(zone) is list:
-	# 					client.MoveC(np.degrees(q_bp[i-1][-1]),np.degrees(q_bp[i][0]),np.degrees(q_bp[i][1]),speed[i],zone[i])
-	# 				else:
-	# 					client.MoveC(np.degrees(q_bp[i-1][-1]),np.degrees(q_bp[i][0]),np.degrees(q_bp[i][1]),speed[i],zone)
-	# 			else:
-	# 				if type(zone) is list:
-	# 					client.MoveC(np.degrees(q_bp[i-1][-1]),np.degrees(q_bp[i][0]),np.degrees(q_bp[i][1]),speed,zone[i])
-	# 				else:
-	# 					client.MoveC(np.degrees(q_bp[i-1][-1]),np.degrees(q_bp[i][0]),np.degrees(q_bp[i][1]),speed,zone)
-
-				
-
-	# 		elif 'movej' in primitives[i]:
-	# 			if type(speed) is list:
-	# 				if type(zone) is list:
-	# 					client.MoveJ(np.degrees(q_bp[i][0]),speed[i],zone[i])
-	# 				else:
-	# 					client.MoveJ(np.degrees(q_bp[i][0]),speed[i],zone)
-	# 			else:
-	# 				if type(zone) is list:
-	# 					client.MoveJ(np.degrees(q_bp[i][0]),speed,zone[i])
-	# 				else:
-	# 					client.MoveJ(np.degrees(q_bp[i][0]),speed,zone)
-	# 			if arc==True and i==0:
-	# 				client.SetArc(True)
-	# 	if arc:
-	# 		client.SetArc(False)
-
-	# 	return client
-

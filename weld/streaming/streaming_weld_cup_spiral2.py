@@ -166,10 +166,11 @@ def main():
 	# feedrate_cmd=nominal_feedrate
 	# vd_relative=nominal_vd_relative
 	# feedrate_gain=0.5
-	# feedrate_min=60
+	# feedrate_min=100
 	# feedrate_max=300
 	# nominal_slice_increment=int(1.8/slicing_meta['line_resolution'])
 	# slice_inc_gain=3.
+	# vd_max=10
 
 	# ###set up control parameters
 	# job_offset=400 		###200 for Aluminum ER4043, 300 for Steel Alloy ER70S-6, 400 for Stainless Steel ER316L
@@ -182,14 +183,15 @@ def main():
 	# feedrate_cmd=nominal_feedrate
 	# vd_relative=nominal_vd_relative
 	# feedrate_gain=0.5
-	# feedrate_min=60
+	# feedrate_min=100
 	# feedrate_max=300
 	# nominal_slice_increment=int(1.45/slicing_meta['line_resolution'])
 	# slice_inc_gain=3.
+	# vd_max=6
 
 	###set up control parameters
 	job_offset=300 		###200 for Aluminum ER4043, 300 for Steel Alloy ER70S-6, 400 for Stainless Steel ER316L
-	nominal_feedrate=80
+	nominal_feedrate=150
 	nominal_vd_relative=0.1
 	nominal_wire_length=25 #pixels
 	nominal_temp_below=500
@@ -198,10 +200,11 @@ def main():
 	feedrate_cmd=nominal_feedrate
 	vd_relative=nominal_vd_relative
 	feedrate_gain=0.5
-	feedrate_min=60
+	feedrate_min=120
 	feedrate_max=300
-	nominal_slice_increment=int(1.45/slicing_meta['line_resolution'])
+	nominal_slice_increment=int(1.3/slicing_meta['line_resolution'])
 	slice_inc_gain=3.
+	vd_max=5
 
 	##########################################SENSORS LOGGIGN########################################################
 	rr_sensors = WeldRRSensor(weld_service=fronius_sub,cam_service=None,microphone_service=microphone,current_service=current_sub)
@@ -254,9 +257,7 @@ def main():
 	# except:
 	# 	traceback.print_exc()
 	# finally:
-	# 	print('stop welding')
 	# 	fronius_client.stop_weld()
-	# 	print('welding stop')
 
 
 	######################################################LAYER WELDING##########################################################################################
@@ -400,8 +401,8 @@ def main():
 			####CONTROL PARAMETERS
 			feedrate_cmd-=20
 			vd_relative+=1
-			vd_relative=min(6,vd_relative)
-			feedrate_cmd=max(feedrate_cmd,100)
+			vd_relative=min(vd_max,vd_relative)
+			feedrate_cmd=max(feedrate_cmd,feedrate_min)
 			slice_num+=int(nominal_slice_increment)
 			print('FEEDRATE: ',feedrate_cmd,'VD: ',vd_relative)
 

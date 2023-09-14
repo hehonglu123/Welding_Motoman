@@ -55,7 +55,9 @@ ws=WeldSend(client)
 
 ###########################################layer welding############################################
 num_layer_start=int(0*layer_height_num)	###modify layer num here
-num_layer_end=int(2*layer_height_num)
+num_layer_end=int(1*layer_height_num)
+feedrate=300
+job_offset=300
 q_prev=client.getJointAnglesMH(robot.pulse2deg)
 # q_prev=np.array([-3.791544713877046391e-01,7.156749523014762637e-01,2.756772964158371586e-01,2.106493295914119712e-01,-7.865937103692784982e-01,-5.293956242391706368e-01])	###for motosim tests only
 
@@ -117,9 +119,9 @@ for layer in range(num_layer_start,num_layer_end,layer_height_num):
 			v2_all.append(min(100,100*positioner_w/positioner.joint_vel_limit[1]))
 			primitives.append('movel')
 
-		q_prev=rob1_js[breakpoints[-1]]
+		q_prev=positioner_js[breakpoints[-1]]
 	
 
 		###robot1=robot2 speed tests
-		timestamp_robot,joint_recording,job_line,_=ws.weld_segment_tri(primitives,robot,positioner,robot2,q1_all,positioner_all,q2_all,v1_all,v1_all,cond_all=[215],arc=True, cool= True)
+		timestamp_robot,joint_recording,job_line,_=ws.weld_segment_tri(primitives,robot,positioner,robot2,q1_all,positioner_all,q2_all,v1_all,v1_all,cond_all=[int(job_offset+feedrate/10)],arc=False)
 		np.savetxt('joint_recording.csv',np.hstack((timestamp_robot.reshape(-1, 1),job_line.reshape(-1, 1),joint_recording)),delimiter=',')
