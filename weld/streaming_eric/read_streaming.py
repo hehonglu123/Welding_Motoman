@@ -17,6 +17,8 @@ from scanPathGen import *
 from scanProcess import *
 from PH_interp import *
 from weldCorrectionStrategy import *
+from matplotlib.animation import FuncAnimation
+from functools import partial
 
 from general_robotics_toolbox import *
 import matplotlib.pyplot as plt
@@ -113,6 +115,17 @@ for layer in range(total_layer):
     robot_stamps=robot_js[:,0]
     q_out_exe=robot_js[:,7:]
     # robot_stamps=
+    
+    # fig = plt.figure()
+
+    # def updatefig(i):
+    #     fig.clear()
+    #     plt.scatter(mti_recording[i][0],mti_recording[i][1])
+    #     plt.draw()
+
+    # anim = FuncAnimation(fig, updatefig, 1000)
+    # plt.show()
+    
     
     #### scanning process: processing point cloud and get h
     curve_sliced_relative=np.array(curve_sliced_relative)

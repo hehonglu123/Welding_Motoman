@@ -67,9 +67,9 @@ for l in range(total_layers):
         
     curve_relative=np.array(curve_relative)
     
-    # plt.plot(curve_relative[:,0],curve_relative[:,1],'-o')
-    # plt.axis("equal")
-    # plt.show()
+    plt.plot(curve_relative[:,0],curve_relative[:,1],'-o')
+    plt.axis("equal")
+    plt.show()
     
     np.savetxt(path_dir+'slice'+str(l)+'_0.csv',curve_relative,delimiter=',')
 

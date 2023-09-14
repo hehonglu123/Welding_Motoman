@@ -39,7 +39,7 @@ class CalibRobotPH:
                   raw_data_dir='',split_motion=2,uframe_num=1,utool_num=1,robot_group=1):
         
         client = FANUCClient(rob_IP)
-        read_N=3
+        read_N=1
         
         input("Press Enter and the robot will start moving.")
         
@@ -116,6 +116,12 @@ class CalibRobotPH:
                     break
             else:
                 time.sleep(0.1)
+        # last save
+        np.savetxt(raw_data_dir+'_robot_q_raw.csv',robot_joint,delimiter=',')
+        np.savetxt(raw_data_dir+'_tool_T_raw.csv',tool_T,delimiter=',')
+        np.savetxt(raw_data_dir+'_base_T_raw.csv',base_T,delimiter=',')
+        with open(raw_data_dir+'_marker_raw.pickle', 'wb') as handle:
+            pickle.dump(marker_T, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
 def calib_R2():
 
@@ -224,7 +230,7 @@ def calib_R1():
     calib_obj = CalibRobotPH(mocap_cli,robot)
     
     # speed
-    rob_speed=3
+    rob_speed=10
     waittime=0.5 # stop 0.5 sec for sync
 
     test_qs = []
