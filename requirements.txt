@@ -7,3 +7,4 @@ numpy
 scipy
 pyyaml
 matplotlib
+pandas
