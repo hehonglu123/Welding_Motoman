@@ -400,6 +400,18 @@ class ScanProcess():
         
         return profile_height
     
+    def dh2height(self,layer_curve_relative,layer_curve_dh,last_curve_relative,last_curve_height):
+        
+        last_curve_relative=np.array(last_curve_relative)
+        layer_curve_height=[]
+        for this_id in range(len(layer_curve_relative)):
+            this_p = layer_curve_relative[this_id][:3]
+            last_p_id = np.argmin(np.linalg.norm(last_curve_relative[:,:3]-this_p,2,1))
+            p_height = last_curve_height[last_p_id]+layer_curve_dh[last_p_id][1]
+            layer_curve_height.append(p_height)
+        
+        return layer_curve_height
+    
     def pcd2height(self,scanned_points,z_height_start,bbox_min=(-40,-20,0),bbox_max=(40,20,45),\
                    resolution_z=0.1,windows_z=0.2,resolution_x=0.1,windows_x=1,stop_thres=20,\
                    stop_thres_w=10,use_points_num=5,width_thres=0.8,Transz0_H=None):
