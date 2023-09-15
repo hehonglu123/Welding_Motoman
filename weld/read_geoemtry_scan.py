@@ -88,7 +88,7 @@ ph_param_r2.fit(PH_q,method='FBF')
 ph_param_r2=None
 #### load S1 kinematic model
 
-regen_pcd = False
+regen_pcd = True
 
 #### data directory
 dataset='circle_large/'
@@ -172,9 +172,15 @@ for layer_count in range(0,total_count):
             pcd = scan_process.pcd_register_mti(mti_recording,q_out_exe,robot_stamps,use_calib=True,ph_param=ph_param_r2)
             # pcd = scan_process.pcd_register_mti(mti_recording,q_out_exe,robot_stamps,use_calib=False)
             # visualize_pcd([pcd])
-            pcd = scan_process.pcd_noise_remove(pcd,nb_neighbors=40,std_ratio=1.5,\
-                                                min_bound=crop_min,max_bound=crop_max,outlier_remove=True,cluster_based_outlier_remove=True,cluster_neighbor=1,min_points=100)
-            # visualize_pcd([pcd])
+            while True:
+                pcd = scan_process.pcd_noise_remove(pcd,nb_neighbors=40,std_ratio=1.5,\
+                                                    min_bound=crop_min,max_bound=crop_max,outlier_remove=True,cluster_based_outlier_remove=True,cluster_neighbor=1,min_points=300)
+            
+                visualize_pcd([pcd])
+                q=input("Continue?")
+                if q=='':
+                    break
+                    
         else:
             pcd=o3d.io.read_point_cloud(out_scan_dir+'processed_pcd.pcd')
         
