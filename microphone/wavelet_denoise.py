@@ -24,7 +24,7 @@ def plot_spectrum(samples, fs):
     plt.ylabel('Amplitude')
     plt.grid()
 
-base_path = '../data/wall_weld_test/weld_scan_2023_07_17_16_30_34/'
+base_path = '../data/wall_weld_test/moveL_100_baseline_weld_scan_2023_07_07_15_20_56/'
 
 if os.path.exists(base_path):
     # 获取指定路径下的所有子目录

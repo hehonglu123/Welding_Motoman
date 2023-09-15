@@ -8,7 +8,7 @@ from scipy.signal import butter, lfilter
 import os
 import re
 
-base_path = '../data/wall_weld_test/moveL_100_repeat_weld_scan_2023_08_02_17_07_02/'
+base_path = '../data/wall_weld_test/moveL_100_baseline_weld_scan_2023_07_07_15_20_56/'
 
 if os.path.exists(base_path):
     # 获取指定路径下的所有子目录

@@ -133,6 +133,12 @@ class WeldRRSensor(object):
 			first_channel = np.concatenate(self.audio_recording)
 			first_channel_int16=(first_channel*32767).astype(np.int16)
 			plt.plot(first_channel_int16)
+			plt.title("Microphone data")
+			plt.show()
+		if self.current_service:
+			print("Current data length:",len(self.current))
+			plt.plot(self.current_timestamp,self.current)
+			plt.title("Current data")
 			plt.show()
 	
 	def clean_weld_record(self):
@@ -169,8 +175,9 @@ class WeldRRSensor(object):
 				header='timestamp,voltage,current,feedrate,energy', comments='')
 		
 	def save_current_file(self,filedir):
+		current_timestamp=np.array(self.current_timestamp)
 		np.savetxt(filedir + 'current.csv',
-				np.array([(self.current_timestamp-self.current_timestamp[0]), self.current]).T, delimiter=',',
+				np.array([(current_timestamp-current_timestamp[0]), self.current]).T, delimiter=',',
 				header='timestamp,current', comments='')
 	
 	def clean_ir_record(self):

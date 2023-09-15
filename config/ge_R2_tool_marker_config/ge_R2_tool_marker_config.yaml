@@ -1,0 +1,33 @@
+tool_markers:
+  marker1_rigid3:
+  - 0
+  - 0
+  - 0
+  marker2_rigid3:
+  - 0
+  - 0
+  - 0
+  marker3_rigid3:
+  - 0
+  - 0
+  - 0
+  marker4_rigid3:
+  - 0
+  - 0
+  - 0
+  marker5_rigid3:
+  - 0
+  - 0
+  - 0
+  marker6_rigid3:
+  - 0
+  - 0
+  - 0
+  marker7_rigid3:
+  - 0
+  - 0
+  - 0
+  marker8_rigid3:
+  - 0
+  - 0
+  - 0
