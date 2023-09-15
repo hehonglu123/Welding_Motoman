@@ -53,18 +53,16 @@ robot_scan_base = robot_weld.T_base_basemarker.inv()*robot_scan.T_base_basemarke
 robot_scan.base_H = H_from_RT(robot_scan_base.R,robot_scan_base.p)
 positioner_base = robot_weld.T_base_basemarker.inv()*positioner.T_base_basemarker
 positioner.base_H = H_from_RT(positioner_base.R,positioner_base.p)
-T_to_base = Transform(np.eye(3),[0,0,-380])
-positioner.base_H = np.matmul(positioner.base_H,H_from_RT(T_to_base.R,T_to_base.p))
+# T_to_base = Transform(np.eye(3),[0,0,-380])
+# positioner.base_H = np.matmul(positioner.base_H,H_from_RT(T_to_base.R,T_to_base.p))
 # input(positioner.base_H)
 
-# robot_weld.robot.P=deepcopy(robot_weld.calib_P)
-# robot_weld.robot.H=deepcopy(robot_weld.calib_H)
-# robot_weld.robot.T_flange = deepcopy(robot_weld.T_tool_flange)
-# robot_weld.robot.R_tool = deepcopy(robot_weld.T_tool_toolmarker.R)
-# robot_weld.robot.p_tool = deepcopy(robot_weld.T_tool_toolmarker.p)
-
+robot_weld.robot.P=deepcopy(robot_weld.calib_P)
+robot_weld.robot.H=deepcopy(robot_weld.calib_H)
 robot_scan.robot.P=deepcopy(robot_scan.calib_P)
 robot_scan.robot.H=deepcopy(robot_scan.calib_H)
+positioner.robot.P=deepcopy(positioner.calib_P)
+positioner.robot.H=deepcopy(positioner.calib_H)
 
 #### load R1 kinematic model
 PH_data_dir='../mocap/PH_grad_data/test'+R1_ph_dataset_date+'_R1/train_data_'
@@ -89,149 +87,141 @@ ph_param_r2=PH_Param(nom_P,nom_H)
 ph_param_r2.fit(PH_q,method='FBF')
 ph_param_r2=None
 #### load S1 kinematic model
-# positioner.robot.P=deepcopy(positioner.calib_P)
-# positioner.robot.H=deepcopy(positioner.calib_H)
+
+regen_pcd = False
 
 #### data directory
-# dataset='cup/'
-# sliced_alg='circular_slice_shifted/'
-# curve_data_dir = '../data/'+dataset+sliced_alg
-# data_dir=curve_data_dir+'weld_scan_'+'2023_07_11_16_25_30'+'/'
-# baselayer=False
-# layer=367
-# x=0
-
-# dataset='blade0.1/'
-# sliced_alg='auto_slice/'
-# curve_data_dir = '../data/'+dataset+sliced_alg
-# data_dir=curve_data_dir+'weld_scan_'+'2023_07_19_11_41_30'+'/'
-# baselayer=True
-# layer=1
-# x=0
-
-# dataset='blade0.1/'
-# sliced_alg='auto_slice/'
-# curve_data_dir = '../data/'+dataset+sliced_alg
-# data_dir=curve_data_dir+'weld_scan_'+'2023_07_24_13_13_53'+'/'
-# baselayer=False
-# last_layer=365
-# layer=384
-# x=0
-
-# dataset='blade0.1/'
-# sliced_alg='auto_slice/'
-# curve_data_dir = '../data/'+dataset+sliced_alg
-# data_dir=curve_data_dir+'weld_scan_2023_09_05_18_32_02'+'/'
-# baselayer=False
-# last_layer=1
-# layer=0
-# x=0
-
 dataset='circle_large/'
-sliced_alg='static_stepwise/'
+sliced_alg='static_stepwise_split/'
 curve_data_dir = '../data/'+dataset+sliced_alg
-data_dir=curve_data_dir+'weld_scan_2023_09_12_16_39_10'+'/'
-baselayer=False
-last_layer=86
-layer=105
-x=0
+data_dir=curve_data_dir+'weld_scan_2023_09_12_17_58_14'+'/'
 
-use_actual = False
+#### welding spec, goal
+with open(curve_data_dir+'slicing.yml', 'r') as file:
+    slicing_meta = yaml.safe_load(file)
+line_resolution = slicing_meta['line_resolution']
+total_layer = slicing_meta['num_layers']
+total_baselayer = slicing_meta['num_baselayers']
 
-if not baselayer:
-    layer_data_dir=data_dir+'layer_'+str(layer)+'_'+str(x)+'/'
-    if layer!=0:
-        last_layer_data_dir=data_dir+'layer_'+str(last_layer)+'_'+str(x)+'/'
+all_layer_dir=glob.glob(data_dir+'layer_*_0')
+total_print_layer = len(all_layer_dir)
+total_count=total_print_layer
+
+layer_num = []
+for layer_count in range(-1,total_count):
+    # get printed layer number
+    layer=all_layer_dir[layer_count].split('/')
+    layer=layer[-1]
+    layer=layer.split('\\')
+    layer=layer[-1]
+    layer=layer.split('_')
+    layer=int(layer[1])
+    layer_num.append(layer)
+layer_num = np.sort(layer_num)
+
+last_curve_relative = []
+last_curve_height = []
+for layer_count in range(0,total_count):
+    baselayer=False
+    # if layer_count!= 0 and layer_count<=total_baselayer:
+    #     baselayer=True
+    
+    # get printed layer number
+    layer=int(layer_num[layer_count])
+    
+    print("Layer:",layer)
+        
+    layer_data_dir=data_dir+'layer_'+str(layer)+'_'
+    
+    num_sections = len(glob.glob(layer_data_dir+'*'))
+    pcd_layer=o3d.geometry.PointCloud()
+    
+    layer_curve_relative=[]
+    layer_curve_dh=[]
+    for x in range(num_sections):
+        layer_sec_data_dir=layer_data_dir+str(x)+'/'
+        out_scan_dir = layer_sec_data_dir+'scans/'
+        print(out_scan_dir)
+        
+        if layer<0:
+            read_layer=0
+        else:
+            read_layer=layer
+        if not baselayer:
+            curve_sliced_relative=np.loadtxt(curve_data_dir+'curve_sliced_relative/slice'+str(read_layer)+'_'+str(x)+'.csv',delimiter=',')
+            curve_sliced_js=np.loadtxt(curve_data_dir+'curve_sliced_js/MA2010_js'+str(read_layer)+'_'+str(x)+'.csv',delimiter=',').reshape((-1,6))
+            positioner_js=np.loadtxt(curve_data_dir+'curve_sliced_js/D500B_js'+str(read_layer)+'_'+str(x)+'.csv',delimiter=',')
+        else:
+            curve_sliced_relative=np.loadtxt(curve_data_dir+'curve_sliced_relative/baselayer'+str(read_layer)+'_'+str(x)+'.csv',delimiter=',')
+            curve_sliced_js=np.loadtxt(curve_data_dir+'curve_sliced_js/MA2010_base_js'+str(read_layer)+'_'+str(x)+'.csv',delimiter=',').reshape((-1,6))
+            positioner_js=np.loadtxt(curve_data_dir+'curve_sliced_js/D500B_base_js'+str(read_layer)+'_'+str(x)+'.csv',delimiter=',')
+        
+        rob_js_plan = np.hstack((curve_sliced_js,positioner_js))
+        
+        with open(out_scan_dir+'mti_scans.pickle', 'rb') as file:
+            mti_recording=pickle.load(file)
+        q_out_exe=np.loadtxt(out_scan_dir+'scan_js_exe.csv',delimiter=',')
+        robot_stamps=np.loadtxt(out_scan_dir+'scan_robot_stamps.csv',delimiter=',')
+
+        scan_process = ScanProcess(robot_scan,positioner)
+        if regen_pcd:
+            #### scanning process: processing point cloud and get h
+            crop_extend=15
+            crop_min=tuple(np.min(curve_sliced_relative[:,:3],axis=0)-crop_extend)
+            crop_max=tuple(np.max(curve_sliced_relative[:,:3],axis=0)+crop_extend)
+            pcd = scan_process.pcd_register_mti(mti_recording,q_out_exe,robot_stamps,use_calib=True,ph_param=ph_param_r2)
+            # pcd = scan_process.pcd_register_mti(mti_recording,q_out_exe,robot_stamps,use_calib=False)
+            # visualize_pcd([pcd])
+            pcd = scan_process.pcd_noise_remove(pcd,nb_neighbors=40,std_ratio=1.5,\
+                                                min_bound=crop_min,max_bound=crop_max,outlier_remove=True,cluster_based_outlier_remove=True,cluster_neighbor=1,min_points=100)
+            # visualize_pcd([pcd])
+        else:
+            pcd=o3d.io.read_point_cloud(out_scan_dir+'processed_pcd.pcd')
+        
+        # dh plot
+        if layer!=-1:
+            profile_height = scan_process.pcd2dh(pcd,last_pcd,curve_sliced_relative,robot_weld,rob_js_plan,ph_param=ph_param_r1,drawing=True)
+            if len(layer_curve_dh)!=0:
+                profile_height[:,0]+=layer_curve_dh[-1,0]
+            layer_curve_dh.extend(profile_height)
+        layer_curve_relative.extend(curve_sliced_relative)
+
+        pcd_layer+=pcd
+    
+    # get the full layer height
+    if layer!=-1:
+        layer_curve_height=scan_process.dh2height(layer_curve_relative,layer_curve_dh,last_curve_relative,last_curve_height)
     else:
-        last_layer_data_dir=data_dir+'baselayer_'+str(last_layer)+'_'+str(x)+'/'
-else:
-    layer_data_dir=data_dir+'baselayer_'+str(layer)+'_'+str(x)+'/'
-    last_layer_data_dir=data_dir+'baselayer_'+str(last_layer)+'_'+str(x)+'/'
-out_scan_dir = layer_data_dir+'scans/'
-last_out_scan_dir = last_layer_data_dir+'scans/'
+        layer_curve_height=np.zeros(len(layer_curve_relative))
+    
+    last_pcd=pcd_layer
+    last_curve_height=layer_curve_height
+    last_curve_relative=layer_curve_relative
 
-if not baselayer:
-    curve_sliced_relative=np.loadtxt(curve_data_dir+'curve_sliced_relative/slice'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
-    curve_sliced_js=np.loadtxt(curve_data_dir+'curve_sliced_js/MA2010_js'+str(layer)+'_'+str(x)+'.csv',delimiter=',').reshape((-1,6))
-    positioner_js=np.loadtxt(curve_data_dir+'curve_sliced_js/D500B_js'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
-else:
-    curve_sliced_relative=np.loadtxt(curve_data_dir+'curve_sliced_relative/baselayer'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
-    curve_sliced_js=np.loadtxt(curve_data_dir+'curve_sliced_js/MA2010_base_js'+str(layer)+'_'+str(x)+'.csv',delimiter=',').reshape((-1,6))
-    positioner_js=np.loadtxt(curve_data_dir+'curve_sliced_js/D500B_base_js'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
-rob_js_plan = np.hstack((curve_sliced_js,positioner_js))
-
-### robot 1
-weld_q_exe = np.loadtxt(layer_data_dir+'weld_js_exe.csv',delimiter=',')
-if use_actual:
-    curve_sliced_relative=[]
-    for q_out in weld_q_exe[::-1]:
-        Table_home_T = positioner.fwd(q_out[-2:])
-        T_S1TCP_R1Base = np.matmul(positioner.base_H,H_from_RT(Table_home_T.R,Table_home_T.p))
-        T_R1Base_S1TCP = np.linalg.inv(T_S1TCP_R1Base)
-        ### R1 fwd
-        opt_P,opt_H = ph_param_r1.predict(q_out[1:3])
-        robot_weld.robot.P=opt_P
-        robot_weld.robot.H=opt_H
-        robot_T = robot_weld.fwd(q_out[:6])
-        ###
-        T_R1TCP_S1TCP = np.matmul(T_R1Base_S1TCP,H_from_RT(robot_T.R,robot_T.p))
-        # print(robot_T)
-        # input(T_R1TCP_S1TCP[:3,-1])
-        if len(curve_sliced_relative)==0 or np.linalg.norm(T_R1TCP_S1TCP[:3,-1]-curve_sliced_relative[-1][:3])>0.8:
-            if len(curve_sliced_relative)==0 or np.fabs(T_R1TCP_S1TCP[2,-1]-curve_sliced_relative[-1][2])<0.4:
-                curve_sliced_relative.append(np.append(T_R1TCP_S1TCP[:3,-1],T_R1TCP_S1TCP[:3,2]))
-    curve_sliced_relative=curve_sliced_relative[::-1]
-    print("curve len:",len(curve_sliced_relative))
-###########
-
-with open(out_scan_dir+'mti_scans.pickle', 'rb') as file:
-    mti_recording=pickle.load(file)
-q_out_exe=np.loadtxt(out_scan_dir+'scan_js_exe.csv',delimiter=',')
-robot_stamps=np.loadtxt(out_scan_dir+'scan_robot_stamps.csv',delimiter=',')
-
-#### scanning process: processing point cloud and get h
-curve_sliced_relative=np.array(curve_sliced_relative)
-crop_extend=15
-crop_min=tuple(np.min(curve_sliced_relative[:,:3],axis=0)-crop_extend)
-crop_max=tuple(np.max(curve_sliced_relative[:,:3],axis=0)+crop_extend)
-scan_process = ScanProcess(robot_scan,positioner)
-pcd = scan_process.pcd_register_mti(mti_recording,q_out_exe,robot_stamps,use_calib=True,ph_param=ph_param_r2)
-# pcd = scan_process.pcd_register_mti(mti_recording,q_out_exe,robot_stamps,use_calib=False)
-# visualize_pcd([pcd])
-pcd = scan_process.pcd_noise_remove(pcd,nb_neighbors=40,std_ratio=1.5,\
-                                    min_bound=crop_min,max_bound=crop_max,outlier_remove=True,cluster_based_outlier_remove=True,cluster_neighbor=1,min_points=100)
-# visualize_pcd([pcd])
-
-# last pcd
-with open(last_out_scan_dir+'mti_scans.pickle', 'rb') as file:
-    mti_recording=pickle.load(file)
-q_out_exe=np.loadtxt(last_out_scan_dir+'scan_js_exe.csv',delimiter=',')
-robot_stamps=np.loadtxt(last_out_scan_dir+'scan_robot_stamps.csv',delimiter=',')
-#### scanning process: processing point cloud and get h
-curve_sliced_relative=np.array(curve_sliced_relative)
-crop_extend=15
-crop_min=tuple(np.min(curve_sliced_relative[:,:3],axis=0)-crop_extend)
-crop_max=tuple(np.max(curve_sliced_relative[:,:3],axis=0)+crop_extend)
-scan_process = ScanProcess(robot_scan,positioner)
-last_pcd = scan_process.pcd_register_mti(mti_recording,q_out_exe,robot_stamps,use_calib=True,ph_param=ph_param_r2)
-# pcd = scan_process.pcd_register_mti(mti_recording,q_out_exe,robot_stamps,use_calib=False)
-# visualize_pcd([pcd])
-last_pcd = scan_process.pcd_noise_remove(last_pcd,nb_neighbors=40,std_ratio=1.5,\
-                                    min_bound=crop_min,max_bound=crop_max,outlier_remove=True,cluster_based_outlier_remove=True,cluster_neighbor=1,min_points=100)
-# visualize_pcd([pcd])
-
-if use_actual:
-    profile_height = scan_process.pcd2dh(pcd,last_pcd,curve_sliced_relative,drawing=True)
-else:
-    profile_height = scan_process.pcd2dh(pcd,last_pcd,curve_sliced_relative,robot_weld,rob_js_plan,ph_param=ph_param_r1,drawing=True)
-
-
-curve_i=0
-total_curve_i = len(profile_height)
-for curve_i in range(total_curve_i):
-    color_dist = plt.get_cmap("rainbow")(float(curve_i)/total_curve_i)
-    plt.scatter(profile_height[curve_i,0],profile_height[curve_i,1],c=color_dist)
-plt.xlabel('Lambda')
-plt.ylabel('dh to Layer N (mm)')
-plt.title("Height Profile")
-plt.show()
+    curve_i=0
+    layer_curve_dh=np.array(layer_curve_dh)
+    total_curve_i = len(layer_curve_dh)
+    ax = plt.figure().add_subplot()
+    for curve_i in range(total_curve_i):
+        color_dist = plt.get_cmap("rainbow")(float(curve_i)/total_curve_i)
+        ax.scatter(layer_curve_dh[curve_i,0],layer_curve_dh[curve_i,1],c=color_dist)
+    ax.set_xlabel('Lambda')
+    ax.set_ylabel('dh to Layer N (mm)')
+    ax.set_title("dH Profile")
+    plt.ion()
+    plt.show(block=False)
+    
+    curve_i=0
+    total_curve_i = len(layer_curve_height)
+    layer_curve_relative=np.array(layer_curve_relative)
+    lam_curve = calc_lam_cs(layer_curve_relative[:,:3])
+    ax = plt.figure().add_subplot()
+    for curve_i in range(total_curve_i):
+        color_dist = plt.get_cmap("rainbow")(float(curve_i)/total_curve_i)
+        ax.scatter(lam_curve[curve_i],layer_curve_height[curve_i],c=color_dist)
+    ax.set_xlabel('Lambda')
+    ax.set_ylabel('Layer N Height (mm)')
+    ax.set_title("Height Profile")
+    plt.show(block=False)
+    
+    input("Continue? ")

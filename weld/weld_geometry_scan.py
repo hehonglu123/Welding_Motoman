@@ -190,9 +190,8 @@ arc_on=True
 save_weld_record=True
 save_output_points=True
 
-all_profile_height=None
-curve_sliced_relative=None
-all_last_curve_relative=None
+last_layer_curve_relative = []
+last_layer_curve_height = []
 
 ## forward/backward, baselayer/regular layers
 # forward = True
@@ -218,6 +217,8 @@ print("Last Layer:",last_layer)
 print("Layer Count:",layer_count)
 
 mean_layer_dh=None
+
+
 while True:
     print("Layer Count:",layer_count)
 
@@ -228,31 +229,34 @@ while True:
         baselayer=False
     forward=True if layer_count%2==0 else False
 
-    ####### Decide which layer to print #######
-    if all_profile_height is None and layer_count!=-1:
+    ####### Load previous data if start from middle #######
+    if layer_count!=-1 and len(last_layer_curve_relative)==0:
         read_layer=0 if layer<0 else layer
+        
         if baselayer:
             last_num_sections=len(glob.glob(curve_data_dir+'curve_sliced_relative/baselayer'+str(read_layer)+'_*.csv'))
         else:
             last_num_sections=len(glob.glob(curve_data_dir+'curve_sliced_relative/slice'+str(read_layer)+'_*.csv'))
-        all_profile_height=[]
+        
         last_pcd_layer=o3d.geometry.PointCloud()
-        print(last_num_sections)
         for x in range(last_num_sections):
             if baselayer:
-                last_scan_dir=data_dir+'baselayer_'+str(layer)+'_'+str(x)+'/scans/'
+                last_scan_dir=data_dir+'baselayer_'+str(read_layer)+'_'+str(x)+'/scans/'
             else:
-                last_scan_dir=data_dir+'layer_'+str(layer)+'_'+str(x)+'/scans/'
+                last_scan_dir=data_dir+'layer_'+str(read_layer)+'_'+str(x)+'/scans/'
+                
+            # load previous curve
+            last_layer_curve_relative.extend(np.loadtxt(curve_data_dir+'curve_sliced_relative/slice'+str(read_layer)+'_'+str(x)+'.csv',delimiter=','))
+            # load previous pcd
             if layer!=-1:
-                this_sec_dh = np.load(last_scan_dir+'height_profile.npy')
-                nanid = np.argwhere(np.isnan(this_sec_dh[:,1]))
-                if len(nanid)>0:
-                    nanid=nanid[0]
-                    this_sec_dh[nanid,1] = deepcopy(this_sec_dh[nanid+1,1])
-                all_profile_height.extend(this_sec_dh)
-            last_pcd_layer = last_pcd_layer+o3d.io.read_point_cloud(last_scan_dir+'processed_pcd.pcd')
+                last_pcd_layer = last_pcd_layer+o3d.io.read_point_cloud(last_scan_dir+'processed_pcd.pcd')
+            
+        # load previous height
+        if layer!=-1:
+            last_layer_curve_height = np.load('baselayer_'+str(read_layer)+'_0/scans/'+'height_profile.npy')
         visualize_pcd([last_pcd_layer])
-        all_profile_height=np.array(all_profile_height)
+    
+    ####### Decide which layer to print #######
     if baselayer:
         last_layer = layer
         layer = layer_count
@@ -268,14 +272,18 @@ while True:
             # plt.scatter(all_profile_height[:,0],all_profile_height[:,1])
             # plt.show()
             # print(all_profile_height[:,1])
-            mean_layer_dh=np.mean(all_profile_height[:,1])
-            dlayer = int(round(mean_layer_dh/line_resolution)) # find the "delta layer" using dh
-            dlayer = max(10,dlayer)
+            mean_layer_height=np.mean(last_layer_curve_height[:,1])
+            
             last_layer = layer # update last layer
-            layer = layer+dlayer # update layer
-
-            print("Last Mean dh:",mean_layer_dh)
-            print("Last Mean dlayer:",dlayer)
+            
+            # dlayer = int(round(mean_layer_dh/line_resolution)) # find the "delta layer" using dh
+            # dlayer = max(10,dlayer)
+            # layer = layer+dlayer # update layer
+            # print("Last Mean dh:",mean_layer_dh)
+            # print("Last Mean dlayer:",dlayer)
+            
+            layer = int(round(mean_layer_height/line_resolution))
+            print("Last Mean height:",mean_layer_height)
             print("Last Layer:",last_layer)
             print("This Layer:",layer)
 
@@ -286,19 +294,17 @@ while True:
     # if close to total layer
     if layer+layer_height_num>=total_layer:
         dlayer = total_layer-layer
-        des_dh = dlayer*line_resolution
-        if des_dh<print_min_dh: # too close to the total layer
+        if dlayer*line_resolution<print_min_dh: # too close to the total layer
             break
 
     print("Print Layer:",layer,"Foward",forward,"Baselayer",baselayer)
     ####################DETERMINE CURVE ORDER##############################################
-    all_curve_relative=[]
     if not baselayer:
         num_sections=len(glob.glob(curve_data_dir+'curve_sliced_relative/slice'+str(layer)+'_*.csv'))
     else:
         num_sections=len(glob.glob(curve_data_dir+'curve_sliced_relative/baselayer'+str(layer)+'_*.csv'))
+        
     #### welding
-    
     start_section=0
     if layer>=start_weld_layer and not baselayer:
         for x in range(start_section,num_sections):
@@ -323,17 +329,11 @@ while True:
             lam1=calc_lam_js(curve_sliced_js,robot_weld)
             lam2=calc_lam_js(positioner_js,positioner)
             lam_relative=calc_lam_cs(curve_sliced_relative)
+            lam_relative=np.array(lam_relative)
 
             num_points_layer=max(2,int(lam_relative[-1]/waypoint_distance))
 
-            ###find which end to start depending on how close to joint limit
-            # q_prev=robot_client.getJointAnglesDB(positioner.pulse2deg)
-            # if positioner.upper_limit[1]-q_prev[1]>q_prev[1]-positioner.lower_limit[1]:
-            #     breakpoints=np.linspace(0,len(curve_sliced_js)-1,num=num_points_layer).astype(int)
-            # else:
-            #     breakpoints=np.linspace(len(curve_sliced_js)-1,0,num=num_points_layer).astype(int)
-            
-            ## using forward/backward techniqu
+            ## using forward/backward technique
             if forward:
                 breakpoints=np.linspace(0,len(curve_sliced_js)-1,num=num_points_layer).astype(int)
             else:
@@ -344,19 +344,10 @@ while True:
                 this_weld_v=np.ones(len(breakpoints)-1)*planned_v[layer_count]
                 weld_job=planned_job[layer_count]
             else: # start correction after "start_feedback"
-                if all_profile_height is None or all_last_curve_relative is None:
-                    last_num_sections=len(glob.glob(curve_data_dir+'curve_sliced_relative/slice'+str(last_layer)+'_*.csv'))
-                    all_last_curve_relative=[]
-                    for x in range(0,last_num_sections):
-                        all_last_curve_relative.extend(np.loadtxt(curve_data_dir+'curve_sliced_relative/slice'+str(last_layer)+'_'+str(x)+'.csv',delimiter=','))
-                        layer_data_dir=data_dir+'layer_'+str(last_layer)+'_'+str(x)+'/'
-                        out_scan_dir = layer_data_dir+'scans/'
-                    
-                    all_last_curve_relative=np.array(all_last_curve_relative)
 
                 #### correction strategy
                 this_weld_v,all_dh=\
-                    strategy_4(all_profile_height,des_dh,curve_sliced_relative,all_last_curve_relative,breakpoints,max_v=weld_max_v,min_v=weld_min_v,ipm_mode=weld_mode)
+                    strategy_4(last_layer_curve_height,des_dh,curve_sliced_relative,last_layer_curve_relative,breakpoints,max_v=weld_max_v,min_v=weld_min_v,ipm_mode=weld_mode)
                 weld_job=des_job
 
                 ####################
@@ -367,17 +358,18 @@ while True:
 
                 fig, ax1 = plt.subplots()
                 ax2 = ax1.twinx()
-                ax1.scatter(all_profile_height[:,0],all_profile_height[:,1],c='blue',label='Height Layer '+str(layer))
+                ax1.scatter(lam_relative[breakpoints],all_dh,c='blue',label='Height Layer '+str(layer))
                 for bp_i in range(len(breakpoints)-1):
                     ax2.plot([lam_relative[breakpoints[bp_i]],lam_relative[breakpoints[bp_i+1]]],[this_weld_v[bp_i],this_weld_v[bp_i]],'-o')
                 ax1.set_xlabel('X-axis (Lambda) (mm)')
-                ax1.set_ylabel('Height (mm)', color='g')
+                ax1.set_ylabel('dH (mm)', color='g')
                 ax2.set_ylabel('Speed (mm/sec)', color='b')
                 ax1.legend(loc=0)
                 ax2.legend(loc=0)
-                plt.title("Height and Speed, 40 MoveL")
+                plt.title("dH and Speed, 40 MoveL")
                 plt.legend()
-                plt.show()
+                plt.ion()
+                plt.show(block=False)
 
                 # plt.scatter(all_profile_height[:,0],all_profile_height[:,1],c='blue')
                 # for bp_i in range(len(breakpoints)-1):
@@ -443,8 +435,6 @@ while True:
                     np.savetxt(layer_data_dir + 'weld_js_exe.csv',rob_js_exe,delimiter=',')
                     np.savetxt(layer_data_dir + 'weld_robot_stamps.csv',rob_stamps,delimiter=',')
                     rr_sensors.save_all_sensors(layer_data_dir)
-            
-            all_curve_relative.append(curve_sliced_relative)
 
     ## move R1 back to home
     # print(q1_all)
@@ -457,23 +447,10 @@ while True:
             read_layer=0
         else:
             read_layer=layer
-        if len(all_curve_relative) ==0:
-            if not baselayer:
-                num_sections=len(glob.glob(curve_data_dir+'curve_sliced_relative/slice'+str(read_layer)+'_*.csv'))
-                all_curve_relative=[]
-                for x in range(0,num_sections):
-                    all_curve_relative.append(np.loadtxt(curve_data_dir+'curve_sliced_relative/slice'+str(read_layer)+'_'+str(x)+'.csv',delimiter=','))
-            else:
-                num_sections=len(glob.glob(curve_data_dir+'curve_sliced_relative/baselayer'+str(read_layer)+'_*.csv'))
-                all_curve_relative=[]
-                for x in range(0,num_sections):
-                    all_curve_relative.append(np.loadtxt(curve_data_dir+'curve_sliced_relative/baselayer'+str(read_layer)+'_'+str(x)+'.csv',delimiter=','))
-
+            
         pcd_layer=o3d.geometry.PointCloud()
-        all_profile_height=[]
-        all_last_curve_relative=[]
-        section_count=0
-        print(num_sections)
+        layer_curve_relative=[]
+        layer_curve_dh=[]
         for x in range(0,num_sections): 
             ### scanning path module
             spg = ScanPathGen(robot_scan,positioner,scan_stand_off_d,Rz_angle,Ry_angle,bounds_theta)
@@ -487,6 +464,7 @@ while True:
                 curve_sliced_js=np.loadtxt(curve_data_dir+'curve_sliced_js/MA2010_base_js'+str(read_layer)+'_'+str(x)+'.csv',delimiter=',').reshape((-1,6))
                 positioner_js=np.loadtxt(curve_data_dir+'curve_sliced_js/D500B_base_js'+str(read_layer)+'_'+str(x)+'.csv',delimiter=',')
             rob_js_plan = np.hstack((curve_sliced_js,positioner_js))
+            layer_curve_relative
 
             # if len(curve_sliced_relative)<2:
             #     continue
@@ -503,7 +481,6 @@ while True:
             
             ## get breakpoints
             lam_relative=calc_lam_cs(scan_p)
-            print(lam_relative)
             scan_waypoint_distance=10 ## mm
             breakpoints=[0]
             for path_i in range(0,len(lam_relative)):
@@ -514,15 +491,11 @@ while True:
             
             ###find which end to start depending on how close to the current positioner pose
             q_prev=robot_client.getJointAnglesDB(positioner.pulse2deg)
-            print('q prev:',np.degrees(q_prev))
-            print("q out 2 [0]",np.degrees(q_out2[0]))
-            print("q out 2 [-1]",np.degrees(q_out2[-1]))
             if np.linalg.norm(q_prev-q_out2[0])>np.linalg.norm(q_prev-q_out2[-1]):
                 breakpoints=breakpoints[::-1]
 
             # generate motion program
             q_bp1,q_bp2,s1_all,s2_all=spg.gen_motion_program(q_out1,q_out2,scan_p,scan_speed,breakpoints=breakpoints,init_sync_move=0)
-            print(len(q_bp2))
             v1_all=[1]
             v2_all=[1]
             primitives=['movej']
@@ -531,7 +504,6 @@ while True:
                 positioner_w=scan_speed/np.linalg.norm(scan_p[breakpoints[j]][:2])
                 v2_all.append(min(100,100*positioner_w/positioner.joint_vel_limit[1]))
                 primitives.append('movel')
-            print(v1_all)
             #######################################
 
             ######## scanning motion #########
@@ -594,7 +566,6 @@ while True:
             mti_recording=np.array(mti_recording)
             joint_recording=np.array(joint_recording)
             q_out_exe=joint_recording[:,6:]
-            print(np.degrees(q_out_exe[:10]))
             #####################
             # exit()
 
@@ -618,7 +589,7 @@ while True:
             ########################
 
             #### scanning process: processing point cloud and get h
-            curve_sliced_relative=np.array(curve_sliced_relative)
+            # curve_sliced_relative=np.array(curve_sliced_relative)
             crop_extend=15
             crop_min=tuple(np.min(curve_sliced_relative[:,:3],axis=0)-crop_extend)
             crop_max=tuple(np.max(curve_sliced_relative[:,:3],axis=0)+crop_extend)
@@ -628,34 +599,58 @@ while True:
                                                 min_bound=crop_min,max_bound=crop_max,cluster_based_outlier_remove=True,cluster_neighbor=1,min_points=100)
             visualize_pcd([pcd])
             
+            # record dh and curve relative
             if layer!=-1:
-                profile_height = scan_process.pcd2dh(pcd,last_pcd_layer,curve_sliced_relative,robot_weld,rob_js_plan,ph_param=ph_param_r1,drawing=True)
+                profile_dh = scan_process.pcd2dh(pcd,last_pcd_layer,curve_sliced_relative,robot_weld,rob_js_plan,ph_param=ph_param_r1,drawing=True)
             
-                curve_i=0
-                total_curve_i = len(profile_height)
-                for curve_i in range(total_curve_i):
-                    color_dist = plt.get_cmap("rainbow")(float(curve_i)/total_curve_i)
-                    plt.scatter(profile_height[curve_i,0],profile_height[curve_i,1],c=color_dist)
-                plt.xlabel('Lambda')
-                plt.ylabel('dh to Layer N (mm)')
-                plt.title("Height Profile")
-                plt.show()
-                all_profile_height.extend(profile_height)
-                pcd_layer = pcd_layer+pcd
-
-                # all_profile_height.extend(np.array([[0,1],[1,1]]))
-                all_last_curve_relative.extend(curve_sliced_relative)
+                if len(layer_curve_dh)!=0:
+                    profile_dh[:,0]+=layer_curve_dh[-1,0]
+                layer_curve_dh.extend(profile_dh)
+            layer_curve_relative.extend(curve_sliced_relative)
             
+            # save dh and pcd
             if save_output_points:
                 o3d.io.write_point_cloud(out_scan_dir+'processed_pcd.pcd',pcd)
                 if layer!=-1:
-                    np.save(out_scan_dir+'height_profile.npy',profile_height)
-            # exit()
+                    np.save(out_scan_dir+'dh_profile.npy',profile_dh)
 
-            section_count+=1
-        all_profile_height=np.array(all_profile_height)
-        all_last_curve_relative=np.array(all_last_curve_relative)
-        last_pcd_layer=deepcopy(pcd_layer)
+            pcd_layer+=pcd
+
+        # get the full layer height
+        if layer!=-1:
+            layer_curve_height=scan_process.dh2height(layer_curve_relative,layer_curve_dh,last_layer_curve_relative,last_layer_curve_height)
+        else:
+            layer_curve_height=np.zeros(len(layer_curve_relative))
+        
+        last_pcd_layer=pcd_layer
+        last_layer_curve_height=layer_curve_height
+        last_layer_curve_relative=layer_curve_relative
+
+        curve_i=0
+        layer_curve_dh=np.array(layer_curve_dh)
+        total_curve_i = len(layer_curve_dh)
+        ax = plt.figure().add_subplot()
+        for curve_i in range(total_curve_i):
+            color_dist = plt.get_cmap("rainbow")(float(curve_i)/total_curve_i)
+            ax.scatter(layer_curve_dh[curve_i,0],layer_curve_dh[curve_i,1],c=color_dist)
+        ax.set_xlabel('Lambda')
+        ax.set_ylabel('dh to Layer N (mm)')
+        ax.set_title("dH Profile")
+        plt.ion()
+        plt.show(block=False)
+        
+        curve_i=0
+        total_curve_i = len(layer_curve_height)
+        layer_curve_relative=np.array(layer_curve_relative)
+        lam_curve = calc_lam_cs(layer_curve_relative[:,:3])
+        ax = plt.figure().add_subplot()
+        for curve_i in range(total_curve_i):
+            color_dist = plt.get_cmap("rainbow")(float(curve_i)/total_curve_i)
+            ax.scatter(lam_curve[curve_i],layer_curve_height[curve_i],c=color_dist)
+        ax.set_xlabel('Lambda')
+        ax.set_ylabel('Layer N Height (mm)')
+        ax.set_title("Height Profile")
+        plt.show(block=False)
 
     input("Scan Move to Home")
     # move robot to home
