@@ -335,6 +335,8 @@ class ScanProcess():
                 this_points_z = np.sort(this_points_z)[-1*height_ids:]
                 bbox = o3d.geometry.AxisAlignedBoundingBox(min_bound=(-1e5,-1e5,this_points_z[0]),max_bound=(1e5,1e5,1e5))
                 sp_lamx=sp_lamx.crop(bbox)
+                
+                # visualize_pcd([sp_lamx],origin_size=2)
 
                 last_points_z = np.asarray(last_sp_lamx.points)[:,2]
                 if len(last_points_z>0):
@@ -354,9 +356,9 @@ class ScanProcess():
             
             this_dh = np.mean(this_points_z)-np.mean(last_points_z)
 
-            dh_max=7
-            if this_dh>dh_max:
-                this_dh=np.nan
+            # dh_max=7
+            # if this_dh>dh_max:
+            #     this_dh=np.nan
 
             dh.append(this_dh)
 
