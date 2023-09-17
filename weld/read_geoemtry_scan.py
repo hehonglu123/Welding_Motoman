@@ -172,14 +172,23 @@ for layer_count in range(0,total_count):
             pcd = scan_process.pcd_register_mti(mti_recording,q_out_exe,robot_stamps,use_calib=True,ph_param=ph_param_r2)
             # pcd = scan_process.pcd_register_mti(mti_recording,q_out_exe,robot_stamps,use_calib=False)
             # visualize_pcd([pcd])
+            cluser_minp = 300
             while True:
-                pcd = scan_process.pcd_noise_remove(pcd,nb_neighbors=40,std_ratio=1.5,\
-                                                    min_bound=crop_min,max_bound=crop_max,outlier_remove=True,cluster_based_outlier_remove=True,cluster_neighbor=1,min_points=300)
-            
-                visualize_pcd([pcd])
-                q=input("Continue?")
+                pcd_new = scan_process.pcd_noise_remove(pcd,nb_neighbors=40,std_ratio=1.5,\
+                                                    min_bound=crop_min,max_bound=crop_max,outlier_remove=True,cluster_based_outlier_remove=True,cluster_neighbor=1,min_points=cluser_minp)
+                visualize_pcd([pcd_new])
+                while True:
+                    q=input("Continue?")
+                    if q=='':
+                        break
+                    try:
+                        cluser_minp=int(q)
+                        break
+                    except:
+                        continue
                 if q=='':
                     break
+            pcd=pcd_new
                     
         else:
             pcd=o3d.io.read_point_cloud(out_scan_dir+'processed_pcd.pcd')
