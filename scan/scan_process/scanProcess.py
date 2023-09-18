@@ -280,7 +280,7 @@ class ScanProcess():
         #     ang=(n/poly_num)*(np.pi*2)
         #     bounding_polygon.append(np.array([radius*np.cos(ang),radius*np.sin(ang),0]))
         # rectangle
-        y_max=5
+        y_max=7
         bounding_polygon.append(np.array([radius,y_max,0]))
         bounding_polygon.append(np.array([radius,-y_max,0]))
         bounding_polygon.append(np.array([-radius,-y_max,0]))
@@ -356,7 +356,9 @@ class ScanProcess():
             
             this_dh = np.mean(this_points_z)-np.mean(last_points_z)
 
-            # dh_max=7
+            dh_max=7
+            dh_min=-2
+            this_dh = max(min(this_dh,dh_max),dh_min)
             # if this_dh>dh_max:
             #     this_dh=np.nan
 
@@ -409,7 +411,7 @@ class ScanProcess():
         for this_id in range(len(layer_curve_relative)):
             this_p = layer_curve_relative[this_id][:3]
             last_p_id = np.argmin(np.linalg.norm(last_curve_relative[:,:3]-this_p,2,1))
-            p_height = last_curve_height[last_p_id]+layer_curve_dh[last_p_id][1]
+            p_height = last_curve_height[last_p_id]+layer_curve_dh[this_id][1]
             layer_curve_height.append(p_height)
         
         return layer_curve_height

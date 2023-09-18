@@ -389,5 +389,6 @@ data/blade0.1/auto_slice/weld_scan*
 data/wall/dense_slice/weld_scan*
 data/circle_large/static_stepwise/weld_scan*
 data/circle_large/static_stepwise_split/weld_scan*
+data/circle_large/static_stepwise_zero/weld_scan*
 mocap/ge_testbed/data/*
 *.avi

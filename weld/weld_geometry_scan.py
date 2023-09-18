@@ -103,7 +103,7 @@ positioner.robot.H=deepcopy(positioner.calib_H)
 # dataset='blade0.1/'
 # sliced_alg='auto_slice/'
 dataset='circle_large/'
-sliced_alg='static_stepwise_split/'
+sliced_alg='static_stepwise_zero/'
 curve_data_dir = '../data/'+dataset+sliced_alg
 
 current_time = datetime.datetime.now()
@@ -164,6 +164,7 @@ robot_client=MotionProgramExecClient()
 ws=WeldSend(robot_client)
 # weld state logging
 weld_ser = RRN.SubscribeService('rr+tcp://192.168.55.10:60823?service=welder')
+mic_ser = RRN.ConnectService('rr+tcp://192.168.55.20:60828?service=microphone')
 ## RR sensor objects
 rr_sensors = WeldRRSensor(weld_service=weld_ser)
 # MTI connect to RR
@@ -197,10 +198,15 @@ last_layer_curve_height = []
 # forward = True
 # baselayer = False
 
-layer=266
-last_layer=244
-layer_count=11
-start_weld_layer=222
+# layer=-1
+# last_layer=-1
+# layer_count=-1
+# start_weld_layer=0
+
+layer=298
+last_layer=274
+layer_count=13
+start_weld_layer=323
 
 # try:
 #     layer_count=len(glob.glob(data_dir+'layer_*_0'))+1
@@ -208,7 +214,7 @@ start_weld_layer=222
 #     pass
 
 manual_dh=False
-correction=True
+correction=False
 
 print("Planned V (first 10):",planned_v[:10])
 print("Planned Job (first 10):",planned_job[:10])
@@ -217,7 +223,6 @@ print("Last Layer:",last_layer)
 print("Layer Count:",layer_count)
 
 mean_layer_dh=None
-
 
 while True:
     print("Layer Count:",layer_count)
@@ -250,10 +255,11 @@ while True:
             # load previous pcd
             if layer!=-1:
                 last_pcd_layer = last_pcd_layer+o3d.io.read_point_cloud(last_scan_dir+'processed_pcd.pcd')
+        last_layer_curve_relative=np.array(last_layer_curve_relative)
             
         # load previous height
         if layer!=-1:
-            last_layer_curve_height = np.load('baselayer_'+str(read_layer)+'_0/scans/'+'height_profile.npy')
+            last_layer_curve_height = np.load(data_dir+'layer_'+str(read_layer)+'_0/scans/'+'height_profile.npy')
         visualize_pcd([last_pcd_layer])
     
     ####### Decide which layer to print #######
@@ -272,7 +278,7 @@ while True:
             # plt.scatter(all_profile_height[:,0],all_profile_height[:,1])
             # plt.show()
             # print(all_profile_height[:,1])
-            mean_layer_height=np.mean(last_layer_curve_height[:,1])
+            mean_layer_height=np.mean(last_layer_curve_height)
             
             last_layer = layer # update last layer
             
@@ -299,10 +305,14 @@ while True:
 
     print("Print Layer:",layer,"Foward",forward,"Baselayer",baselayer)
     ####################DETERMINE CURVE ORDER##############################################
-    if not baselayer:
-        num_sections=len(glob.glob(curve_data_dir+'curve_sliced_relative/slice'+str(layer)+'_*.csv'))
+    if layer<0:
+        read_layer=0
     else:
-        num_sections=len(glob.glob(curve_data_dir+'curve_sliced_relative/baselayer'+str(layer)+'_*.csv'))
+        read_layer=layer
+    if not baselayer:
+        num_sections=len(glob.glob(curve_data_dir+'curve_sliced_relative/slice'+str(read_layer)+'_*.csv'))
+    else:
+        num_sections=len(glob.glob(curve_data_dir+'curve_sliced_relative/baselayer'+str(read_layer)+'_*.csv'))
         
     #### welding
     start_section=0
@@ -490,7 +500,7 @@ while True:
                 breakpoints.append(len(lam_relative)-1)
             
             ###find which end to start depending on how close to the current positioner pose
-            q_prev=robot_client.getJointAnglesDB(positioner.pulse2deg)
+            q_prev=ws.client.getJointAnglesDB(positioner.pulse2deg)
             if np.linalg.norm(q_prev-q_out2[0])>np.linalg.norm(q_prev-q_out2[-1]):
                 breakpoints=breakpoints[::-1]
 
@@ -528,7 +538,7 @@ while True:
             mp = MotionProgram(ROBOT_CHOICE='RB2',ROBOT_CHOICE2='ST1',pulse2deg=robot_scan.pulse2deg,pulse2deg_2=positioner.pulse2deg)
             target2=['MOVJ',np.degrees(q_bp2[0][0]),to_start_speed]
             mp.MoveJ(np.degrees(q_bp1[0][0]), to_start_speed, 0, target2=target2)
-            robot_client.execute_motion_program(mp)
+            ws.client.execute_motion_program(mp)
 
             ## motion start
             mp = MotionProgram(ROBOT_CHOICE='RB2',ROBOT_CHOICE2='ST1',pulse2deg=robot_scan.pulse2deg,pulse2deg_2=positioner.pulse2deg)
@@ -539,9 +549,9 @@ while True:
             target2=['MOVJ',np.degrees(q_bp2[-1][0]),v2_all[-1]]
             mp.MoveL(np.degrees(q_bp1[-1][0]), v1_all[-1], 0, target2=target2)
 
-            robot_client.execute_motion_program_nonblocking(mp)
+            ws.client.execute_motion_program_nonblocking(mp)
             ###streaming
-            robot_client.StartStreaming()
+            ws.client.StartStreaming()
             start_time=time.time()
             state_flag=0
             joint_recording=[]
@@ -552,7 +562,7 @@ while True:
             while True:
                 if state_flag & STATUS_RUNNING == 0 and time.time()-start_time>1.:
                     break 
-                res, fb_data = robot_client.fb.try_receive_state_sync(robot_client.controller_info, 0.001)
+                res, fb_data = ws.client.fb.try_receive_state_sync(ws.client.controller_info, 0.001)
                 if res:
                     joint_angle=np.hstack((fb_data.group_state[0].feedback_position,fb_data.group_state[1].feedback_position,fb_data.group_state[2].feedback_position))
                     state_flag=fb_data.controller_flags
@@ -561,7 +571,7 @@ while True:
                     robot_stamps.append(timestamp)
                     ###MTI scans YZ point from tool frame
                     mti_recording.append(deepcopy(np.array([mti_client.lineProfile.X_data,mti_client.lineProfile.Z_data])))
-            robot_client.servoMH(False)
+            ws.client.servoMH(False)
             
             mti_recording=np.array(mti_recording)
             joint_recording=np.array(joint_recording)
@@ -627,6 +637,7 @@ while True:
                 o3d.io.write_point_cloud(out_scan_dir+'processed_pcd.pcd',pcd)
                 if layer!=-1:
                     np.save(out_scan_dir+'dh_profile.npy',profile_dh)
+                    
 
             pcd_layer+=pcd
 
@@ -636,9 +647,12 @@ while True:
         else:
             layer_curve_height=np.zeros(len(layer_curve_relative))
         
-        last_pcd_layer=pcd_layer
-        last_layer_curve_height=layer_curve_height
-        last_layer_curve_relative=layer_curve_relative
+        # update
+        last_pcd_layer=deepcopy(pcd_layer)
+        last_layer_curve_height=np.array(layer_curve_height)
+        last_layer_curve_relative=np.array(layer_curve_relative)
+
+        np.save(out_scan_dir+'height_profile.npy',last_layer_curve_height)
 
         curve_i=0
         layer_curve_dh=np.array(layer_curve_dh)
@@ -668,7 +682,8 @@ while True:
 
     input("Scan Move to Home")
     # move robot to home
-    ws.jog_dual(robot_scan,positioner,[R2_mid,R2_home],[0,q_prev[1]],v=to_home_speed)
+    # ws.jog_dual(robot_scan,positioner,[R2_mid,R2_home],[0,q_prev[1]],v=to_home_speed)
+    ws.jog_single(robot_scan,R2_home,v=to_home_speed)
     
     ## increase layer count
     layer_count+=1
