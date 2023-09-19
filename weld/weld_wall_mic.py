@@ -139,7 +139,7 @@ ws=WeldSend(robot_client)
 # weld state logging
 
 ########################################################RR FLIR########################################################
-cam_ser=RRN.ConnectService('rr+tcp://192.168.55.10:60827/?service=camera')
+# cam_ser=RRN.ConnectService('rr+tcp://192.168.55.10:60827/?service=camera')
 ### debug ###
 ########################################################RR CURRENT########################################################
 current_ser=RRN.SubscribeService('rr+tcp://192.168.55.21:12182?service=Current')
@@ -155,9 +155,9 @@ rr_sensors = WeldRRSensor(weld_service=weld_ser,cam_service=cam_ser,microphone_s
 # print('###对传感器赋值')
 ### debug ###
 # test sensor (camera, microphone)
-# print("Test 3 Sec.")
-# rr_sensors.test_all_sensors()
-# print(len(rr_sensors.ir_recording))
+print("Test 3 Sec.")
+rr_sensors.test_all_sensors()
+print(len(rr_sensors.ir_recording))
 # exit()
 ###############
 ### debug ###
@@ -186,7 +186,7 @@ r2_mid = np.radians([43.7851,20,-10,0,0,0])
 # r2_mid = [0,0,0,0,0,0]
 # r2_ir_q = np.zeros(6)
 
-weld_arcon=False
+weld_arcon=True
 
 end_layer = len(weld_z_height)
 if use_previous_cmd:
@@ -212,7 +212,7 @@ for i in range(0,end_layer):
     weld_st = time.time()
     if (profile_height is not None) and (i==2):
         mean_h_base = np.mean(profile_height[:,1])
-    if i>=0 and True:
+    if i>= 0 and True:
         weld_plan_st = time.time()
         if i>=2:
             base_layer=False
@@ -443,9 +443,9 @@ for i in range(0,end_layer):
         wm.audio_denoise(layer_data_dir)
         std_value_co1, std_value_co2, scan_flag = wm.audio_MFCC(layer_data_dir)
         if scan_flag == True:
-            print('Defect identified, correction is needed!!')
+            input('Defect identified, correction is needed!! Press enter to continue')
         else:
-            print('Everything looks good, will keep welding!!')
+            input('Everything looks good, will keep welding!! Press enter to continue')
         ### debug ###
     # exit()
     if i <= 2 or scan_flag == True:
@@ -458,14 +458,15 @@ for i in range(0,end_layer):
     if i <= 2 or scan_flag == True:
         scan_st = time.time()
         if curve_sliced_relative is None:
-            data_dir='../data/wall_weld_test/weld_scan_2023_08_02_17_07_02/'
-            last_profile_height=np.load('../data/wall_weld_test/weld_scan_2023_08_02_17_07_02/layer_17/scans/height_profile.npy')
-            last_mean_h=np.mean(last_profile_height[:,1])
-            h_largest=np.max(last_profile_height[:,1])
+            data_dir='../data/wall_weld_test/weld_scan_2023_09_18_11_19_26/'
+            # last_profile_height=np.load('../data/wall_weld_test/weld_scan_2023_08_02_17_07_02/layer_17/scans/height_profile.npy')
+            # last_mean_h=np.mean(last_profile_height[:,1])
+            # h_largest=np.max(last_profile_height[:,1])
             layer_data_dir=data_dir+'layer_'+str(i)+'/'
-            curve_sliced_relative=[np.array([ 3.30446707e+01,  1.72700000e+00,  4.36704154e+01,  1.55554573e-04,
-       -6.31394918e-20, -9.99881509e-01]), np.array([-3.19476273e+01,  1.72700000e+00,  4.36704154e+01,  1.55554573e-04,
+            curve_sliced_relative=[np.array([ 4.30470636e+01,  1.72700000e+00,  9.05500874e-01,  1.55554573e-04,
+       -6.31394918e-20, -9.99881509e-01]), np.array([-4.19428647e+01,  1.72700000e+00,  8.92278735e-01,  1.55554573e-04,
        -6.31394918e-20, -9.99881509e-01])]
+            h_largest=curve_sliced_relative[0][2]-3
             input("Start Scanning")
 
         scan_plan_st = time.time()
@@ -500,7 +501,7 @@ for i in range(0,end_layer):
         scan_motion_st = time.time()
         ######## scanning motion #########
         ### execute motion ###
-        robot_client=MotionProgramExecClient()
+        # robot_client=MotionProgramExecClient()
         # input("Press Enter and move to scanning startint point")
 
         ## move to start
@@ -533,7 +534,7 @@ for i in range(0,end_layer):
         while True:
             if state_flag & STATUS_RUNNING == 0 and time.time()-start_time>1.:
                 break 
-            res, fb_data = robot_client.fb.try_receive_state_sync(robot_client.controller_info, 0.001)
+            res, fb_data = ws.client.fb.try_receive_state_sync(ws.client.controller_info, 0.001)
             if res:
                 joint_angle=np.hstack((fb_data.group_state[0].feedback_position,fb_data.group_state[1].feedback_position,fb_data.group_state[2].feedback_position))
                 state_flag=fb_data.controller_flags
@@ -542,7 +543,7 @@ for i in range(0,end_layer):
                 robot_stamps.append(timestamp)
                 ###MTI scans YZ point from tool frame
                 mti_recording.append(deepcopy(np.array([mti_client.lineProfile.X_data,mti_client.lineProfile.Z_data])))
-        robot_client.servoMH(False)
+        ws.client.servoMH(False)
         
         mti_recording=np.array(mti_recording)
         joint_recording=np.array(joint_recording)
@@ -602,7 +603,7 @@ for i in range(0,end_layer):
         #                     [-7.29664987e-06,  9.99997907e-01, -2.04583032e-03, -3.05341146e-03],
         #                     [ 7.13309345e-03,  2.04583032e-03,  9.99972466e-01,  1.49246365e+00],
         #                     [ 0.00000000e+00,  0.00000000e+00,  0.00000000e+00,  1.00000000e+00]])
-        z_height_start=h_largest-3
+        z_height_start=h_largest-6
         crop_extend=10
         crop_min=(curve_x_end-crop_extend,-30,-10)
         crop_max=(curve_x_start+crop_extend,30,z_height_start+30)
