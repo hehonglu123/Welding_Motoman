@@ -273,7 +273,7 @@ for i in range(0,end_layer):
 
 
         else: # start correction from 2nd top layer
-            if i >2 and scan_flag == True:
+            if i > 2 and scan_flag == True:
                 if profile_height is None:
                     data_dir='../data/wall_weld_test/weld_scan_2023_08_02_15_17_25/'
                     print("Using data:",data_dir)
@@ -333,7 +333,7 @@ for i in range(0,end_layer):
                 path_T.insert(0,Transform(path_T[0].R,path_T[0].p+np.array([0,0,10])))
                 path_T.append(Transform(path_T[-1].R,path_T[-1].p+np.array([0,0,10])))
             else:
-                h_target = mean_h_base + ((i-2) * input_dh)
+                h_target = mean_h_base +np.array((i-2) * input_dh)
 
                 dh_direction = np.array([0,0,h_target-curve_sliced_relative[0][2]])
                 dh_direction_R1 = T_R1Base_S1TCP[:3,:3]@dh_direction
@@ -440,12 +440,19 @@ for i in range(0,end_layer):
         print("Weld Time:",time.time()-weld_st)
         ### debug ###
         # print('###声音数据处理')
-        wm.audio_denoise(layer_data_dir)
-        std_value_co1, std_value_co2, scan_flag = wm.audio_MFCC(layer_data_dir)
-        if scan_flag == True:
-            input('Defect identified, correction is needed!! Press enter to continue')
+        try:
+            wm.audio_denoise(layer_data_dir)
+            std_value_co1, std_value_co2, scan_flag = wm.audio_MFCC(layer_data_dir)
+        except:
+            scan_flag = False 
+            print(f'Microphone is disconnected! {i}layer data lost!')
+        if i <= 2:
+            input('No defect identification in baselayers')
         else:
-            input('Everything looks good, will keep welding!! Press enter to continue')
+            if scan_flag == True:
+                input('Defect identified, correction is needed!! Press enter to continue')
+            else:
+                input('Everything looks good, will keep welding!! Press enter to continue')
         ### debug ###
     # exit()
     if i <= 2 or scan_flag == True:
