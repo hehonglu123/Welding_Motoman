@@ -92,8 +92,9 @@ regen_pcd = False
 
 #### data directory
 dataset='circle_large/'
-sliced_alg='static_stepwise_zero/'
+sliced_alg='static_stepwise_shift/'
 curve_data_dir = '../data/'+dataset+sliced_alg
+# data_dir=curve_data_dir+'weld_scan_baseline_2023_09_18_16_17_34'+'/'
 data_dir=curve_data_dir+'weld_scan_correction_2023_09_18_14_35_10'+'/'
 
 #### welding spec, goal
@@ -124,6 +125,8 @@ last_curve_height = []
 all_pcd=o3d.geometry.PointCloud()
 viz_obj=[]
 Transz0_H=None
+
+dh_std=[]
 for layer_count in range(0,total_count):
     baselayer=False
     # if layer_count!= 0 and layer_count<=total_baselayer:
@@ -223,32 +226,32 @@ for layer_count in range(0,total_count):
     
     layer_curve_relative=np.array(layer_curve_relative)
     
-    curve_p=[]
-    curve_R=[]
-    curve_i=0
-    for curve_wp in layer_curve_relative:
-        if np.all(curve_wp==layer_curve_relative[-1]):
-            wp_R = direction2R(-1*curve_wp[3:],curve_wp[:3]-layer_curve_relative[curve_i-1][:3])
-        else:
-            wp_R = direction2R(-1*curve_wp[3:],layer_curve_relative[curve_i+1][:3]-curve_wp[:3])
-        curve_p.append(curve_wp[:3])
-        curve_R.append(wp_R)
-        curve_i+=1
-    path_viz_frames = visualize_frames(curve_R[:-20],curve_p[:-20],size=1,visualize=False,frame_obj=True)
-    viz_obj.extend(path_viz_frames)
+    # curve_p=[]
+    # curve_R=[]
+    # curve_i=0
+    # for curve_wp in layer_curve_relative:
+    #     if np.all(curve_wp==layer_curve_relative[-1]):
+    #         wp_R = direction2R(-1*curve_wp[3:],curve_wp[:3]-layer_curve_relative[curve_i-1][:3])
+    #     else:
+    #         wp_R = direction2R(-1*curve_wp[3:],layer_curve_relative[curve_i+1][:3]-curve_wp[:3])
+    #     curve_p.append(curve_wp[:3])
+    #     curve_R.append(wp_R)
+    #     curve_i+=1
+    # path_viz_frames = visualize_frames(curve_R[:-20],curve_p[:-20],size=1,visualize=False,frame_obj=True)
+    # viz_obj.extend(path_viz_frames)
 
-    curve_i=0
     layer_curve_dh=np.array(layer_curve_dh)
-    total_curve_i = len(layer_curve_dh)
-    ax = plt.figure().add_subplot()
-    for curve_i in range(total_curve_i):
-        color_dist = plt.get_cmap("rainbow")(float(curve_i)/total_curve_i)
-        ax.scatter(layer_curve_dh[curve_i,0],layer_curve_dh[curve_i,1],c=color_dist)
-    ax.set_xlabel('Lambda')
-    ax.set_ylabel('dh to Layer N (mm)')
-    ax.set_title("dH Profile")
-    plt.ion()
-    plt.show(block=False)
+    # curve_i=0
+    # total_curve_i = len(layer_curve_dh)
+    # ax = plt.figure().add_subplot()
+    # for curve_i in range(total_curve_i):
+    #     color_dist = plt.get_cmap("rainbow")(float(curve_i)/total_curve_i)
+    #     ax.scatter(layer_curve_dh[curve_i,0],layer_curve_dh[curve_i,1],c=color_dist)
+    # ax.set_xlabel('Lambda')
+    # ax.set_ylabel('dh to Layer N (mm)')
+    # ax.set_title("dH Profile")
+    # plt.ion()
+    # plt.show(block=False)
     
     # curve_i=0
     # total_curve_i = len(layer_curve_height)
@@ -263,10 +266,16 @@ for layer_count in range(0,total_count):
     # ax.set_title("Height Profile")
     # plt.show(block=False)
     
-    input("Continue? ")
+    # input("Continue? ")
     # viz_list=deepcopy(viz_obj)
     # viz_list.append(all_pcd)
     # visualize_pcd(viz_list)
+    
+    if layer!=-1:
+        dh_std.append(np.std(layer_curve_dh[:,1]))
 
-viz_obj.append(all_pcd)
-visualize_pcd(viz_obj)
+# save std data
+np.save(data_dir+'height_std.npy',dh_std)
+
+# viz_obj.append(all_pcd)
+# visualize_pcd(viz_obj)
