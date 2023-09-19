@@ -201,7 +201,7 @@ for layer_count in range(0,total_count):
         # dh plot
         if layer!=-1:
             # profile_height = scan_process.pcd2dh(pcd,last_pcd,curve_sliced_relative,robot_weld,rob_js_plan,ph_param=ph_param_r1,drawing=True)
-            profile_height = scan_process.pcd2dh(pcd,curve_sliced_relative,drawing=True)
+            profile_height = scan_process.pcd2dh(pcd,curve_sliced_relative,drawing=False)
             if len(layer_curve_dh)!=0:
                 profile_height[:,0]+=layer_curve_dh[-1,0]
             layer_curve_dh.extend(profile_height)

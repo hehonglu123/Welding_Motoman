@@ -219,6 +219,8 @@ manual_dh=False
 correction=False
 recal_dh=False
 
+start_shift=False
+
 print("Planned V (first 10):",planned_v[:10])
 print("Planned Job (first 10):",planned_job[:10])
 print("Start Layer:",layer)
@@ -247,6 +249,7 @@ while True:
             last_num_sections=len(glob.glob(curve_data_dir+'curve_sliced_relative/slice'+str(read_layer)+'_*.csv'))
         
         last_pcd_layer=o3d.geometry.PointCloud()
+        layer_curve_dh=[]
         for x in range(last_num_sections):
             if baselayer:
                 last_scan_dir=data_dir+'baselayer_'+str(read_layer)+'_'+str(x)+'/scans/'
@@ -258,11 +261,15 @@ while True:
             # load previous pcd
             if layer!=-1:
                 last_pcd_layer = last_pcd_layer+o3d.io.read_point_cloud(last_scan_dir+'processed_pcd.pcd')
+                profile_dh = np.load(last_scan_dir+'height_profile.npy')
+                layer_curve_dh.extend(profile_dh)
+                
         last_layer_curve_relative=np.array(last_layer_curve_relative)
+        layer_curve_dh=np.array(layer_curve_dh)
             
         # load previous height
-        if layer!=-1:
-            layer_curve_dh = np.load(data_dir+'layer_'+str(read_layer)+'_0/scans/'+'height_profile.npy')
+        # if layer!=-1:
+        #     layer_curve_dh = np.load(data_dir+'layer_'+str(read_layer)+'_0/scans/'+'height_profile.npy')
         visualize_pcd([last_pcd_layer])
     
     ####### Decide which layer to print #######
@@ -284,9 +291,12 @@ while True:
             # mean_layer_height=np.mean(last_layer_curve_height)
             # last_layer = layer # update last layer
             
-            mean_layer_dh=np.mean(layer_curve_dh)
-            dlayer = int(round(mean_layer_dh/line_resolution)) # find the "delta layer" using dh
-            dlayer = max(10,dlayer)
+            mean_layer_dh=np.mean(layer_curve_dh[:,1])
+            if not start_shift:
+                dlayer = int(round(mean_layer_dh/line_resolution)) # find the "delta layer" using dh
+            else:
+                dlayer = np.ceil(mean_layer_dh/line_resolution/2)*2-1 # enforce a odd dlayer for shift
+            dlayer = max(9,dlayer)
             last_layer=layer
             layer = layer+dlayer # update layer
             print("Last Mean dh:",mean_layer_dh)
@@ -362,6 +372,7 @@ while True:
                 
                 if recal_dh:
                     profile_dh = scan_process.pcd2dh(last_pcd_layer,curve_sliced_relative,drawing=True)
+                    layer_curve_dh = profile_dh
                     last_layer_curve_relative=deepcopy(curve_sliced_relative)
 
                 #### correction strategy
@@ -652,7 +663,6 @@ while True:
                 if layer!=-1:
                     np.save(out_scan_dir+'height_profile.npy',profile_dh)
                     
-
             pcd_layer+=pcd
         
         # update

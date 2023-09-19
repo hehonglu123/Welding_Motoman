@@ -354,6 +354,7 @@ def strategy_3(profile_height,input_dh,curve_sliced_relative,R_S1TCP,num_l,noise
 def strategy_4(profile_height,des_dh,curve_sliced_relative,last_curve_sliced_relative,breakpoints,max_v=1000,min_v=1,ipm_mode=160):
 
     last_curve_sliced_relative=np.array(last_curve_sliced_relative)
+    profile_height=np.array(profile_height)
     mean_h = np.mean(profile_height[:,1])
     target_h = mean_h+des_dh
     
