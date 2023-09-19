@@ -36,7 +36,7 @@ zero_config=np.zeros(6)
 # print(robot_weld.fwd(zero_config))
 # print(robot_scan.fwd(zero_config))
 ## generate circle path and positioner js
-algo_name = 'static_stepwise_zero'
+algo_name = 'static_stepwise_shift'
 circle_radius=35
 circle_offset=np.radians(-90)
 d_circle_offset = np.radians(0.5)
