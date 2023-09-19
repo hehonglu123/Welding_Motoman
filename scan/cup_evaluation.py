@@ -1,5 +1,6 @@
 import sys,time, copy, yaml
 import open3d as o3d
+from matplotlib import cm
 
 sys.path.append('../toolbox/')
 from utils import *
@@ -49,6 +50,12 @@ def collapse(left_pc,right_pc,target_points):
     
     return np.sum(width,axis=1), collapsed_surface
 
+def error_map_gen(collapsed_surface,target_points):
+    error_map=np.zeros(len(collapsed_surface))
+    for i in range(len(collapsed_surface)):
+        error_map[i]=np.linalg.norm(target_points-collapsed_surface[i],axis=1).min()
+    return error_map
+
 def visualize_pcd(show_pcd_list,point_show_normal=False):
 
     show_pcd_list_legacy=[]
@@ -85,7 +92,7 @@ target_points=o3d.geometry.PointCloud()
 target_points.points=o3d.utility.Vector3dVector(target_points_pc)
 
 
-scanned_dir='../../evaluation/Cup_ER70S6/'
+scanned_dir='../../evaluation/Cup_ER316L/'
 ######## read the scanned stl
 scanned_mesh = o3d.io.read_triangle_mesh(scanned_dir+'cup.stl')
 scanned_mesh.compute_vertex_normals()
@@ -148,3 +155,11 @@ o3d.visualization.draw_geometries([target_points,collapsed_surface_pc,highlight_
 
 print('error max: ',error_off.max(),'error avg: ',np.mean(error_off))
 print(error_miss.max(),np.mean(error_miss))
+
+error_map=error_map_gen(collapsed_surface,target_points_transform)
+print(error_map)
+error_map_normalized=error_map/np.max(error_map)
+#convert normalized error map to color heat map
+error_map_color=cm.inferno(error_map_normalized)[:,:3]
+collapsed_surface_pc.colors=o3d.utility.Vector3dVector(error_map_color)
+o3d.visualization.draw_geometries([collapsed_surface_pc])

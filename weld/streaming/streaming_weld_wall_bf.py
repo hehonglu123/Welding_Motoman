@@ -118,8 +118,8 @@ layer_counts=0
 slice_num=0
 welding_started=False
 ###job=feedrate/10+200
-job_offset=200
-nominal_feedrate=100
+job_offset=400
+nominal_feedrate=150
 nominal_vd_relative=10
 nominal_wire_length=25 #pixels
 nominal_temp_below=500
@@ -307,7 +307,8 @@ while slice_num<slicing_meta['num_layers']:
 			temp_below_avg=np.average(temp_below)
 			###proportional feedback
 			# feedrate=min(max(feedrate+1*(nominal_temp_below-temp_below_avg),feedrate_min),feedrate_max)
-			slice_increment=max(nominal_slice_increment+slice_inc_gain*(nominal_wire_length-wire_length_avg),-nominal_slice_increment+2)
+			# slice_increment=max(nominal_slice_increment+slice_inc_gain*(nominal_wire_length-wire_length_avg),-nominal_slice_increment+2)
+			slice_increment=nominal_slice_increment
 			# vd_relative=feedrate/10-3
 			print('WIRE LENGTH: ',wire_length_avg,'TEMP BELOW: ',temp_below_avg,'FEEDRATE: ',feedrate,'VD: ',vd_relative,'SLICE INC: ',slice_increment)
 			slice_num+=int(slice_increment)
