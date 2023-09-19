@@ -1,7 +1,6 @@
 from copy import deepcopy
 from pathlib import Path
-import pickle
-import sys
+import pickle, traceback, time,datetime, sys, glob
 sys.path.append('../toolbox/')
 sys.path.append('../scan/scan_tools/')
 sys.path.append('../scan/scan_plan/')
@@ -19,10 +18,7 @@ import weldmicphone as wm
 from general_robotics_toolbox import *
 from RobotRaconteur.Client import *
 import matplotlib.pyplot as plt
-import time
-import datetime
 import numpy as np
-import glob
 
 def robot_weld_path_gen(all_layer_z,forward_flag,base_layer):
     R=np.array([[-0.7071, 0.7071, -0.    ],
@@ -155,9 +151,9 @@ rr_sensors = WeldRRSensor(weld_service=weld_ser,cam_service=cam_ser,microphone_s
 # print('###对传感器赋值')
 ### debug ###
 # test sensor (camera, microphone)
-print("Test 3 Sec.")
-rr_sensors.test_all_sensors()
-print(len(rr_sensors.ir_recording))
+# print("Test 3 Sec.")
+# rr_sensors.test_all_sensors()
+# print(len(rr_sensors.ir_recording))
 # exit()
 ###############
 ### debug ###
@@ -199,8 +195,8 @@ ws.jog_dual(robot_scan,positioner,[r2_mid,r2_ir_q],np.radians([-15,180]),to_star
 # print('###R2和positioner正在移动到准备位置')
 ### debug ###
 scan_flag = False
-rr_sensors.clear_all_sensors()
-for i in range(0,end_layer):
+# rr_sensors.clear_all_sensors()
+for i in range(3,end_layer):
     cycle_st = time.time()
     print("==================================")
     print("Layer:",i)
@@ -242,7 +238,7 @@ for i in range(0,end_layer):
         # TODO: Add fitering if near threshold
         
         h_largest=this_z_height
-
+        
 
         if (i<=start_correction_layer):
             if (last_mean_h == 0) and (profile_height is not None):
@@ -275,12 +271,12 @@ for i in range(0,end_layer):
         else: # start correction from 2nd top layer
             if i > 2 and scan_flag == True:
                 if profile_height is None:
-                    data_dir='../data/wall_weld_test/weld_scan_2023_08_02_15_17_25/'
+                    data_dir='../data/wall_weld_test/weld_scan_2023_09_19_15_01_00/'
                     print("Using data:",data_dir)
-                    last_profile_height=np.load(data_dir+'layer_21/scans/height_profile.npy')
+                    last_profile_height=np.load(data_dir+'layer_1/scans/height_profile.npy')
                     last_mean_h=np.mean(last_profile_height[:,1])
-                    profile_height=np.load(data_dir+'layer_22/scans/height_profile.npy')
-                
+                    profile_height=np.load(data_dir+'layer_2/scans/height_profile.npy')
+                    mean_h = np.mean(profile_height[:,1])
 
                 ## parameters
                 # noise_h_thres = 3
@@ -333,19 +329,55 @@ for i in range(0,end_layer):
                 path_T.insert(0,Transform(path_T[0].R,path_T[0].p+np.array([0,0,10])))
                 path_T.append(Transform(path_T[-1].R,path_T[-1].p+np.array([0,0,10])))
             else:
+                if profile_height is None:
+                    data_dir='../data/wall_weld_test/weld_scan_2023_09_19_15_01_00/'
+                    print("Using data:",data_dir)
+                    last_profile_height=np.load(data_dir+'layer_1/scans/height_profile.npy')
+                    last_mean_h=np.mean(last_profile_height[:,1])
+                    profile_height=np.load(data_dir+'layer_2/scans/height_profile.npy')   
+                    mean_h = np.mean(profile_height[:,1]) 
+                    mean_h_base = np.mean(profile_height[:,1])          
+                path_T=[]
+                noise_h_thres = 3
+                mean_h = np.mean(profile_height[:,1])
+                profile_height=np.delete(profile_height,np.where(profile_height[:,1]-mean_h>noise_h_thres),axis=0)
+                profile_height=np.delete(profile_height,np.where(profile_height[:,1]-mean_h<-noise_h_thres),axis=0)
                 h_target = mean_h_base +np.array((i-2) * input_dh)
+                h_std = np.std(profile_height[:,1])
+                curve_sliced_relative_correct = []
+                path_T_S1 = []
 
-                dh_direction = np.array([0,0,h_target-curve_sliced_relative[0][2]])
-                dh_direction_R1 = T_R1Base_S1TCP[:3,:3]@dh_direction
-
+                this_weld_v = []
+                all_dh=[]
                 for curve_i in range(len(curve_sliced_relative)):
-                    curve_sliced_relative[curve_i][2]=h_target
-                
-                for path_i in range(len(path_T)):
-                    path_T[path_i].p=path_T[path_i].p+dh_direction_R1
+                    this_p = np.array([curve_sliced_relative[curve_i][0],curve_sliced_relative[curve_i][1],h_target])
+                    curve_sliced_relative_correct.append(np.append(this_p,curve_sliced_relative[curve_i][3:]))
+                    path_T_S1.append(Transform(R_S1TCP,curve_sliced_relative_correct[-1][:3]))
+                for tcp_T in path_T_S1:
+                    this_p = T_R1Base_S1TCP[:3,:3]@tcp_T.p+T_R1Base_S1TCP[:3,-1]
+                    this_R = T_R1Base_S1TCP[:3,:3]@tcp_T.R
+                    path_T.append(Transform(this_R,this_p))
+                curve_sliced_relative = curve_sliced_relative_correct
                 # add path collision avoidance
                 path_T.insert(0,Transform(path_T[0].R,path_T[0].p+np.array([0,0,10])))
-                path_T.append(Transform(path_T[-1].R,path_T[-1].p+np.array([0,0,10])))
+                path_T.append(Transform(path_T[-1].R,path_T[-1].p+np.array([0,0,10])))                
+                # path_T=all_path_T[i]
+                # curve_sliced_relative=[]
+                # for path_p in path_T:
+                #     this_p = np.matmul(T_S1TCP_R1Base[:3,:3],path_p.p)+T_S1TCP_R1Base[:3,-1]
+                #     this_n = np.matmul(T_S1TCP_R1Base[:3,:3],path_p.R[:,-1])
+                #     curve_sliced_relative.append(np.append(this_p,this_n))
+                # h_target = mean_h_base +np.array((i-2) * input_dh)
+
+                # dh_direction = np.array([0,0,h_target-curve_sliced_relative[0][2]])
+                # dh_direction_R1 = T_R1Base_S1TCP[:3,:3]@dh_direction
+
+                # for curve_i in range(len(curve_sliced_relative)):
+                #     curve_sliced_relative[curve_i][2]=h_target
+                
+                # for path_i in range(len(path_T)):
+                #     path_T[path_i].p=path_T[path_i].p+dh_direction_R1
+                # curve_sliced_relative=curve_sliced_relative[1:-1] # the start and end is for collision prevention
         path_q = []
         for tcp_T in path_T:
             path_q.append(robot_weld.inv(tcp_T.p,tcp_T.R,zero_config)[0])
@@ -406,7 +438,19 @@ for i in range(0,end_layer):
             primitives.append('movel')
         ### debug ###
         rr_sensors.start_all_sensors()
+        # try:
+        print(primitives)
+        print(path_q[1:-1])
+        print(np.append(10,this_weld_v))
+        print(len(primitives),len(path_q[1:-1]),len(np.append(10,this_weld_v)))
         rob_stamps,rob_js_exe,_,_=ws.weld_segment_single(primitives,robot_weld,path_q[1:-1],np.append(10,this_weld_v),cond_all=[int(this_job_number)],arc=weld_arcon)
+        # except:
+        #     traceback.print_exc()
+        #     print(primitives)
+        #     print(path_q[1:-1])
+        #     print(np.append(10,this_weld_v))
+        #     print(len(primitives),len(path_q[1:-1]),len(np.append(10,this_weld_v)))
+
         rr_sensors.stop_all_sensors()
         # print('###所有传感器打开')
         # print('###焊接一层')
@@ -447,7 +491,7 @@ for i in range(0,end_layer):
             scan_flag = False 
             print(f'Microphone is disconnected! {i}layer data lost!')
         if i <= 2:
-            input('No defect identification in baselayers')
+            input('No defect identification in baselayers and 1st top layer!! Press enter to continue')
         else:
             if scan_flag == True:
                 input('Defect identified, correction is needed!! Press enter to continue')
