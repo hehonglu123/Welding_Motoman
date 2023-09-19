@@ -217,7 +217,6 @@ Transz0_H=None
 
 manual_dh=False
 correction=False
-recal_dh=False
 
 print("Planned V (first 10):",planned_v[:10])
 print("Planned Job (first 10):",planned_job[:10])
@@ -262,7 +261,7 @@ while True:
             
         # load previous height
         if layer!=-1:
-            layer_curve_dh = np.load(data_dir+'layer_'+str(read_layer)+'_0/scans/'+'height_profile.npy')
+            last_layer_curve_height = np.load(data_dir+'layer_'+str(read_layer)+'_0/scans/'+'height_profile.npy')
         visualize_pcd([last_pcd_layer])
     
     ####### Decide which layer to print #######
@@ -281,20 +280,18 @@ while True:
             # plt.scatter(all_profile_height[:,0],all_profile_height[:,1])
             # plt.show()
             # print(all_profile_height[:,1])
-            # mean_layer_height=np.mean(last_layer_curve_height)
-            # last_layer = layer # update last layer
+            mean_layer_height=np.mean(last_layer_curve_height)
             
-            mean_layer_dh=np.mean(layer_curve_dh)
-            dlayer = int(round(mean_layer_dh/line_resolution)) # find the "delta layer" using dh
-            dlayer = max(10,dlayer)
-            last_layer=layer
-            layer = layer+dlayer # update layer
-            print("Last Mean dh:",mean_layer_dh)
-            print("Last Mean dlayer:",dlayer)
+            last_layer = layer # update last layer
             
-            # layer = int(round(mean_layer_height/line_resolution))
-            # print("Last Mean height:",mean_layer_height)
+            # dlayer = int(round(mean_layer_dh/line_resolution)) # find the "delta layer" using dh
+            # dlayer = max(10,dlayer)
+            # layer = layer+dlayer # update layer
+            # print("Last Mean dh:",mean_layer_dh)
+            # print("Last Mean dlayer:",dlayer)
             
+            layer = int(round(mean_layer_height/line_resolution))
+            print("Last Mean height:",mean_layer_height)
             print("Last Layer:",last_layer)
             print("This Layer:",layer)
 
@@ -360,13 +357,11 @@ while True:
                 weld_job=planned_job[layer_count]
             else: # start correction after "start_feedback"
                 
-                if recal_dh:
-                    profile_dh = scan_process.pcd2dh(last_pcd_layer,curve_sliced_relative,drawing=True)
-                    last_layer_curve_relative=deepcopy(curve_sliced_relative)
+                
 
                 #### correction strategy
                 this_weld_v,all_dh=\
-                    strategy_4(layer_curve_dh,des_dh,curve_sliced_relative,last_layer_curve_relative,breakpoints,max_v=weld_max_v,min_v=weld_min_v,ipm_mode=weld_mode)
+                    strategy_4(last_layer_curve_height,des_dh,curve_sliced_relative,last_layer_curve_relative,breakpoints,max_v=weld_max_v,min_v=weld_min_v,ipm_mode=weld_mode)
                 weld_job=des_job
 
                 ####################
@@ -639,7 +634,7 @@ while True:
             # record dh and curve relative
             if layer!=-1:
                 # profile_dh = scan_process.pcd2dh(pcd,last_pcd_layer,curve_sliced_relative,robot_weld,rob_js_plan,ph_param=ph_param_r1,drawing=True)
-                profile_dh = scan_process.pcd2dh(pcd,curve_sliced_relative,drawing=True)
+                profile_dh = scan_process.pcd2dh(pcd,last_pcd_layer,curve_sliced_relative,drawing=True)
             
                 if len(layer_curve_dh)!=0:
                     profile_dh[:,0]+=layer_curve_dh[-1,0]
@@ -650,14 +645,23 @@ while True:
             if save_output_points:
                 o3d.io.write_point_cloud(out_scan_dir+'processed_pcd.pcd',pcd)
                 if layer!=-1:
-                    np.save(out_scan_dir+'height_profile.npy',profile_dh)
+                    np.save(out_scan_dir+'dh_profile.npy',profile_dh)
                     
 
             pcd_layer+=pcd
+
+        # get the full layer height
+        if layer!=-1:
+            layer_curve_height=scan_process.dh2height(layer_curve_relative,layer_curve_dh,last_layer_curve_relative,last_layer_curve_height)
+        else:
+            layer_curve_height=np.zeros(len(layer_curve_relative))
         
         # update
         last_pcd_layer=deepcopy(pcd_layer)
+        last_layer_curve_height=np.array(layer_curve_height)
         last_layer_curve_relative=np.array(layer_curve_relative)
+
+        np.save(out_scan_dir+'height_profile.npy',last_layer_curve_height)
 
         curve_i=0
         layer_curve_dh=np.array(layer_curve_dh)

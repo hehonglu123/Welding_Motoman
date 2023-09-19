@@ -88,13 +88,13 @@ ph_param_r2.fit(PH_q,method='FBF')
 ph_param_r2=None
 #### load S1 kinematic model
 
-regen_pcd = True
+regen_pcd = False
 
 #### data directory
 dataset='circle_large/'
-sliced_alg='static_stepwise_split/'
+sliced_alg='static_stepwise_zero/'
 curve_data_dir = '../data/'+dataset+sliced_alg
-data_dir=curve_data_dir+'weld_scan_2023_09_12_17_58_14'+'/'
+data_dir=curve_data_dir+'weld_scan_correction_2023_09_18_14_35_10'+'/'
 
 #### welding spec, goal
 with open(curve_data_dir+'slicing.yml', 'r') as file:
@@ -108,7 +108,7 @@ total_print_layer = len(all_layer_dir)
 total_count=total_print_layer
 
 layer_num = []
-for layer_count in range(-1,total_count):
+for layer_count in range(0,total_count):
     # get printed layer number
     layer=all_layer_dir[layer_count].split('/')
     layer=layer[-1]
@@ -121,6 +121,9 @@ layer_num = np.sort(layer_num)
 
 last_curve_relative = []
 last_curve_height = []
+all_pcd=o3d.geometry.PointCloud()
+viz_obj=[]
+Transz0_H=None
 for layer_count in range(0,total_count):
     baselayer=False
     # if layer_count!= 0 and layer_count<=total_baselayer:
@@ -193,9 +196,12 @@ for layer_count in range(0,total_count):
         else:
             pcd=o3d.io.read_point_cloud(out_scan_dir+'processed_pcd.pcd')
         
+        pcd,Transz0_H = scan_process.pcd_calib_z(pcd,Transz0_H=Transz0_H)
+        
         # dh plot
         if layer!=-1:
-            profile_height = scan_process.pcd2dh(pcd,last_pcd,curve_sliced_relative,robot_weld,rob_js_plan,ph_param=ph_param_r1,drawing=True)
+            # profile_height = scan_process.pcd2dh(pcd,last_pcd,curve_sliced_relative,robot_weld,rob_js_plan,ph_param=ph_param_r1,drawing=True)
+            profile_height = scan_process.pcd2dh(pcd,curve_sliced_relative,drawing=True)
             if len(layer_curve_dh)!=0:
                 profile_height[:,0]+=layer_curve_dh[-1,0]
             layer_curve_dh.extend(profile_height)
@@ -204,14 +210,32 @@ for layer_count in range(0,total_count):
         pcd_layer+=pcd
     
     # get the full layer height
-    if layer!=-1:
-        layer_curve_height=scan_process.dh2height(layer_curve_relative,layer_curve_dh,last_curve_relative,last_curve_height)
-    else:
-        layer_curve_height=np.zeros(len(layer_curve_relative))
+    # if layer!=-1:
+    #     layer_curve_height=scan_process.dh2height(layer_curve_relative,layer_curve_dh,last_curve_relative,last_curve_height)
+    # else:
+    #     layer_curve_height=np.zeros(len(layer_curve_relative))
     
     last_pcd=pcd_layer
-    last_curve_height=layer_curve_height
-    last_curve_relative=layer_curve_relative
+    # last_curve_height=layer_curve_height
+    # last_curve_relative=layer_curve_relative
+    
+    all_pcd=all_pcd+last_pcd
+    
+    layer_curve_relative=np.array(layer_curve_relative)
+    
+    curve_p=[]
+    curve_R=[]
+    curve_i=0
+    for curve_wp in layer_curve_relative:
+        if np.all(curve_wp==layer_curve_relative[-1]):
+            wp_R = direction2R(-1*curve_wp[3:],curve_wp[:3]-layer_curve_relative[curve_i-1][:3])
+        else:
+            wp_R = direction2R(-1*curve_wp[3:],layer_curve_relative[curve_i+1][:3]-curve_wp[:3])
+        curve_p.append(curve_wp[:3])
+        curve_R.append(wp_R)
+        curve_i+=1
+    path_viz_frames = visualize_frames(curve_R[:-20],curve_p[:-20],size=1,visualize=False,frame_obj=True)
+    viz_obj.extend(path_viz_frames)
 
     curve_i=0
     layer_curve_dh=np.array(layer_curve_dh)
@@ -226,17 +250,23 @@ for layer_count in range(0,total_count):
     plt.ion()
     plt.show(block=False)
     
-    curve_i=0
-    total_curve_i = len(layer_curve_height)
-    layer_curve_relative=np.array(layer_curve_relative)
-    lam_curve = calc_lam_cs(layer_curve_relative[:,:3])
-    ax = plt.figure().add_subplot()
-    for curve_i in range(total_curve_i):
-        color_dist = plt.get_cmap("rainbow")(float(curve_i)/total_curve_i)
-        ax.scatter(lam_curve[curve_i],layer_curve_height[curve_i],c=color_dist)
-    ax.set_xlabel('Lambda')
-    ax.set_ylabel('Layer N Height (mm)')
-    ax.set_title("Height Profile")
-    plt.show(block=False)
+    # curve_i=0
+    # total_curve_i = len(layer_curve_height)
+    # layer_curve_relative=np.array(layer_curve_relative)
+    # lam_curve = calc_lam_cs(layer_curve_relative[:,:3])
+    # ax = plt.figure().add_subplot()
+    # for curve_i in range(total_curve_i):
+    #     color_dist = plt.get_cmap("rainbow")(float(curve_i)/total_curve_i)
+    #     ax.scatter(lam_curve[curve_i],layer_curve_height[curve_i],c=color_dist)
+    # ax.set_xlabel('Lambda')
+    # ax.set_ylabel('Layer N Height (mm)')
+    # ax.set_title("Height Profile")
+    # plt.show(block=False)
     
     input("Continue? ")
+    # viz_list=deepcopy(viz_obj)
+    # viz_list.append(all_pcd)
+    # visualize_pcd(viz_list)
+
+viz_obj.append(all_pcd)
+visualize_pcd(viz_obj)
