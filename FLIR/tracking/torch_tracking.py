@@ -4,12 +4,14 @@ import numpy as np
 sys.path.append('../../toolbox/')
 from flir_toolbox import *
 
+#load template
+template = cv2.imread('torch_template.png',0)
 
 # Load the IR recording data from the pickle file
-with open('../../../recorded_data/weld_scan_job205_v152023_07_27_13_23_06/layer_150/ir_recording.pickle', 'rb') as file:
+with open('../../../recorded_data/ER316L_wall_streaming_bf/layer_394/ir_recording.pickle', 'rb') as file:
     ir_recording = pickle.load(file)
 
-ir_ts=np.loadtxt('../../../recorded_data/weld_scan_job205_v152023_07_27_13_23_06/layer_150/ir_stamps.csv', delimiter=',')
+ir_ts=np.loadtxt('../../../recorded_data/ER316L_wall_streaming_bf/layer_394/ir_stamps.csv', delimiter=',')
 
 
 # Create a window to display the images
@@ -21,29 +23,24 @@ colorbar_max = np.max(ir_recording)
 
 
 frame=308
-# print(np.max(ir_recording[i]), np.min(ir_recording[i]))
-centroid, bbox=flame_detection(ir_recording[frame])
-
 
 temp=counts2temp(ir_recording[frame].flatten(),6.39661118e+03, 1.40469989e+03, 1.00000008e+00, 8.69393436e+00, 8.40029488e+03,Emiss=0.13).reshape((240,320))
-temp[temp > 1300] = 1300    ##thresholding
+temp[temp > 500] = 500    ##thresholding
 # Normalize the data to [0, 255]
 ir_normalized = ((temp - np.min(temp)) / (np.max(temp) - np.min(temp))) * 255
 
 # ir_normalized = ir_normalized[50:-50, 50:-50]
-ir_normalized=np.clip(ir_normalized, 0, 255)
+ir_normalized=np.clip(ir_normalized, 0, 255).astype(np.uint8)
+
+max_loc=torch_detect(ir_normalized,template)
+
 
 # Convert the IR image to BGR format with the inferno colormap
-ir_bgr = cv2.applyColorMap(ir_normalized.astype(np.uint8), cv2.COLORMAP_INFERNO)
+ir_bgr = cv2.applyColorMap(ir_normalized, cv2.COLORMAP_INFERNO)
+
 
 # add bounding box
-if centroid is not None:
-    # cv2.rectangle(ir_bgr, (bbox[0],bbox[1]), (bbox[0]+bbox[2],bbox[1]+bbox[3]), (0,255,0), thickness=1)   #flame bbox
-    bbox_below_size=10
-    centroid_below=(int(centroid[0]+bbox[2]/2+bbox_below_size/2),centroid[1])
-    cv2.rectangle(ir_bgr, (int(centroid_below[0]-bbox_below_size/2),int(centroid_below[1]-bbox_below_size/2)), (int(centroid_below[0]+bbox_below_size/2),int(centroid_below[1]+bbox_below_size/2)), (0,255,0), thickness=1)   #flame below centroid
-
-cv2.rectangle(ir_bgr, (50,110,95,60), (255,0,0), thickness=1)   #flame below centroid
+cv2.rectangle(ir_bgr, max_loc, (max_loc[0] + template.shape[1], max_loc[1] + template.shape[0]), (0,255,0), 2)
 
 
 # Display the IR image
@@ -54,4 +51,4 @@ cv2.waitKey()
 # Close the window after the loop is completed
 cv2.destroyAllWindows()
 
-np.save('torch_template.npy',ir_recording[frame][110:170,50:145])
+# np.save('torch_template.npy',ir_normalized[110:175,40:145])
