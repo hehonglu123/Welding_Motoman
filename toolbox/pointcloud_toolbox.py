@@ -1,5 +1,5 @@
 import open3d as o3d
-
+from sklearn.decomposition import PCA
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import colors as mcolors
@@ -8,41 +8,51 @@ from copy import deepcopy
 import colorsys
 import math
 import pickle
-
-def icp_align2(source_points,target_points,H=np.eye(4),icp_turns = 1,threshold=5,max_iteration=1000):
-    ###find transformation from pc1 to pc2 with ICP, with initial guess H
-    # Convert numpy arrays to Open3D point cloud format
-    source_cloud = o3d.geometry.PointCloud()
-    source_cloud.points = o3d.utility.Vector3dVector(source_points)
-
-    target_cloud = o3d.geometry.PointCloud()
-    target_cloud.points = o3d.utility.Vector3dVector(target_points)
-
-    for i in range(icp_turns):
-        icp_iteration = o3d.pipelines.registration.registration_icp(
-            source_cloud, target_cloud,init=H, max_correspondence_distance=1.5,
-            estimation_method=o3d.pipelines.registration.TransformationEstimationPointToPoint(),
-            criteria=o3d.pipelines.registration.ICPConvergenceCriteria(relative_fitness=1.000000e-06, relative_rmse=1.000000e-06, max_iteration=max_iteration))
-        H = icp_iteration.transformation
-        print(icp_iteration)
-    return H
+from utils import *
+from scipy.spatial import KDTree
 
 
-def icp_align(pc1,pc2,H=np.eye(4),icp_turns = 1,threshold=5,max_iteration=1000):
-    ###find transformation from pc1 to pc2 with ICP, with initial guess H
-    pc1_o3d=o3d.geometry.PointCloud()
-    pc1_o3d.points = o3d.utility.Vector3dVector(pc1)
-    pc2_o3d=o3d.geometry.PointCloud()
-    pc2_o3d.points = o3d.utility.Vector3dVector(pc2)
-    for i in range(icp_turns):
-        reg_p2p = o3d.pipelines.registration.registration_icp(
-                    pc1_o3d, pc2_o3d, threshold, H,
-                    o3d.pipelines.registration.TransformationEstimationPointToPoint(),
-                    o3d.pipelines.registration.ICPConvergenceCriteria(max_iteration=max_iteration))
-        print(reg_p2p)
-        pc1_o3d=pc1_o3d.transform(reg_p2p.transformation)
-        H = reg_p2p.transformation@H
-    return H
+def global_alignment(pc1,pc2):
+    ###align pc1 to pc2 with PCA
+    pca1 = PCA()
+    pca1.fit(np.array(pc1))
+    R1 = pca1.components_.T
+    pca2 = PCA()
+    pca2.fit(np.array(pc2))
+    R2 = pca2.components_.T
+
+    #make sure the rotation matrix is right-handed
+    if np.cross(R1[:,0],R1[:,1])@R1[:,2]<0:
+        R1[:,2]=-R1[:,2]   
+    if np.cross(R2[:,0],R2[:,1])@R2[:,2]<0:
+        R2[:,2]=-R2[:,2]
+
+    R=R2@R1.T
+    p=np.mean(np.array(pc2),axis=0)-np.mean(pc1@R.T,axis=0)
+
+    pc1_transformed=pc1@R.T+p
+    kdtree = KDTree(pc2)
+    distances, indices = kdtree.query(pc1_transformed)
+    rmse = np.sqrt(np.mean(np.square(distances)))
+
+    min_rmse=rmse
+    R_best=R
+    p_best=p
+    ###rotate about x,y,z axis to find minimum rmse
+    for R1 in [R1@Rx(np.pi),R1@Ry(np.pi),R1@Rz(np.pi)]:
+        R=R2@R1.T
+        p=np.mean(np.array(pc2),axis=0)-np.mean(pc1@R.T,axis=0)
+        pc1_transformed=pc1@R.T+p
+        kdtree = KDTree(pc2)
+        distances, indices = kdtree.query(pc1_transformed)
+        rmse = np.sqrt(np.mean(np.square(distances)))
+        if rmse<min_rmse:
+            min_rmse=rmse
+            R_best=R
+            p_best=p
+    
+    return R_best,p_best
+
 
 def colormap(all_h):
 
