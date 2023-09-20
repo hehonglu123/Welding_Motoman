@@ -1,5 +1,8 @@
 Convergent Manufacturing for WAAM Process
 
+# Dependencies
+`python311 -m pip install -r requirements.txt`
+
 # Usage
 ## INFORM 
 * [DX200 Driver](https://github.com/hehonglu123/dx200_motion_progam_exec):   Create Motoman INFORM code (*.JBI) and upload it to the robot controller
