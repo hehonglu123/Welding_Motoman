@@ -99,5 +99,3 @@ def audio_MFCC(file_path):
     else:
         print(f"Path '{file_path}' does not exist!")
         
-# You can now call the function like this:
-# audio_MFCC('../data/wall_weld_test/weld_scan_2023_07_17_16_30_34/')

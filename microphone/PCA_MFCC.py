@@ -14,7 +14,7 @@ std_co1 = []
 std_co2 = []
 std_value_co1 = []
 std_value_co2 = []
-base_path = '../data/wall_weld_test/moveL_100_baseline_weld_scan_2023_07_07_15_20_56/'
+base_path = '../data/wall_weld_test/weld_scan_correction_2023_09_19_21_14_58/'
 
 if os.path.exists(base_path):
     # 获取指定路径下的所有子目录
@@ -62,7 +62,7 @@ if os.path.exists(base_path):
             # 如果你想要显示图例，可以使用以下命令：
             # plt.legend()
 
-            # plt.show()
+            plt.show()
             plt.close()
             std_value_co1 = np.std(mfccs[0])
             std_value_co2 = np.std(mfccs[1])
