@@ -119,19 +119,14 @@ mti_client.setExposureTime("25")
 
 ###set up control parameters
 job_offset=200 		###200 for Aluminum ER4043 (215,100 ipm), 300 for Steel Alloy ER70S-6 (300 ipm, 3 mm/sec), 400 for Stainless Steel ER316L
-nominal_feedrate=250
-nominal_vd_relative=8
-base_feedrate_cmd=250
-base_vd=8
-feedrate_cmd=nominal_feedrate
-vd_relative=nominal_vd_relative
-feedrate_gain=0.5
-feedrate_min=60
-feedrate_max=300
-nominal_slice_increment=int(1.45/slicing_meta['line_resolution'])
+nominal_feedrate=170
+d_feedrate = -10
+nominal_vd_relative=10
+nominal_slice_increment=int(1.84/slicing_meta['line_resolution'])
 scanner_lag_bp=int(slicing_meta['scanner_lag_breakpoints'])
 scanner_lag=slicing_meta['scanner_lag']
 slice_inc_gain=3.
+end_layer_count = 6
 
 arc_on=True
 
@@ -146,7 +141,7 @@ rob2_js_all_slices=[]
 positioner_js_all_slices=[]
 lam_relative_all_slices=[]
 lam_relative_dense_all_slices=[]
-for i in range(30,31):
+for i in range(0,250):
     rob1_js_all_slices.append(np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(i)+'_0.csv',delimiter=','))
     rob2_js_all_slices.append(np.loadtxt(data_dir+'curve_sliced_js/MA1440_js'+str(i)+'_0.csv',delimiter=','))
     positioner_js_all_slices.append(np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(i)+'_0.csv',delimiter=','))
@@ -156,11 +151,15 @@ for i in range(30,31):
     lam_relative_dense_all_slices.append(np.linspace(0,lam_relative[-1],num=int(lam_relative[-1]/point_distance)))
 
 input("Enter to start")
+layer_count=0
 slice_num=0
+feedrate_cmd=nominal_feedrate
+vd_relative=nominal_vd_relative
 robot_logging_all=[]
 weld_logging_all=[]
 mti_logging_all=[]
 while slice_num<len(lam_relative_all_slices):
+    print("Layer:",slice_num,"#:",layer_count)
     print('FEEDRATE: ',feedrate_cmd,'VD: ',vd_relative)
     ###change feedrate
     fronius_client.async_set_job_number(int(feedrate_cmd/10)+job_offset, my_handler)
@@ -168,6 +167,22 @@ while slice_num<len(lam_relative_all_slices):
     rob1_js=copy.deepcopy(rob1_js_all_slices[slice_num])
     rob2_js=copy.deepcopy(rob2_js_all_slices[slice_num])
     positioner_js=copy.deepcopy(positioner_js_all_slices[slice_num])
+    
+    ###TRJAECTORY WARPING
+    if slice_num>10:
+        rob1_js_prev=copy.deepcopy(rob1_js_all_slices[slice_num-nominal_slice_increment])
+        rob2_js_prev=copy.deepcopy(rob2_js_all_slices[slice_num-nominal_slice_increment])
+        positioner_js_prev=copy.deepcopy(positioner_js_all_slices[slice_num-nominal_slice_increment])
+        rob1_js,rob2_js,positioner_js=warp_traj(rob1_js,rob2_js,positioner_js,rob1_js_prev,rob2_js_prev,positioner_js_prev,reversed=True)
+    if slice_num<slicing_meta['num_layers']-nominal_slice_increment:
+        rob1_js_next=copy.deepcopy(rob1_js_all_slices[slice_num+nominal_slice_increment])
+        rob2_js_next=copy.deepcopy(rob2_js_all_slices[slice_num+nominal_slice_increment])
+        positioner_js_next=copy.deepcopy(positioner_js_all_slices[slice_num+nominal_slice_increment])
+        rob1_js,rob2_js,positioner_js=warp_traj(rob1_js,rob2_js,positioner_js,rob1_js_next,rob2_js_next,positioner_js_next,reversed=False)
+    
+    ###find closest %2pi
+    num2p=np.round((q14[-1]-positioner_js[0,1])/(2*np.pi))
+    positioner_js[:,1]=positioner_js[:,1]+num2p*2*np.pi
     
     curve_js_all_dense=interp1d(lam_relative_all_slices[slice_num],np.hstack((rob1_js,rob2_js,positioner_js)),kind='cubic',axis=0)(lam_relative_dense_all_slices[slice_num])
     ### get breakpoints for vd
@@ -222,7 +237,16 @@ while slice_num<len(lam_relative_all_slices):
         
         ####CONTROL PARAMETERS
         last_slice_num=slice_num
+        # increment slice layer num
         slice_num+=int(nominal_slice_increment)
+        # change feedrate and such
+        if layer_count>0: # dont update for baselayer
+            feedrate_cmd = feedrate_cmd-d_feedrate
+            # speed decrease in ratio, so the increment rate stays the same
+            vd_relative = (feedrate_cmd/nominal_feedrate)*nominal_vd_relative 
+        layer_count+=1
+        if layer_count>=end_layer_count:
+            break
         
     except:
         traceback.print_exc()
