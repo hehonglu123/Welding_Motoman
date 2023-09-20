@@ -111,7 +111,8 @@ formatted_time = current_time.strftime('%Y_%m_%d_%H_%M_%S.%f')[:-7]
 
 data_date = input("Use old data directory? (Enter or put time e.g. 2023_07_11_16_25_30): ")
 if data_date == '':
-    data_dir=curve_data_dir+'weld_scan_'+formatted_time+'/'
+    # data_dir=curve_data_dir+'weld_scan_'+formatted_time+'/'
+    data_dir=curve_data_dir+'weld_scan_2023_09_19_18_03_53/'
 else:
     data_dir=curve_data_dir+'weld_scan_'+data_date+'/'
 print("Use data directory:",data_dir)
@@ -133,6 +134,7 @@ print("The Desired speed (according to desired h",des_dh,"will be",\
       des_v,"mm/sec")
 des_dw = 4
 waypoint_distance=1.625 	###waypoint separation (calculate from 40moveL/95mm, where we did the test)
+waypoint_distance=1
 layer_height_num=int(des_dh/line_resolution) # preplanned
 layer_width_num=int(des_dw/line_resolution) # preplanned
 
@@ -158,7 +160,7 @@ to_home_speed=10
 R1_home = np.radians([10,0,0,0,0,0])
 R2_mid = np.radians([6,20,-10,0,0,0])
 R2_home = np.radians([70,10,-5,0,0,0])
-
+scan_process = ScanProcess(robot_scan,positioner)
 # ## rr drivers and all other drivers
 robot_client=MotionProgramExecClient()
 ws=WeldSend(robot_client)
@@ -203,12 +205,16 @@ last_layer_curve_height = []
 # layer_count=-1
 # start_weld_layer=0
 
-layer=298
-last_layer=274
-layer_count=13
-start_weld_layer=323
+layer=442
+last_layer=419
+layer_count=19
+start_weld_layer=466
 
-Transz0_H=None
+# Transz0_H=None
+Transz0_H=np.array([[ 1.00000000e+00, -3.44596496e-09,  1.06792503e-05, -2.89186618e-05],
+ [-3.44596496e-09,  9.99999792e-01,  6.45357024e-04, -1.74758162e-03],
+ [-1.06792503e-05, -6.45357024e-04,  9.99999792e-01, -2.70792939e+00],
+ [ 0.00000000e+00,  0.00000000e+00,  0.00000000e+00,  1.00000000e+00]])
 
 # try:
 #     layer_count=len(glob.glob(data_dir+'layer_*_0'))+1
@@ -216,10 +222,10 @@ Transz0_H=None
 #     pass
 
 manual_dh=False
-correction=False
-recal_dh=False
+correction=True
+recal_dh=True
 
-start_shift=False
+start_shift=True
 
 print("Planned V (first 10):",planned_v[:10])
 print("Planned Job (first 10):",planned_job[:10])
@@ -295,7 +301,8 @@ while True:
             if not start_shift:
                 dlayer = int(round(mean_layer_dh/line_resolution)) # find the "delta layer" using dh
             else:
-                dlayer = np.ceil(mean_layer_dh/line_resolution/2)*2-1 # enforce a odd dlayer for shift
+                print("enforce odd dlayer")
+                dlayer = int(np.ceil(mean_layer_dh/line_resolution/2)*2-1) # enforce a odd dlayer for shift
             dlayer = max(9,dlayer)
             last_layer=layer
             layer = layer+dlayer # update layer
@@ -374,6 +381,8 @@ while True:
                     profile_dh = scan_process.pcd2dh(last_pcd_layer,curve_sliced_relative,drawing=True)
                     layer_curve_dh = profile_dh
                     last_layer_curve_relative=deepcopy(curve_sliced_relative)
+
+                layer_curve_dh=np.roll(layer_curve_dh,4)
 
                 #### correction strategy
                 this_weld_v,all_dh=\
