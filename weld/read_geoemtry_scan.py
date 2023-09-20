@@ -95,7 +95,7 @@ dataset='circle_large/'
 sliced_alg='static_stepwise_shift/'
 curve_data_dir = '../data/'+dataset+sliced_alg
 # data_dir=curve_data_dir+'weld_scan_baseline_2023_09_18_16_17_34'+'/'
-data_dir=curve_data_dir+'weld_scan_correction_2023_09_18_14_35_10'+'/'
+data_dir=curve_data_dir+'weld_scan_correction_2023_09_19_16_32_31'+'/'
 
 #### welding spec, goal
 with open(curve_data_dir+'slicing.yml', 'r') as file:
