@@ -14,6 +14,10 @@ def v2dh_loglog(v,mode=140):
         # 160 ipm
         # log(Δh)=-0.4619*log(V)+1.647 
         logdh = -0.4619*np.log(v)+1.647 
+    elif mode==180:
+        # 180 ipm
+        # log Δℎ = −0.3713 ∗ log 𝑉 + 1.506 
+        logdh = -0.3713*np.log(v)+1.506 
     elif mode==220:
         # 220 ipm
         # log(Δh)=-0.5699*log(V)+1.985 
@@ -38,6 +42,10 @@ def dh2v_loglog(dh,mode=140):
         # 160 ipm
         # log(Δh)=-0.4619∗log(V)+1.647 
         logv = (logdh-1.647)/(-0.4619)
+    elif mode==180:
+        # 180 ipm
+        # log Δℎ = −0.3713 ∗ log 𝑉 + 1.506 
+        logv = (logdh-1.506)/(-0.3713)
     elif mode==220:
         # 220 ipm
         logv = (logdh-1.985)/(-0.5699)
@@ -93,7 +101,10 @@ if __name__=='__main__':
     # print(dh2v_loglog(1.5,160))
     # print(v2dh_loglog(75,220))
 
-    print(v2dh_loglog(5,100))
+    # print(v2dh_loglog(5,100))
+    print(v2dh_loglog(10,160))
+    print(v2dh_loglog(10,180))
+    print(v2dh_loglog(9.411764,160))
     # print(v2dh_loglog(6,100))
     # print(v2dh_loglog(10,100))
     # print(dh2v_loglog(5,100))

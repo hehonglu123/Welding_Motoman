@@ -109,22 +109,27 @@ for layer in range(total_layer):
         curve_sliced_relative=np.loadtxt(curve_data_dir+'curve_sliced_relative/slice'+str(layer)+'_'+str(sec_num)+'.csv',delimiter=',')
     else:
         curve_sliced_relative=np.loadtxt(curve_data_dir+'curve_sliced_relative/slice'+str(layer-1)+'_'+str(sec_num)+'.csv',delimiter=',')
-        
+    
     mti_recording=mti_recording_all[layer]
     robot_js=robot_js_all[layer]
     robot_stamps=robot_js[:,0]
     q_out_exe=robot_js[:,7:]
     # robot_stamps=
     
-    # fig = plt.figure()
+    fig = plt.figure()
 
-    # def updatefig(i):
-    #     fig.clear()
-    #     plt.scatter(mti_recording[i][0],mti_recording[i][1])
-    #     plt.draw()
+    playback_speed=2
 
-    # anim = FuncAnimation(fig, updatefig, 1000)
-    # plt.show()
+    def updatefig(i):
+        fig.clear()
+        draw_mti_recording=np.delete(mti_recording[i*playback_speed],mti_recording[i*playback_speed][1]==0,axis=1)
+        plt.scatter(draw_mti_recording[0],draw_mti_recording[1])
+        plt.xlim((-30,30))
+        plt.ylim((50,120))
+        plt.draw()
+
+    anim = FuncAnimation(fig, updatefig, np.floor(len(mti_recording)/playback_speed).astype(int),interval=30)
+    plt.show()
     
     
     #### scanning process: processing point cloud and get h
