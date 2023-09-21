@@ -10,10 +10,20 @@ import os
 import re
 from matplotlib.ticker import MaxNLocator
 
+def moving_average(data_list, window_size):
+    weights = np.ones(window_size) / window_size
+    return np.convolve(data_list, weights, mode='valid')
+mean_mov_co1 = []
+mean_mov_co2 = []
+mfcc_mean = []
 std_co1 = []
 std_co2 = []
 std_value_co1 = []
 std_value_co2 = []
+mean_co1 = []
+mean_co2 = []
+mean_value_co1 = []
+mean_value_co2 = []
 base_path = '../data/wall_weld_test/weld_scan_correction_2023_09_19_21_14_58/'
 
 if os.path.exists(base_path):
@@ -43,6 +53,9 @@ if os.path.exists(base_path):
             mfccs = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=13)  # 获取13个MFCC系数
             print("MFCCs shape:", mfccs.shape)  # 此处得到的形状通常为(13, 时间帧数)
             print(mfccs[:,0])
+            mfcc_mean = np.mean(mfccs)
+            print('mfcc_mean', mfcc_mean)
+            
             plt.figure(figsize=(10, 4))
             img = librosa.display.specshow(mfccs, x_axis='time', cmap='viridis')
             # plt.colorbar(img, label='MFCC Coefficient Value')
@@ -55,19 +68,24 @@ if os.path.exists(base_path):
 
             for i in range(2):
                 plt.plot(mfccs[i], label=f'MFCC co {i+1}')
+                plt.axhline(y=np.mean(mfccs[i]), color='r', linestyle='-', label=f'MFCC co_mean {i+1}')
                 plt.ylabel('MFCC Coefficients')
                 plt.xlabel('number of frames')
                 plt.title(f'MFCC 1st and 2nd coefficients of {layer_dir}')
 
             # 如果你想要显示图例，可以使用以下命令：
-            # plt.legend()
-
+            plt.legend()
             plt.show()
             plt.close()
             std_value_co1 = np.std(mfccs[0])
             std_value_co2 = np.std(mfccs[1])
             std_co1.append(std_value_co1)
             std_co2.append(std_value_co2)
+            mean_value_co1 = np.mean(mfccs[0])
+            mean_value_co2 = np.mean(mfccs[1])
+            mean_co1.append(mean_value_co1)
+            mean_co2.append(mean_value_co2)  
+            mean_mov = moving_average()          
             n += 1  
             # exit()
 #             # 进行PCA分析，以减少维度（例如，从13维减少到2维以便于可视化）
@@ -96,3 +114,17 @@ plt.title("Standard Deviation of the MFCC")
 plt.legend()
 plt.show()
 plt.close()
+
+x_labels = range(len(mean_co1))
+plt.figure(figsize=(6, 6))
+plt.plot(x_labels, mean_co1, marker='o', linestyle='-',color="blue", label = 'mean_co1')
+plt.plot(x_labels, mean_co2, marker='o', linestyle='-',color="orange",label = 'mean_co2')
+ax = plt.gca()  # 获取当前的axes对象
+ax.xaxis.set_major_locator(MaxNLocator(integer=True))  # 强制x轴刻度为整数
+plt.xlabel('Index of layers')
+plt.ylabel("MFCC coefficient mean")
+plt.title("Mean of the MFCC")
+plt.legend()
+plt.show()
+plt.close()
+
