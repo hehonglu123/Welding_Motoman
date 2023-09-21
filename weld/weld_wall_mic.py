@@ -116,7 +116,7 @@ to_start_speed=4
 to_home_speed=5
 correction = True
 save_weld_record=True
-
+scan_flag_trigger = True
 start_correction_layer=2
 # start_correction_layer=99999999
 
@@ -269,8 +269,7 @@ for i in range(0,end_layer):
 
 
         else: # start correction from 2nd top layer
-            if i > 2 and scan_flag == True and correction == True:
-                correction = False
+            if i > 2 and (scan_flag == True and scan_flag_trigger == True):
                 if profile_height is None:
                     data_dir='../data/wall_weld_test/weld_scan_2023_09_19_15_01_00/'
                     print("Using data:",data_dir)
@@ -310,7 +309,7 @@ for i in range(0,end_layer):
                 # h_std_thres=-1
 
                 nominal_v=weld_v
-                curve_sliced_relative,path_T_S1,this_weld_v,all_dh,last_mean_h=\
+                curve_sliced_relative,path_T_S1,this_weld_v,all_dh,last_mean_h,scan_flag_trigger=\
                     strategy_3(profile_height,input_dh,curve_sliced_relative,R_S1TCP,num_l,noise_h_thres=noise_h_thres,\
                             min_v=min_v,max_v=max_v,h_std_thres=h_std_thres,nominal_v=nominal_v,ipm_mode=ipm_mode)
                 print('curve_sliced_relative',curve_sliced_relative)
@@ -330,7 +329,6 @@ for i in range(0,end_layer):
                 path_T.insert(0,Transform(path_T[0].R,path_T[0].p+np.array([0,0,10])))
                 path_T.append(Transform(path_T[-1].R,path_T[-1].p+np.array([0,0,10])))
             else:
-                correction = True
                 if profile_height is None:
                     data_dir='../data/wall_weld_test/weld_scan_2023_09_19_15_01_00/'
                     print("Using data:",data_dir)
@@ -338,7 +336,8 @@ for i in range(0,end_layer):
                     last_mean_h=np.mean(last_profile_height[:,1])
                     profile_height=np.load(data_dir+'layer_2/scans/height_profile.npy')   
                     mean_h = np.mean(profile_height[:,1]) 
-                    mean_h_base = np.mean(profile_height[:,1])          
+                    mean_h_base = np.mean(profile_height[:,1])  
+                scan_flag_trigger = True      
                 path_T=[]
                 noise_h_thres = 3
                 mean_h = np.mean(profile_height[:,1])
@@ -495,23 +494,22 @@ for i in range(0,end_layer):
             scan_flag = False 
             print(f'Microphone is disconnected! {i}layer data lost!')
         if i <= 2:
-            input('No defect identification in baselayers and 1st top layer!! Press enter to continue')
+            print('No defect identification in baselayers and 1st top layer!! Press enter to continue')
         else:
-            if scan_flag == True and correction == True:
-                correction = True
-                input('Defect identified, correction is needed!! Press enter to continue')
+            if (scan_flag == True and scan_flag_trigger == True):
+                print('Defect identified, correction is needed!! Press enter to continue')
             else:
-                input('Everything looks good, will keep welding!! Press enter to continue')
+                print('Everything looks good, will keep welding!! Press enter to continue')
         ### debug ###
     # exit()
-    if i <= 2 or scan_flag == True:
+    if i <= 2 or (scan_flag == True and scan_flag_trigger == True):
         ### debug ###
         ws.jog_single(robot_weld,np.zeros(6),to_home_speed)
         # print('###R1移动到原点')
         ### debug ###
 
     #### scanning
-    if i <= 2 or scan_flag == True:
+    if i <= 2 or (scan_flag == True and scan_flag_trigger == True):
         scan_st = time.time()
         if curve_sliced_relative is None:
 
@@ -643,7 +641,7 @@ for i in range(0,end_layer):
     # with open(out_scan_dir + 'mti_scans.pickle', 'rb') as file:
     #     mti_recording=pickle.load(file)
     ########################
-    if i <= 2 or scan_flag == True:
+    if i <= 2 or (scan_flag == True and scan_flag_trigger == True):
         recon_3d_st = time.time()
         #### scanning process: processing point cloud and get h
         try:

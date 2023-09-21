@@ -295,6 +295,7 @@ def strategy_3(profile_height,input_dh,curve_sliced_relative,R_S1TCP,num_l,noise
 
         plt.scatter(profile_height[:,0],profile_height[:,1]-np.mean(profile_height[:,1]))
         plt.show()
+        scan_flag = False
 
     else:
         # chop curve
@@ -348,8 +349,9 @@ def strategy_3(profile_height,input_dh,curve_sliced_relative,R_S1TCP,num_l,noise
         for p in all_profile:
             plt.scatter(p[:,0],p[:,1]-np.mean(profile_height[:,1]))
         plt.show()
+        scan_flag = True
     
-    return curve_sliced_relative_correct,path_T_S1,this_weld_v,all_dh,mean_h
+    return curve_sliced_relative_correct,path_T_S1,this_weld_v,all_dh,mean_h, scan_flag
 
 def strategy_4(profile_height,des_dh,curve_sliced_relative,last_curve_sliced_relative,breakpoints,max_v=1000,min_v=1,ipm_mode=160):
 
