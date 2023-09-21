@@ -303,11 +303,11 @@ for i in range(0,end_layer):
                 
                 # min_v=10
                 # max_v=75
-                # h_std_thres=0.5
+                h_std_thres=0.5
 
                 min_v=-1
                 max_v=1000
-                h_std_thres=-1
+                # h_std_thres=-1
 
                 nominal_v=weld_v
                 curve_sliced_relative,path_T_S1,this_weld_v,all_dh,last_mean_h=\
@@ -472,9 +472,11 @@ for i in range(0,end_layer):
             # save weld record
             np.savetxt(layer_data_dir + 'weld_js_exe.csv',rob_js_exe,delimiter=',')
             np.savetxt(layer_data_dir + 'weld_robot_stamps.csv',rob_stamps,delimiter=',')
-            rr_sensors.save_all_sensors(layer_data_dir)
-            # print('###保存所有传感器数据')
-            ### debug ###
+            try:
+                rr_sensors.save_all_sensors(layer_data_dir)
+            except:
+                traceback.print_exc()
+
 
         print("Weld actual weld time:",time.time()-weld_motion_weld_st)
         weld_to_home_st = time.time()
@@ -485,8 +487,7 @@ for i in range(0,end_layer):
         ######################################################
 
         print("Weld Time:",time.time()-weld_st)
-        ### debug ###
-        # print('###声音数据处理')
+
         try:
             wm.audio_denoise(layer_data_dir)
             std_value_co1, std_value_co2, scan_flag = wm.audio_MFCC(layer_data_dir)
@@ -681,7 +682,7 @@ for i in range(0,end_layer):
         if save_output_points:
             o3d.io.write_point_cloud(out_scan_dir+'processed_pcd.pcd',pcd)
             np.save(out_scan_dir+'height_profile.npy',profile_height)
-        visualize_pcd([pcd])
+        # visualize_pcd([pcd])
         plt.scatter(profile_height[:,0],profile_height[:,1])
         plt.show()
         # exit()
