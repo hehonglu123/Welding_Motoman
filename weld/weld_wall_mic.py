@@ -114,7 +114,7 @@ for i in range(len(weld_z_height)-2):
 
 to_start_speed=4
 to_home_speed=5
-
+correction = True
 save_weld_record=True
 
 start_correction_layer=2
@@ -151,9 +151,9 @@ rr_sensors = WeldRRSensor(weld_service=weld_ser,cam_service=cam_ser,microphone_s
 # print('###对传感器赋值')
 ### debug ###
 # test sensor (camera, microphone)
-# print("Test 3 Sec.")
-# rr_sensors.test_all_sensors()
-# print(len(rr_sensors.ir_recording))
+print("Test 3 Sec.")
+rr_sensors.test_all_sensors()
+print(len(rr_sensors.ir_recording))
 # exit()
 ###############
 ### debug ###
@@ -196,7 +196,7 @@ ws.jog_dual(robot_scan,positioner,[r2_mid,r2_ir_q],np.radians([-15,180]),to_star
 ### debug ###
 scan_flag = False
 # rr_sensors.clear_all_sensors()
-for i in range(3,end_layer):
+for i in range(0,end_layer):
     cycle_st = time.time()
     print("==================================")
     print("Layer:",i)
@@ -269,7 +269,8 @@ for i in range(3,end_layer):
 
 
         else: # start correction from 2nd top layer
-            if i > 2 and scan_flag == True:
+            if i > 2 and scan_flag == True and correction == True:
+                correction = False
                 if profile_height is None:
                     data_dir='../data/wall_weld_test/weld_scan_2023_09_19_15_01_00/'
                     print("Using data:",data_dir)
@@ -329,6 +330,7 @@ for i in range(3,end_layer):
                 path_T.insert(0,Transform(path_T[0].R,path_T[0].p+np.array([0,0,10])))
                 path_T.append(Transform(path_T[-1].R,path_T[-1].p+np.array([0,0,10])))
             else:
+                correction = True
                 if profile_height is None:
                     data_dir='../data/wall_weld_test/weld_scan_2023_09_19_15_01_00/'
                     print("Using data:",data_dir)
@@ -347,8 +349,6 @@ for i in range(3,end_layer):
                 curve_sliced_relative_correct = []
                 path_T_S1 = []
 
-                this_weld_v = []
-                all_dh=[]
                 for curve_i in range(len(curve_sliced_relative)):
                     this_p = np.array([curve_sliced_relative[curve_i][0],curve_sliced_relative[curve_i][1],h_target])
                     curve_sliced_relative_correct.append(np.append(this_p,curve_sliced_relative[curve_i][3:]))
@@ -360,7 +360,10 @@ for i in range(3,end_layer):
                 curve_sliced_relative = curve_sliced_relative_correct
                 # add path collision avoidance
                 path_T.insert(0,Transform(path_T[0].R,path_T[0].p+np.array([0,0,10])))
-                path_T.append(Transform(path_T[-1].R,path_T[-1].p+np.array([0,0,10])))                
+                path_T.append(Transform(path_T[-1].R,path_T[-1].p+np.array([0,0,10])))      
+                print('curve_sliced_relative',curve_sliced_relative)
+                print('path_T_S1',path_T_S1)
+                print('this_weld_v',this_weld_v) 
                 # path_T=all_path_T[i]
                 # curve_sliced_relative=[]
                 # for path_p in path_T:
@@ -406,22 +409,22 @@ for i in range(3,end_layer):
         print("Nominal V:",weld_velocity[i])
         print("Correct V:",this_weld_v)
         print("curve_sliced_relative:",curve_sliced_relative)
-        print(path_T[0])
-        print(len(path_T))
-        print(len(curve_sliced_relative))
+        print('path_T[0]', path_T[0])
+        print('len(path_T)', len(path_T))
+        print('len(curve_sliced_relative)', len(curve_sliced_relative))
 
         print("Weld Plan time:",time.time()-weld_plan_st)
 
         ######################################################
         ########### Do welding #############
         # exit()
-        input("Press Enter and move to weld starting point.")
+        # input("Press Enter and move to weld starting point.")
         ### debug ###
         ws.jog_single(robot_weld,path_q[0],to_start_speed)
         # print('###R1正在移动到准备位置')
         ### debug ###
         weld_motion_weld_st = time.time()
-        input("Press Enter and start welding.")
+        # input("Press Enter and start welding.")
         # mp=MotionProgram(ROBOT_CHOICE='RB1',pulse2deg=robot_weld.pulse2deg)
         # mp.MoveL(np.degrees(path_q[1]), 10, 0)
         # mp.setArc(select, int(this_job_number))
@@ -493,7 +496,8 @@ for i in range(3,end_layer):
         if i <= 2:
             input('No defect identification in baselayers and 1st top layer!! Press enter to continue')
         else:
-            if scan_flag == True:
+            if scan_flag == True and correction == True:
+                correction = True
                 input('Defect identified, correction is needed!! Press enter to continue')
             else:
                 input('Everything looks good, will keep welding!! Press enter to continue')
@@ -509,6 +513,7 @@ for i in range(3,end_layer):
     if i <= 2 or scan_flag == True:
         scan_st = time.time()
         if curve_sliced_relative is None:
+
             data_dir='../data/wall_weld_test/weld_scan_2023_09_18_11_19_26/'
             # last_profile_height=np.load('../data/wall_weld_test/weld_scan_2023_08_02_17_07_02/layer_17/scans/height_profile.npy')
             # last_mean_h=np.mean(last_profile_height[:,1])

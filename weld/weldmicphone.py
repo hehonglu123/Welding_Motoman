@@ -89,7 +89,7 @@ def audio_MFCC(file_path):
         print('std_value_co1:',std_value_co1)
         std_value_co2 = np.std(mfccs[1])
         print('std_value_co2:',std_value_co2)
-        if std_value_co1 > 20 or std_value_co2 > 20:
+        if std_value_co1 > 20 or std_value_co2 > 15:
             scan_flag = True
         else:
             scan_flag = False
