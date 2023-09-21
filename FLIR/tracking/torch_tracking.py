@@ -25,18 +25,15 @@ colorbar_max = np.max(ir_recording)
 frame=308
 
 temp=counts2temp(ir_recording[frame].flatten(),6.39661118e+03, 1.40469989e+03, 1.00000008e+00, 8.69393436e+00, 8.40029488e+03,Emiss=0.13).reshape((240,320))
-temp[temp > 500] = 500    ##thresholding
-# Normalize the data to [0, 255]
+temp[temp > 1300] = 1300    ##thresholding
+
 ir_normalized = ((temp - np.min(temp)) / (np.max(temp) - np.min(temp))) * 255
 
-# ir_normalized = ir_normalized[50:-50, 50:-50]
-ir_normalized=np.clip(ir_normalized, 0, 255).astype(np.uint8)
-
-max_loc=torch_detect(ir_normalized,template)
+max_loc=torch_detect(ir_recording[frame],template)
 
 
 # Convert the IR image to BGR format with the inferno colormap
-ir_bgr = cv2.applyColorMap(ir_normalized, cv2.COLORMAP_INFERNO)
+ir_bgr = cv2.applyColorMap(ir_normalized.astype(np.uint8), cv2.COLORMAP_INFERNO)
 
 
 # add bounding box
@@ -51,4 +48,4 @@ cv2.waitKey()
 # Close the window after the loop is completed
 cv2.destroyAllWindows()
 
-# np.save('torch_template.npy',ir_normalized[110:175,40:145])
+np.save('torch_template.npy',ir_normalized[110:175,40:135])
