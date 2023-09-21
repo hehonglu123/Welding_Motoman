@@ -85,7 +85,8 @@ if os.path.exists(base_path):
             mean_value_co2 = np.mean(mfccs[1])
             mean_co1.append(mean_value_co1)
             mean_co2.append(mean_value_co2)  
-            mean_mov = moving_average()          
+            mean_mov_co1 = moving_average(mfccs[0],60)
+            mean_mov_co2 = moving_average(mfccs[1],60)         
             n += 1  
             # exit()
 #             # 进行PCA分析，以减少维度（例如，从13维减少到2维以便于可视化）
