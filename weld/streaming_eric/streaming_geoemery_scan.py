@@ -122,11 +122,12 @@ job_offset=200 		###200 for Aluminum ER4043 (215,100 ipm), 300 for Steel Alloy E
 nominal_feedrate=170
 d_feedrate = -10
 nominal_vd_relative=10
-nominal_slice_increment=int(1.84/slicing_meta['line_resolution'])
+# nominal_slice_increment=int(1.84/slicing_meta['line_resolution'])
+nominal_slice_increment=26
 scanner_lag_bp=int(slicing_meta['scanner_lag_breakpoints'])
 scanner_lag=slicing_meta['scanner_lag']
 slice_inc_gain=3.
-end_layer_count = 6
+end_layer_count = 7
 
 arc_on=True
 
@@ -153,8 +154,10 @@ for i in range(0,250):
 input("Enter to start")
 layer_count=0
 slice_num=0
-feedrate_cmd=nominal_feedrate
-vd_relative=nominal_vd_relative
+# feedrate_cmd=nominal_feedrate
+feedrate_cmd=250
+# vd_relative=nominal_vd_relative
+vd_relative=8
 robot_logging_all=[]
 weld_logging_all=[]
 mti_logging_all=[]
@@ -187,9 +190,6 @@ while slice_num<len(lam_relative_all_slices):
     curve_js_all_dense=interp1d(lam_relative_all_slices[slice_num],np.hstack((rob1_js,rob2_js,positioner_js)),kind='cubic',axis=0)(lam_relative_dense_all_slices[slice_num])
     ### get breakpoints for vd
     breakpoints=SS.get_breakpoints(lam_relative_dense_all_slices[slice_num],vd_relative)
-    print(breakpoints[0])
-    lag_scan_bp=np.argmin(lam_relative_dense_all_slices[0]<scanner_lag)
-    lag_scan_bp_bp=np.argmin(breakpoints<lag_scan_bp)
 
     curve_js_all_dense=np.array(curve_js_all_dense)
     
@@ -208,7 +208,7 @@ while slice_num<len(lam_relative_all_slices):
         point_stream_start_time=time.time()
         if arc_on:
             fronius_client.start_weld()
-    time.sleep(0.2)
+        time.sleep(0.2)
 
     ## streaming
     robot_ts=[]
@@ -223,7 +223,11 @@ while slice_num<len(lam_relative_all_slices):
                 while time.time()-point_stream_start_time<1/SS.streaming_rate-0.0005:
                     continue
             ###MTI scans YZ point from tool frame
+            st=time.time()
             mti_recording.append(deepcopy(np.array([mti_client.lineProfile.X_data,mti_client.lineProfile.Z_data])))
+            if time.time()-st>0.008:
+                print('MTI scan time:',time.time()-st)
+                print("What????")
             point_stream_start_time=time.time()
             robot_timestamp,q14=SS.position_cmd(curve_js_all_dense[breakpoints[bp_idx]])
             
@@ -237,14 +241,21 @@ while slice_num<len(lam_relative_all_slices):
         
         ####CONTROL PARAMETERS
         last_slice_num=slice_num
-        # increment slice layer num
-        slice_num+=int(nominal_slice_increment)
+        
         # change feedrate and such
         if layer_count>0: # dont update for baselayer
-            feedrate_cmd = feedrate_cmd-d_feedrate
+            if layer_count<1:
+                feedrate_cmd=250
+                vd_relative=8
+            elif layer_count==1:
+                feedrate_cmd=nominal_feedrate-d_feedrate
+                nominal_slice_increment=18
+            feedrate_cmd = feedrate_cmd+d_feedrate
             # speed decrease in ratio, so the increment rate stays the same
             vd_relative = (feedrate_cmd/nominal_feedrate)*nominal_vd_relative 
         layer_count+=1
+        # increment slice layer num
+        slice_num+=int(nominal_slice_increment)
         if layer_count>=end_layer_count:
             break
         
