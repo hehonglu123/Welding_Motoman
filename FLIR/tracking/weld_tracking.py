@@ -47,10 +47,10 @@ for i in range(len(ir_recording)):
     ir_bgr = cv2.applyColorMap(ir_normalized, cv2.COLORMAP_INFERNO)
 
     #torch detection
-    max_loc=torch_detect(ir_recording[i],template)
+    torch_loc=torch_detect(ir_recording[i],template)
     # add bounding box
-    cv2.rectangle(ir_bgr, max_loc, (max_loc[0] + template.shape[1], max_loc[1] + template.shape[0]), (0,255,0), 2)
-    torch_eef=[max_loc[0]+template.shape[1]-3,max_loc[1]+int(template.shape[0]/2)]
+    cv2.rectangle(ir_bgr, torch_loc, (torch_loc[0] + template.shape[1], torch_loc[1] + template.shape[0]), (0,255,0), 2)
+    torch_eef=[torch_loc[0]+template.shape[1]-3,torch_loc[1]+int(template.shape[0]/2)]
     # add bounding box
     if centroid is not None:
         indices=[np.argmax(pixels[0]),np.argmin(pixels[0])]

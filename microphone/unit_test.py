@@ -9,6 +9,7 @@ channels = 1
 audio_recording=[]
 def new_frame(pipe_ep):
     global audio_recording
+    print('here')
     #Loop to get the newest frame
     while (pipe_ep.Available > 0):
         #Receive the packet
@@ -31,7 +32,7 @@ p = c.microphone_stream.Connect(-1)
 p.PacketReceivedEvent+=new_frame
 
 while True:
-    time.sleep(60)
+    time.sleep(5)
     try:
         save_frame(audio_recording,'test')
         print('audio length: ',len(audio_recording))
