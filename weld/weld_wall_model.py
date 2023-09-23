@@ -167,7 +167,7 @@ input("Start?")
 # move robot to ready position
 ws.jog_dual(robot_scan,positioner,[r2_mid,r2_ir_q],np.radians([-15,180]),to_start_speed)
 
-for i in range(0,end_layer):
+for i in range(13,end_layer):
     cycle_st = time.time()
     print("==================================")
     print("Layer:",i)
@@ -177,7 +177,7 @@ for i in range(0,end_layer):
         forward_flag = False
     #### welding
     weld_st = time.time()
-    if i>=0 and True:
+    if i>=14 and True:
         weld_plan_st = time.time()
         if i>=2:
             base_layer=False
@@ -386,7 +386,7 @@ for i in range(0,end_layer):
         scan_st = time.time()
         if curve_sliced_relative is None:
             data_dir='../data/wall_weld_test/weld_scan_100ipm_2023_09_23_15_40_12/'
-            last_profile_height=np.load('../data/wall_weld_test/weld_scan_100ipm_2023_09_23_15_40_12/layer_11/scans/height_profile.npy')
+            last_profile_height=np.load('../data/wall_weld_test/weld_scan_100ipm_2023_09_23_15_40_12/layer_13/scans/height_profile.npy')
             last_mean_h=np.mean(last_profile_height[:,1])
             h_largest=np.max(last_profile_height[:,1])
             layer_data_dir=data_dir+'layer_'+str(i)+'/'
