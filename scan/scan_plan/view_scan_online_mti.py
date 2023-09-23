@@ -30,12 +30,14 @@ while True:
     pcd = o3d.geometry.PointCloud()
     pcd.points=o3d.utility.Vector3dVector(scan_points)
 
-    d=95
+    d=70
+    xaxis=0
+
     width=0.1
     height=0.1
     bbox_mesh = o3d.geometry.TriangleMesh.create_box(width=width, height=height, depth=d)
     box_move=np.eye(4)
-    box_move[0,3]=-width/2 # x-axis
+    box_move[0,3]=-width/2+xaxis # x-axis
     box_move[1,3]=-height/2 # y-axis
     box_move[2,3]=0
     bbox_mesh.transform(box_move)

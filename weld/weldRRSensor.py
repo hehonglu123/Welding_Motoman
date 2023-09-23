@@ -96,12 +96,15 @@ class WeldRRSensor(object):
 
 		if self.weld_service:
 			self.start_weld_cb=False
+			self.weld_timestamp=np.array(self.weld_timestamp)
 		if self.cam_ser:
 			self.start_ir_cb=False
+			self.ir_timestamp=np.array(self.ir_timestamp)
 		if self.mic_service:
 			self.start_mic_cb=False
 		if self.current_service:
 			self.start_current_cb=False
+			self.current_timestamp=np.array(self.current_timestamp)
 	
 	def save_all_sensors(self,filedir):
 
@@ -175,9 +178,8 @@ class WeldRRSensor(object):
 				header='timestamp,voltage,current,feedrate,energy', comments='')
 		
 	def save_current_file(self,filedir):
-		current_timestamp=np.array(self.current_timestamp)
 		np.savetxt(filedir + 'current.csv',
-				np.array([(current_timestamp-current_timestamp[0]), self.current]).T, delimiter=',',
+				np.array([(self.current_timestamp-self.current_timestamp[0]), self.current]).T, delimiter=',',
 				header='timestamp,current', comments='')
 	
 	def clean_ir_record(self):
@@ -234,7 +236,7 @@ class WeldRRSensor(object):
 	
 	def save_mic_file(self,filedir):
 
-		print("Mic length:",len(self.audio_recording))
+		# print("Mic length:",len(self.audio_recording))
 
 		try:
 			first_channel = np.concatenate(self.audio_recording)

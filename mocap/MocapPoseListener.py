@@ -1,4 +1,6 @@
 import numpy as np
+from matplotlib import pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 from general_robotics_toolbox import *
 from RobotRaconteur.Client import *
 import time
@@ -169,10 +171,12 @@ class MocapFrameListener():
         self.target_frames_traj_p={}
         self.target_frames_traj_R={}
         self.traj_stamps={}
+        self.traj_condition={}
         for frame_name in self.target_frames:
             self.target_frames_traj_p[frame_name] = []
             self.target_frames_traj_R[frame_name] = []
             self.traj_stamps[frame_name]=[]
+            self.traj_condition[frame_name]=[]
     
     def collect_point_thread(self):
 
@@ -215,6 +219,7 @@ class MocapFrameListener():
                         else:
                             self.target_frames_traj_R[this_marker_id].append(T_target_source.R)
                         self.traj_stamps[this_marker_id].append(float(data.sensor_data.ts[0]['seconds'])+data.sensor_data.ts[0]['nanoseconds']*1e-9)
+                        self.traj_condition[this_marker_id].append(data.fiducials.recognized_fiducials[i].confidence)
 
         sensor_data_srv.Close()
 
@@ -244,6 +249,10 @@ class MocapFrameListener():
     def get_frames_traj(self):
 
         return self.target_frames_traj_p,self.target_frames_traj_R,self.traj_stamps
+
+    def get_frames_traj_cond(self):
+
+        return self.target_frames_traj_p,self.target_frames_traj_R,self.traj_stamps,self.traj_condition
 
 def robotposelistener():
     config_dir='../config/'
@@ -281,6 +290,33 @@ def robotposelistener():
     print(curve_p[robot_weld.robot_name][-1][1])
 
     mpl_obj.end_pose_listener()
+
+def framelistener_phasespace():
+    
+    mocap_url = url='rr+tcp://localhost:59823?service=phasespace_mocap'
+    mocap_url = mocap_url
+    mocap_cli = RRN.ConnectService(mocap_url)
+
+    mpl_obj = MocapFrameListener(mocap_cli,['marker20_rigid1'],'world')
+    mpl_obj.run_pose_listener()
+    time.sleep(230)
+    mpl_obj.stop_pose_listener()
+
+    curve_p,curve_R,timestamps,confidence = mpl_obj.get_frames_traj_cond()
+    ## robots traj
+    # print('curve p:',np.mean(curve_p['rigid3'],axis=0))
+    # print('std curve p:',np.std(curve_p['rigid3'],axis=0))
+    # print('curve R:',curve_R['rigid3'][-1])
+    # print('curve stamps:',timestamps['rigid3'][-1])
+    
+    condm = np.array(confidence['marker20_rigid1'])
+    point_draw=np.array(curve_p['marker20_rigid1'])
+    point_draw=point_draw[condm<=4]
+    point_draw=point_draw[::100]
+    
+    ax = plt.figure().add_subplot(projection='3d')
+    ax.scatter(-1*point_draw[:,2], -1*point_draw[:,0], point_draw[:,1])
+    plt.show()
 
 def framelistener():
     
@@ -322,5 +358,5 @@ if __name__=='__main__':
 
     # robotposelistener()
     # framelistener()
-    markerlistener()
-
+    # markerlistener()
+    framelistener_phasespace()

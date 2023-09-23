@@ -1,44 +1,16 @@
 import sys, glob, pickle, os, traceback, wave
 from RobotRaconteur.Client import *
 from scipy.interpolate import interp1d
+from pathlib import Path
 sys.path.append('../../toolbox/')
 from robot_def import *
 from lambda_calc import *
 from multi_robot import *
 from flir_toolbox import *
 from StreamingSend import *
-	
-############################################################WELDING PARAMETERS########################################################
+sys.path.append('../')
+from weldRRSensor import *
 
-dataset='wall/'
-sliced_alg='dense_slice/'
-data_dir='../../data/'+dataset+sliced_alg
-with open(data_dir+'slicing.yml', 'r') as file:
-	slicing_meta = yaml.safe_load(file)
-
-
-
-robot=robot_obj('MA2010_A0',def_path='../../config/MA2010_A0_robot_default_config.yml',tool_file_path='../../config/torch.csv',\
-	pulse2deg_file_path='../../config/MA2010_A0_pulse2deg_real.csv',d=15)
-robot2=robot_obj('MA1440_A0',def_path='../../config/MA1440_A0_robot_default_config.yml',tool_file_path='../../config/flir.csv',\
-		pulse2deg_file_path='../../config/MA1440_A0_pulse2deg_real.csv',base_transformation_file='../../config/MA1440_pose_mocap.csv')
-positioner=positioner_obj('D500B',def_path='../../config/D500B_robot_default_config.yml',tool_file_path='../../config/positioner_tcp.csv',\
-	pulse2deg_file_path='../../config/D500B_pulse2deg_real.csv',base_transformation_file='../../config/D500B_pose.csv')
-
-########################################################RR Microphone########################################################
-samplerate = 44000
-channels = 1
-audio_recording=[]
-def microphone_new_frame(pipe_ep):
-    global audio_recording
-    #Loop to get the newest frame
-    while (pipe_ep.Available > 0):
-        #Receive the packet
-        audio_recording.extend(pipe_ep.ReceivePacket().audio_data)
-microphone = RRN.ConnectService('rr+tcp://192.168.55.20:60828?service=microphone')
-p_microphone = microphone.microphone_stream.Connect(-1)
-p_microphone.PacketReceivedEvent+=microphone_new_frame
-########################################################RR FLIR########################################################
 def new_frame(pipe_ep):
 	global flir_logging, flir_ts, image_consts
 	#Loop to get the newest frame
@@ -64,19 +36,43 @@ def new_frame(pipe_ep):
 		#Convert the packet to an image and set the global variable
 		flir_logging.append(display_mat)
 		flir_ts.append(rr_img.image_info.data_header.ts['seconds']+rr_img.image_info.data_header.ts['nanoseconds']*1e-9)
+
+############################################################WELDING PARAMETERS########################################################
+
+dataset='wall/'
+sliced_alg='dense_slice/'
+data_dir='../../data/'+dataset+sliced_alg
+with open(data_dir+'slicing.yml', 'r') as file:
+	slicing_meta = yaml.safe_load(file)
+
+
+
+robot=robot_obj('MA2010_A0',def_path='../../config/MA2010_A0_robot_default_config.yml',tool_file_path='../../config/torch.csv',\
+	pulse2deg_file_path='../../config/MA2010_A0_pulse2deg_real.csv',d=15)
+robot2=robot_obj('MA1440_A0',def_path='../../config/MA1440_A0_robot_default_config.yml',tool_file_path='../../config/flir.csv',\
+		pulse2deg_file_path='../../config/MA1440_A0_pulse2deg_real.csv',base_transformation_file='../../config/MA1440_pose_mocap.csv')
+positioner=positioner_obj('D500B',def_path='../../config/D500B_robot_default_config.yml',tool_file_path='../../config/positioner_tcp.csv',\
+	pulse2deg_file_path='../../config/D500B_pulse2deg_real.csv',base_transformation_file='../../config/D500B_pose.csv')
+
+
+########################################################RR Microphone########################################################
+microphone = RRN.ConnectService('rr+tcp://192.168.55.20:60828?service=microphone')
+########################################################RR FLIR########################################################
 flir=RRN.ConnectService('rr+tcp://192.168.55.10:60827/?service=camera')
-flir.setf_param("focus_pos", RR.VarValue(int(1900),"int32"))
+flir.setf_param("focus_pos", RR.VarValue(int(2000),"int32"))
 flir.setf_param("object_distance", RR.VarValue(0.4,"double"))
 flir.setf_param("reflected_temperature", RR.VarValue(291.15,"double"))
 flir.setf_param("atmospheric_temperature", RR.VarValue(293.15,"double"))
 flir.setf_param("relative_humidity", RR.VarValue(50,"double"))
 flir.setf_param("ext_optics_temperature", RR.VarValue(293.15,"double"))
 flir.setf_param("ext_optics_transmission", RR.VarValue(0.99,"double"))
-# flir.setf_param("current_case", RR.VarValue(2,"int32"))
+flir.setf_param("current_case", RR.VarValue(2,"int32"))
+# flir.setf_param("ir_format", RR.VarValue("temperature_linear_100mK","string"))
 flir.setf_param("ir_format", RR.VarValue("radiometric","string"))
 flir.setf_param("object_emissivity", RR.VarValue(0.13,"double"))
 flir.setf_param("scale_limit_low", RR.VarValue(293.15,"double"))
 flir.setf_param("scale_limit_upper", RR.VarValue(5000,"double"))
+global image_consts, flir_logging, flir_ts
 image_consts = RRN.GetConstants('com.robotraconteur.image', flir)
 p=flir.frame_stream.Connect(-1)
 #Set the callback for when a new pipe packet is received to the
@@ -88,9 +84,12 @@ try:
 	flir.start_streaming()
 except: pass
 ########################################################RR FRONIUS########################################################
-fronius_client = RRN.ConnectService('rr+tcp://192.168.55.21:60823?service=welder')
+fronius_sub=RRN.SubscribeService('rr+tcp://192.168.55.21:60823?service=welder')
+fronius_client = fronius_sub.GetDefaultClientWait(1)      #connect, timeout=30s
+hflags_const = RRN.GetConstants("experimental.fronius", fronius_client)["WelderStateHighFlags"]
 fronius_client.prepare_welder()
-vd_relative=5
+########################################################RR CURRENT########################################################
+current_sub=RRN.SubscribeService('rr+tcp://192.168.55.21:12182?service=Current')
 ########################################################RR STREAMING########################################################
 
 RR_robot_sub = RRN.SubscribeService('rr+tcp://192.168.55.15:59945?service=robot')
@@ -109,6 +108,10 @@ streaming_rate=125.
 point_distance=0.04		###STREAMING POINT INTERPOLATED DISTANCE
 SS=StreamingSend(RR_robot,RR_robot_state,RobotJointCommand,streaming_rate)
 
+##########################################SENSORS LOGGIGN########################################################
+rr_sensors = WeldRRSensor(weld_service=fronius_sub,cam_service=None,microphone_service=microphone,current_service=current_sub)
+
+
 ###########################################layer welding############################################
 q14=np.zeros(14)
 res, robot_state, _ = RR_robot_state.TryGetInValue()
@@ -118,9 +121,9 @@ layer_counts=0
 slice_num=0
 welding_started=False
 ###job=feedrate/10+200
-job_offset=200
-nominal_feedrate=100
-nominal_vd_relative=10
+job_offset=400
+nominal_feedrate=150
+nominal_vd_relative=8
 nominal_wire_length=25 #pixels
 nominal_temp_below=500
 
@@ -132,7 +135,7 @@ vd_relative=nominal_vd_relative
 feedrate_gain=0.5
 feedrate_min=60
 feedrate_max=300
-nominal_slice_increment=int(1.5/slicing_meta['line_resolution'])
+nominal_slice_increment=int(1.3/slicing_meta['line_resolution'])
 slice_inc_gain=3.
 
 ###BASELAYER WELDING
@@ -167,10 +170,10 @@ slice_inc_gain=3.
 # 	if not welding_started:
 # 		SS.jog2q(np.hstack((rob1_js_dense[breakpoints[0]],rob2_js_dense[breakpoints[0]],positioner_js_dense[breakpoints[0]])))
 # 		fronius_client.start_weld()
-#		welding_started=True
+# 		welding_started=True
 
-# 	robot_ts=[]
-# 	robot_js=[]
+# 	timestamp_robot=[]
+# 	joint_recording=[]
 # 	for bp_idx in range(len(breakpoints)):
 		
 # 		if bp_idx<10:	###streaming 10 points before process FLIR monitoring
@@ -192,13 +195,13 @@ slice_inc_gain=3.
 # 				###busy wait for accurate 8ms streaming
 # 				while time.time()-point_stream_start_time<1/SS.streaming_rate-0.0005:
 # 					continue
-# 		robot_ts.append(robot_timestamp)
-# 		robot_js.append(q14)
+# 		timestamp_robot.append(robot_timestamp)
+# 		joint_recording.append(q14)
 
 # 	###LOGGING
 # 	local_recorded_dir='recorded_data/wall_recording/'
 # 	os.makedirs(local_recorded_dir,exist_ok=True)
-# 	np.savetxt(local_recorded_dir+'slice_%i_%i_joint.csv'%(slice_num,x),np.hstack((np.array(robot_ts)-robot_ts[0].reshape((-1,1)),np.array(robot_js))),delimiter=',')
+# 	np.savetxt(local_recorded_dir+'slice_%i_%i_joint.csv'%(slice_num,x),np.hstack(((np.array(timestamp_robot)-timestamp_robot[0]).reshape((-1,1)),np.array(joint_recording))),delimiter=',')
 # 	flir_ts_rec=np.array(flir_ts)-flir_ts[0]
 # 	np.savetxt(local_recorded_dir+'slice_%i_%i_flir_ts.csv'%(slice_num,x),flir_ts_rec,delimiter=',')
 # 	with open(local_recorded_dir+'slice_%i_%i_flir.pickle'%(slice_num,x), 'wb') as file:
@@ -219,7 +222,6 @@ while slice_num<slicing_meta['num_layers']:
 
 	###############DETERMINE SECTION ORDER###########################
 	sections=[0]
-
 	####################DETERMINE CURVE ORDER##############################################
 	for x in sections:
 		try:
@@ -246,8 +248,8 @@ while slice_num<slicing_meta['num_layers']:
 			wire_length=[]
 			temp_below=[]
 			audio_recording=[]
-			robot_ts=[]
-			robot_js=[]
+			timestamp_robot=[]
+			joint_recording=[]
 			flir_logging=[]
 			flir_ts=[]
 
@@ -258,7 +260,7 @@ while slice_num<slicing_meta['num_layers']:
 				welding_started=True
 				fronius_client.start_weld()
 				
-
+			rr_sensors.start_all_sensors()
 			for bp_idx in range(len(breakpoints)):
 				
 				if bp_idx<10:	###streaming 10 points before process FLIR monitoring
@@ -280,34 +282,28 @@ while slice_num<slicing_meta['num_layers']:
 						###busy wait for accurate 8ms streaming
 						while time.time()-point_stream_start_time<1/SS.streaming_rate-0.0005:
 							continue
-					robot_ts.append(robot_timestamp)
-					robot_js.append(q14)
+					timestamp_robot.append(robot_timestamp)
+					joint_recording.append(q14)
 			
 
 			###LOGGING
-			local_recorded_dir='recorded_data/wall_recording/'
-			os.makedirs(local_recorded_dir,exist_ok=True)
-			np.savetxt(local_recorded_dir+'slice_%i_%i_joint.csv'%(slice_num,x),np.hstack((np.array(robot_ts)-robot_ts[0].reshape((-1,1)),np.array(robot_js))),delimiter=',')
+			rr_sensors.stop_all_sensors()
+			recorded_dir='recorded_data/wall_recording/'
+			layer_data_dir=recorded_dir+'layer_'+str(slice_num)+'/'
+			Path(layer_data_dir).mkdir(exist_ok=True)
 			flir_ts_rec=np.array(flir_ts)-flir_ts[0]
-			np.savetxt(local_recorded_dir+'slice_%i_%i_flir_ts.csv'%(slice_num,x),flir_ts_rec,delimiter=',')
-			with open(local_recorded_dir+'slice_%i_%i_flir.pickle'%(slice_num,x), 'wb') as file:
+			np.savetxt(layer_data_dir+'ir_stamps.csv',flir_ts_rec,delimiter=',')
+			with open(layer_data_dir+'ir_recording.pickle', 'wb') as file:
 				pickle.dump(flir_logging, file)
-			first_channel = np.concatenate(audio_recording)
-			first_channel_int16=(first_channel*32767).astype(np.int16)
-			with wave.open(local_recorded_dir+'slice_%i_%i_microphone.wav'%(slice_num,x), 'wb') as wav_file:
-				# Set the WAV file parameters
-				wav_file.setnchannels(channels)
-				wav_file.setsampwidth(2)  # 2 bytes per sample (16-bit)
-				wav_file.setframerate(samplerate)
-
-				# Write the audio data to the WAV file
-				wav_file.writeframes(first_channel_int16.tobytes())
+			np.savetxt(layer_data_dir+'joint_recording.csv',np.hstack(((np.array(timestamp_robot)-timestamp_robot[0]).reshape(-1, 1),np.array(joint_recording))),delimiter=',')
+			rr_sensors.save_all_sensors(layer_data_dir)
 
 			wire_length_avg=np.average(wire_length)
 			temp_below_avg=np.average(temp_below)
 			###proportional feedback
 			# feedrate=min(max(feedrate+1*(nominal_temp_below-temp_below_avg),feedrate_min),feedrate_max)
-			slice_increment=max(nominal_slice_increment+slice_inc_gain*(nominal_wire_length-wire_length_avg),-nominal_slice_increment+2)
+			# slice_increment=max(nominal_slice_increment+slice_inc_gain*(nominal_wire_length-wire_length_avg),-nominal_slice_increment+2)
+			slice_increment=nominal_slice_increment
 			# vd_relative=feedrate/10-3
 			print('WIRE LENGTH: ',wire_length_avg,'TEMP BELOW: ',temp_below_avg,'FEEDRATE: ',feedrate,'VD: ',vd_relative,'SLICE INC: ',slice_increment)
 			slice_num+=int(slice_increment)

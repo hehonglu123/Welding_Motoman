@@ -87,3 +87,51 @@ def flame_detection(raw_img,threshold=1.2e4,area_threshold=10):
     bbox = stats[valid_index, :-1]
 
     return centroid, bbox
+
+
+def weld_detection(raw_img,threshold=1.2e4,area_threshold=10):
+    ###flame detection by raw counts thresholding and connected components labeling
+    #centroids: x,y
+    #bbox: x,y,w,h
+    #pixels: row,col coordinates
+
+    threshold=max(threshold,np.max(raw_img)*0.9)
+    thresholded_img=(raw_img>threshold).astype(np.uint8)
+    if np.max(thresholded_img)==0:
+        # print('max counts below threshold: ',np.max(raw_img))
+        return None, None, None
+
+    nb_components, labels, stats, centroids = cv2.connectedComponentsWithStats(thresholded_img, connectivity=4)
+
+    valid_indices=np.where(stats[:, cv2.CC_STAT_AREA] > area_threshold)[0][1:]  ###threshold connected area
+    if len(valid_indices)==0:
+        # print('no connected components')
+        return None, None, None
+    
+    average_pixel_values = [np.mean(raw_img[labels == label]) for label in valid_indices]   ###sorting
+
+    valid_index=valid_indices[np.argmax(average_pixel_values)]      ###get the area with largest average brightness value
+
+    #list of pixel coordinates
+    pixels=np.where(labels==valid_index)
+    # Extract the centroid and bounding box of the largest component
+    centroid = centroids[valid_index]
+    bbox = stats[valid_index, :-1]
+
+    return centroid, bbox, pixels
+
+def torch_detect(ir_image,template):
+    #threshold and normalize ir image
+    ir_torch_tracking=ir_image.copy()
+    ir_torch_tracking[ir_torch_tracking>1e4]=1e4
+    ir_torch_tracking_normalized = ((ir_torch_tracking - np.min(ir_torch_tracking)) / (np.max(ir_torch_tracking) - np.min(ir_torch_tracking))) * 255
+
+    # run edge detection
+    edges = cv2.Canny(ir_torch_tracking_normalized.astype(np.uint8), threshold1=50, threshold2=200)
+    # bolden all edges
+    edges=cv2.dilate(edges,None,iterations=1)
+
+    ###template matching with normalized image
+    res = cv2.matchTemplate(edges,template,cv2.TM_CCOEFF_NORMED)
+    min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(res)
+    return max_loc

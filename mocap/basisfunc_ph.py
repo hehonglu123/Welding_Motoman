@@ -10,8 +10,8 @@ from matplotlib import pyplot as plt
 
 from PH_interp import *
 
-ph_dataset_date='0516'
-test_dataset_date='0516'
+ph_dataset_date='0801'
+test_dataset_date='0801'
 PH_data_dir='PH_grad_data/test'+ph_dataset_date+'_R1/train_data_'
 test_data_dir='kinematic_raw_data/test'+test_dataset_date+'/'
 
@@ -19,7 +19,7 @@ config_dir='../config/'
 ### z pointing x-axis (with 22 deg angle), y pointing y-axis
 robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path=config_dir+'torch.csv',d=15,\
 pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',\
-base_marker_config_file=config_dir+'MA2010_'+ph_dataset_date+'_marker_config.yaml',tool_marker_config_file=config_dir+'weldgun_'+ph_dataset_date+'_marker_config.yaml')
+base_marker_config_file=config_dir+'MA2010_marker_config/MA2010_'+ph_dataset_date+'_marker_config.yaml',tool_marker_config_file=config_dir+'weldgun_marker_config/weldgun_'+ph_dataset_date+'_marker_config.yaml')
 
 # print(robot_weld.fwd(np.zeros(6)))
 # exit()
@@ -39,8 +39,8 @@ origin_p_tool = deepcopy(robot_weld.robot.p_tool)
 
 with open(PH_data_dir+'calib_PH_q.pickle','rb') as file:
     PH_q=pickle.load(file)
-ph_param_lin=PH_Param()
-ph_param_lin.fit(PH_q,method='linear')
+# ph_param_lin=PH_Param()
+# ph_param_lin.fit(PH_q,method='linear')
 
 ## nominal
 ph_q_nom = []
@@ -57,7 +57,7 @@ basis_func.append(lambda q2,q3,a: np.sin(a*q3))
 basis_func.append(lambda q2,q3,a: np.cos(a*q3))
 basis_func.append(lambda q2,q3,a: np.sin(a*(q2+q3)))
 basis_func.append(lambda q2,q3,a: np.cos(a*(q2+q3)))
-basis_function_num=3
+basis_function_num=2
 ###################################
 
 diff_ph_q = []
@@ -116,12 +116,15 @@ print(VT[-2:])
 
 plt.imshow(np.fabs(VT))
 plt.colorbar()
-plt.title("V Transpose (Abs)")
+plt.title("V Transpose (Abs)",fontsize=20)
+plt.xticks(fontsize=15)
+plt.yticks(fontsize=15)
 plt.show()
 
 plt.plot(np.log10(S),'-o')
-plt.xticks(np.arange(0,len(S),2))
-plt.xlabel('Singular Value Index')
-plt.ylabel('Singular Value (log 10 scale)')
-plt.title("Singular Values of Coefficient Matrix (A)")
+plt.xticks(np.arange(0,len(S),2),fontsize=15)
+plt.xlabel('Singular Value Index',fontsize=15)
+plt.ylabel('Singular Value (log 10 scale)',fontsize=15)
+plt.yticks(fontsize=15)
+plt.title("Singular Values of Coefficient Matrix (A)",fontsize=20)
 plt.show()
