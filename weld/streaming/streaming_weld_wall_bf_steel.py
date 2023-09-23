@@ -8,7 +8,7 @@ from lambda_calc import *
 from multi_robot import *
 from flir_toolbox import *
 from StreamingSend import *
-sys.path.append('../')
+sys.path.append('../../sensor_fusion/')
 from weldRRSensor import *
 
 def new_frame(pipe_ep):
@@ -44,7 +44,8 @@ sliced_alg='dense_slice/'
 data_dir='../../data/'+dataset+sliced_alg
 with open(data_dir+'slicing.yml', 'r') as file:
 	slicing_meta = yaml.safe_load(file)
-
+#load template
+template = cv2.imread('../../FLIR/tracking/torch_template.png',0)
 
 
 robot=robot_obj('MA2010_A0',def_path='../../config/MA2010_A0_robot_default_config.yml',tool_file_path='../../config/torch.csv',\
@@ -121,9 +122,9 @@ layer_counts=0
 slice_num=0
 welding_started=False
 ###job=feedrate/10+200
-job_offset=400
+job_offset=300
 nominal_feedrate=150
-nominal_vd_relative=8
+nominal_vd_relative=6
 nominal_wire_length=25 #pixels
 nominal_temp_below=500
 
@@ -182,14 +183,21 @@ slice_inc_gain=3.
 # 			point_stream_start_time=time.time()
 # 			robot_timestamp,q14=SS.position_cmd(np.hstack((rob1_js_dense[breakpoints[bp_idx]],rob2_js_dense[breakpoints[bp_idx]],positioner_js_dense[breakpoints[bp_idx]])))
 # 			####################################FLIR PROCESSING####################################
-# 			#TODO: make sure processing time within 8ms
-# 			centroid, bbox=flame_detection(flir_logging[-1])
+# 			#torch detection
+# 			torch_loc=torch_detect(flir_logging[-1],template)
+# 			torch_eef=[torch_loc[0]+template.shape[1]-3,torch_loc[1]+int(template.shape[0]/2)]
+# 			centroid, bbox, pixels=weld_detection(flir_logging[-1])
 # 			if centroid is not None:
+# 				###find wire tip
+# 				indices=[np.argmax(pixels[0]),np.argmin(pixels[0])]
+# 				idx=indices[np.argmin(np.abs(pixels[0][indices]-torch_eef[1]))]
+# 				tip=[pixels[1][idx],pixels[0][idx]] #x,y coordinates
+# 				wire_length.append(abs(tip[0]-torch_eef[0]))
+# 				###find temperature below
 # 				bbox_below_size=5
-# 				centroid_below=(int(centroid[0]+bbox[2]/2+bbox_below_size/2),centroid[1])
-# 				temp_in_bbox=counts2temp(flir_logging[-1][int(centroid_below[1]-bbox_below_size):int(centroid_below[1]+bbox_below_size),int(centroid_below[0]-bbox_below_size):int(centroid_below[0]+bbox_below_size)].flatten(),6.39661118e+03, 1.40469989e+03, 1.00000008e+00, 8.69393436e+00, 8.40029488e+03,Emiss=0.13)
+# 				centroid_below=(int(tip[0]+bbox[2]/2+bbox_below_size/2),tip[1])
+# 				temp_in_bbox=counts2temp(flir_logging[-1][int(centroid_below[1]-bbox_below_size):int(centroid_below[1]+bbox_below_size),int(centroid_below[0]-bbox_below_size):int(centroid_below[0]+bbox_below_size)].flatten(),6.39661118e+03, 1.40469989e+03, 1.00000008e+00, 8.69393436e+00, 8.40029488e+03,Emiss=0.85)
 # 				temp_below.append(np.average(temp_in_bbox))
-# 				wire_length.append(centroid[0]-139)
 			
 # 			if bp_idx<len(breakpoints)-1: ###no wait at last point
 # 				###busy wait for accurate 8ms streaming
@@ -269,15 +277,22 @@ while slice_num<slicing_meta['num_layers']:
 					point_stream_start_time=time.time()
 					robot_timestamp,q14=SS.position_cmd(np.hstack((rob1_js_dense[breakpoints[bp_idx]],rob2_js_dense[breakpoints[bp_idx]],positioner_js_dense[breakpoints[bp_idx]])))
 					####################################FLIR PROCESSING####################################
-					#TODO: make sure processing time within 8ms
-					centroid, bbox=flame_detection(flir_logging[-1])
+					#torch detection
+					torch_loc=torch_detect(flir_logging[-1],template)
+					torch_eef=[torch_loc[0]+template.shape[1]-3,torch_loc[1]+int(template.shape[0]/2)]
+					centroid, bbox, pixels=weld_detection(flir_logging[-1])
 					if centroid is not None:
+						###find wire tip
+						indices=[np.argmax(pixels[0]),np.argmin(pixels[0])]
+						idx=indices[np.argmin(np.abs(pixels[0][indices]-torch_eef[1]))]
+						tip=[pixels[1][idx],pixels[0][idx]] #x,y coordinates
+						wire_length.append(abs(tip[0]-torch_eef[0]))
+						###find temperature below
 						bbox_below_size=5
-						centroid_below=(int(centroid[0]+bbox[2]/2+bbox_below_size/2),centroid[1])
-						temp_in_bbox=counts2temp(flir_logging[-1][int(centroid_below[1]-bbox_below_size):int(centroid_below[1]+bbox_below_size),int(centroid_below[0]-bbox_below_size):int(centroid_below[0]+bbox_below_size)].flatten(),6.39661118e+03, 1.40469989e+03, 1.00000008e+00, 8.69393436e+00, 8.40029488e+03,Emiss=0.13)
+						centroid_below=(int(tip[0]+bbox[2]/2+bbox_below_size/2),tip[1])
+						temp_in_bbox=counts2temp(flir_logging[-1][int(centroid_below[1]-bbox_below_size):int(centroid_below[1]+bbox_below_size),int(centroid_below[0]-bbox_below_size):int(centroid_below[0]+bbox_below_size)].flatten(),6.39661118e+03, 1.40469989e+03, 1.00000008e+00, 8.69393436e+00, 8.40029488e+03,Emiss=0.85)
 						temp_below.append(np.average(temp_in_bbox))
-						wire_length.append(centroid[0]-139)
-					
+						
 					if bp_idx<len(breakpoints)-1: ###no wait at last point
 						###busy wait for accurate 8ms streaming
 						while time.time()-point_stream_start_time<1/SS.streaming_rate-0.0005:
@@ -302,8 +317,10 @@ while slice_num<slicing_meta['num_layers']:
 			temp_below_avg=np.average(temp_below)
 			###proportional feedback
 			# feedrate=min(max(feedrate+1*(nominal_temp_below-temp_below_avg),feedrate_min),feedrate_max)
-			# slice_increment=max(nominal_slice_increment+slice_inc_gain*(nominal_wire_length-wire_length_avg),-nominal_slice_increment+2)
-			slice_increment=nominal_slice_increment
+			if slice_num>100:
+				slice_increment=max(nominal_slice_increment+slice_inc_gain*(nominal_wire_length-wire_length_avg),-nominal_slice_increment+2)
+			else:
+				slice_increment=nominal_slice_increment
 			# vd_relative=feedrate/10-3
 			print('WIRE LENGTH: ',wire_length_avg,'TEMP BELOW: ',temp_below_avg,'FEEDRATE: ',feedrate,'VD: ',vd_relative,'SLICE INC: ',slice_increment)
 			slice_num+=int(slice_increment)

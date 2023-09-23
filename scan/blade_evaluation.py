@@ -1,5 +1,6 @@
 import sys,time, copy
 import open3d as o3d
+from matplotlib import cm
 
 sys.path.append('../toolbox/')
 from utils import *
@@ -52,6 +53,12 @@ def collapse(left_pc,right_pc,target_points):
     
     return np.sum(width,axis=1), collapsed_surface
 
+def error_map_gen(collapsed_surface,target_points):
+    error_map=np.zeros(len(collapsed_surface))
+    for i in range(len(collapsed_surface)):
+        error_map[i]=np.linalg.norm(target_points-collapsed_surface[i],axis=1).min()
+    return error_map
+
 def visualize_pcd(show_pcd_list,point_show_normal=False):
 
     show_pcd_list_legacy=[]
@@ -68,7 +75,7 @@ def visualize_pcd(show_pcd_list,point_show_normal=False):
 
     
 data_dir='../data/blade0.1/'
-scanned_dir='../../evaluation/Blade_ER4043/'
+scanned_dir='../../evaluation/Blade_ER316L/'
 ######## read the scanned stl
 target_mesh = o3d.io.read_triangle_mesh(data_dir+'surface.stl')
 scanned_mesh = o3d.io.read_triangle_mesh(scanned_dir+'no_base_layer.stl')
@@ -127,7 +134,6 @@ collapsed_surface_pc.paint_uniform_color([0.7, 0.7, 0.0])
 print('\sigma(w): ',np.std(width),'\mu(w): ',np.average(width))
 
 error_off,error_miss=calc_error(target_points_transform,collapsed_surface)
-
 highlight_pc=o3d.geometry.PointCloud()
 highlight_pc.points=o3d.utility.Vector3dVector([collapsed_surface[error_off.argmax()]])
 highlight_pc.paint_uniform_color([1.0, 0.0, 0.0])
@@ -137,3 +143,12 @@ o3d.visualization.draw_geometries([target_mesh,collapsed_surface_pc,highlight_pc
 # error_off=np.maximum(error_off-np.average(width),0)
 print('error max: ',error_off.max(),'error avg: ',np.mean(error_off))
 print(error_miss.max(),np.mean(error_miss))
+
+
+error_map=error_map_gen(collapsed_surface,target_points_transform)
+print(error_map)
+error_map_normalized=error_map/np.max(error_map)
+#convert normalized error map to color heat map
+error_map_color=cm.inferno(error_map_normalized)[:,:3]
+collapsed_surface_pc.colors=o3d.utility.Vector3dVector(error_map_color)
+o3d.visualization.draw_geometries([collapsed_surface_pc])
