@@ -113,7 +113,7 @@ start_id=0
 end_id=-1
 
 # datasets=['baseline','correction']
-datasets=['repeat 2']
+datasets=['test']
 
 # datasets=['baseline','correction','repeat 1','repeat 2']
 datasets_h_mean={}
@@ -128,13 +128,14 @@ for dataset in datasets:
         data_dir = '../data/wall_weld_test/moveL_100_repeat_weld_scan_2023_08_02_16_03_50/'
     elif dataset=='repeat 2':
         data_dir = '../data/wall_weld_test/moveL_100_repeat_weld_scan_2023_08_02_17_07_02/'
-
+    elif dataset =='test':
+        data_dir = '../data/wall_weld_test/weld_scan_2023_09_20_21_54_32/'
     forward_flag=False
     all_profile_height=[]
     all_correction_layer=[]
     all_h_mean=[]
     all_h_std=[]
-    for i in range(0,9999999):
+    for i in range(0,50):
         try:
             weld_dir=data_dir+'layer_'+str(i)+'/'
             weld_q=np.loadtxt(weld_dir+'weld_js_exe.csv',delimiter=',')
@@ -152,7 +153,7 @@ for dataset in datasets:
             # with open(data_dir +'mti_scans.pickle', 'rb') as file:
             #     mti_recording=pickle.load(file)
         except:
-            break
+            continue
         print("Layer",i)
         print("Forward:",not forward_flag)
 
@@ -430,7 +431,7 @@ for dataset in datasets:
     plt.xlabel('x-axis (mm)', fontsize=20)
     plt.ylabel('height (mm)', fontsize=20)
     
-    plt.title("Height Profile of 100ipm Model Test", fontsize=20)
+    plt.title("Height Profile of 100ipm MFCC Control Test", fontsize=20)
     plt.tight_layout()
     
 

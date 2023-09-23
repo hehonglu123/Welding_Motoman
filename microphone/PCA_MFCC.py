@@ -24,7 +24,7 @@ mean_co1 = []
 mean_co2 = []
 mean_value_co1 = []
 mean_value_co2 = []
-base_path = '../data/wall_weld_test/weld_scan_2023_09_20_21_54_32/'
+base_path = '../data/wall_weld_test/weld_scan_correction_2023_09_21_08_51_15/'
 
 if os.path.exists(base_path):
     # 获取指定路径下的所有子目录
@@ -42,6 +42,10 @@ if os.path.exists(base_path):
         # Check if mic_recording.wav exists in the current subdir
         if not os.path.exists(mic_recording_path):
             print(f"mic_recording_cut.wav not found in {layer_path}. Skipping...")
+            std_co1.append(0)
+            std_co2.append(0)
+            mean_co1.append(0)
+            mean_co2.append(0) 
             continue  # Skip to the next iteration
 # file_path = '../data/wall_weld_test/moveL_100_repeat_weld_scan_2023_08_02_17_07_02/layer_0/'
         n=0
@@ -75,7 +79,7 @@ if os.path.exists(base_path):
 
             # 如果你想要显示图例，可以使用以下命令：
             plt.legend()
-            # plt.show()
+            plt.show()
             plt.close()
             std_value_co1 = np.std(mfccs[0])
             print('std_value_co1:',std_value_co1)
@@ -88,7 +92,19 @@ if os.path.exists(base_path):
             mean_co1.append(mean_value_co1)
             mean_co2.append(mean_value_co2)  
             mean_mov_co1 = moving_average(mfccs[0],60)
-            mean_mov_co2 = moving_average(mfccs[1],60)         
+            mean_mov_co2 = moving_average(mfccs[1],60)   
+            x_labels = range(len(mean_mov_co1))
+            plt.figure(figsize=(6, 6))
+            plt.plot(x_labels, mean_mov_co1, marker='o', linestyle='-',color="blue", label = 'mean_mov_co1')
+            plt.plot(x_labels, mean_mov_co2, marker='o', linestyle='-',color="orange",label = 'mean_mov_co2')
+            ax = plt.gca()  # 获取当前的axes对象
+            ax.xaxis.set_major_locator(MaxNLocator(integer=True))  # 强制x轴刻度为整数
+            plt.xlabel('Index of samples (60samples/per)')
+            plt.ylabel("MFCC coefficient mean_mov of")
+            plt.title(f"Mean_mov of the MFCC of {layer_dir}")
+            plt.legend()
+            plt.show()
+            plt.close()                  
             n += 1  
             # exit()
 #             # 进行PCA分析，以减少维度（例如，从13维减少到2维以便于可视化）
@@ -109,6 +125,8 @@ x_labels = range(len(std_co1))
 plt.figure(figsize=(6, 6))
 plt.plot(x_labels, std_co1, marker='o', linestyle='-',color="blue", label = 'std_co1')
 plt.plot(x_labels, std_co2, marker='o', linestyle='-',color="orange",label = 'std_co2')
+plt.axhline(y=20, color='blue', linestyle='-', label=f'MFCC co1_std_thres')
+plt.axhline(y=20, color='orange', linestyle='-', label=f'MFCC co2_std_thres')
 ax = plt.gca()  # 获取当前的axes对象
 ax.xaxis.set_major_locator(MaxNLocator(integer=True))  # 强制x轴刻度为整数
 plt.xlabel('Index of layers')
@@ -131,17 +149,6 @@ plt.legend()
 plt.show()
 plt.close()
 
-x_labels = range(len(mean_mov_co1))
-plt.figure(figsize=(6, 6))
-plt.plot(x_labels, mean_mov_co1, marker='o', linestyle='-',color="blue", label = 'mean_mov_co1')
-plt.plot(x_labels, mean_mov_co2, marker='o', linestyle='-',color="orange",label = 'mean_mov_co2')
-ax = plt.gca()  # 获取当前的axes对象
-ax.xaxis.set_major_locator(MaxNLocator(integer=True))  # 强制x轴刻度为整数
-plt.xlabel('Index of layers')
-plt.ylabel("MFCC coefficient mean_mov")
-plt.title("Mean_mov of the MFCC")
-plt.legend()
-plt.show()
-plt.close()
+
 
 
