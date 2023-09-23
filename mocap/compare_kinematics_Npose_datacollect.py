@@ -17,12 +17,11 @@ from MocapPoseListener import *
 dataset_date = '0801'
 
 config_dir='../config/'
-# robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path=config_dir+'weldgun.csv',d=15,\
-# pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg.csv',\
-# base_marker_config_file=config_dir+'MA2010_marker_config.yaml',tool_marker_config_file=config_dir+'weldgun_marker_config.yaml')
+robot_marker_dir=config_dir+'MA2010_marker_config/'
+tool_marker_dir=config_dir+'weldgun_marker_config/'
 robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path=config_dir+'torch.csv',d=15,\
 pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',\
-base_marker_config_file=config_dir+'MA2010_'+dataset_date+'_marker_config.yaml',tool_marker_config_file=config_dir+'weldgun_'+dataset_date+'_marker_config.yaml')
+base_marker_config_file=robot_marker_dir+'MA2010_'+dataset_date+'_marker_config.yaml',tool_marker_config_file=tool_marker_dir+'weldgun_'+dataset_date+'_marker_config.yaml')
 
 # test_qs = np.array([[0.,0.,0.,0.,0.,0.],[0,69,57,0,0,0],[0,-68,-68,0,0,0],[-36.6018,12.4119,-12.1251,-43.3579,-45.4297,68.1203],
 #                 [21.0753,-1.8803,-27.3509,13.1122,-25.1173,-25.2466]])
@@ -36,8 +35,8 @@ test_qs = []
 sample_q = np.radians([[32,14,-5,22,-37,20],[-41,31,6,-41,-49,66],\
                        [0,-60,-60,0,-22,0],[0,0,0,0,0,0],\
                        [0,57,31,0,34,0],[32,14,-5,22,-37,20],[0,0,0,0,0,0]])
-sample_N = [369,238,193,203,264,233] # len(sample_q)-1
-# sample_N = [2,2,2,2,2,2] # len(sample_q)-1
+# sample_N = [369,238,193,203,264,233] # len(sample_q)-1
+sample_N = [2,2,2,2,2,2] # len(sample_q)-1
 for i in range(len(sample_N)):
     start_T = robot_weld.fwd(sample_q[i])
     end_T = robot_weld.fwd(sample_q[i+1])
@@ -70,8 +69,8 @@ mpl_obj = MocapFrameListener(mocap_cli,all_ids,'world',use_quat=True)
 data_dir = 'kinematic_raw_data/'
 
 repeats_N = 1
-rob_speed = 3
-waitTime = 0.75
+rob_speed = 10
+waitTime = 0.1
 
 robot_client = MotionProgramExecClient()
 

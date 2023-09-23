@@ -173,9 +173,11 @@ def calib_R2():
 def calib_R1():
 
     config_dir='../config/'
+    robot_marker_dir=config_dir+'MA2010_marker_config/'
+    tool_marker_dir=config_dir+'weldgun_marker_config/'
     robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path=config_dir+'torch.csv',\
 	pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',\
-    base_marker_config_file=config_dir+'MA2010_marker_config.yaml',tool_marker_config_file=config_dir+'weldgun_marker_config.yaml')
+    base_marker_config_file=robot_marker_dir+'MA2010_marker_config.yaml',tool_marker_config_file=tool_marker_dir+'weldgun_marker_config.yaml')
 
     mocap_url = 'rr+tcp://localhost:59823?service=optitrack_mocap'
     mocap_cli = RRN.ConnectService(mocap_url)
@@ -256,6 +258,7 @@ def calib_R1():
 
 if __name__=='__main__':
 
-    # calib_R1()
+    calib_R1()
+    
     # calib_S1()
-    calib_R2()
+    # calib_R2()

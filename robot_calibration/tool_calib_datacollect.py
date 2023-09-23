@@ -10,13 +10,15 @@ from robot_def import *
 from matplotlib import pyplot as plt
 from dx200_motion_program_exec_client import *
 
-data_dir='R1_weldgun_0809/'
+data_dir='tool_data/'+'R2_mti_0810/'
 
 ph_dataset_date='0801'
 
 config_dir='../config/'
 
-robot_type = 'R1'
+robot_type = 'R2'
+
+data_type='zaxis'
 
 if robot_type == 'R1':
     robot=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',\
@@ -43,7 +45,7 @@ elif robot_type=='R2':
 robot_client.StopStreaming()
 
 Path(data_dir).mkdir(exist_ok=True)
-num_js=len(glob.glob(data_dir+'pose_js_*.csv'))
-np.savetxt(data_dir+'pose_js_'+str(num_js)+'.csv',joint_angle)
+num_js=len(glob.glob(data_dir+'pose_js_'+data_type+'_*.csv'))
+np.savetxt(data_dir+'pose_js_'+data_type+'_'+str(num_js)+'.csv',joint_angle,delimiter=',')
 
 print("Total # of Poses:",num_js+1)

@@ -21,21 +21,25 @@ dataset_date='0801'
 
 config_dir='../config/'
 
-robot_type = 'R2'
+robot_type = 'R1'
 
 if robot_type == 'R1':
+    robot_marker_dir=config_dir+'MA2010_marker_config/'
+    tool_marker_dir=config_dir+'weldgun_marker_config/'
     robot=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',\
                         tool_file_path=config_dir+'torch.csv',d=15,\
                         #  tool_file_path='',d=0,\
                         pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',\
-                        base_marker_config_file=config_dir+'MA2010_'+dataset_date+'_marker_config.yaml',\
-                        tool_marker_config_file=config_dir+'weldgun_'+dataset_date+'_marker_config.yaml')
+                        base_marker_config_file=robot_marker_dir+'MA2010_'+dataset_date+'_marker_config.yaml',\
+                        tool_marker_config_file=tool_marker_dir+'weldgun_'+dataset_date+'_marker_config.yaml')
 elif robot_type == 'R2':
+    robot_marker_dir=config_dir+'MA1440_marker_config/'
+    tool_marker_dir=config_dir+'mti_marker_config/'
     robot=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.yml',\
                         tool_file_path=config_dir+'mti.csv',\
                         pulse2deg_file_path=config_dir+'MA1440_A0_pulse2deg_real.csv',\
-                        base_marker_config_file=config_dir+'MA1440_'+dataset_date+'_marker_config.yaml',\
-                        tool_marker_config_file=config_dir+'mti_'+dataset_date+'_marker_config.yaml')
+                        base_marker_config_file=robot_marker_dir+'MA1440_'+dataset_date+'_marker_config.yaml',\
+                        tool_marker_config_file=tool_marker_dir+'mti_'+dataset_date+'_marker_config.yaml')
 
 #### using rigid body
 use_toolmaker=True
@@ -330,7 +334,8 @@ print(train_set)
 #### Gradient
 plot_grad=False
 plot_error=True
-save_PH = True
+plot_block=False
+save_PH = False
 all_testing_pose=np.arange(N_per_pose)
 # max_iteration = 500
 max_iteration = 200
@@ -346,8 +351,8 @@ dH_low_range = np.radians(0.03)
 H_size = 6
 dH_rotate_axis = [[Rx,Ry],[Rz,Rx],[Rz,Rx],[Ry,Rz],[Rz,Rx],[Ry,Rz]]
 alpha=0.5
-weight_ori = 0.1
-# weight_ori = 1
+# weight_ori = 0.1
+weight_ori = 1
 weight_pos = 1
 lambda_H = 10
 # lambda_H = 1
@@ -454,7 +459,7 @@ for N in train_set:
             print("Gradient Size:",G.shape)
             plt.matshow(G)
             plt.colorbar()
-            plt.show(block=False)
+            plt.show(block=plot_block)
             
         
         # update PH
@@ -486,26 +491,44 @@ for N in train_set:
             plt.close(fig)
         except:
             pass
-        fig,axs = plt.subplots(2,3)
-        axs[0,0].plot(np.array(pos_error_progress))
-        axs[0,0].set_title("Position XYZ error of Pose 1")
-        axs[0,1].plot(np.array(pos_error_norm_progress))
-        axs[0,1].set_title("Position error norm of all poses")
-        pos_error_diff = np.linalg.norm(np.diff(pos_error_norm_progress,axis=0),axis=1).flatten()
-        axs[0,2].plot(np.array(pos_error_diff))
-        axs[0,2].set_title("Position Error Norm Diff")
-        axs[1,0].plot(np.array(ori_error_progress))
-        axs[1,0].set_title("Orientation kdtheta error of Pose 1")
-        axs[1,1].plot(np.array(ori_error_norm_progress))
-        axs[1,1].set_title("Orientation error norm of all poses")
-        ori_error_diff = np.linalg.norm(np.diff(ori_error_norm_progress,axis=0),axis=1).flatten()
-        axs[1,2].plot(np.array(ori_error_diff))
-        axs[1,2].set_title("Orientation Error Norm Diff")
-        fig.canvas.manager.window.wm_geometry("+%d+%d" % (1920+10,10))
-        fig.set_size_inches([13.95,7.92],forward=True)
-        plt.tight_layout()
-        plt.show(block=False)
-        plt.pause(0.01)
+        # fig,axs = plt.subplots(2,3)
+        # axs[0,0].plot(np.array(pos_error_progress))
+        # axs[0,0].set_title("Position XYZ error of Pose 1")
+        # axs[0,1].plot(np.array(pos_error_norm_progress))
+        # axs[0,1].set_title("Position error norm of all poses")
+        # pos_error_diff = np.linalg.norm(np.diff(pos_error_norm_progress,axis=0),axis=1).flatten()
+        # axs[0,2].plot(np.array(pos_error_diff))
+        # axs[0,2].set_title("Position Error Norm Diff")
+        # axs[1,0].plot(np.array(ori_error_progress))
+        # axs[1,0].set_title("Orientation kdtheta error of Pose 1")
+        # axs[1,1].plot(np.array(ori_error_norm_progress))
+        # axs[1,1].set_title("Orientation error norm of all poses")
+        # ori_error_diff = np.linalg.norm(np.diff(ori_error_norm_progress,axis=0),axis=1).flatten()
+        # axs[1,2].plot(np.array(ori_error_diff))
+        # axs[1,2].set_title("Orientation Error Norm Diff")
+        # # fig.canvas.manager.window.wm_geometry("+%d+%d" % (1920+10,10))
+        # # fig.set_size_inches([13.95,7.92],forward=True)
+        # plt.tight_layout()
+        # plt.show(block=plot_block)
+        # plt.pause(0.01)
+        
+        plt.errorbar(np.arange(len(pos_error_norm_progress)),np.mean(pos_error_norm_progress,axis=1),\
+            yerr=np.mean(pos_error_norm_progress,axis=1))
+        plt.xlabel('Iteration',fontsize=15)
+        plt.xticks(np.arange(0,len(pos_error_norm_progress),len(pos_error_norm_progress)/6).astype(int),fontsize=15)
+        plt.ylabel('Position Error Norm (mm)',fontsize=15)
+        plt.yticks(fontsize=15)
+        plt.title("Mean/Std of Position Error Norm of Poses",fontsize=18)
+        plt.show()
+        
+        plt.errorbar(np.arange(len(ori_error_norm_progress)),np.mean(ori_error_norm_progress,axis=1),\
+            yerr=np.mean(ori_error_norm_progress,axis=1))
+        plt.xlabel('Iteration',fontsize=15)
+        plt.xticks(np.arange(0,len(pos_error_norm_progress),len(pos_error_norm_progress)/6).astype(int),fontsize=15)
+        plt.ylabel('Orientation Error Norm (deg)',fontsize=15)
+        plt.yticks(fontsize=15)
+        plt.title("Mean/Std of Orientation Error Norm of Poses",fontsize=18)
+        plt.show()
     
     if save_PH:
         q_key = tuple(robot_q_sample[N,1:3])
@@ -613,7 +636,7 @@ for iter_N in range(max_iteration):
         print("Gradient Size:",G.shape)
         plt.matshow(G)
         plt.colorbar()
-        plt.show(block=False)
+        plt.show(block=plot_block)
     
     # update PH
     Kq = np.diag(np.append(np.ones(P_size*3)*lambda_P,np.ones(H_size*2))*lambda_H)

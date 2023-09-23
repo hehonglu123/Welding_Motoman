@@ -150,9 +150,10 @@ class ScanProcess():
 
             if len(rob_js_exe[scan_i])<=6:
                 if use_calib:
-                    opt_P,opt_H = ph_param.predict(rob_js_exe[scan_i][1:3])
-                    self.robot.robot.P=opt_P
-                    self.robot.robot.H=opt_H
+                    if ph_param is not None:
+                        opt_P,opt_H = ph_param.predict(rob_js_exe[scan_i][1:3])
+                        self.robot.robot.P=opt_P
+                        self.robot.robot.H=opt_H
                     robt_T = self.robot.fwd(rob_js_exe[scan_i][:6],world=True) # T_world^r2tool
                 else:
                     robt_T = self.robot.fwd(rob_js_exe[scan_i][:6],world=True) # T_world^r2tool
@@ -162,9 +163,10 @@ class ScanProcess():
                 # print(np.degrees(self.robot.robot.joint_lower_limit))
                 # print("===============")
                 if use_calib:
-                    opt_P,opt_H = ph_param.predict(rob_js_exe[scan_i][1:3])
-                    self.robot.robot.P=opt_P
-                    self.robot.robot.H=opt_H
+                    if ph_param is not None:
+                        opt_P,opt_H = ph_param.predict(rob_js_exe[scan_i][1:3])
+                        self.robot.robot.P=opt_P
+                        self.robot.robot.H=opt_H
                     robt_T = self.robot.fwd(rob_js_exe[scan_i][:6],world=True) # T_world^r2tool
                 else:
                     robt_T = self.robot.fwd(rob_js_exe[scan_i][:6],world=True) # T_world^r2tool
@@ -183,6 +185,8 @@ class ScanProcess():
             
             ## voxel down sample
             pcd = pcd.voxel_down_sample(voxel_size=voxel_size)
+            # if scan_i==100:
+            #     visualize_pcd([pcd])
 
             if pcd_combined is None:
                 pcd_combined=deepcopy(pcd)
@@ -224,6 +228,182 @@ class ScanProcess():
         
         return pcd_combined
 
+    def pcd2dh_old(self,scanned_points,last_scanned_points,curve_relative,robot_weld=None,q_weld=None,ph_param=None,drawing=False):
+
+        ##### cross section parameters
+        # resolution_z=0.1
+        # windows_z=0.2
+        # resolution_x=0.1
+        # windows_x=1
+        # stop_thres=20
+        # stop_thres_w=10
+        # use_points_num=5 # use the largest/smallest N to compute w
+        # width_thres=0.8 # prune width that is too close
+        ###################################
+
+        if robot_weld is not None:
+            origin_P = deepcopy(robot_weld.robot.P)
+            origin_H = deepcopy(robot_weld.robot.H)
+            
+            curve_relative = []
+            for q in q_weld:
+                Table_home_T = self.positioner.fwd(q[-2:])
+                T_S1TCP_R1Base = np.matmul(self.positioner.base_H,H_from_RT(Table_home_T.R,Table_home_T.p))
+                T_R1Base_S1TCP = np.linalg.inv(T_S1TCP_R1Base)
+                
+                ### R1 fwd
+                if ph_param is not None:
+                    opt_P,opt_H = ph_param.predict(q[1:3])
+                    robot_weld.robot.P=opt_P
+                    robot_weld.robot.H=opt_H
+                robot_T = robot_weld.fwd(q[:6])
+                ###
+                
+                T_R1TCP_S1TCP = np.matmul(T_R1Base_S1TCP,H_from_RT(robot_T.R,robot_T.p))
+                curve_relative.append(np.append(T_R1TCP_S1TCP[:3,-1],T_R1TCP_S1TCP[:3,2]))
+            
+            robot_weld.robot.P=deepcopy(origin_P)
+            robot_weld.robot.H=deepcopy(origin_H)
+        
+        curve_relative=np.array(curve_relative)
+
+        # create the cropping polygon
+        bounding_polygon=[]
+        radius_scale=0.55
+        # radius_scale=0.2
+        radius=np.mean(np.linalg.norm(np.diff(curve_relative[:,:3],axis=0),axis=1))*radius_scale
+        print("height neighbor radius:",radius)
+        
+        # circle        
+        # poly_num=12
+        # for n in range(poly_num):
+        #     ang=(n/poly_num)*(np.pi*2)
+        #     bounding_polygon.append(np.array([radius*np.cos(ang),radius*np.sin(ang),0]))
+        # rectangle
+        y_max=7
+        bounding_polygon.append(np.array([radius,y_max,0]))
+        bounding_polygon.append(np.array([radius,-y_max,0]))
+        bounding_polygon.append(np.array([-radius,-y_max,0]))
+        bounding_polygon.append(np.array([-radius,y_max,0]))
+        ###
+        
+        bounding_polygon = np.array(bounding_polygon).astype("float64")
+        crop_poly = o3d.visualization.SelectionPolygonVolume()
+        crop_poly.bounding_polygon = o3d.utility.Vector3dVector(bounding_polygon)
+        crop_poly.orthogonal_axis = 'z'
+        crop_poly.axis_max=30
+        # crop_poly.axis_min=-15
+        crop_poly.axis_min=-10
+
+        if drawing:
+            scanned_points_draw = deepcopy(scanned_points)
+            scanned_points_draw.paint_uniform_color([0.3,0.3,0.3])
+            last_scanned_points_draw = deepcopy(last_scanned_points)
+            last_scanned_points_draw.paint_uniform_color([0.5,0.5,0.5])
+            path_points = o3d.geometry.PointCloud()
+            last_path_points = o3d.geometry.PointCloud()
+            curve_R = []
+            curve_p = []
+        
+        # loop through curve to get dh
+        curve_i=0
+        total_curve_i = len(curve_relative)
+        dh=[]
+        for curve_wp in curve_relative:
+            if np.all(curve_wp==curve_relative[-1]):
+                wp_R = direction2R(-1*curve_wp[3:],curve_wp[:3]-curve_relative[curve_i-1][:3])
+            else:
+                wp_R = direction2R(-1*curve_wp[3:],curve_relative[curve_i+1][:3]-curve_wp[:3])
+
+            sp_lamx=deepcopy(scanned_points)
+            ## transform the scanned points to waypoints
+            sp_lamx.transform(np.linalg.inv(H_from_RT(wp_R,curve_wp[:3])))
+            # visualize_pcd([sp_lamx])
+            ## crop the scanned points around the waypoints
+            sp_lamx = crop_poly.crop_point_cloud(sp_lamx)
+            # visualize_pcd([sp_lamx],origin_size=10)
+            ## dh is simply the z height after transform. Average over an radius
+            
+            last_sp_lamx=deepcopy(last_scanned_points)
+            last_sp_lamx.transform(np.linalg.inv(H_from_RT(wp_R,curve_wp[:3])))
+            last_sp_lamx = crop_poly.crop_point_cloud(last_sp_lamx)
+            
+            percentage=0.05
+            this_points_z = np.asarray(sp_lamx.points)[:,2]
+            if len(this_points_z>0):
+                height_ids=max(int(percentage*len(this_points_z)),10)
+                this_points_z = np.sort(this_points_z)[-1*height_ids:]
+                bbox = o3d.geometry.AxisAlignedBoundingBox(min_bound=(-1e5,-1e5,this_points_z[0]),max_bound=(1e5,1e5,1e5))
+                sp_lamx=sp_lamx.crop(bbox)
+                
+                # visualize_pcd([sp_lamx],origin_size=2)
+
+                last_points_z = np.asarray(last_sp_lamx.points)[:,2]
+                if len(last_points_z>0):
+                    height_ids=max(int(percentage*len(last_points_z)),10)
+                    last_points_z = np.sort(last_points_z)[-1*height_ids:]
+                    bbox = o3d.geometry.AxisAlignedBoundingBox(min_bound=(-1e5,-1e5,last_points_z[0]),max_bound=(1e5,1e5,1e5))
+                    last_sp_lamx=last_sp_lamx.crop(bbox)
+                else:
+                    print("not find")
+                    this_points_z=np.nan
+                    last_points_z=np.nan
+            else:
+                print("not find")
+                this_points_z=np.nan
+                last_points_z=np.nan
+            
+            
+            this_dh = np.mean(this_points_z)-np.mean(last_points_z)
+
+            dh_max=7
+            dh_min=-2
+            this_dh = max(min(this_dh,dh_max),dh_min)
+            # if this_dh>dh_max:
+            #     this_dh=np.nan
+
+            dh.append(this_dh)
+
+            if drawing:
+                ## paint pcd for visualization
+                color_dist = plt.get_cmap("rainbow")(float(curve_i)/total_curve_i)
+                sp_lamx.paint_uniform_color(color_dist[:3])
+                sp_lamx.transform(H_from_RT(wp_R,curve_wp[:3]))
+                path_points = path_points+sp_lamx
+                last_sp_lamx.paint_uniform_color(color_dist[:3])
+                last_sp_lamx.transform(H_from_RT(wp_R,curve_wp[:3]))
+                last_path_points = last_path_points+last_sp_lamx
+                curve_R.append(wp_R)
+                curve_p.append(curve_wp[:3])
+
+            curve_i+=1
+
+        window_nan=3
+        for curve_i in range(len(dh)):
+            if np.isnan(dh[curve_i]):
+                if curve_i<window_nan:
+                    dh[curve_i]=np.nanmean(dh[0:2*window_nan])
+                elif curve_i>len(dh)-window_nan:
+                    dh[curve_i]=np.nanmean(dh[-2*window_nan:])
+                else:
+                    dh[curve_i]=np.nanmean(dh[curve_i-window_nan:curve_i+window_nan])
+        # input(dh)
+
+        curve_relative=np.array(curve_relative)
+        lam = calc_lam_cs(curve_relative[:,:3])
+        profile_height = np.array([lam,dh]).T   
+
+        if drawing:
+            path_points.transform(H_from_RT(np.eye(3),[0,0,0.0001]))
+            last_path_points.transform(H_from_RT(np.eye(3),[0,0,0.0001]))
+            path_viz_frames = visualize_frames(curve_R,curve_p,size=1,visualize=False,frame_obj=True)
+            draw_obj = []
+            draw_obj.extend(path_viz_frames)
+            draw_obj.extend([scanned_points_draw,path_points,last_scanned_points_draw,last_path_points])
+            visualize_pcd(draw_obj)
+        
+        return profile_height
+    
     def pcd2dh(self,scanned_points,curve_relative,robot_weld=None,q_weld=None,ph_param=None,drawing=False):
 
         ##### cross section parameters
@@ -240,16 +420,6 @@ class ScanProcess():
         if robot_weld is not None:
             origin_P = deepcopy(robot_weld.robot.P)
             origin_H = deepcopy(robot_weld.robot.H)
-            # origin_flange = deepcopy(robot_weld.robot.T_flange)
-            # origin_R_tool = deepcopy(robot_weld.robot.R_tool)
-            # origin_p_tool = deepcopy(robot_weld.robot.p_tool)
-            # robot_weld.robot.P=deepcopy(robot_weld.calib_P)
-            # robot_weld.robot.H=deepcopy(robot_weld.calib_H)
-            # robot_weld.robot.T_flange = deepcopy(robot_weld.T_tool_flange)
-            # robot_weld.robot.R_tool = deepcopy(robot_weld.T_tool_toolmarker.R)
-            # robot_weld.robot.p_tool = deepcopy(robot_weld.T_tool_toolmarker.p)
-            
-            
             
             curve_relative = []
             for q in q_weld:
@@ -258,9 +428,10 @@ class ScanProcess():
                 T_R1Base_S1TCP = np.linalg.inv(T_S1TCP_R1Base)
                 
                 ### R1 fwd
-                opt_P,opt_H = ph_param.predict(q[1:3])
-                robot_weld.robot.P=opt_P
-                robot_weld.robot.H=opt_H
+                if ph_param is not None:
+                    opt_P,opt_H = ph_param.predict(q[1:3])
+                    robot_weld.robot.P=opt_P
+                    robot_weld.robot.H=opt_H
                 robot_T = robot_weld.fwd(q[:6])
                 ###
                 
@@ -269,28 +440,36 @@ class ScanProcess():
             
             robot_weld.robot.P=deepcopy(origin_P)
             robot_weld.robot.H=deepcopy(origin_H)
-            # robot_weld.robot.T_flange = deepcopy(origin_flange)
-            # robot_weld.robot.R_tool = deepcopy(origin_R_tool)
-            # robot_weld.robot.p_tool = deepcopy(origin_p_tool)
         
         curve_relative=np.array(curve_relative)
 
         # create the cropping polygon
-        poly_num=12
+        bounding_polygon=[]
         radius_scale=0.55
+        # radius_scale=0.2
         radius=np.mean(np.linalg.norm(np.diff(curve_relative[:,:3],axis=0),axis=1))*radius_scale
         print("height neighbor radius:",radius)
-        bounding_polygon=[]
-        for n in range(poly_num):
-            ang=(n/poly_num)*(np.pi*2)
-            bounding_polygon.append(np.array([radius*np.cos(ang),radius*np.sin(ang),0]))
+        
+        # circle        
+        # poly_num=12
+        # for n in range(poly_num):
+        #     ang=(n/poly_num)*(np.pi*2)
+        #     bounding_polygon.append(np.array([radius*np.cos(ang),radius*np.sin(ang),0]))
+        # rectangle
+        y_max=5
+        bounding_polygon.append(np.array([radius,y_max,0]))
+        bounding_polygon.append(np.array([radius,-y_max,0]))
+        bounding_polygon.append(np.array([-radius,-y_max,0]))
+        bounding_polygon.append(np.array([-radius,y_max,0]))
+        ###
+        
         bounding_polygon = np.array(bounding_polygon).astype("float64")
         crop_poly = o3d.visualization.SelectionPolygonVolume()
         crop_poly.bounding_polygon = o3d.utility.Vector3dVector(bounding_polygon)
         crop_poly.orthogonal_axis = 'z'
         crop_poly.axis_max=30
         # crop_poly.axis_min=-15
-        crop_poly.axis_min=-0.1
+        crop_poly.axis_min=-5
 
         if drawing:
             scanned_points_draw = deepcopy(scanned_points)
@@ -317,9 +496,26 @@ class ScanProcess():
             sp_lamx = crop_poly.crop_point_cloud(sp_lamx)
             # visualize_pcd([sp_lamx],origin_size=10)
             ## dh is simply the z height after transform. Average over an radius
-            this_dh = np.mean(np.asarray(sp_lamx.points)[:,2])
-            if np.isnan(this_dh):
-                this_dh=0
+            
+            percentage=0.05
+            this_points_z = np.asarray(sp_lamx.points)[:,2]
+            if len(this_points_z>0):
+                height_ids=max(int(percentage*len(this_points_z)),10)
+                this_points_z = np.sort(this_points_z)[-1*height_ids:]
+                bbox = o3d.geometry.AxisAlignedBoundingBox(min_bound=(-1e5,-1e5,this_points_z[0]),max_bound=(1e5,1e5,1e5))
+                sp_lamx=sp_lamx.crop(bbox)
+            else:
+                print("not find")
+                this_points_z=np.nan
+            
+            
+            this_dh = np.nanmean(this_points_z)
+
+            dh_max=7
+            dh_min=-2
+            this_dh = max(min(this_dh,dh_max),dh_min)
+            # if this_dh>dh_max:
+            #     this_dh=np.nan
 
             dh.append(this_dh)
 
@@ -334,14 +530,16 @@ class ScanProcess():
 
             curve_i+=1
 
+        window_nan=3
         for curve_i in range(len(dh)):
             if np.isnan(dh[curve_i]):
-                if curve_i==0:
-                    dh[curve_i]=np.nanmean(dh[curve_i:curve_i+2])
-                elif curve_i!=len(dh)-1:
-                    dh[curve_i]=np.nanmean(dh[curve_i-2:curve_i])
+                if curve_i<window_nan:
+                    dh[curve_i]=np.nanmean(dh[0:2*window_nan])
+                elif curve_i>len(dh)-window_nan:
+                    dh[curve_i]=np.nanmean(dh[-2*window_nan:])
                 else:
-                    dh[curve_i]=np.nanmean(dh[curve_i-1:curve_i+1])
+                    dh[curve_i]=np.nanmean(dh[curve_i-window_nan:curve_i+window_nan])
+        # input(dh)
 
         curve_relative=np.array(curve_relative)
         lam = calc_lam_cs(curve_relative[:,:3])
@@ -356,6 +554,36 @@ class ScanProcess():
             visualize_pcd(draw_obj)
         
         return profile_height
+    
+    def dh2height(self,layer_curve_relative,layer_curve_dh,last_curve_relative,last_curve_height):
+        
+        last_curve_relative=np.array(last_curve_relative)
+        layer_curve_height=[]
+        for this_id in range(len(layer_curve_relative)):
+            this_p = layer_curve_relative[this_id][:3]
+            last_p_id = np.argmin(np.linalg.norm(last_curve_relative[:,:3]-this_p,2,1))
+            p_height = last_curve_height[last_p_id]+layer_curve_dh[this_id][1]
+            layer_curve_height.append(p_height)
+        
+        return layer_curve_height
+    
+    def pcd_calib_z(self,scanned_points,Transz0_H=None):
+        
+        if Transz0_H is None:
+            ####### plane segmentation
+            plane_model, inliers = scanned_points.segment_plane(distance_threshold=float(0.75),
+                                                    ransac_n=int(5),
+                                                    num_iterations=int(3000))
+            ## Transform the plane to z=0
+            plain_norm = plane_model[:3]/np.linalg.norm(plane_model[:3])
+            k = np.cross(plain_norm,[0,0,1])
+            k = k/np.linalg.norm(k)
+            theta = np.arccos(plain_norm[2])
+            Transz0 = Transform(rot(k,theta),[0,0,0])*\
+                        Transform(np.eye(3),[0,0,plane_model[3]/plane_model[2]])
+            Transz0_H=H_from_RT(Transz0.R,Transz0.p)
+        scanned_points.transform(Transz0_H)
+        return scanned_points,Transz0_H
     
     def pcd2height(self,scanned_points,z_height_start,bbox_min=(-40,-20,0),bbox_max=(40,20,45),\
                    resolution_z=0.1,windows_z=0.2,resolution_x=0.1,windows_x=1,stop_thres=20,\

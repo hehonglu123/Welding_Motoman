@@ -94,6 +94,8 @@ class PH_Param(object):
         elif method=='FBF':
             self._fit_interp(RBFFourierInterpolator)
             self.predict_func=self._predict_interp
+        elif method=='CPA':
+            self.predict_func=self._predict_interp
         else:
             print("Choose a method")
             self.train_q=None
@@ -178,6 +180,7 @@ class PH_Param(object):
         X = np.linspace(min(self.train_q[:,0]), max(self.train_q[:,0]),1000)
         Y = np.linspace(min(self.train_q[:,1]), max(self.train_q[:,1]),1000)
         X, Y = np.meshgrid(X, Y)
+        # print(X)
 
         # plot P
         print("**P Variation**")
@@ -186,31 +189,41 @@ class PH_Param(object):
         markdown_str+='|-|-|-|\n'
         draw_mean=[]
         draw_std=[]
+        fig,axs = plt.subplots(2,4)
         for i in range(len(nom_P[0])):
             p_dist = []
             for q in self.train_q:
                 p_dist.append(np.linalg.norm(self.data[tuple(q)]['P'][:,i]-nom_P[:,i]))
             # use linear interp to plot
             interp = LinearNDInterpolator(self.train_q, p_dist)
-            
             Z = interp(X, Y)
-            # plt.pcolormesh(np.degrees(X), np.degrees(Y), Z, shading='auto')
-            # plt.plot(np.degrees(self.train_q[:,0]), np.degrees(self.train_q[:,1]), "ok",ms=3, label="Training Poses (q2q3)")
-            # plt.legend()
-            # plt.colorbar()
-            # # plt.axis("equal")
-            # plt.xlabel('q2 (deg)')
-            # plt.ylabel('q3 (deg)')
-            # plt.title("Distance to Nominal (mm), P"+str(i+1))
-            # plt.show()
+            
+            # interp = RBFFourierInterpolator(self.train_q, p_dist)
+            
+            im=axs[int(i/4),int(i%4)].pcolormesh(np.degrees(X), np.degrees(Y), Z, shading='auto')
+            plt.colorbar(im,ax=axs[int(i/4),int(i%4)])
+            axs[int(i/4),int(i%4)].plot(np.degrees(self.train_q[:,0]), np.degrees(self.train_q[:,1]), "ok",ms=3, label="Training Poses (q2q3)")
+            axs[int(i/4),int(i%4)].set_xlabel('q2 (deg)')
+            axs[int(i/4),int(i%4)].set_ylabel('q3 (deg)')
+            axs[int(i/4),int(i%4)].set_title("Distance to Nominal (mm), P"+str(i+1))
+            axs[int(i/4),int(i%4)].legend(loc="upper left")
 
             markdown_str+='|P'+str(i+1)+'|'+format(round(np.mean(p_dist),4),'.4f')+'|'+format(round(np.std(p_dist),4),'.4f')+'|\n'
             draw_mean.append(np.mean(p_dist))
             draw_std.append(np.std(p_dist))
+        # plt.legend()
+        # plt.colorbar()
+        # plt.axis("equal")
+        # plt.title("Deviated Angle to Nominal (deg) of Rotation Axis")
+        fig.suptitle("Deviated Distance to Nominal Position Vector P (mm)")
+        plt.show()
+        
         print(markdown_str)
         plt.errorbar(np.arange(len(draw_mean)),draw_mean,draw_std)
-        plt.xticks(np.arange(len(draw_mean)),['P1','P2','P3','P4','P5','P6','P7'])
-        plt.title('P Variation')
+        plt.xticks(np.arange(len(draw_mean)),['P1','P2','P3','P4','P5','P6','P7'],fontsize=15)
+        plt.ylabel("Deviation Distance (mm)",fontsize=15)
+        plt.yticks(fontsize=15)
+        plt.title('P Variation',fontsize=18)
         plt.show()
 
         # plot H
@@ -220,6 +233,7 @@ class PH_Param(object):
         markdown_str+='|-|-|-|\n'
         draw_mean=[]
         draw_std=[]
+        fig,axs = plt.subplots(2,3)
         for i in range(len(nom_H[0])):
             h_ang = []
             for q in self.train_q:
@@ -232,42 +246,52 @@ class PH_Param(object):
             # use linear interp to plot
             interp = LinearNDInterpolator(self.train_q, h_ang)
             Z = interp(X, Y)
-            # plt.pcolormesh(np.degrees(X), np.degrees(Y), Z, shading='auto')
-            # plt.plot(np.degrees(self.train_q[:,0]), np.degrees(self.train_q[:,1]), "ok",ms=3, label="Training Poses (q2q3)")
-            # plt.legend()
-            # plt.colorbar()
-            # # plt.axis("equal")
-            # plt.xlabel('q2 (deg)')
-            # plt.ylabel('q3 (deg)')
-            # plt.title("Angle to Nominal (deg), H"+str(i+1))
-            # plt.show()
+            # interp = RBFFourierInterpolator(self.train_q, h_ang)
+            
+            im=axs[int(i/3),int(i%3)].pcolormesh(np.degrees(X), np.degrees(Y), Z, shading='auto')
+            plt.colorbar(im,ax=axs[int(i/3),int(i%3)])
+            axs[int(i/3),int(i%3)].plot(np.degrees(self.train_q[:,0]), np.degrees(self.train_q[:,1]), "ok",ms=3, label="Training Poses (q2q3)")
+            axs[int(i/3),int(i%3)].set_xlabel('q2 (deg)')
+            axs[int(i/3),int(i%3)].set_ylabel('q3 (deg)')
+            axs[int(i/3),int(i%3)].set_title("Angle to Nominal (deg), H"+str(i+1))
+            axs[int(i/3),int(i%3)].legend(loc="upper left")
 
             markdown_str+='|H'+str(i+1)+'|'+format(round(np.mean(h_ang),4),'.4f')+'|'+format(round(np.std(h_ang),4),'.4f')+'|\n'
             draw_mean.append(np.mean(h_ang))
             draw_std.append(np.std(h_ang))
+            
+        # plt.legend()
+        # plt.colorbar()
+        # plt.axis("equal")
+        # plt.title("Deviated Angle to Nominal (deg) of Rotation Axis")
+        fig.suptitle("Deviated Angle to Nominal Rotation Axis H (deg)")
+        plt.show()
+        
         print(markdown_str)
         plt.errorbar(np.arange(len(draw_mean)),draw_mean,draw_std)
-        plt.xticks(np.arange(len(draw_mean)),['H1','H2','H3','H4','H5','H6'])
-        plt.title('H Variation')
+        plt.xticks(np.arange(len(draw_mean)),['H1','H2','H3','H4','H5','H6'],fontsize=15)
+        plt.ylabel("Deviated Angle (deg)",fontsize=15)
+        plt.yticks(fontsize=15)
+        plt.title('H Variation',fontsize=18)
         plt.show()
 
 if __name__=='__main__':
 
-    # PH_data_dir='PH_grad_data/test0801_R1/train_data_'
-    # test_data_dir='kinematic_raw_data/test0801/'
-    
-    # nom_P=np.array([[0,0,0],[150,0,0],[0,0,760],\
-    #                [1082,0,200],[0,0,0],[0,0,0],[100,0,0]]).T
-    # nom_H=np.array([[0,0,1],[0,1,0],[0,-1,0],\
-    #                [-1,0,0],[0,-1,0],[-1,0,0]]).T
-    
-    PH_data_dir='PH_grad_data/test0804_R2/train_data_'
+    PH_data_dir='PH_grad_data/test0801_R1/train_data_'
     test_data_dir='kinematic_raw_data/test0801/'
     
-    nom_P=np.array([[0,0,0],[155,0,0],[0,0,614],\
-                   [640,0,200],[0,0,0],[0,0,0],[100,0,0]]).T
+    nom_P=np.array([[0,0,0],[150,0,0],[0,0,760],\
+                   [1082,0,200],[0,0,0],[0,0,0],[100,0,0]]).T
     nom_H=np.array([[0,0,1],[0,1,0],[0,-1,0],\
-                [-1,0,0],[0,-1,0],[-1,0,0]]).T
+                   [-1,0,0],[0,-1,0],[-1,0,0]]).T
+    
+    # PH_data_dir='PH_grad_data/test0804_R2/train_data_'
+    # test_data_dir='kinematic_raw_data/test0801/'
+    
+    # nom_P=np.array([[0,0,0],[155,0,0],[0,0,614],\
+    #                [640,0,200],[0,0,0],[0,0,0],[100,0,0]]).T
+    # nom_H=np.array([[0,0,1],[0,1,0],[0,-1,0],\
+    #             [-1,0,0],[0,-1,0],[-1,0,0]]).T
 
     import pickle
     with open(PH_data_dir+'calib_PH_q.pickle','rb') as file:
