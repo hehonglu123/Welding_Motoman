@@ -1,6 +1,6 @@
 from copy import deepcopy
 from pathlib import Path
-import pickle, sys, time, datetime, traceback
+import pickle, sys, time, datetime, traceback, glob
 sys.path.append('../toolbox/')
 sys.path.append('../scan/scan_tools/')
 sys.path.append('../scan/scan_plan/')
@@ -102,7 +102,7 @@ print(job_number)
 
 ipm_mode=100
 weld_velocity=[5,5]
-weld_v=5
+weld_v=4
 print("input dh:",v2dh_loglog(weld_v,ipm_mode))
 for i in range(len(weld_z_height)-2):
     weld_velocity.append(weld_v)
@@ -111,8 +111,8 @@ for i in range(len(weld_z_height)-2):
 print(weld_velocity)
 # exit()
 
-to_start_speed=4
-to_home_speed=5
+to_start_speed=6
+to_home_speed=6
 
 save_weld_record=True
 
@@ -121,7 +121,7 @@ start_correction_layer=99999999
 
 current_time = datetime.datetime.now()
 formatted_time = current_time.strftime('%Y_%m_%d_%H_%M_%S.%f')[:-7]
-data_dir='../data/wall_weld_test/weld_scan_'+formatted_time+'/'
+data_dir=f'../data/wall_weld_test/70S_model_{model_job_nuber}ipm_'  +formatted_time+'/'
 
 ### read cmd
 use_previous_cmd=False
@@ -131,11 +131,13 @@ cmd_dir = '../data/wall_weld_test/'+'moveL_100_weld_scan_2023_08_02_15_17_25/'
 robot_client=MotionProgramExecClient()
 ws=WeldSend(robot_client)
 # weld state logging
+current_ser=RRN.SubscribeService('rr+tcp://192.168.55.21:12182?service=Current')
 weld_ser = RRN.SubscribeService('rr+tcp://192.168.55.10:60823?service=welder')
 cam_ser=RRN.ConnectService('rr+tcp://192.168.55.10:60827/?service=camera')
 mic_ser = RRN.ConnectService('rr+tcp://192.168.55.20:60828?service=microphone')
 ## RR sensor objects
-rr_sensors = WeldRRSensor(weld_service=weld_ser,cam_service=cam_ser,microphone_service=mic_ser)
+rr_sensors = WeldRRSensor(weld_service=weld_ser,cam_service=cam_ser,microphone_service=mic_ser,current_service=current_ser)
+
 
 # ## test sensor (camera, microphone)
 print("Test 3 Sec.")
@@ -464,24 +466,23 @@ for i in range(13,end_layer):
         mti_recording=[]
         r_pulse2deg = np.append(robot_scan.pulse2deg,positioner.pulse2deg)
         while True:
-            if state_flag & 0x08 == 0 and time.time()-start_time>1.:
-                break
-            res, data = ws.client.receive_from_robot(0.01)
+            if state_flag & STATUS_RUNNING == 0 and time.time()-start_time>1.:
+                break 
+            res, fb_data = ws.client.fb.try_receive_state_sync(ws.client.controller_info, 0.001)
             if res:
-                joint_angle=np.radians(np.divide(np.array(data[26:34]),r_pulse2deg))
-                state_flag=data[16]
+                joint_angle=np.hstack((fb_data.group_state[0].feedback_position,fb_data.group_state[1].feedback_position,fb_data.group_state[2].feedback_position))
+                state_flag=fb_data.controller_flags
                 joint_recording.append(joint_angle)
-                timestamp=data[0]+data[1]*1e-9
+                timestamp=fb_data.time
                 robot_stamps.append(timestamp)
                 ###MTI scans YZ point from tool frame
                 mti_recording.append(deepcopy(np.array([mti_client.lineProfile.X_data,mti_client.lineProfile.Z_data])))
         ws.client.servoMH(False)
-
-        print("Scan motion scan time:",time.time()-scan_motion_scan_st)
         
-        scan_to_home_st = time.time()
         mti_recording=np.array(mti_recording)
-        q_out_exe=joint_recording
+        joint_recording=np.array(joint_recording)
+        q_out_exe=joint_recording[:,6:]
+        print(np.degrees(q_out_exe[:10]))
 
         # input("Press Enter to Move Home")
         # move robot to home
@@ -505,7 +506,7 @@ for i in range(13,end_layer):
                 pickle.dump(mti_recording, file)
             print('Total scans:',len(mti_recording))
         
-        print("Scan to home:",time.time()-scan_to_home_st)
+        # print("Scan to home:",time.time()-scan_to_home_st)
         print("Scan motion time:",time.time()-scan_motion_st)
         
         print("Scan Time:",time.time()-scan_st)
