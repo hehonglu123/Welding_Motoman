@@ -427,7 +427,7 @@ for i in range(0,end_layer):
         scan_motion_st = time.time()
         ######## scanning motion #########
         ### execute motion ###
-        robot_client=MotionProgramExecClient()
+        # robot_client=MotionProgramExecClient()
         # input("Press Enter and move to scanning startint point")
 
         ## move to start
