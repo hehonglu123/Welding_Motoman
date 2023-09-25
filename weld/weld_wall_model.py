@@ -93,7 +93,7 @@ weld_z_height=[0,6,7] # two base layer height to first top layer
 weld_z_height=np.append(weld_z_height,np.arange(weld_z_height[-1],final_height,1)+1)
 # job_number=[115,115]
 job_number=[330,330]
-model_job_nuber = 100
+model_job_nuber = 130
 job_number=np.append(job_number,np.ones(len(weld_z_height)-2)*(int(model_job_nuber)/10 + 300)) # 100 ipm
 # job_number=np.append(job_number,np.ones(len(weld_z_height)-2)*206) # 160 ipm
 # job_number=np.append(job_number,np.ones(len(weld_z_height)-2)*212) # 220 ipm
@@ -111,7 +111,7 @@ for i in range(len(weld_z_height)-2):
 print(weld_velocity)
 # exit()
 
-to_start_speed=6
+to_start_speed=5
 to_home_speed=6
 
 save_weld_record=True
@@ -134,7 +134,7 @@ ws=WeldSend(robot_client)
 current_ser=RRN.SubscribeService('rr+tcp://192.168.55.21:12182?service=Current')
 weld_ser = RRN.SubscribeService('rr+tcp://192.168.55.10:60823?service=welder')
 cam_ser=RRN.ConnectService('rr+tcp://192.168.55.10:60827/?service=camera')
-mic_ser = RRN.ConnectService('rr+tcp://192.168.55.20:60828?service=microphone')
+mic_ser = RRN.ConnectService('rr+tcp://192.168.55.15:60828?service=microphone')
 ## RR sensor objects
 rr_sensors = WeldRRSensor(weld_service=weld_ser,cam_service=cam_ser,microphone_service=mic_ser,current_service=current_ser)
 
@@ -175,7 +175,7 @@ input("Start?")
 # move robot to ready position
 ws.jog_dual(robot_scan,positioner,[r2_mid,r2_ir_q],np.radians([-15,180]),to_start_speed)
 
-for i in range(13,end_layer):
+for i in range(0,end_layer):
     cycle_st = time.time()
     print("==================================")
     print("Layer:",i)
@@ -185,7 +185,7 @@ for i in range(13,end_layer):
         forward_flag = False
     #### welding
     weld_st = time.time()
-    if i>=14 and True:
+    if i>=0 and True:
         weld_plan_st = time.time()
         if i>=2:
             base_layer=False
@@ -394,7 +394,7 @@ for i in range(13,end_layer):
         scan_st = time.time()
         if curve_sliced_relative is None:
             data_dir='../data/wall_weld_test/weld_scan_100ipm_2023_09_23_15_40_12/'
-            last_profile_height=np.load('../data/wall_weld_test/weld_scan_100ipm_2023_09_23_15_40_12/layer_13/scans/height_profile.npy')
+            last_profile_height=np.load('../data/wall_weld_test/weld_scan_100ipm_2023_09_23_15_40_12/layer_11/scans/height_profile.npy')
             last_mean_h=np.mean(last_profile_height[:,1])
             h_largest=np.max(last_profile_height[:,1])
             layer_data_dir=data_dir+'layer_'+str(i)+'/'
@@ -561,7 +561,7 @@ for i in range(13,end_layer):
         np.save(out_scan_dir+'height_profile.npy',profile_height)
     # visualize_pcd([pcd])
     plt.scatter(profile_height[:,0],profile_height[:,1])
-    plt.show()
+    # plt.show()
     # exit()
 
     if np.mean(profile_height[:,1])>final_height and np.std(profile_height[:,1])<final_h_std_thres and (not use_previous_cmd):

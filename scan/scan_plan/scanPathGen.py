@@ -242,7 +242,7 @@ class ScanPathGen():
         for i in range(len(scan_R)):
             scan_R[i] = np.matmul(scan_R[i],R_path)
         
-        visualize_frames(scan_R[::10],scan_p[::10],size=3)
+        # visualize_frames(scan_R[::10],scan_p[::10],size=3)
         # print(scan_R[0])
 
         return scan_p,scan_R
