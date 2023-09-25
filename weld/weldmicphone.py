@@ -2,13 +2,9 @@ import librosa
 import librosa.display
 import soundfile as sf
 from scipy.signal import butter, lfilter
-import os
+import os, re, pywt, wave, copy, warnings
 import numpy as np
 import matplotlib.pyplot as plt
-import pywt
-import wave
-import copy
-import warnings
 
 warnings.filterwarnings("ignore", category=RuntimeWarning, module="lazy_loader")
 def highpass_filter(data, sr, cutoff=1000):
@@ -99,3 +95,16 @@ def audio_MFCC(file_path):
     else:
         print(f"Path '{file_path}' does not exist!")
         
+if __name__ == "__main__":
+    data_dir='../data/wall_weld_test/70S_model_120ipm_2023_09_23_21_27_03/'
+    if os.path.exists(data_dir):
+        subdirs = [d for d in os.listdir(data_dir) if os.path.isdir(os.path.join(data_dir, d))]
+        layer_dirs = [d for d in subdirs if re.match(r'layer_\d+', d)]
+        for layer_dir in sorted(layer_dirs, key=lambda x: int(x.split('_')[-1])):
+            layer_path = os.path.join(data_dir, layer_dir + '/',)
+            mic_recording_path = os.path.join(layer_path, "mic_recording.wav")
+            if not os.path.exists(mic_recording_path):
+                print(f"mic_recording.wav not found in {layer_path}. Skipping...")
+                continue  # Skip to the next iteration
+            audio_denoise(layer_path)
+            std_value_co1, std_value_co2, scan_flag = audio_MFCC(layer_path)    

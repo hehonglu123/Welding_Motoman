@@ -475,31 +475,76 @@ coeffs = np.polyfit(x, y, 2)
 print('coeffs',coeffs)
 # 创建多项式对象，以便进行函数的评估
 p = np.poly1d(coeffs)
+
 # 使用 linspace 函数创建用于绘图的 x 值数组
 x_fit = np.linspace(x.min(), x.max(), 500)
+
 # 使用多项式对象计算出 y 值
 y_fit = p(x_fit)
-# 绘图：原始数据点和拟合曲线
-plt.plot(x, y, 'o')
-plt.plot(x_fit, y_fit, '-')
-plt.show()
-plt.close()
 
 log_x = np.log(x)
 log_y = np.log(y)
 print('log_x',log_x)
 print('log_y',log_y)
-coeffs = np.polyfit(log_x, log_y, 1)
-p = np.poly1d(coeffs)
-print('loglog-coeffs',coeffs)
-# 使用 linspace 函数创建用于绘图的 x 值数组
-x_fit = np.linspace(log_x.min(), log_x.max(), 500)
-# 使用多项式对象计算出 y 值
-y_fit = p(x_fit)
-plt.plot(log_x, log_y, 'o')
+# 绘图：原始数据点和拟合曲线
+plt.plot(x, y, 'o')
 plt.plot(x_fit, y_fit, '-')
 plt.show()
-plt.close()
+# for dataset in datasets:
+#     plt.plot(np.arange(len(datasets_h_std[dataset])),datasets_h_std[dataset],'-o',label=dataset)
+# plt.axhline(y = 0.48, color = 'r', linestyle = '-')
+# plt.legend()
+# plt.xlabel('Layer')
+# plt.ylabel('Height STD (mm)')
+# plt.title("Height STD")
+# plt.show()
+slope, intercept, r_value, p_value, std_err = stats.linregress(log_x, log_y)
 
+# 生成拟合直线的数据
+fit_line_x = np.linspace(min(log_x), max(log_y), 100)
+fit_line_y = np.exp(intercept + slope * np.log(fit_line_x))
 
+# 绘制原始数据的散点图和拟合直线的线图
+plt.scatter(log_x, log_y, label='Original Data', color='blue')
+plt.plot(fit_line_x, fit_line_y, label='Fit Line', color='red')
+
+# 添加图例和轴标签
+plt.legend()
+plt.xscale('log')
+plt.yscale('log')
+plt.xlabel('A_list (log scale)')
+plt.ylabel('B_list (log scale)')
+plt.title('Log-Log Fit')
+
+# 显示图像
+plt.show()
+m = -0.62015
+c = 1.84913
+
+# Generate x values
+x = np.linspace(1, 100, 400)  # 从1到100的400个值
+y = m * np.log(x) + c  # 使用公式计算y值
+
+# Plot
+plt.plot(log_x, log_y, 'o',label = 'Log(delta_h_mean) Vs. Log(Velocity) Scatter')
+plt.plot(np.log(x), y, '-',label = '100ipm_Model Fit Curve')  # 使用loglog函数绘制双对数图
+plt.xlabel('Log(V) (log(mm/s))',fontsize=18)
+plt.ylabel('Log(delta_h) (log(mm))',fontsize=18)
+plt.title('Log-Log Model Plot of 100ipm',fontsize=18)
+# Set finer grid
+ax = plt.gca()
+
+# Adjust grid line thickness
+ax.xaxis.grid(True, linewidth=1)  # Increase linewidth for thicker grid lines
+ax.yaxis.grid(True, linewidth=1)  # Increase linewidth for thicker grid lines
+
+plt.grid(True)
+# Customize legend
+legend = plt.legend(fontsize = 15, loc="upper right")  # Adjust fontsize as needed and specify location
+frame = legend.get_frame()
+frame.set_linewidth(1.5)  # Adjust legend box border thickness
+
+# Adjust tick label fontsize
+ax.tick_params(axis="both", labelsize=18)  # Adjust fontsize as needed
+plt.show()
 
