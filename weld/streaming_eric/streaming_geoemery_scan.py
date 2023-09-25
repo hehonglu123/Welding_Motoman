@@ -220,16 +220,17 @@ while slice_num<len(lam_relative_all_slices):
             ####################################MTI PROCESSING####################################
             if bp_idx<len(breakpoints)-1: ###no wait at last point
                 ###busy wait for accurate 8ms streaming
-                while time.time()-point_stream_start_time<1/SS.streaming_rate-0.0005:
+                while (time.time()-point_stream_start_time)<(1/SS.streaming_rate-0.0005):
                     continue
+            point_stream_start_time=time.time()
+            robot_timestamp,q14=SS.position_cmd(curve_js_all_dense[breakpoints[bp_idx]])
+            
             ###MTI scans YZ point from tool frame
             st=time.time()
             mti_recording.append(deepcopy(np.array([mti_client.lineProfile.X_data,mti_client.lineProfile.Z_data])))
             if time.time()-st>0.008:
                 print('MTI scan time:',time.time()-st)
                 print("What????")
-            point_stream_start_time=time.time()
-            robot_timestamp,q14=SS.position_cmd(curve_js_all_dense[breakpoints[bp_idx]])
             
             robot_ts.append(robot_timestamp)
             robot_js.append(q14)
@@ -241,7 +242,8 @@ while slice_num<len(lam_relative_all_slices):
         
         ####CONTROL PARAMETERS
         last_slice_num=slice_num
-        
+        # increment slice layer num
+        slice_num+=int(nominal_slice_increment)
         # change feedrate and such
         if layer_count>0: # dont update for baselayer
             if layer_count<1:
@@ -254,8 +256,7 @@ while slice_num<len(lam_relative_all_slices):
             # speed decrease in ratio, so the increment rate stays the same
             vd_relative = (feedrate_cmd/nominal_feedrate)*nominal_vd_relative 
         layer_count+=1
-        # increment slice layer num
-        slice_num+=int(nominal_slice_increment)
+        
         if layer_count>=end_layer_count:
             break
         
