@@ -145,7 +145,7 @@ class ScanProcess():
     def pcd_register_mti(self,all_scan_points,rob_js_exe,rob_stamps,voxel_size=0.05,static_positioner_q=np.radians([-60,180]),use_calib=False,ph_param=None):
 
         pcd_combined = None
-        scan_N = len(rob_stamps) ## total scans
+        scan_N = len(rob_js_exe) ## total scans
         for scan_i in range(scan_N):
 
             if len(rob_js_exe[scan_i])<=6:
@@ -228,7 +228,7 @@ class ScanProcess():
         
         return pcd_combined
 
-    def pcd2dh_old(self,scanned_points,last_scanned_points,curve_relative,robot_weld=None,q_weld=None,ph_param=None,drawing=False):
+    def pcd2dh_compare(self,scanned_points,last_scanned_points,curve_relative,robot_weld=None,q_weld=None,ph_param=None,drawing=False):
 
         ##### cross section parameters
         # resolution_z=0.1
@@ -309,6 +309,7 @@ class ScanProcess():
         curve_i=0
         total_curve_i = len(curve_relative)
         dh=[]
+        z_height=[]
         for curve_wp in curve_relative:
             if np.all(curve_wp==curve_relative[-1]):
                 wp_R = direction2R(-1*curve_wp[3:],curve_wp[:3]-curve_relative[curve_i-1][:3])
@@ -353,8 +354,8 @@ class ScanProcess():
                 this_points_z=np.nan
                 last_points_z=np.nan
             
-            
             this_dh = np.mean(this_points_z)-np.mean(last_points_z)
+            this_zheight = np.mean(this_points_z)
 
             dh_max=7
             dh_min=-2
@@ -363,6 +364,7 @@ class ScanProcess():
             #     this_dh=np.nan
 
             dh.append(this_dh)
+            z_height.append(this_zheight)
 
             if drawing:
                 ## paint pcd for visualization
@@ -387,11 +389,19 @@ class ScanProcess():
                     dh[curve_i]=np.nanmean(dh[-2*window_nan:])
                 else:
                     dh[curve_i]=np.nanmean(dh[curve_i-window_nan:curve_i+window_nan])
+            if np.isnan(z_height[curve_i]):
+                if curve_i<window_nan:
+                    z_height[curve_i]=np.nanmean(z_height[0:2*window_nan])
+                elif curve_i>len(z_height)-window_nan:
+                    z_height[curve_i]=np.nanmean(z_height[-2*window_nan:])
+                else:
+                    z_height[curve_i]=np.nanmean(z_height[curve_i-window_nan:curve_i+window_nan])
         # input(dh)
 
         curve_relative=np.array(curve_relative)
         lam = calc_lam_cs(curve_relative[:,:3])
-        profile_height = np.array([lam,dh]).T   
+        profile_dh = np.array([lam,dh]).T 
+        profile_height = np.array([lam,z_height]).T   
 
         if drawing:
             path_points.transform(H_from_RT(np.eye(3),[0,0,0.0001]))
@@ -402,7 +412,7 @@ class ScanProcess():
             draw_obj.extend([scanned_points_draw,path_points,last_scanned_points_draw,last_path_points])
             visualize_pcd(draw_obj)
         
-        return profile_height
+        return profile_dh,profile_height
     
     def pcd2dh(self,scanned_points,curve_relative,robot_weld=None,q_weld=None,ph_param=None,drawing=False):
 
