@@ -222,7 +222,9 @@ else:
 if use_actual:
     profile_height = scan_process.pcd2dh(pcd,last_pcd,curve_sliced_relative,drawing=True)
 else:
-    profile_height = scan_process.pcd2dh(pcd,last_pcd,curve_sliced_relative,robot_weld,rob_js_plan,ph_param=ph_param_r1,drawing=True)
+    # profile_height = scan_process.pcd2dh(pcd,last_pcd,curve_sliced_relative,robot_weld,rob_js_plan,ph_param=ph_param_r1,drawing=True)
+    # profile_height = scan_process.pcd2dh(pcd,last_pcd,curve_sliced_relative)
+    profile_height = scan_process.pcd2dh(pcd,curve_sliced_relative,drawing=True)
 
 
 curve_i=0
