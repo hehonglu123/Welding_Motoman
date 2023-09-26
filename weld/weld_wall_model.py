@@ -92,10 +92,11 @@ final_h_std_thres=999999999
 weld_z_height=[0,6,7] # two base layer height to first top layer
 weld_z_height=np.append(weld_z_height,np.arange(weld_z_height[-1],final_height,1)+1)
 # job_number=[115,115]
-job_number=[330,330]
+job_number=[430,430]
 model_job_nuber = 130
-job_number=np.append(job_number,np.ones(len(weld_z_height)-2)*(int(model_job_nuber)/10 + 300)) # 100 ipm
-# job_number=np.append(job_number,np.ones(len(weld_z_height)-2)*206) # 160 ipm
+# job_number=np.append(job_number,np.ones(len(weld_z_height)-2)*(int(model_job_nuber)/10 + 200)) # ER4043
+# job_number=np.append(job_number,np.ones(len(weld_z_height)-2)*(int(model_job_nuber)/10 + 300)) # ER70S-6
+job_number=np.append(job_number,np.ones(len(weld_z_height)-2)*(int(model_job_nuber)/10 + 400)) # 316L
 # job_number=np.append(job_number,np.ones(len(weld_z_height)-2)*212) # 220 ipm
 print(weld_z_height)
 print(job_number)
@@ -121,7 +122,7 @@ start_correction_layer=99999999
 
 current_time = datetime.datetime.now()
 formatted_time = current_time.strftime('%Y_%m_%d_%H_%M_%S.%f')[:-7]
-data_dir=f'../data/wall_weld_test/70S_model_{model_job_nuber}ipm_'  +formatted_time+'/'
+data_dir=f'../data/wall_weld_test/316L_model_{model_job_nuber}ipm_'  +formatted_time+'/'
 
 ### read cmd
 use_previous_cmd=False
@@ -370,6 +371,9 @@ for i in range(0,end_layer):
             # save weld record
             np.savetxt(layer_data_dir + 'weld_js_exe.csv',rob_js_exe,delimiter=',')
             np.savetxt(layer_data_dir + 'weld_robot_stamps.csv',rob_stamps,delimiter=',')
+            np.save(layer_data_dir+'primitives.npy',primitives)
+            np.save(layer_data_dir+'path_q.npy',path_q)
+            np.save(layer_data_dir+'this_weld_v.npy',np.append(10,this_weld_v))
             try:
                 rr_sensors.save_all_sensors(layer_data_dir)
             except:
