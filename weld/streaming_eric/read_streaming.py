@@ -206,9 +206,9 @@ for layer_count in range(0,total_layer):
         anim = FuncAnimation(fig, updatefig, np.floor(len(mti_recording)/playback_speed).astype(int),interval=30,repeat=False)
         plt.show()
     
-    
     #### scanning process: processing point cloud and get h
     curve_sliced_relative=np.array(curve_sliced_relative)
+    continue
     
     scan_process = ScanProcess(robot_scan,positioner)
     if regen_pcd:

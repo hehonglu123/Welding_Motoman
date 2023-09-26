@@ -30,7 +30,7 @@ while True:
     pcd = o3d.geometry.PointCloud()
     pcd.points=o3d.utility.Vector3dVector(scan_points)
 
-    d=70
+    d=95
     xaxis=0
 
     width=0.1
@@ -43,4 +43,9 @@ while True:
     bbox_mesh.transform(box_move)
 
     visualize_pcd([pcd,bbox_mesh])
+
+    plt.scatter(scan_points[:,0],scan_points[:,2])
+    plt.xlim((-30,30))
+    plt.ylim((50,120))
+    plt.show()
 
