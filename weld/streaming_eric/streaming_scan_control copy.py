@@ -75,8 +75,8 @@ positioner.base_H = H_from_RT(positioner_base.R,positioner_base.p)
 #### data ####
 dataset='circle_large/'
 sliced_alg='static_spiral/'
-data_dir='../../data/'+dataset+sliced_alg
-with open(data_dir+'slicing.yml', 'r') as file:
+curve_data_dir='../../data/'+dataset+sliced_alg
+with open(curve_data_dir+'slicing.yml', 'r') as file:
     slicing_meta = yaml.safe_load(file)
 
 current_time = datetime.datetime.now()
@@ -84,10 +84,10 @@ formatted_time = current_time.strftime('%Y_%m_%d_%H_%M_%S.%f')[:-7]
 
 data_date = input("Use old data directory? (Enter or put time e.g. 2023_07_11_16_25_30): ")
 if data_date == '':
-    recorded_data_dir=data_dir+'weld_scan_'+formatted_time+'/'
+    recorded_data_dir=curve_data_dir+'weld_scan_'+formatted_time+'/'
 else:
-    recorded_data_dir=data_dir+'weld_scan_'+data_date+'/'
-print("Use data directory:",data_dir)
+    recorded_data_dir=curve_data_dir+'weld_scan_'+data_date+'/'
+print("Use data directory:",recorded_data_dir)
 
 ########################################################RR FRONIUS########################################################
 fronius_sub=RRN.SubscribeService('rr+tcp://192.168.55.21:60823?service=welder')
@@ -122,87 +122,128 @@ job_offset=200 		###200 for Aluminum ER4043 (215,100 ipm), 300 for Steel Alloy E
 nominal_feedrate=170
 d_feedrate = -10
 nominal_vd_relative=10
-# nominal_slice_increment=int(1.84/slicing_meta['line_resolution'])
-nominal_slice_increment=26
+segment_distance=0.8 ## segment d, such that ||xi_{j}-xi_{j-1}||=0.8
+base_nominal_slice_increment=26
+base_layer_N=2
+nominal_slice_increment=18
 scanner_lag_bp=int(slicing_meta['scanner_lag_breakpoints'])
 scanner_lag=slicing_meta['scanner_lag']
 end_layer_count = 7
 
-arc_on=True
+arc_on=False
 
 res, robot_state, _ = RR_robot_state.TryGetInValue()
 q14=robot_state.joint_position
 
 welding_started=False
 
+#### Planned Print layers
+all_layers=[0]
+for i in range(end_layer_count):
+    if i<base_layer_N:
+        all_layers.append(all_layers[-1]+base_nominal_slice_increment)
+    else:
+        all_layers.append(all_layers[-1]+nominal_slice_increment)
+print("Planned Print Layers:",all_layers)
+
 ####PRELOAD ALL SLICES TO SAVE INPROCESS TIME
 rob1_js_all_slices=[]
 rob2_js_all_slices=[]
 positioner_js_all_slices=[]
+curve_relative_all_slices=[]
+curve_relative_dense_all_slices=[]
 lam_relative_all_slices=[]
 lam_relative_dense_all_slices=[]
-for i in range(0,250):
-    rob1_js_all_slices.append(np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(i)+'_0.csv',delimiter=','))
-    rob2_js_all_slices.append(np.loadtxt(data_dir+'curve_sliced_js/MA1440_js'+str(i)+'_0.csv',delimiter=','))
-    positioner_js_all_slices.append(np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(i)+'_0.csv',delimiter=','))
-    curve_sliced_relative=np.loadtxt(data_dir+'curve_sliced_relative/slice'+str(i)+'_0.csv',delimiter=',')
+for layer_n in all_layers:
+    rob1_js_all_slices.append(np.loadtxt(curve_data_dir+'curve_sliced_js/MA2010_js'+str(layer_n)+'_0.csv',delimiter=','))
+    rob2_js_all_slices.append(np.loadtxt(curve_data_dir+'curve_sliced_js/MA1440_js'+str(layer_n)+'_0.csv',delimiter=','))
+    positioner_js_all_slices.append(np.loadtxt(curve_data_dir+'curve_sliced_js/D500B_js'+str(layer_n)+'_0.csv',delimiter=','))
+    curve_sliced_relative=np.loadtxt(curve_data_dir+'curve_sliced_relative/slice'+str(layer_n)+'_0.csv',delimiter=',')
+    curve_relative_all_slices.append(curve_sliced_relative)
     lam_relative=calc_lam_cs(curve_sliced_relative)
     lam_relative_all_slices.append(lam_relative)
     lam_relative_dense_all_slices.append(np.linspace(0,lam_relative[-1],num=int(lam_relative[-1]/point_distance)))
+    curve_sliced_dense_relative=interp1d(lam_relative,curve_sliced_relative,kind='cubic',axis=0)(lam_relative_dense_all_slices[-1])
+    curve_relative_dense_all_slices.append(curve_sliced_dense_relative)
+rob1_js_warp_all_slices=[]
+rob2_js_warp_all_slices=[]
+positioner_warp_js_all_slices=[]
+for i in range(end_layer_count):
+    rob1_js=deepcopy(rob1_js_all_slices[i])
+    rob2_js=deepcopy(rob2_js_all_slices[i])
+    positioner_js=deepcopy(positioner_js_all_slices[i])
+    ###TRJAECTORY WARPING
+    if i>0:
+        rob1_js_prev=deepcopy(rob1_js_all_slices[i-1])
+        rob2_js_prev=deepcopy(rob2_js_all_slices[i-1])
+        positioner_js_prev=deepcopy(positioner_js_all_slices[i-1])
+        rob1_js,rob2_js,positioner_js=warp_traj(rob1_js,rob2_js,positioner_js,rob1_js_prev,rob2_js_prev,positioner_js_prev,reversed=True)
+    if i<end_layer_count-1:
+        rob1_js_next=deepcopy(rob1_js_all_slices[i+1])
+        rob2_js_next=deepcopy(rob2_js_all_slices[i+1])
+        positioner_js_next=deepcopy(positioner_js_all_slices[i+1])
+        rob1_js,rob2_js,positioner_js=warp_traj(rob1_js,rob2_js,positioner_js,rob1_js_next,rob2_js_next,positioner_js_next,reversed=False)
+
+    rob1_js_warp_all_slices.append(rob1_js)
+    rob2_js_warp_all_slices.append(rob2_js)
+    positioner_warp_js_all_slices.append(positioner_js)
 
 input("Enter to start")
-layer_count=0
-slice_num=0
+
 # feedrate_cmd=nominal_feedrate
 feedrate_cmd=250
 # vd_relative=nominal_vd_relative
 vd_relative=8
+x_state_location=[]
+x_state_dh = []
+
 robot_logging_all=[]
 weld_logging_all=[]
 mti_logging_all=[]
-while slice_num<len(lam_relative_all_slices):
-    print("Layer:",slice_num,"#:",layer_count)
+for layer_count in range(0,end_layer_count):
+    layer=all_layers[layer_count]
+    print("Layer:",layer,"#:",layer_count)
     print('FEEDRATE: ',feedrate_cmd,'VD: ',vd_relative)
     ###change feedrate
     fronius_client.async_set_job_number(int(feedrate_cmd/10)+job_offset, my_handler)
-    x=0
-    rob1_js=copy.deepcopy(rob1_js_all_slices[slice_num])
-    rob2_js=copy.deepcopy(rob2_js_all_slices[slice_num])
-    positioner_js=copy.deepcopy(positioner_js_all_slices[slice_num])
     
-    ###TRJAECTORY WARPING
-    if slice_num>10:
-        rob1_js_prev=copy.deepcopy(rob1_js_all_slices[slice_num-nominal_slice_increment])
-        rob2_js_prev=copy.deepcopy(rob2_js_all_slices[slice_num-nominal_slice_increment])
-        positioner_js_prev=copy.deepcopy(positioner_js_all_slices[slice_num-nominal_slice_increment])
-        rob1_js,rob2_js,positioner_js=warp_traj(rob1_js,rob2_js,positioner_js,rob1_js_prev,rob2_js_prev,positioner_js_prev,reversed=True)
-    if slice_num<slicing_meta['num_layers']-nominal_slice_increment:
-        rob1_js_next=copy.deepcopy(rob1_js_all_slices[slice_num+nominal_slice_increment])
-        rob2_js_next=copy.deepcopy(rob2_js_all_slices[slice_num+nominal_slice_increment])
-        positioner_js_next=copy.deepcopy(positioner_js_all_slices[slice_num+nominal_slice_increment])
-        rob1_js,rob2_js,positioner_js=warp_traj(rob1_js,rob2_js,positioner_js,rob1_js_next,rob2_js_next,positioner_js_next,reversed=False)
+    ## the current curve, the next path curve and the next target curve
+    if layer_count!=0:
+        curve_sliced_relative=curve_relative_all_slices[layer_count-1]
+    path_curve_dense_relative=curve_relative_dense_all_slices[layer_count]
+    if layer_count<end_layer_count:
+        target_curve_sliced_relative=curve_relative_all_slices[layer_count+1]
+    lam_relative_dense=deepcopy(lam_relative_dense_all_slices[layer_count])
+        
+    rob1_js=rob1_js_warp_all_slices[layer_count]
+    rob2_js=rob2_js_warp_all_slices[layer_count]
+    positioner_js=positioner_warp_js_all_slices[layer_count]
+    
+    num_segbp_layer=max(2,int(lam_relative_dense[-1]/segment_distance))
+    segment_bp = np.linspace(0,len(lam_relative_dense)-1,num=num_segbp_layer).astype(int)
+    segment_bp_sample = (np.diff(segment_bp)/2+segment_bp[:-1])
+    segment_bp_sample=segment_bp_sample.astype(int) # sample the middle point
+    # segment_bp=segment_bp[1:] # from 1 ~ the last point (ignore 0)
     
     ###find closest %2pi
     num2p=np.round((q14[-1]-positioner_js[0,1])/(2*np.pi))
     positioner_js[:,1]=positioner_js[:,1]+num2p*2*np.pi
     
-    curve_js_all_dense=interp1d(lam_relative_all_slices[slice_num],np.hstack((rob1_js,rob2_js,positioner_js)),kind='cubic',axis=0)(lam_relative_dense_all_slices[slice_num])
-    ### get breakpoints for vd
-    breakpoints=SS.get_breakpoints(lam_relative_dense_all_slices[slice_num],vd_relative)
+    curve_js_all_dense=interp1d(lam_relative_all_slices[layer_count],np.hstack((rob1_js,rob2_js,positioner_js)),kind='cubic',axis=0)(lam_relative_dense_all_slices[layer_count])
 
     curve_js_all_dense=np.array(curve_js_all_dense)
     
     ###start welding at the first layer, then non-stop
     if not welding_started:
         #jog above
-        waypoint_pose=robot_weld.fwd(curve_js_all_dense[breakpoints[0],:6])
+        waypoint_pose=robot_weld.fwd(curve_js_all_dense[0,:6])
         waypoint_pose.p[-1]+=50
         waypoint_q=robot_weld.inv(waypoint_pose.p,waypoint_pose.R,curve_js_all_dense[0,:6])[0]
         # SS.jog2q(np.hstack((waypoint_q,np.radians([21,5,-39,0,-47,49]),curve_js_all_dense[0,12:])))
         SS.jog2q(np.hstack((np.radians([-50,28,7,0,-47,0]),curve_js_all_dense[0,6:])))
         # exit()
         SS.jog2q(np.hstack((waypoint_q,curve_js_all_dense[0,6:])))
-        SS.jog2q(curve_js_all_dense[breakpoints[0]])
+        SS.jog2q(curve_js_all_dense[0])
         welding_started=True
         point_stream_start_time=time.time()
         if arc_on:
@@ -214,25 +255,35 @@ while slice_num<len(lam_relative_all_slices):
     robot_js=[]
     mti_recording=[]
     try:
-        ###start logging
-        for bp_idx in range(len(breakpoints)):
-            ####################################MTI PROCESSING####################################
-            if bp_idx<len(breakpoints)-1: ###no wait at last point
-                ###busy wait for accurate 8ms streaming
-                while (time.time()-point_stream_start_time)<(1/SS.streaming_rate-0.0005):
-                    continue
-            point_stream_start_time=time.time()
-            robot_timestamp,q14=SS.position_cmd(curve_js_all_dense[breakpoints[bp_idx]])
+        for seg_i in range(len(segment_bp)-1):
+            vd_relative = nominal_vd_relative # TODO: feedback control here
             
-            ###MTI scans YZ point from tool frame
-            st=time.time()
-            mti_recording.append(deepcopy(np.array([mti_client.lineProfile.X_data,mti_client.lineProfile.Z_data])))
-            if time.time()-st>0.008:
-                print('MTI scan time:',time.time()-st)
-                print("What????")
+            ### get breakpoints for vd
+            bp_start = segment_bp[seg_i]
+            bp_end = segment_bp[seg_i+1]
+            breakpoints=SS.get_breakpoints(lam_relative_dense[bp_start:bp_end],vd_relative)
+            breakpoints=breakpoints+bp_start
             
-            robot_ts.append(robot_timestamp)
-            robot_js.append(q14)
+            ###start logging
+            for bp_idx in range(len(breakpoints)):
+                ####################################MTI PROCESSING####################################
+                if bp_idx<len(breakpoints)-1: ###no wait at last point
+                    ###busy wait for accurate 8ms streaming
+                    while (time.time()-point_stream_start_time)<(1/SS.streaming_rate-0.0005):
+                        continue
+                point_stream_start_time=time.time()
+                robot_timestamp,q14=SS.position_cmd(curve_js_all_dense[breakpoints[bp_idx]])
+                
+                ###MTI scans YZ point from tool frame
+                st=time.time()
+                mti_recording.append(deepcopy(np.array([mti_client.lineProfile.X_data,mti_client.lineProfile.Z_data])))
+                ## TODO: calculate dh
+                if time.time()-st>0.008:
+                    print('MTI scan time:',time.time()-st)
+                    print("What????")
+                
+                robot_ts.append(robot_timestamp)
+                robot_js.append(q14)
         robot_ts=np.array(robot_ts)
         robot_ts=robot_ts-robot_ts[0]
         robot_js=np.array(robot_js)
