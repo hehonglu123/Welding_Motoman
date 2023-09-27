@@ -219,6 +219,7 @@ for layer_count in range(0,end_layer_count):
     rob2_js=rob2_js_warp_all_slices[layer_count]
     positioner_js=positioner_warp_js_all_slices[layer_count]
     
+    ## get the segment for changing velocity
     num_segbp_layer=max(2,int(lam_relative_dense[-1]/segment_distance))
     segment_bp = np.linspace(0,len(lam_relative_dense)-1,num=num_segbp_layer).astype(int)
     segment_bp_sample = (np.diff(segment_bp)/2+segment_bp[:-1])
