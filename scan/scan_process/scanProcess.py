@@ -722,14 +722,19 @@ class ScanProcess():
         mti_pcd=np.delete(mti_pcd,mti_pcd[1]>crop_max[1],axis=1)
         mti_pcd=np.delete(mti_pcd,mti_pcd[0]<crop_min[0],axis=1)
         mti_pcd=np.delete(mti_pcd,mti_pcd[0]>crop_max[0],axis=1)
+        mti_pcd[0]=-1*mti_pcd[0]
         mti_pcd = mti_pcd.T
         
         # cluster based noise remove
         dbscan.fit(mti_pcd)
-        cluster_id = dbscan.labels_>=0
-        mti_pcd_noise_remove=mti_pcd[cluster_id]
-        
         n_clusters_ = len(set(dbscan.labels_))
+
+        if n_clusters_>1:
+            cluster_id = dbscan.labels_>=0
+            mti_pcd_noise_remove=mti_pcd[cluster_id]
+        else:
+            mti_pcd_noise_remove=mti_pcd
+        
         # transform to R2TCP
         T_R2TCP_S1TCP=self.positioner.fwd(robot_q[6:],world=True).inv()*self.robot.fwd(robot_q[:6],world=True)
         target_z = np.array(target_p)
@@ -739,6 +744,18 @@ class ScanProcess():
         point_location=np.insert(point_location,1,0)
         point_location = np.matmul(T_R2TCP_S1TCP.R,point_location)+T_R2TCP_S1TCP.p
         point_location[2]=point_location[2]-offset_z
-        
+
         delta_h = (target_z[2]-point_location[2])
+
+        # for cluster_i in range(n_clusters_-1):
+        #     cluster_id = dbscan.labels_==cluster_i
+        #     plt.scatter(-1*mti_pcd[cluster_id][:,0],mti_pcd[cluster_id][:,1])
+        # plt.scatter(-1*mti_pcd[:,0],mti_pcd[:,1])
+        # # plt.axhline(y = target_z[2], color = 'r', linestyle = '-')
+        # plt.axhline(y = point_location_z_R2TCP-delta_h, color = 'r', linestyle = '-')
+        # plt.xlim((-30,30))
+        # # plt.ylim((50,120))
+        # plt.ylim((0,120))
+        # plt.show()
+
         return delta_h,point_location
