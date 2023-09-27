@@ -8,7 +8,7 @@ from utils import *
 from lambda_calc import *
 from general_robotics_toolbox import *
 import open3d as o3d
-
+from sklearn.cluster import DBSCAN
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import colors
@@ -712,4 +712,33 @@ class ScanProcess():
         
         return profile_height_arr,Transz0_H
 
+    def scan2dh(self,scan,robot_q,target_p,crop_min=[-10,85],crop_max=[10,100],offset_z=2.2):
         
+        dbscan = DBSCAN(eps=0.5,min_samples=20)
+        ## remove not in interested region
+        st=time.time()
+        mti_pcd=np.delete(scan,scan[1]==0,axis=1)
+        mti_pcd=np.delete(mti_pcd,mti_pcd[1]<crop_min[1],axis=1)
+        mti_pcd=np.delete(mti_pcd,mti_pcd[1]>crop_max[1],axis=1)
+        mti_pcd=np.delete(mti_pcd,mti_pcd[0]<crop_min[0],axis=1)
+        mti_pcd=np.delete(mti_pcd,mti_pcd[0]>crop_max[0],axis=1)
+        mti_pcd = mti_pcd.T
+        
+        # cluster based noise remove
+        dbscan.fit(mti_pcd)
+        cluster_id = dbscan.labels_>=0
+        mti_pcd_noise_remove=mti_pcd[cluster_id]
+        
+        n_clusters_ = len(set(dbscan.labels_))
+        # transform to R2TCP
+        T_R2TCP_S1TCP=self.positioner.fwd(robot_q[6:],world=True).inv()*self.robot_scan.fwd(robot_q[:6],world=True)
+        target_z = np.array(target_p)
+        largest_id = np.argsort(mti_pcd_noise_remove[:,1])[:10]
+        point_location = np.mean(mti_pcd_noise_remove[largest_id],axis=0)
+        point_location_z_R2TCP = deepcopy(point_location[1])
+        point_location=np.insert(point_location,1,0)
+        point_location = np.matmul(T_R2TCP_S1TCP.R,point_location)+T_R2TCP_S1TCP.p
+        point_location[2]=point_location[2]-offset_z
+        
+        delta_h = (target_z[2]-point_location[2])
+        return delta_h,point_location
