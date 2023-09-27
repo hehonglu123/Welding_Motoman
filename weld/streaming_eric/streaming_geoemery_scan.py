@@ -123,12 +123,12 @@ nominal_feedrate=170
 d_feedrate = -10
 nominal_vd_relative=10
 # nominal_slice_increment=int(1.84/slicing_meta['line_resolution'])
-nominal_slice_increment=26
+nominal_slice_increment=18
 scanner_lag_bp=int(slicing_meta['scanner_lag_breakpoints'])
 scanner_lag=slicing_meta['scanner_lag']
 end_layer_count = 7
 
-arc_on=True
+arc_on=False
 
 res, robot_state, _ = RR_robot_state.TryGetInValue()
 q14=robot_state.joint_position
@@ -152,7 +152,8 @@ for i in range(0,250):
 
 input("Enter to start")
 layer_count=0
-slice_num=0
+# slice_num=0
+slice_num=116
 # feedrate_cmd=nominal_feedrate
 feedrate_cmd=250
 # vd_relative=nominal_vd_relative
@@ -205,6 +206,7 @@ while slice_num<len(lam_relative_all_slices):
         SS.jog2q(curve_js_all_dense[breakpoints[0]])
         welding_started=True
         point_stream_start_time=time.time()
+        exit()
         if arc_on:
             fronius_client.start_weld()
         time.sleep(0.2)

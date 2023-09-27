@@ -314,6 +314,7 @@ for layer_count in range(0,total_layer):
     
     #### scanning process: processing point cloud and get h
     curve_sliced_relative=np.array(curve_sliced_relative)
+    continue
     
     scan_process = ScanProcess(robot_scan,positioner)
     if regen_pcd:
