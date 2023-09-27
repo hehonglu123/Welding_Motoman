@@ -1,12 +1,50 @@
-import sys,time, copy
+import sys,time, copy, io
 import open3d as o3d
 from matplotlib import cm
+import matplotlib.pyplot as plt
+import cv2
 
 sys.path.append('../toolbox/')
 from utils import *
 from pointcloud_toolbox import *
 sys.path.append('../slicing/')
 from slicing import check_boundary
+
+def color_bar(rng):
+    z_rng = np.arange(rng[1], rng[0], -0.1)
+    ax = plt.subplot()
+    im = ax.imshow(np.vstack((z_rng, z_rng, z_rng, z_rng)).T, extent=(0, 1, rng[0], rng[1]), cmap='inferno')
+    plt.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)
+    plt.ylabel('error [mm]')
+
+    '''
+    write it to an IO buffer in memory
+    '''
+    buf = io.BytesIO()
+    plt.savefig(buf, format='png', bbox_inches='tight', dpi=100, transparent=True)
+
+    '''
+    read the buffer as a cv2 image (maybe also works directly into open3d?)
+    '''
+    buf.seek(0)
+    array = np.asarray(bytearray(buf.read()), dtype=np.uint8)
+    im = cv2.imdecode(array, cv2.IMREAD_UNCHANGED)
+
+    '''
+    convert image to a open3d material (texture) and map it on a thin box
+    '''
+    im_o3d = o3d.geometry.Image(cv2.cvtColor(im, cv2.COLOR_RGBA2BGRA))
+    box = o3d.geometry.TriangleMesh.create_box(im.shape[1]/3, im.shape[0]/2, 0.1, create_uv_map=True, map_texture_to_each_face=True)
+    box.rotate(Rx(-np.pi/2),center=(0,0,0))
+
+    box.compute_triangle_normals()
+
+    mat = o3d.visualization.rendering.MaterialRecord()
+    mat.shader = 'defaultLitTransparency' # 'defaultLit' would show background of box white
+    # mat.base_color = [1,1,1, 0.75]
+    mat.albedo_img = im_o3d
+
+    return box, mat
 
 def calc_error(target_points,collapsed_points):
     error_off=[]
@@ -75,7 +113,7 @@ def visualize_pcd(show_pcd_list,point_show_normal=False):
 
     
 data_dir='../data/blade0.1/'
-scanned_dir='../../evaluation/Blade_ER316L/'
+scanned_dir='../../evaluation/Blade_ER70S6/'
 ######## read the scanned stl
 target_mesh = o3d.io.read_triangle_mesh(data_dir+'surface.stl')
 scanned_mesh = o3d.io.read_triangle_mesh(scanned_dir+'no_base_layer.stl')
@@ -146,9 +184,25 @@ print(error_miss.max(),np.mean(error_miss))
 
 
 error_map=error_map_gen(collapsed_surface,target_points_transform)
-print(error_map)
+box,mat=color_bar([error_map.min(),error_map.max()])
+
 error_map_normalized=error_map/np.max(error_map)
 #convert normalized error map to color heat map
 error_map_color=cm.inferno(error_map_normalized)[:,:3]
 collapsed_surface_pc.colors=o3d.utility.Vector3dVector(error_map_color)
+
+z_rng = np.arange(error_map.max(), error_map.min(), (error_map.min()-error_map.max())/100)
+ax = plt.subplot()
+im = ax.imshow(np.vstack((z_rng, z_rng, z_rng, z_rng)).T, extent=(0,  (error_map.max()-error_map.min())/20, error_map.min(), error_map.max()), cmap='inferno')
+plt.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)
+plt.ylabel('error [mm]')
+plt.show()
 o3d.visualization.draw_geometries([collapsed_surface_pc])
+
+# o3d.visualization.gui.Application.instance.initialize()
+# w = o3d.visualization.O3DVisualizer('title', 1024, 768)
+# w.add_geometry('colorbar', box, mat)
+# w.add_geometry('pcd', collapsed_surface_pc)
+# w.reset_camera_to_default()
+# o3d.visualization.gui.Application.instance.add_window(w)
+# o3d.visualization.gui.Application.instance.run()

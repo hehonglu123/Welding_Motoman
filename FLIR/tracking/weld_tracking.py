@@ -8,10 +8,10 @@ from flir_toolbox import *
 template = cv2.imread('torch_template.png',0)
 
 # Load the IR recording data from the pickle file
-with open('../../../recorded_data/ER316L_wall_streaming_bf/layer_394/ir_recording.pickle', 'rb') as file:
+with open('../../../recorded_data/ER70S6_wall_recording_bf/layer_198/ir_recording.pickle', 'rb') as file:
     ir_recording = pickle.load(file)
 
-ir_ts=np.loadtxt('../../../recorded_data/ER316L_wall_streaming_bf/layer_394/ir_stamps.csv', delimiter=',')
+ir_ts=np.loadtxt('../../../recorded_data/ER70S6_wall_recording_bf/layer_198/ir_stamps.csv', delimiter=',')
 
 
 result = cv2.VideoWriter('output.avi', 
@@ -63,13 +63,13 @@ for i in range(len(ir_recording)):
 
 
     # Write the IR image to the video file
-    result.write(ir_bgr)
+    # result.write(ir_bgr)
 
     # Display the IR image
-    # cv2.imshow("IR Recording", ir_bgr)
+    cv2.imshow("IR Recording", ir_bgr)
 
-    # # Wait for a specific time (in milliseconds) before displaying the next frame
-    # cv2.waitKey(int(1000*(ir_ts[i+1]-ir_ts[i])))
+    # Wait for a specific time (in milliseconds) before displaying the next frame
+    cv2.waitKey(int(1000*(ir_ts[i+1]-ir_ts[i])))
 
 result.release()
 # Close the window after the loop is completed
