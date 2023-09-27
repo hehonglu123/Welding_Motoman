@@ -41,9 +41,9 @@ def connect_failed(s, client_id, url, err):
     mti_sub=RRN.SubscribeService(url)
     mti_client=mti_sub.GetDefaultClientWait(1)
 
-R1_ph_dataset_date='0801'
-R2_ph_dataset_date='0801'
-S1_ph_dataset_date='0801'
+R1_ph_dataset_date='0926'
+R2_ph_dataset_date='0926'
+S1_ph_dataset_date='0926'
 
 zero_config=np.zeros(6)
 # 0. robots.
@@ -70,6 +70,12 @@ robot_scan_base = robot_weld.T_base_basemarker.inv()*robot_scan.T_base_basemarke
 robot_scan.base_H = H_from_RT(robot_scan_base.R,robot_scan_base.p)
 positioner_base = robot_weld.T_base_basemarker.inv()*positioner.T_base_basemarker
 positioner.base_H = H_from_RT(positioner_base.R,positioner_base.p)
+# robot_weld.robot.P=deepcopy(robot_weld.calib_P)
+# robot_weld.robot.H=deepcopy(robot_weld.calib_H)
+# robot_scan.robot.P=deepcopy(robot_scan.calib_P)
+# robot_scan.robot.H=deepcopy(robot_scan.calib_H)
+# positioner.robot.P=deepcopy(positioner.calib_P)
+# positioner.robot.H=deepcopy(positioner.calib_H)
 
 #### data ####
 dataset='circle_large/'
@@ -256,6 +262,15 @@ for layer_count in range(0,end_layer_count):
         waypoint_pose=robot_weld.fwd(curve_js_all_dense[0,:6])
         waypoint_pose.p[-1]+=50
         waypoint_q=robot_weld.inv(waypoint_pose.p,waypoint_pose.R,curve_js_all_dense[0,:6])[0]
+
+        # TODO: Better place for load calib
+        robot_weld.robot.P=deepcopy(robot_weld.calib_P)
+        robot_weld.robot.H=deepcopy(robot_weld.calib_H)
+        robot_scan.robot.P=deepcopy(robot_scan.calib_P)
+        robot_scan.robot.H=deepcopy(robot_scan.calib_H)
+        positioner.robot.P=deepcopy(positioner.calib_P)
+        positioner.robot.H=deepcopy(positioner.calib_H)
+
         # SS.jog2q(np.hstack((waypoint_q,np.radians([21,5,-39,0,-47,49]),curve_js_all_dense[0,12:])))
         SS.jog2q(np.hstack((np.radians([-50,28,7,0,-47,0]),curve_js_all_dense[0,6:])))
         # exit()
@@ -284,9 +299,10 @@ for layer_count in range(0,end_layer_count):
             bp_end = segment_bp[seg_i+1]
             breakpoints=SS.get_breakpoints(lam_relative_dense[bp_start:bp_end],vd_relative)
             breakpoints=breakpoints+bp_start
+            print(breakpoints)
             
             ###start logging
-            for bp_idx in range(len(breakpoints)):
+            for bp_idx in breakpoints:
                 ####################################MTI PROCESSING####################################
                 if bp_idx<len(breakpoints)-1: ###no wait at last point
                     ###busy wait for accurate 8ms streaming
@@ -361,7 +377,7 @@ lag_scan_bp=np.argmin(lam_relative_dense<scanner_lag)
 breakpoints=SS.get_breakpoints(lam_relative_dense[:lag_scan_bp],vd_relative)
 try:
     ###start logging
-    for bp_idx in range(0,breakpoints):
+    for bp_idx in breakpoints:
         ####################################MTI PROCESSING####################################
         if bp_idx<len(breakpoints)-1: ###no wait at last point
             ###busy wait for accurate 8ms streaming

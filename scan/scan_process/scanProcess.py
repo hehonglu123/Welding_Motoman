@@ -731,7 +731,7 @@ class ScanProcess():
         
         n_clusters_ = len(set(dbscan.labels_))
         # transform to R2TCP
-        T_R2TCP_S1TCP=self.positioner.fwd(robot_q[6:],world=True).inv()*self.robot_scan.fwd(robot_q[:6],world=True)
+        T_R2TCP_S1TCP=self.positioner.fwd(robot_q[6:],world=True).inv()*self.robot.fwd(robot_q[:6],world=True)
         target_z = np.array(target_p)
         largest_id = np.argsort(mti_pcd_noise_remove[:,1])[:10]
         point_location = np.mean(mti_pcd_noise_remove[largest_id],axis=0)
