@@ -48,7 +48,7 @@ class CalibRobotPH:
             mp.MoveJ(start_p[j],rob_speed,0)
             # mp.MoveJ(paths[j][0],rob_speed,0)
             client.execute_motion_program(mp)
-            time.sleep(3)
+            time.sleep(0.5)
 
             mp=MotionProgram(ROBOT_CHOICE=ROBOT_CHOICE,pulse2deg=rob_p2d)
             for N in range(repeat_N):
@@ -268,5 +268,5 @@ if __name__=='__main__':
 
     # calib_R1()
     
-    calib_S1()
-    # calib_R2()
+    # calib_S1()
+    calib_R2()
