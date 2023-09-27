@@ -20,14 +20,13 @@ from multi_robot import *
 from traj_manipulation import *
 from robot_def import *
 from scan_utils import *
-from scan_continuous import *
-from scanPathGen import *
 from scanProcess import *
 from PH_interp import *
 from dx200_motion_program_exec_client import *
 from StreamingSend import *
 sys.path.append('../')
 from weldRRSensor import *
+from streaming_control import *
 
 def my_handler(exp):
 	if (exp is not None):
@@ -88,6 +87,7 @@ if data_date == '':
 else:
     recorded_data_dir=curve_data_dir+'weld_scan_'+data_date+'/'
 print("Use data directory:",recorded_data_dir)
+#################################
 
 ########################################################RR FRONIUS########################################################
 fronius_sub=RRN.SubscribeService('rr+tcp://192.168.55.21:60823?service=welder')
@@ -115,27 +115,37 @@ mti_sub=RRN.SubscribeService("rr+tcp://192.168.55.10:60830/?service=MTI2D")
 mti_sub.ClientConnectFailed += connect_failed
 mti_client=mti_sub.GetDefaultClientWait(1)
 mti_client.setExposureTime("25")
-#############################
+###############################################################
 
 ###set up control parameters
 job_offset=200 		###200 for Aluminum ER4043 (215,100 ipm), 300 for Steel Alloy ER70S-6 (300 ipm, 3 mm/sec), 400 for Stainless Steel ER316L
-nominal_feedrate=170
-d_feedrate = -10
+nominal_feedrate=160
+base_nominal_feedrate=250
 nominal_vd_relative=10
+base_nominal_vd_relative=8
 segment_distance=0.8 ## segment d, such that ||xi_{j}-xi_{j-1}||=0.8
 base_nominal_slice_increment=26
+delta_h_star = 1.8
+nominal_slice_increment=int(delta_h_star/slicing_meta['line_resolution'])
 base_layer_N=2
-nominal_slice_increment=18
 scanner_lag_bp=int(slicing_meta['scanner_lag_breakpoints'])
 scanner_lag=slicing_meta['scanner_lag']
 end_layer_count = 7
 
-arc_on=False
-
-res, robot_state, _ = RR_robot_state.TryGetInValue()
-q14=robot_state.joint_position
+weld_feedback_gain_K=1
 
 welding_started=False
+arc_on=False
+##############################
+
+### scan process object
+scan_process = ScanProcess(robot_scan,positioner)
+#######################
+
+### get the initial robot pose
+res, robot_state, _ = RR_robot_state.TryGetInValue()
+q14=robot_state.joint_position
+##############################
 
 #### Planned Print layers
 all_layers=[0]
@@ -190,10 +200,9 @@ for i in range(end_layer_count):
 
 input("Enter to start")
 
-# feedrate_cmd=nominal_feedrate
-feedrate_cmd=250
-# vd_relative=nominal_vd_relative
-vd_relative=8
+### set up variables for welding and scanning
+feedrate_cmd=base_nominal_feedrate
+vd_relative=base_nominal_vd_relative
 x_state_location=[]
 x_state_dh = []
 
@@ -201,28 +210,36 @@ robot_logging_all=[]
 weld_logging_all=[]
 mti_logging_all=[]
 for layer_count in range(0,end_layer_count):
-    layer=all_layers[layer_count]
+    base_layer=True if layer_count<base_layer_N else False # baselayer flag
+    feedrate_cmd = base_nominal_feedrate if base_layer else nominal_feedrate # set feedrate
+    vd_relative = base_nominal_vd_relative if base_layer else nominal_vd_relative # set feedrate
+    
+    layer=all_layers[layer_count] # get current layer
     print("Layer:",layer,"#:",layer_count)
     print('FEEDRATE: ',feedrate_cmd,'VD: ',vd_relative)
     ###change feedrate
     fronius_client.async_set_job_number(int(feedrate_cmd/10)+job_offset, my_handler)
     
     ## the current curve, the next path curve and the next target curve
-    if layer_count!=0:
-        curve_sliced_relative=curve_relative_all_slices[layer_count-1]
     path_curve_dense_relative=curve_relative_dense_all_slices[layer_count]
-    if layer_count<end_layer_count:
-        target_curve_sliced_relative=curve_relative_all_slices[layer_count+1]
     lam_relative_dense=deepcopy(lam_relative_dense_all_slices[layer_count])
-        
+    if layer_count<end_layer_count:
+        target_curve_dense_relative=curve_relative_dense_all_slices[layer_count+1]
+        target_lam_relative_dense=deepcopy(lam_relative_dense_all_slices[layer_count+1])
+    
+    ## get the executed warp robot path (js)
     rob1_js=rob1_js_warp_all_slices[layer_count]
     rob2_js=rob2_js_warp_all_slices[layer_count]
     positioner_js=positioner_warp_js_all_slices[layer_count]
     
+    ## get the segment for changing velocity
     num_segbp_layer=max(2,int(lam_relative_dense[-1]/segment_distance))
     segment_bp = np.linspace(0,len(lam_relative_dense)-1,num=num_segbp_layer).astype(int)
     segment_bp_sample = (np.diff(segment_bp)/2+segment_bp[:-1])
     segment_bp_sample=segment_bp_sample.astype(int) # sample the middle point
+    if len(x_state_location)==0:
+        x_state_location = path_curve_dense_relative[segment_bp_sample][:,:3]
+        x_state_dh = [[] for x in range(len(x_state_location))]
     # segment_bp=segment_bp[1:] # from 1 ~ the last point (ignore 0)
     
     ###find closest %2pi
@@ -256,7 +273,11 @@ for layer_count in range(0,end_layer_count):
     mti_recording=[]
     try:
         for seg_i in range(len(segment_bp)-1):
-            vd_relative = nominal_vd_relative # TODO: feedback control here
+            
+            # Feedback control. TODO: get the correct delta segments
+            if not base_layer:
+                vd_relative = weld_controller_lambda(np.mean(x_state_dh[0]),weld_feedback_gain_K,nominal_feedrate)
+            ####################3
             
             ### get breakpoints for vd
             bp_start = segment_bp[seg_i]
@@ -277,13 +298,27 @@ for layer_count in range(0,end_layer_count):
                 ###MTI scans YZ point from tool frame
                 st=time.time()
                 mti_recording.append(deepcopy(np.array([mti_client.lineProfile.X_data,mti_client.lineProfile.Z_data])))
-                ## TODO: calculate dh
+                ## Get the delta h. TODO: get the correct target p
+                delta_h,point_p = scan_process.scan2dh(deepcopy(mti_recording[-1]),\
+                    q14[6:],path_curve_dense_relative[0],crop_min=[-10,85],crop_max=[10,100],offset_z=2.2)
+                x_state_location_arr = np.array(x_state_location)
+                x_state_i = np.argsort(np.linalg.norm(x_state_location_arr[:,:2]-point_p[:2],axis=1))[0] # only look at xy
+                x_state_dh[x_state_i].append(delta_h)
+                ################################
                 if time.time()-st>0.008:
                     print('MTI scan time:',time.time()-st)
                     print("What????")
-                
+                ### record data
                 robot_ts.append(robot_timestamp)
                 robot_js.append(q14)
+            
+            ### update x_state 
+            x_state_location.pop(0)
+            x_state_location.append(target_curve_dense_relative[segment_bp_sample[seg_i]])
+            x_state_dh.pop(0)
+            x_state_dh.append([])
+            #########################
+            
         robot_ts=np.array(robot_ts)
         robot_ts=robot_ts-robot_ts[0]
         robot_js=np.array(robot_js)
@@ -291,20 +326,6 @@ for layer_count in range(0,end_layer_count):
         mti_logging_all.append(mti_recording)
         
         ####CONTROL PARAMETERS
-        last_slice_num=slice_num
-        # increment slice layer num
-        slice_num+=int(nominal_slice_increment)
-        # change feedrate and such
-        if layer_count>0: # dont update for baselayer
-            if layer_count<1:
-                feedrate_cmd=250
-                vd_relative=8
-            elif layer_count==1:
-                feedrate_cmd=nominal_feedrate-d_feedrate
-                nominal_slice_increment=18
-            feedrate_cmd = feedrate_cmd+d_feedrate
-            # speed decrease in ratio, so the increment rate stays the same
-            vd_relative = (feedrate_cmd/nominal_feedrate)*nominal_vd_relative 
         layer_count+=1
         
         if layer_count>=end_layer_count:
@@ -318,17 +339,29 @@ for layer_count in range(0,end_layer_count):
 if arc_on:
     fronius_client.stop_weld()
 
+vd_relative=nominal_vd_relative
 ## streaming final for scanner lagging
+path_curve_dense_relative=curve_relative_dense_all_slices[layer_count-1]
+lam_relative_dense=deepcopy(lam_relative_dense_all_slices[layer_count-1])
+## get the executed warp robot path (js)
+rob1_js=rob1_js_all_slices[layer_count-1]
+rob2_js=rob2_js_all_slices[layer_count-1]
+positioner_js=positioner_js_all_slices[layer_count-1]
+###find closest %2pi
+num2p=np.round((q14[-1]-positioner_js[0,1])/(2*np.pi))
+positioner_js[:,1]=positioner_js[:,1]+num2p*2*np.pi
+curve_js_all_dense=interp1d(lam_relative_all_slices[layer_count-1],np.hstack((rob1_js,rob2_js,positioner_js)),kind='cubic',axis=0)(lam_relative_dense_all_slices[layer_count-1])
+curve_js_all_dense=np.array(curve_js_all_dense)
+
 robot_ts=[]
 robot_js=[]
 mti_recording=[]
 # point_stream_start_time=time.time()
-lag_scan_bp=np.argmin(lam_relative_dense_all_slices[last_slice_num]<scanner_lag)
-lag_scan_bp_bp=np.argmin(breakpoints<lag_scan_bp)
-curve_js_all_dense[:,13]=curve_js_all_dense[:,13]-(curve_js_all_dense[0,13]-curve_js_all_dense[-1,13])
+lag_scan_bp=np.argmin(lam_relative_dense<scanner_lag)
+breakpoints=SS.get_breakpoints(lam_relative_dense[:lag_scan_bp],vd_relative)
 try:
     ###start logging
-    for bp_idx in range(0,lag_scan_bp):
+    for bp_idx in range(0,breakpoints):
         ####################################MTI PROCESSING####################################
         if bp_idx<len(breakpoints)-1: ###no wait at last point
             ###busy wait for accurate 8ms streaming
