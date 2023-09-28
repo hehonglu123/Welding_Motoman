@@ -11,6 +11,8 @@ def normalize2cv(frame):
 
 
 # Load the IR recording data from the pickle file
+#70S_model_120ipm_2023_09_23_21_27_03
+#316L_model_120ipm_2023_09_25_19_56_43
 with open('../../../recorded_data/316L_model_120ipm_2023_09_25_19_56_43/layer_3/ir_recording.pickle', 'rb') as file:
     ir_recording = pickle.load(file)
 
@@ -44,10 +46,10 @@ for i in range(1,len(ir_recording)):
     # Optionally apply a colormap to the difference
     ir_colormap = cv2.applyColorMap(normalize2cv(ir_recording[i]), cv2.COLORMAP_INFERNO)
     ir_colormap[172,88]=[0,255,0]
-    result.write(ir_colormap)
-    # cv2.imshow("IR Flow",ir_colormap)
-    # # Wait for a specific time (in milliseconds) before displaying the next frame
-    # cv2.waitKey(int(1000*(ir_ts[i+1]-ir_ts[i])))
+    # result.write(ir_colormap)
+    cv2.imshow("IR Flow",ir_colormap)
+    # Wait for a specific time (in milliseconds) before displaying the next frame
+    cv2.waitKey(int(1000*(ir_ts[i+1]-ir_ts[i])))
 
 result.release()
 # Close the window after the loop is completed

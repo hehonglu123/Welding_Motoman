@@ -12,6 +12,8 @@ def normalize2cv(frame):
 
 for i in range(2,10):
     # Load the IR recording data from the pickle file
+    #70S_model_120ipm_2023_09_23_21_27_03
+    #316L_model_120ipm_2023_09_25_19_56_43
     with open('../../../recorded_data/316L_model_120ipm_2023_09_25_19_56_43/layer_%i/ir_recording.pickle'%(i), 'rb') as file:
         ir_recording = pickle.load(file)
     data = read_csv('../../../recorded_data/316L_model_120ipm_2023_09_25_19_56_43/layer_%i/command1.csv'%(i))
