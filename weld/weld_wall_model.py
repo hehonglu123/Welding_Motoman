@@ -93,23 +93,23 @@ final_h_std_thres=999999999
 weld_z_height=[0,6,7] # two base layer height to first top layer
 weld_z_height=np.append(weld_z_height,np.arange(weld_z_height[-1],final_height,1)+1)
 # job_number=[115,115]
-job_number=[225,225]
-model_job_nuber = 100
-job_number=np.append(job_number,np.ones(len(weld_z_height)-2)*(int(model_job_nuber)/10 + 200)) # ER4043
+job_number=[430,430]
+model_job_nuber = 240
+# job_number=np.append(job_number,np.ones(len(weld_z_height)-2)*(int(model_job_nuber)/10 + 200)) # ER4043
 # job_number=np.append(job_number,np.ones(len(weld_z_height)-2)*(int(model_job_nuber)/10 + 300)) # ER70S-6
-# job_number=np.append(job_number,np.ones(len(weld_z_height)-2)*(int(model_job_nuber)/10 + 400)) # 316L
+job_number=np.append(job_number,np.ones(len(weld_z_height)-2)*(int(model_job_nuber)/10 + 400)) # 316L
 # job_number=np.append(job_number,np.ones(len(weld_z_height)-2)*212) # 220 ipm
 print(weld_z_height)
 print(job_number)
 
 ipm_mode=100
 weld_velocity=[5,5]
-weld_v=5
+weld_v=4
 print("input dh:",v2dh_loglog(weld_v,ipm_mode))
 for i in range(len(weld_z_height)-2):
     weld_velocity.append(weld_v)
-    # if weld_v==weld_velocity[-2]:
-    #     weld_v+=2
+    if weld_v==weld_velocity[-2]:
+        weld_v+=2
 print(weld_velocity)
 # exit()
 
@@ -167,7 +167,7 @@ r2_ir_q = np.radians([38.1523,35.3321,-67.5745,145.4767,-87.9081,-96.3553])
 r2_mid = np.radians([43.7851,20,-10,0,0,0])
 # r2_ir_q = np.zeros(6)
 
-weld_arcon=False
+weld_arcon=True
 
 end_layer = len(weld_z_height)
 if use_previous_cmd:

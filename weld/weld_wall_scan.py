@@ -93,7 +93,7 @@ weld_z_height=[0,6,7] # two base layer height to first top layer
 weld_z_height=np.append(weld_z_height,np.arange(weld_z_height[-1],final_height,1)+1)
 # job_number=[115,115]
 job_number=[215,215]
-model_job_nuber = 130
+model_job_nuber = 100
 job_number=np.append(job_number,np.ones(len(weld_z_height)-2)*(int(model_job_nuber)/10 + 200)) # ER4043
 # job_number=np.append(job_number,np.ones(len(weld_z_height)-2)*206) # 160 ipm
 # job_number=np.append(job_number,np.ones(len(weld_z_height)-2)*212) # 220 ipm
@@ -101,6 +101,7 @@ print(weld_z_height)
 print(job_number)
 
 ipm_mode=100
+
 weld_velocity=[5,5]
 weld_v=5
 print("input dh:",v2dh_loglog(weld_v,ipm_mode))
@@ -111,12 +112,12 @@ for i in range(len(weld_z_height)-2):
 # print(weld_velocity)
 # exit()
 
-to_start_speed=4
-to_home_speed=5
+to_start_speed=5
+to_home_speed=6
 
 save_weld_record=True
 
-start_correction_layer=2
+start_correction_layer=3
 # start_correction_layer=99999999
 
 current_time = datetime.datetime.now()
@@ -281,7 +282,7 @@ for i in range(0,end_layer):
             h_std_thres=-1
 
             nominal_v=weld_v
-            curve_sliced_relative,path_T_S1,this_weld_v,all_dh,last_mean_h=\
+            curve_sliced_relative,path_T_S1,this_weld_v,all_dh,last_mean_h,scan_flag=\
                 strategy_3(profile_height,input_dh,curve_sliced_relative,R_S1TCP,num_l,noise_h_thres=noise_h_thres,\
                            min_v=min_v,max_v=max_v,h_std_thres=h_std_thres,nominal_v=nominal_v,ipm_mode=ipm_mode)
             
