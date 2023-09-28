@@ -52,12 +52,12 @@ def robot_weld_path_gen(all_layer_z,forward_flag,base_layer):
     
     return all_path_T
 
-zero_config=np.zeros(6)
-R1_ph_dataset_date='0801'
-R2_ph_dataset_date='0801'
-S1_ph_dataset_date='0801'
+R1_ph_dataset_date='0926'
+R2_ph_dataset_date='0926'
+S1_ph_dataset_date='0926'
 
-# 0. robots. Note use "(robot)_pose_mocapcalib.csv"
+zero_config=np.zeros(6)
+# 0. robots.
 config_dir='../config/'
 R1_marker_dir=config_dir+'MA2010_marker_config/'
 weldgun_marker_dir=config_dir+'weldgun_marker_config/'
@@ -75,6 +75,7 @@ robot_scan=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_co
 positioner=positioner_obj('D500B',def_path=config_dir+'D500B_robot_default_config.yml',tool_file_path=config_dir+'positioner_tcp.csv',\
     base_transformation_file=config_dir+'D500B_pose.csv',pulse2deg_file_path=config_dir+'D500B_pulse2deg_real.csv',\
     base_marker_config_file=S1_marker_dir+'D500B_'+S1_ph_dataset_date+'_marker_config.yaml',tool_marker_config_file=S1_tcp_marker_dir+'positioner_tcp_marker_config.yaml')
+
 
 Table_home_T = positioner.fwd(np.radians([-15,180]))
 T_S1TCP_R1Base = np.linalg.inv(np.matmul(positioner.base_H,H_from_RT(Table_home_T.R,Table_home_T.p)))
@@ -162,11 +163,11 @@ curve_sliced_relative=None
 last_mean_h = 0
 
 # ir pose
-r2_ir_q = np.radians([43.3469,36.0996,-63.0900,142.5838,-83.0429,-96.0737])
+r2_ir_q = np.radians([38.1523,35.3321,-67.5745,145.4767,-87.9081,-96.3553])
 r2_mid = np.radians([43.7851,20,-10,0,0,0])
 # r2_ir_q = np.zeros(6)
 
-weld_arcon=True
+weld_arcon=False
 
 end_layer = len(weld_z_height)
 if use_previous_cmd:
