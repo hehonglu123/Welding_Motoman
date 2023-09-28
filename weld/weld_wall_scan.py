@@ -1,7 +1,6 @@
 from copy import deepcopy
 from pathlib import Path
-import pickle
-import sys
+import pickle, sys, time, datetime, traceback, glob
 sys.path.append('../toolbox/')
 sys.path.append('../scan/scan_tools/')
 sys.path.append('../scan/scan_plan/')
@@ -15,12 +14,9 @@ from weldCorrectionStrategy import *
 from weldRRSensor import *
 from WeldSend import *
 from dx200_motion_program_exec_client import *
-
 from general_robotics_toolbox import *
 from RobotRaconteur.Client import *
 import matplotlib.pyplot as plt
-import time
-import datetime
 import numpy as np
 
 def robot_weld_path_gen(all_layer_z,forward_flag,base_layer):
@@ -56,23 +52,34 @@ def robot_weld_path_gen(all_layer_z,forward_flag,base_layer):
     
     return all_path_T
 
+R1_ph_dataset_date='0926'
+R2_ph_dataset_date='0926'
+S1_ph_dataset_date='0926'
+
 zero_config=np.zeros(6)
-# 0. robots. Note use "(robot)_pose_mocapcalib.csv"
+# 0. robots.
 config_dir='../config/'
+R1_marker_dir=config_dir+'MA2010_marker_config/'
+weldgun_marker_dir=config_dir+'weldgun_marker_config/'
+R2_marker_dir=config_dir+'MA1440_marker_config/'
+mti_marker_dir=config_dir+'mti_marker_config/'
+S1_marker_dir=config_dir+'D500B_marker_config/'
+S1_tcp_marker_dir=config_dir+'positioner_tcp_marker_config/'
 robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',d=15,tool_file_path=config_dir+'torch.csv',\
-    pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',\
-    base_marker_config_file=config_dir+'MA2010_marker_config.yaml',tool_marker_config_file=config_dir+'weldgun_marker_config.yaml')
-robot_scan=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.yml',tool_file_path=config_dir+'mti_backup.csv',\
-    base_transformation_file=config_dir+'MA1440_pose.csv',pulse2deg_file_path=config_dir+'MA1440_A0_pulse2deg_real.csv',\
-    base_marker_config_file=config_dir+'MA1440_marker_config.yaml')
+	pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',\
+    base_marker_config_file=R1_marker_dir+'MA2010_'+R1_ph_dataset_date+'_marker_config.yaml',tool_marker_config_file=weldgun_marker_dir+'weldgun_'+R1_ph_dataset_date+'_marker_config.yaml')
+robot_scan=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.yml',tool_file_path=config_dir+'mti.csv',\
+	base_transformation_file=config_dir+'MA1440_pose.csv',pulse2deg_file_path=config_dir+'MA1440_A0_pulse2deg_real.csv',\
+    base_marker_config_file=R2_marker_dir+'MA1440_'+R2_ph_dataset_date+'_marker_config.yaml',tool_marker_config_file=mti_marker_dir+'mti_'+R2_ph_dataset_date+'_marker_config.yaml')
+
 positioner=positioner_obj('D500B',def_path=config_dir+'D500B_robot_default_config.yml',tool_file_path=config_dir+'positioner_tcp.csv',\
     base_transformation_file=config_dir+'D500B_pose.csv',pulse2deg_file_path=config_dir+'D500B_pulse2deg_real.csv',\
-    base_marker_config_file=config_dir+'D500B_marker_config.yaml',tool_marker_config_file=config_dir+'positioner_tcp_marker_config.yaml')
+    base_marker_config_file=S1_marker_dir+'D500B_'+S1_ph_dataset_date+'_marker_config.yaml',tool_marker_config_file=S1_tcp_marker_dir+'positioner_tcp_marker_config.yaml')
+
 
 Table_home_T = positioner.fwd(np.radians([-15,180]))
 T_S1TCP_R1Base = np.linalg.inv(np.matmul(positioner.base_H,H_from_RT(Table_home_T.R,Table_home_T.p)))
 T_R1Base_S1TCP = np.linalg.inv(T_S1TCP_R1Base)
-
 #### change base H to calibrated ones ####
 robot_scan.base_H = H_from_RT(robot_scan.T_base_basemarker.R,robot_scan.T_base_basemarker.p)
 positioner.base_H = H_from_RT(positioner.T_base_basemarker.R,positioner.T_base_basemarker.p)
@@ -86,7 +93,8 @@ weld_z_height=[0,6,7] # two base layer height to first top layer
 weld_z_height=np.append(weld_z_height,np.arange(weld_z_height[-1],final_height,1)+1)
 # job_number=[115,115]
 job_number=[215,215]
-job_number=np.append(job_number,np.ones(len(weld_z_height)-2)*200) # 100 ipm
+model_job_nuber = 130
+job_number=np.append(job_number,np.ones(len(weld_z_height)-2)*(int(model_job_nuber)/10 + 200)) # ER4043
 # job_number=np.append(job_number,np.ones(len(weld_z_height)-2)*206) # 160 ipm
 # job_number=np.append(job_number,np.ones(len(weld_z_height)-2)*212) # 220 ipm
 print(weld_z_height)
@@ -108,12 +116,12 @@ to_home_speed=5
 
 save_weld_record=True
 
-# start_correction_layer=2
-start_correction_layer=99999999
+start_correction_layer=2
+# start_correction_layer=99999999
 
 current_time = datetime.datetime.now()
 formatted_time = current_time.strftime('%Y_%m_%d_%H_%M_%S.%f')[:-7]
-data_dir='../data/wall_weld_test/weld_scan_'+formatted_time+'/'
+data_dir=f'../data/wall_weld_test/ER4043_correction_{model_job_nuber}ipm_'  +formatted_time+'/'
 
 ### read cmd
 use_previous_cmd=False
@@ -123,16 +131,18 @@ cmd_dir = '../data/wall_weld_test/'+'moveL_100_weld_scan_2023_08_02_15_17_25/'
 robot_client=MotionProgramExecClient()
 ws=WeldSend(robot_client)
 # weld state logging
+current_ser=RRN.SubscribeService('rr+tcp://192.168.55.21:12182?service=Current')
 weld_ser = RRN.SubscribeService('rr+tcp://192.168.55.10:60823?service=welder')
 cam_ser=RRN.ConnectService('rr+tcp://192.168.55.10:60827/?service=camera')
-mic_ser = RRN.ConnectService('rr+tcp://192.168.55.20:60828?service=microphone')
+mic_ser = RRN.ConnectService('rr+tcp://192.168.55.15:60828?service=microphone')
 ## RR sensor objects
-rr_sensors = WeldRRSensor(weld_service=weld_ser,cam_service=cam_ser,microphone_service=mic_ser)
+rr_sensors = WeldRRSensor(weld_service=weld_ser,cam_service=cam_ser,microphone_service=mic_ser,current_service=current_ser)
+
 
 # ## test sensor (camera, microphone)
-# print("Test 3 Sec.")
-# rr_sensors.test_all_sensors()
-# print(len(rr_sensors.ir_recording))
+print("Test 3 Sec.")
+rr_sensors.test_all_sensors()
+print(len(rr_sensors.ir_recording))
 # exit()
 ###############
 
@@ -142,20 +152,20 @@ mti_client.setExposureTime("25")
 ###################################
 base_layer = True
 profile_height=None
-Transz0_H=None
-# Transz0_H=np.array([[ 9.99997540e-01,  2.06703673e-06, -2.21825071e-03, -3.46701381e-03],
-#  [ 2.06703673e-06,  9.99998263e-01,  1.86365986e-03,  2.91280622e-03],
-#  [ 2.21825071e-03, -1.86365986e-03,  9.99995803e-01,  1.56294293e+00],
-#  [ 0.00000000e+00,  0.00000000e+00,  0.00000000e+00,  1.00000000e+00]])
+# Transz0_H=None
+Transz0_H=np.array([[ 9.99997540e-01,  2.06703673e-06, -2.21825071e-03, -3.46701381e-03],
+ [ 2.06703673e-06,  9.99998263e-01,  1.86365986e-03,  2.91280622e-03],
+ [ 2.21825071e-03, -1.86365986e-03,  9.99995803e-01,  1.56294293e+00],
+ [ 0.00000000e+00,  0.00000000e+00,  0.00000000e+00,  1.00000000e+00]])
 curve_sliced_relative=None
 last_mean_h = 0
 
 # ir pose
-r2_ir_q = np.radians([43.3469,36.0996,-63.0900,142.5838,-83.0429,-96.0737])
+r2_ir_q = np.radians([38.1523,35.3321,-67.5745,145.4767,-87.9081,-96.3553])
 r2_mid = np.radians([43.7851,20,-10,0,0,0])
 # r2_ir_q = np.zeros(6)
 
-weld_arcon=False
+weld_arcon=True
 
 end_layer = len(weld_z_height)
 if use_previous_cmd:
@@ -324,7 +334,7 @@ for i in range(0,end_layer):
         ws.jog_single(robot_weld,path_q[0],to_start_speed)
         
         weld_motion_weld_st = time.time()
-        # input("Press Enter and start welding.")
+        input("Press Enter and start welding.")
         # mp=MotionProgram(ROBOT_CHOICE='RB1',pulse2deg=robot_weld.pulse2deg)
         # mp.MoveL(np.degrees(path_q[1]), 10, 0)
         # mp.setArc(select, int(this_job_number))
@@ -341,7 +351,11 @@ for i in range(0,end_layer):
             primitives.append('movel')
 
         rr_sensors.start_all_sensors()
+
+
         rob_stamps,rob_js_exe,_,_=ws.weld_segment_single(primitives,robot_weld,path_q[1:-1],np.append(10,this_weld_v),cond_all=[int(this_job_number)],arc=weld_arcon)
+
+
         rr_sensors.stop_all_sensors()
 
         if save_weld_record:
@@ -356,7 +370,13 @@ for i in range(0,end_layer):
             # save weld record
             np.savetxt(layer_data_dir + 'weld_js_exe.csv',rob_js_exe,delimiter=',')
             np.savetxt(layer_data_dir + 'weld_robot_stamps.csv',rob_stamps,delimiter=',')
-            rr_sensors.save_all_sensors(layer_data_dir)
+            np.save(layer_data_dir+'primitives.npy',primitives)
+            np.save(layer_data_dir+'path_q.npy',path_q)
+            np.save(layer_data_dir+'this_weld_v.npy',np.append(10,this_weld_v))
+            try:
+                rr_sensors.save_all_sensors(layer_data_dir)
+            except:
+                traceback.print_exc()
         
         print("Weld actual weld time:",time.time()-weld_motion_weld_st)
         weld_to_home_st = time.time()
@@ -418,7 +438,7 @@ for i in range(0,end_layer):
         scan_motion_st = time.time()
         ######## scanning motion #########
         ### execute motion ###
-        robot_client=MotionProgramExecClient()
+        # robot_client=MotionProgramExecClient()
         # input("Press Enter and move to scanning startint point")
 
         ## move to start
@@ -449,25 +469,23 @@ for i in range(0,end_layer):
         mti_recording=[]
         r_pulse2deg = np.append(robot_scan.pulse2deg,positioner.pulse2deg)
         while True:
-            if state_flag & 0x08 == 0 and time.time()-start_time>1.:
-                break
-            res, data = ws.client.receive_from_robot(0.01)
+            if state_flag & STATUS_RUNNING == 0 and time.time()-start_time>1.:
+                break 
+            res, fb_data = ws.client.fb.try_receive_state_sync(ws.client.controller_info, 0.001)
             if res:
-                joint_angle=np.radians(np.divide(np.array(data[26:34]),r_pulse2deg))
-                state_flag=data[16]
+                joint_angle=np.hstack((fb_data.group_state[0].feedback_position,fb_data.group_state[1].feedback_position,fb_data.group_state[2].feedback_position))
+                state_flag=fb_data.controller_flags
                 joint_recording.append(joint_angle)
-                timestamp=data[0]+data[1]*1e-9
+                timestamp=fb_data.time
                 robot_stamps.append(timestamp)
                 ###MTI scans YZ point from tool frame
                 mti_recording.append(deepcopy(np.array([mti_client.lineProfile.X_data,mti_client.lineProfile.Z_data])))
         ws.client.servoMH(False)
-
-        print("Scan motion scan time:",time.time()-scan_motion_scan_st)
         
-        scan_to_home_st = time.time()
         mti_recording=np.array(mti_recording)
-        q_out_exe=joint_recording
-
+        joint_recording=np.array(joint_recording)
+        q_out_exe=joint_recording[:,6:]
+        print(np.degrees(q_out_exe[:10]))
         # input("Press Enter to Move Home")
         # move robot to home
         # q2=np.zeros(6)
@@ -490,7 +508,6 @@ for i in range(0,end_layer):
                 pickle.dump(mti_recording, file)
             print('Total scans:',len(mti_recording))
         
-        print("Scan to home:",time.time()-scan_to_home_st)
         print("Scan motion time:",time.time()-scan_motion_st)
         
         print("Scan Time:",time.time()-scan_st)

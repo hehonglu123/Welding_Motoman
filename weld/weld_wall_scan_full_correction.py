@@ -76,18 +76,30 @@ def robot_weld_path_gen(all_layer_z,forward_flag,base_layer):
     
     return all_path_T
 
+R1_ph_dataset_date='0926'
+R2_ph_dataset_date='0926'
+S1_ph_dataset_date='0926'
+
 zero_config=np.zeros(6)
-# 0. robots. Note use "(robot)_pose_mocapcalib.csv"
+# 0. robots.
 config_dir='../config/'
+R1_marker_dir=config_dir+'MA2010_marker_config/'
+weldgun_marker_dir=config_dir+'weldgun_marker_config/'
+R2_marker_dir=config_dir+'MA1440_marker_config/'
+mti_marker_dir=config_dir+'mti_marker_config/'
+S1_marker_dir=config_dir+'D500B_marker_config/'
+S1_tcp_marker_dir=config_dir+'positioner_tcp_marker_config/'
 robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',d=15,tool_file_path=config_dir+'torch.csv',\
 	pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',\
-    base_marker_config_file=config_dir+'MA2010_marker_config.yaml',tool_marker_config_file=config_dir+'weldgun_marker_config.yaml')
+    base_marker_config_file=R1_marker_dir+'MA2010_'+R1_ph_dataset_date+'_marker_config.yaml',tool_marker_config_file=weldgun_marker_dir+'weldgun_'+R1_ph_dataset_date+'_marker_config.yaml')
 robot_scan=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.yml',tool_file_path=config_dir+'mti.csv',\
 	base_transformation_file=config_dir+'MA1440_pose.csv',pulse2deg_file_path=config_dir+'MA1440_A0_pulse2deg_real.csv',\
-    base_marker_config_file=config_dir+'MA1440_marker_config.yaml')
+    base_marker_config_file=R2_marker_dir+'MA1440_'+R2_ph_dataset_date+'_marker_config.yaml',tool_marker_config_file=mti_marker_dir+'mti_'+R2_ph_dataset_date+'_marker_config.yaml')
+
 positioner=positioner_obj('D500B',def_path=config_dir+'D500B_robot_default_config.yml',tool_file_path=config_dir+'positioner_tcp.csv',\
     base_transformation_file=config_dir+'D500B_pose.csv',pulse2deg_file_path=config_dir+'D500B_pulse2deg_real.csv',\
-    base_marker_config_file=config_dir+'D500B_marker_config.yaml',tool_marker_config_file=config_dir+'positioner_tcp_marker_config.yaml')
+    base_marker_config_file=S1_marker_dir+'D500B_'+S1_ph_dataset_date+'_marker_config.yaml',tool_marker_config_file=S1_tcp_marker_dir+'positioner_tcp_marker_config.yaml')
+
 
 Table_home_T = positioner.fwd(np.radians([-15,180]))
 T_S1TCP_R1Base = np.linalg.inv(np.matmul(positioner.base_H,H_from_RT(Table_home_T.R,Table_home_T.p)))
