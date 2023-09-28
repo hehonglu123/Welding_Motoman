@@ -28,8 +28,9 @@ import numpy as np
 import glob
 import yaml
 from math import ceil,floor
-
+from streaming_control import *
 from sklearn.cluster import DBSCAN
+from StreamingSend import *
 
 R1_ph_dataset_date='0926'
 R2_ph_dataset_date='0926'
@@ -115,17 +116,22 @@ with open(data_dir+'robot_js.pickle', 'rb') as file:
     
 ## streaming parameters
 point_distance=0.01			###STREAMING POINT INTERPOLATED DISTANCE
+streaming_rate=125
 segment_distance=0.8 ## segment d, such that ||xi_{j}-xi_{j-1}||=0.8
+nominal_feedrate=160
 base_nominal_slice_increment=26
 base_layer_N=2
 delta_h_star = 1.8
+base_nominal_vd_relative=8
+nominal_vd_relative=10
 nominal_slice_increment=int(delta_h_star/slicing_meta['line_resolution'])
 scanner_lag_bp=int(slicing_meta['scanner_lag_breakpoints'])
 scanner_lag=slicing_meta['scanner_lag']
 end_layer_count = 10
 offset_z=0
-
 weld_feedback_gain_K=1
+SS=StreamingSend(None,None,None,streaming_rate)
+scan_process = ScanProcess(robot_scan,positioner)
 
 regen_pcd=False
 regen_dh=False
@@ -188,192 +194,209 @@ all_pcd=o3d.geometry.PointCloud()
 layer=0
 x_state_location=[]
 x_state_dh = []
-for layer_count in range(0,total_layer):
-    print("Layer Count",layer_count)
-    ## the current curve, the next path curve and the next target curve
-    if layer_count!=0:
-        curve_sliced_relative=curve_relative_all_slices[layer_count-1]
-    path_curve_dense_relative=curve_relative_dense_all_slices[layer_count]
-    if layer_count<total_layer:
-        target_curve_sliced_relative=curve_relative_all_slices[layer_count+1]
+x_state_height=[]
+x_state_lam = []
+
+lam_all=[]
+dh_all=[]
+height_all=[]
+error_all=[]
+
+dh_layer=[]
+height_layer=[]
+lam_layer=[]
+for layer_count in range(end_layer_count):
+    base_layer=True if layer_count<base_layer_N else False # baselayer flag
+    vd_relative = base_nominal_vd_relative if base_layer else nominal_vd_relative # set feedrate
     
-    num_segbp_layer=max(2,int(lam_relative_dense_all_slices[layer_count][-1]/segment_distance))
-    segment_bp = np.linspace(0,len(lam_relative_dense_all_slices[layer_count])-1,num=num_segbp_layer).astype(int)
+    layer=all_layers[layer_count] # get current layer
+    print("Layer:",layer,"#:",layer_count)
+    
+    ## the current curve, the next path curve and the next target curve
+    if layer_count>0:
+        last_lam_relative_dense=deepcopy(lam_relative_dense_all_slices[layer_count-1])
+    path_curve_dense_relative=deepcopy(curve_relative_dense_all_slices[layer_count])
+    lam_relative_dense=deepcopy(lam_relative_dense_all_slices[layer_count])
+    if layer_count<end_layer_count:
+        target_curve_dense_relative=curve_relative_dense_all_slices[layer_count+1]
+        target_lam_relative_dense=deepcopy(lam_relative_dense_all_slices[layer_count+1])
+    
+    ## get the segment for changing velocity
+    num_segbp_layer=max(2,int(lam_relative_dense[-1]/segment_distance))
+    segment_bp = np.linspace(0,len(lam_relative_dense)-1,num=num_segbp_layer).astype(int)
     segment_bp_sample = (np.diff(segment_bp)/2+segment_bp[:-1])
     segment_bp_sample=segment_bp_sample.astype(int) # sample the middle point
-    segment_bp=segment_bp[1:] # from 1 ~ the last point (ignore 0)
-    
-    # Here is where the welding happens
-    ###################################
-    
-    x_state_location = path_curve_dense_relative[segment_bp_sample][:,:3]
-    x_state_dh = [[] for x in range(len(x_state_location))]
-    
-    robot_js=robot_js_all[layer_count]
-    # wrap to -pi pi
-    count=0
-    ang=robot_js[0][-1]
-    while ang<-np.pi:
-        ang+=2*np.pi
-        count+=1
-    robot_js[:,-1]=robot_js[:,-1]+count*2*np.pi
-    
-    mti_recording=np.array(mti_recording_all[layer_count])
-    # update to scan the same layer
-    this_mti_recording = deepcopy(mti_recording[robot_js[:,-1]>-np.pi])
-    this_robot_js = deepcopy(robot_js[robot_js[:,-1]>-np.pi])
-    if layer_count>0:
-        layer_robot_js = np.vstack((last_robot_js,this_robot_js))
-        layer_mti_recording=[]
-        layer_mti_recording.extend(deepcopy(last_mti_recording))
-        layer_mti_recording.extend(deepcopy(this_mti_recording))
-    last_robot_js = deepcopy(robot_js[robot_js[:,-1]<=-np.pi])
-    last_mti_recording = deepcopy(mti_recording[robot_js[:,-1]<=-np.pi])
-    if layer_count>0:
-        robot_js=layer_robot_js
-        mti_recording=layer_mti_recording
-    
-    # if layer_count!=0:
-    #     mti_recording = mti_recording_all[layer_count].T[]
-    
-    robot_stamps=robot_js[:,0]
-    q_out_exe=robot_js[:,7:]
-    # robot_stamps=
-    
-    if layer_count>=0:
-        dbscan = DBSCAN(eps=0.5,min_samples=20)
-        # dbscan = DBSCAN(eps=0.6,min_samples=20)
-        fig = plt.figure()
-        playback_speed=2
+    if len(x_state_location)==0:
+        x_state_location = deepcopy(path_curve_dense_relative[segment_bp_sample][:,:3])
+        x_state_location = list(x_state_location)
+        x_state_dh = [[] for x in range(len(x_state_location))]
+        x_state_height = [[] for x in range(len(x_state_location))]
+        x_state_lam = deepcopy(lam_relative_dense[segment_bp_sample])
+        x_state_lam = list(x_state_lam)
+
+    ## streaming
+    read_recording_cnt=0
+    bp_status=0
+    print(len(mti_recording_all[layer_count]))
+    print(len(robot_js_all[layer_count]))
+    for seg_i in range(len(segment_bp)-1):
         
-        def updatefig(i):
-            print("frame:",i)
-            fig.clear()
+        # Feedback control. TODO: get the correct delta segments
+        if not base_layer:
+            vd_relative = weld_controller_lambda(np.mean(x_state_dh[0]),weld_feedback_gain_K,nominal_feedrate)
+        vd_relative=min(vd_relative,13)
+        vd_relative=max(vd_relative,5)
+        ####################3
+        
+        ### get breakpoints for vd
+        bp_start = segment_bp[seg_i]
+        bp_end = segment_bp[seg_i+1]
+        breakpoints=SS.get_breakpoints(lam_relative_dense[bp_start:bp_end],vd_relative)
+        breakpoints=breakpoints+bp_start
+        print("delta h:",np.mean(x_state_dh[0]),", vd:",vd_relative)
+        # exit()
+        
+        ###start logging
+        bp_cnt=0
+        for bp in breakpoints:
+            #################################### READ MTI and joints####################################
+            robot_timestamp=robot_js_all[layer_count][read_recording_cnt][0]
+            q14=robot_js_all[layer_count][read_recording_cnt][1:]
+            mti_points = mti_recording_all[layer_count][read_recording_cnt]
+            read_recording_cnt+=1
             
-            ## remove not in interested region
-            st=time.time()
-            mti_pcd=np.delete(mti_recording[i*playback_speed],mti_recording[i*playback_speed][1]==0,axis=1)
-            mti_pcd=np.delete(mti_pcd,mti_pcd[1]<85,axis=1)
-            mti_pcd=np.delete(mti_pcd,mti_pcd[1]>100,axis=1)
-            mti_pcd=np.delete(mti_pcd,mti_pcd[0]<-10,axis=1)
-            mti_pcd=np.delete(mti_pcd,mti_pcd[0]>10,axis=1)
-            mti_pcd = mti_pcd.T
-            
-            # cluster based noise remove
-            dbscan.fit(mti_pcd)
-            cluster_id = dbscan.labels_>=0
-            mti_pcd_noise_remove=mti_pcd[cluster_id]
-            
-            n_clusters_ = len(set(dbscan.labels_))
-            print(n_clusters_)
-            # transform to R2TCP
-            T_R2TCP_S1TCP=positioner.fwd(q_out_exe[i*playback_speed][6:],world=True).inv()*robot_scan.fwd(q_out_exe[i*playback_speed][:6],world=True)
-            # T_S1TCP_R2TCP = T_R2TCP_S1TCP.inv()
-            target_z = np.array([0,0,target_curve_sliced_relative[0][2]])
-            largest_id = np.argsort(mti_pcd_noise_remove[:,1])[:10]
-            point_location = np.mean(mti_pcd_noise_remove[largest_id],axis=0)
-            point_location_z_R2TCP = deepcopy(point_location[1])
-            point_location=np.insert(point_location,1,0)
-            point_location = np.matmul(T_R2TCP_S1TCP.R,point_location)+T_R2TCP_S1TCP.p
-            point_location[2]=point_location[2]-offset_z
-            
-            delta_h = (target_z[2]-point_location[2])
-            
-            x_state_i = np.argsort(np.linalg.norm(x_state_location-point_location,axis=1))[0]
+            ## Get the delta h. TODO: get the correct target p
+            # if bp<len(lam_relative_dense)/2:
+            if bp<np.argmin(lam_relative_dense<scanner_lag):
+                target_p = deepcopy(path_curve_dense_relative[0][:3])+np.array([0,0,delta_h_star])
+            else:
+                target_p = deepcopy(target_curve_dense_relative[0][:3])+np.array([0,0,delta_h_star])
+            delta_h,point_p = scan_process.scan2dh(deepcopy(mti_points),\
+                q14[6:],target_p,crop_min=[-10,85],crop_max=[10,100],offset_z=offset_z)
+            x_state_location_arr = np.array(x_state_location)
+            x_state_i = np.argsort(np.linalg.norm(x_state_location_arr[:,:2]-point_p[:2],axis=1))[0] # only look at xy
             x_state_dh[x_state_i].append(delta_h)
-            
-            # target_z = np.matmul(T_S1TCP_R2TCP.R,target_z)+T_S1TCP_R2TCP.p
-            print("X state i:",x_state_i)
-            print("Positioner Location:",np.degrees(q_out_exe[i*playback_speed][-1]))
-            print("Delta h:",delta_h)
-            print("Total T:",time.time()-st)
-            print("============")
-            for cluster_i in range(n_clusters_-1):
-                cluster_id = dbscan.labels_==cluster_i
-                plt.scatter(-1*mti_pcd[cluster_id][:,0],mti_pcd[cluster_id][:,1])
-            plt.scatter(-1*mti_pcd[:,0],mti_pcd[:,1])
-            # plt.axhline(y = target_z[2], color = 'r', linestyle = '-')
-            plt.axhline(y = point_location_z_R2TCP-delta_h, color = 'r', linestyle = '-')
-            plt.xlim((-30,30))
-            # plt.ylim((50,120))
-            plt.ylim((0,120))
-            plt.draw()
-        if show_animation:
-            anim = FuncAnimation(fig, updatefig, np.floor(len(mti_recording)/playback_speed).astype(int),interval=16,repeat=False)
-            # anim = FuncAnimation(fig, updatefig, np.floor(500).astype(int),interval=16,repeat=False)
-            plt.show()
-    
-        ## calculate speed for each segments
-        for x_state_i in range(len(x_state_location)):
-            find_closest_i=0
-            while len(x_state_dh[x_state_i+find_closest_i])==0:
-                find_closest_i+=1
-            if len(x_state_dh[x_state_i+find_closest_i])>0:
-                print("Closest i:",find_closest_i)
-                print("Mean dh:",np.mean(x_state_dh[x_state_i+find_closest_i]))
-    
-    #### scanning process: processing point cloud and get h
-    curve_sliced_relative=np.array(curve_sliced_relative)
-    
-    scan_process = ScanProcess(robot_scan,positioner)
-    if regen_pcd:
-        crop_extend=15
-        crop_min=tuple(np.min(curve_sliced_relative[:,:3],axis=0)-crop_extend)
-        crop_max=tuple(np.max(curve_sliced_relative[:,:3],axis=0)+crop_extend)
-        pcd = scan_process.pcd_register_mti(mti_recording,q_out_exe,robot_stamps,use_calib=True,ph_param=ph_param_r2)
-        # pcd = scan_process.pcd_register_mti(mti_recording,q_out_exe,robot_stamps,use_calib=False)
-        # visualize_pcd([pcd])
-        pcd = scan_process.pcd_noise_remove(pcd,nb_neighbors=40,std_ratio=1.5,\
-                                            min_bound=crop_min,max_bound=crop_max,outlier_remove=True,cluster_based_outlier_remove=True,cluster_neighbor=1,min_points=300)
-        o3d.io.write_point_cloud(data_dir+'layer_'+str(layer_count)+'_pcd.pcd',pcd)
-    else:
-        pcd=o3d.io.read_point_cloud(data_dir+'layer_'+str(layer_count)+'_pcd.pcd')
-    # visualize_pcd([pcd])
-    
-    pcd,Transz0_H=scan_process.pcd_calib_z(pcd,Transz0_H=Transz0_H)
-    if layer_count!=0:
+            x_state_height[x_state_i].append(deepcopy(point_p[2]))
+            ################################
+            bp_cnt+=1            
         
-        if regen_dh:
-            profile_dh,profile_height = scan_process.pcd2dh_compare(pcd,last_pcd,curve_sliced_relative[::4],drawing=False)
-            np.save(data_dir+'layer_'+str(layer_count)+'_dh_profile.npy',profile_dh)
-            np.save(data_dir+'layer_'+str(layer_count)+'_height_profile.npy',profile_height)
-        else:
-            profile_dh=np.load(data_dir+'layer_'+str(layer_count)+'_dh_profile.npy')
-            profile_height=np.load(data_dir+'layer_'+str(layer_count)+'_height_profile.npy')
-            
-        
-        # profile_dh_first_half = 
-        
-        # curve_i=0
-        # total_curve_i = len(profile_dh)
-        # ax = plt.figure().add_subplot()
-        # for curve_i in range(total_curve_i):
-        #     color_dist = plt.get_cmap("rainbow")(float(curve_i)/total_curve_i)
-        #     ax.scatter(profile_dh[curve_i,0],profile_dh[curve_i,1],c=color_dist)
-        # ax.set_xlabel('Lambda')
-        # ax.set_ylabel('dh to previous (mm)')
-        # ax.set_title("dH Profile")
-        # plt.show()
-        
-        # curve_i=0
-        # total_curve_i = len(profile_height)
-        # ax = plt.figure().add_subplot()
-        # for curve_i in range(total_curve_i):
-        #     color_dist = plt.get_cmap("rainbow")(float(curve_i)/total_curve_i)
-        #     ax.scatter(profile_height[curve_i,0],profile_height[curve_i,1],c=color_dist)
-        # ax.set_xlabel('Lambda')
-        # ax.set_ylabel('dh to Layer N (mm)')
-        # ax.set_title("Height Profile")
-        # plt.show()
-        
+        ### update x_state 
+        x_state_location.pop(0)
+        x_state_location.append(target_curve_dense_relative[segment_bp_sample[seg_i]][:3])
+        this_lam = x_state_lam.pop(0)
+        x_state_lam.append(target_lam_relative_dense[segment_bp_sample[seg_i]])
+        this_dh = x_state_dh.pop(0)
+        x_state_dh.append([])
+        this_height = x_state_height.pop(0)
+        x_state_height.append([])
+        lam_layer.append(this_lam)
+        dh_layer.append(deepcopy(this_dh))
+        height_layer.append(deepcopy(this_height))
+        #########################
     
-    all_pcd += pcd
-    # visualize_pcd([all_pcd])
-    last_pcd=pcd
+    if layer_count>0:
+        dh_lambda=[]
+        error_lambda=[]
+        height_lambda=[]
+        for h_arr in dh_layer:
+            dh_lambda.append(np.mean(h_arr))
+            error_lambda.append(np.mean(h_arr)-delta_h_star)
+        for h_arr in height_layer:
+            height_lambda.append(np.mean(h_arr))
+        plt.scatter(lam_layer,dh_lambda)
+        plt.title("Delta h of Layer "+str(layer_count))
+        plt.xlabel("Lambda (mm)")
+        plt.ylabel("delta h (mm)")
+        plt.show()
+        lam_all.append(lam_layer)
+        dh_all.append(dh_lambda)
+        error_all.append(error_lambda)
+        height_all.append(height_lambda)
+    dh_layer=[]
+    lam_layer=[]
+    height_layer=[]
+
+## streaming final for scanner lagging
+layer_count=end_layer_count
+path_curve_dense_relative=curve_relative_dense_all_slices[layer_count]
+lam_relative_dense=deepcopy(lam_relative_dense_all_slices[layer_count])
+vd_relative=nominal_vd_relative
+# point_stream_start_time=time.time()
+lag_scan_bp=np.argmin(lam_relative_dense<scanner_lag)
+lag_scan_bp = int(lag_scan_bp)
+breakpoints=SS.get_breakpoints(lam_relative_dense[:lag_scan_bp],vd_relative)
+read_recording_cnt=0
+###start logging
+for bp_idx in range(len(breakpoints)):
+    #################################### READ MTI and joints####################################
+    robot_timestamp=robot_js_all[layer_count][read_recording_cnt][0]
+    q14=robot_js_all[layer_count][read_recording_cnt][1:]
+    mti_points = mti_recording_all[layer_count][read_recording_cnt]
+    read_recording_cnt+=1
     
-    ## update welding param
-    
-    
+    ## Get the delta h. TODO: get the correct target p
+    target_p = deepcopy(path_curve_dense_relative[0][:3])+np.array([0,0,delta_h_star])
+    delta_h,point_p = scan_process.scan2dh(deepcopy(mti_points),\
+        q14[6:],target_p,crop_min=[-10,85],crop_max=[10,100],offset_z=offset_z)
+    x_state_location_arr = np.array(x_state_location)
+    x_state_i = np.argsort(np.linalg.norm(x_state_location_arr[:,:2]-point_p[:2],axis=1))[0] # only look at xy
+    x_state_dh[x_state_i].append(delta_h)
+    x_state_height[x_state_i].append(point_p[2])
+
+dh_layer=x_state_dh
+lam_layer=x_state_lam
+height_layer=x_state_height
+dh_lambda=[]
+error_lambda=[]
+height_lambda=[]
+for h_arr in dh_layer:
+    dh_lambda.append(np.mean(h_arr))
+    error_lambda.append(np.mean(h_arr)-delta_h_star)
+for h_arr in height_layer:
+    height_lambda.append(np.mean(h_arr))
+plt.scatter(lam_layer,dh_lambda)
+plt.title("Layer "+str(layer_count))
+plt.xlabel("Lambda (mm)")
+plt.ylabel("delta h (mm)")
+plt.show()
+
+lam_all.append(lam_layer)
+dh_all.append(dh_lambda)
+height_all.append(height_lambda)
+error_all.append(error_lambda)
+
+for layer_cnt in range(len(lam_all)):
+    plt.scatter(lam_all[layer_cnt],height_all[layer_cnt])
+plt.xlabel("Lambda (mm)",fontsize=15)
+plt.ylabel("Height (mm)",fontsize=15)
+plt.xticks(fontsize=15)
+plt.yticks(fontsize=15)
+plt.title("Layers",fontsize=20)
+plt.show()
+
+height_std=[]
+for h_arr in height_all:
+    height_std.append(np.std(h_arr))
+plt.plot(range(1,end_layer_count+1),height_std,'-o')
+plt.xlabel("Layer #",fontsize=15)
+plt.ylabel("Height Std (mm)",fontsize=15)
+plt.xticks(fontsize=15)
+plt.yticks(fontsize=15)
+plt.title("Height Std",fontsize=20)
+plt.show()
+
+error_norm=[]
+for error in error_all:
+    error_norm.append(np.linalg.norm(error))
+plt.plot(range(1,end_layer_count+1),error_norm,'-o')
+plt.xlabel("Layer #",fontsize=15)
+plt.ylabel("Error norm (mm)",fontsize=15)
+plt.xticks(fontsize=15)
+plt.yticks(fontsize=15)
+plt.title("Error 2-Norm",fontsize=20)
+plt.show()
+
+exit()
 if regen_pcd:
     o3d.io.write_point_cloud(data_dir+'full_pcd.pcd',all_pcd)
 

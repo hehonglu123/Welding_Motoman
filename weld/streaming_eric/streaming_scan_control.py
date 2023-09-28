@@ -41,15 +41,9 @@ def connect_failed(s, client_id, url, err):
     mti_sub=RRN.SubscribeService(url)
     mti_client=mti_sub.GetDefaultClientWait(1)
 
-<<<<<<< HEAD
 R1_ph_dataset_date='0926'
 R2_ph_dataset_date='0926'
 S1_ph_dataset_date='0926'
-=======
-R1_ph_dataset_date='0801'
-R2_ph_dataset_date='0801'
-S1_ph_dataset_date='0801'
->>>>>>> 35d91bf1ed6712c626e1a41df1408d9d8105a0ff
 
 zero_config=np.zeros(6)
 # 0. robots.
@@ -76,7 +70,6 @@ robot_scan_base = robot_weld.T_base_basemarker.inv()*robot_scan.T_base_basemarke
 robot_scan.base_H = H_from_RT(robot_scan_base.R,robot_scan_base.p)
 positioner_base = robot_weld.T_base_basemarker.inv()*positioner.T_base_basemarker
 positioner.base_H = H_from_RT(positioner_base.R,positioner_base.p)
-<<<<<<< HEAD
 T_to_base = Transform(np.eye(3),[0,0,-380])
 positioner.base_H = np.matmul(positioner.base_H,H_from_RT(T_to_base.R,T_to_base.p))
 # robot_weld.robot.P=deepcopy(robot_weld.calib_P)
@@ -85,8 +78,6 @@ positioner.base_H = np.matmul(positioner.base_H,H_from_RT(T_to_base.R,T_to_base.
 # robot_scan.robot.H=deepcopy(robot_scan.calib_H)
 # positioner.robot.P=deepcopy(positioner.calib_P)
 # positioner.robot.H=deepcopy(positioner.calib_H)
-=======
->>>>>>> 35d91bf1ed6712c626e1a41df1408d9d8105a0ff
 
 #### data ####
 dataset='circle_large/'
@@ -125,11 +116,7 @@ RR_robot.command_mode = halt_mode
 time.sleep(0.1)
 RR_robot.command_mode = position_mode
 streaming_rate=125.
-<<<<<<< HEAD
 point_distance=0.01		###STREAMING POINT INTERPOLATED DISTANCE
-=======
-point_distance=0.04		###STREAMING POINT INTERPOLATED DISTANCE
->>>>>>> 35d91bf1ed6712c626e1a41df1408d9d8105a0ff
 SS=StreamingSend(RR_robot,RR_robot_state,RobotJointCommand,streaming_rate)
 ##################### mti ################
 mti_sub=RRN.SubscribeService("rr+tcp://192.168.55.10:60830/?service=MTI2D")
@@ -151,21 +138,13 @@ nominal_slice_increment=int(delta_h_star/slicing_meta['line_resolution'])
 base_layer_N=2
 scanner_lag_bp=int(slicing_meta['scanner_lag_breakpoints'])
 scanner_lag=slicing_meta['scanner_lag']
-<<<<<<< HEAD
 end_layer_count = 10
 offset_z=0
-=======
-end_layer_count = 7
->>>>>>> 35d91bf1ed6712c626e1a41df1408d9d8105a0ff
 
 weld_feedback_gain_K=1
 
 welding_started=False
-<<<<<<< HEAD
 arc_on=True
-=======
-arc_on=False
->>>>>>> 35d91bf1ed6712c626e1a41df1408d9d8105a0ff
 ##############################
 
 ### scan process object
@@ -251,11 +230,7 @@ for layer_count in range(0,end_layer_count):
     fronius_client.async_set_job_number(int(feedrate_cmd/10)+job_offset, my_handler)
     
     ## the current curve, the next path curve and the next target curve
-<<<<<<< HEAD
     path_curve_dense_relative=deepcopy(curve_relative_dense_all_slices[layer_count])
-=======
-    path_curve_dense_relative=curve_relative_dense_all_slices[layer_count]
->>>>>>> 35d91bf1ed6712c626e1a41df1408d9d8105a0ff
     lam_relative_dense=deepcopy(lam_relative_dense_all_slices[layer_count])
     if layer_count<end_layer_count:
         target_curve_dense_relative=curve_relative_dense_all_slices[layer_count+1]
@@ -272,12 +247,8 @@ for layer_count in range(0,end_layer_count):
     segment_bp_sample = (np.diff(segment_bp)/2+segment_bp[:-1])
     segment_bp_sample=segment_bp_sample.astype(int) # sample the middle point
     if len(x_state_location)==0:
-<<<<<<< HEAD
         x_state_location = deepcopy(path_curve_dense_relative[segment_bp_sample][:,:3])
         x_state_location = list(x_state_location)
-=======
-        x_state_location = path_curve_dense_relative[segment_bp_sample][:,:3]
->>>>>>> 35d91bf1ed6712c626e1a41df1408d9d8105a0ff
         x_state_dh = [[] for x in range(len(x_state_location))]
     # segment_bp=segment_bp[1:] # from 1 ~ the last point (ignore 0)
     
@@ -285,11 +256,7 @@ for layer_count in range(0,end_layer_count):
     num2p=np.round((q14[-1]-positioner_js[0,1])/(2*np.pi))
     positioner_js[:,1]=positioner_js[:,1]+num2p*2*np.pi
     
-<<<<<<< HEAD
     curve_js_all_dense=interp1d(lam_relative_all_slices[layer_count],np.hstack((rob1_js,rob2_js,positioner_js)),kind='cubic',axis=0)(lam_relative_dense)
-=======
-    curve_js_all_dense=interp1d(lam_relative_all_slices[layer_count],np.hstack((rob1_js,rob2_js,positioner_js)),kind='cubic',axis=0)(lam_relative_dense_all_slices[layer_count])
->>>>>>> 35d91bf1ed6712c626e1a41df1408d9d8105a0ff
 
     curve_js_all_dense=np.array(curve_js_all_dense)
     
@@ -299,7 +266,6 @@ for layer_count in range(0,end_layer_count):
         waypoint_pose=robot_weld.fwd(curve_js_all_dense[0,:6])
         waypoint_pose.p[-1]+=50
         waypoint_q=robot_weld.inv(waypoint_pose.p,waypoint_pose.R,curve_js_all_dense[0,:6])[0]
-<<<<<<< HEAD
 
         # TODO: Better place for load calib
         # robot_weld.robot.P=deepcopy(robot_weld.calib_P)
@@ -309,8 +275,6 @@ for layer_count in range(0,end_layer_count):
         # positioner.robot.P=deepcopy(positioner.calib_P)
         # positioner.robot.H=deepcopy(positioner.calib_H)
 
-=======
->>>>>>> 35d91bf1ed6712c626e1a41df1408d9d8105a0ff
         # SS.jog2q(np.hstack((waypoint_q,np.radians([21,5,-39,0,-47,49]),curve_js_all_dense[0,12:])))
         SS.jog2q(np.hstack((np.radians([-50,28,7,0,-47,0]),curve_js_all_dense[0,6:])))
         # exit()
@@ -332,11 +296,8 @@ for layer_count in range(0,end_layer_count):
             # Feedback control. TODO: get the correct delta segments
             if not base_layer:
                 vd_relative = weld_controller_lambda(np.mean(x_state_dh[0]),weld_feedback_gain_K,nominal_feedrate)
-<<<<<<< HEAD
             vd_relative=min(vd_relative,13)
             vd_relative=max(vd_relative,5)
-=======
->>>>>>> 35d91bf1ed6712c626e1a41df1408d9d8105a0ff
             ####################3
             
             ### get breakpoints for vd
@@ -344,7 +305,6 @@ for layer_count in range(0,end_layer_count):
             bp_end = segment_bp[seg_i+1]
             breakpoints=SS.get_breakpoints(lam_relative_dense[bp_start:bp_end],vd_relative)
             breakpoints=breakpoints+bp_start
-<<<<<<< HEAD
             print("delta h:",np.mean(x_state_dh[0]),", vd:",vd_relative)
             # exit()
             
@@ -352,38 +312,22 @@ for layer_count in range(0,end_layer_count):
             for bp in breakpoints:
                 ####################################MTI PROCESSING####################################
                 if bp!=len(lam_relative_dense)-1: ###no wait at last point
-=======
-            
-            ###start logging
-            for bp_idx in range(len(breakpoints)):
-                ####################################MTI PROCESSING####################################
-                if bp_idx<len(breakpoints)-1: ###no wait at last point
->>>>>>> 35d91bf1ed6712c626e1a41df1408d9d8105a0ff
                     ###busy wait for accurate 8ms streaming
                     while (time.time()-point_stream_start_time)<(1/SS.streaming_rate-0.0005):
                         continue
                 point_stream_start_time=time.time()
-<<<<<<< HEAD
                 robot_timestamp,q14=SS.position_cmd(curve_js_all_dense[bp])
-=======
-                robot_timestamp,q14=SS.position_cmd(curve_js_all_dense[breakpoints[bp_idx]])
->>>>>>> 35d91bf1ed6712c626e1a41df1408d9d8105a0ff
                 
                 ###MTI scans YZ point from tool frame
                 st=time.time()
                 mti_recording.append(deepcopy(np.array([mti_client.lineProfile.X_data,mti_client.lineProfile.Z_data])))
                 ## Get the delta h. TODO: get the correct target p
-<<<<<<< HEAD
                 if bp<len(curve_js_all_dense)/2:
                     target_p = deepcopy(path_curve_dense_relative[0][:3])+np.array([0,0,delta_h_star])
                 else:
                     target_p = deepcopy(target_curve_dense_relative[0][:3])+np.array([0,0,delta_h_star])
                 delta_h,point_p = scan_process.scan2dh(deepcopy(mti_recording[-1]),\
                     q14[6:],target_p,crop_min=[-10,85],crop_max=[10,100],offset_z=offset_z)
-=======
-                delta_h,point_p = scan_process.scan2dh(deepcopy(mti_recording[-1]),\
-                    q14[6:],path_curve_dense_relative[0],crop_min=[-10,85],crop_max=[10,100],offset_z=2.2)
->>>>>>> 35d91bf1ed6712c626e1a41df1408d9d8105a0ff
                 x_state_location_arr = np.array(x_state_location)
                 x_state_i = np.argsort(np.linalg.norm(x_state_location_arr[:,:2]-point_p[:2],axis=1))[0] # only look at xy
                 x_state_dh[x_state_i].append(delta_h)
@@ -397,11 +341,7 @@ for layer_count in range(0,end_layer_count):
             
             ### update x_state 
             x_state_location.pop(0)
-<<<<<<< HEAD
             x_state_location.append(target_curve_dense_relative[segment_bp_sample[seg_i]][:3])
-=======
-            x_state_location.append(target_curve_dense_relative[segment_bp_sample[seg_i]])
->>>>>>> 35d91bf1ed6712c626e1a41df1408d9d8105a0ff
             x_state_dh.pop(0)
             x_state_dh.append([])
             #########################
@@ -411,12 +351,6 @@ for layer_count in range(0,end_layer_count):
         robot_js=np.array(robot_js)
         robot_logging_all.append(np.hstack((robot_ts.reshape(-1, 1),robot_js)))
         mti_logging_all.append(mti_recording)
-        
-        ####CONTROL PARAMETERS
-        layer_count+=1
-        
-        if layer_count>=end_layer_count:
-            break
         
     except:
         traceback.print_exc()
@@ -445,27 +379,20 @@ robot_js=[]
 mti_recording=[]
 # point_stream_start_time=time.time()
 lag_scan_bp=np.argmin(lam_relative_dense<scanner_lag)
-<<<<<<< HEAD
 lag_scan_bp = int(lag_scan_bp+lag_scan_bp/10)
 breakpoints=SS.get_breakpoints(lam_relative_dense[:lag_scan_bp],vd_relative)
 try:
     ###start logging
     for bp_idx in range(len(breakpoints)):
-=======
-breakpoints=SS.get_breakpoints(lam_relative_dense[:lag_scan_bp],vd_relative)
-try:
-    ###start logging
-    for bp_idx in range(0,breakpoints):
->>>>>>> 35d91bf1ed6712c626e1a41df1408d9d8105a0ff
         ####################################MTI PROCESSING####################################
         if bp_idx<len(breakpoints)-1: ###no wait at last point
             ###busy wait for accurate 8ms streaming
             while time.time()-point_stream_start_time<1/SS.streaming_rate-0.0005:
                 continue
         ###MTI scans YZ point from tool frame
-        mti_recording.append(deepcopy(np.array([mti_client.lineProfile.X_data,mti_client.lineProfile.Z_data])))
         point_stream_start_time=time.time()
         robot_timestamp,q14=SS.position_cmd(curve_js_all_dense[breakpoints[bp_idx]])
+        mti_recording.append(deepcopy(np.array([mti_client.lineProfile.X_data,mti_client.lineProfile.Z_data])))
         
         robot_ts.append(robot_timestamp)
         robot_js.append(q14)
