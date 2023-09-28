@@ -722,11 +722,15 @@ class ScanProcess():
         mti_pcd=np.delete(mti_pcd,mti_pcd[1]>crop_max[1],axis=1)
         mti_pcd=np.delete(mti_pcd,mti_pcd[0]<crop_min[0],axis=1)
         mti_pcd=np.delete(mti_pcd,mti_pcd[0]>crop_max[0],axis=1)
+<<<<<<< HEAD
         mti_pcd[0]=-1*mti_pcd[0]
+=======
+>>>>>>> 35d91bf1ed6712c626e1a41df1408d9d8105a0ff
         mti_pcd = mti_pcd.T
         
         # cluster based noise remove
         dbscan.fit(mti_pcd)
+<<<<<<< HEAD
         n_clusters_ = len(set(dbscan.labels_))
 
         if n_clusters_>1:
@@ -737,6 +741,14 @@ class ScanProcess():
         
         # transform to R2TCP
         T_R2TCP_S1TCP=self.positioner.fwd(robot_q[6:],world=True).inv()*self.robot.fwd(robot_q[:6],world=True)
+=======
+        cluster_id = dbscan.labels_>=0
+        mti_pcd_noise_remove=mti_pcd[cluster_id]
+        
+        n_clusters_ = len(set(dbscan.labels_))
+        # transform to R2TCP
+        T_R2TCP_S1TCP=self.positioner.fwd(robot_q[6:],world=True).inv()*self.robot_scan.fwd(robot_q[:6],world=True)
+>>>>>>> 35d91bf1ed6712c626e1a41df1408d9d8105a0ff
         target_z = np.array(target_p)
         largest_id = np.argsort(mti_pcd_noise_remove[:,1])[:10]
         point_location = np.mean(mti_pcd_noise_remove[largest_id],axis=0)
@@ -744,6 +756,7 @@ class ScanProcess():
         point_location=np.insert(point_location,1,0)
         point_location = np.matmul(T_R2TCP_S1TCP.R,point_location)+T_R2TCP_S1TCP.p
         point_location[2]=point_location[2]-offset_z
+<<<<<<< HEAD
 
         delta_h = (target_z[2]-point_location[2])
 
@@ -758,4 +771,8 @@ class ScanProcess():
         # plt.ylim((0,120))
         # plt.show()
 
+=======
+        
+        delta_h = (target_z[2]-point_location[2])
+>>>>>>> 35d91bf1ed6712c626e1a41df1408d9d8105a0ff
         return delta_h,point_location

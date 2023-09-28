@@ -25,6 +25,7 @@ mp.MoveJ(q1,5,0)
 robot_stamps,curve_exe, job_line,job_step = robot_client.execute_motion_program(mp)
 print("Test read joints:",np.degrees(curve_exe))
 
+<<<<<<< HEAD
 mp = MotionProgram(ROBOT_CHOICE='RB2', pulse2deg=robot_scan.pulse2deg)
 mp.MoveJ(q2,5,0)
 robot_client.execute_motion_program(mp)
@@ -32,3 +33,12 @@ robot_client.execute_motion_program(mp)
 mp = MotionProgram(ROBOT_CHOICE='ST1', pulse2deg=positioner.pulse2deg)
 mp.MoveJ(q3,90,0)
 robot_client.execute_motion_program(mp)
+=======
+# mp = MotionProgram(ROBOT_CHOICE='RB2', pulse2deg=robot_scan.pulse2deg)
+# mp.MoveJ(q2,5,0)
+# robot_client.execute_motion_program(mp)
+
+# mp = MotionProgram(ROBOT_CHOICE='ST1', pulse2deg=positioner.pulse2deg)
+# mp.MoveJ(q3,90,0)
+# robot_client.execute_motion_program(mp)
+>>>>>>> 35d91bf1ed6712c626e1a41df1408d9d8105a0ff

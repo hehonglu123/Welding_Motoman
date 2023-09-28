@@ -7,9 +7,12 @@ import sys
 sys.path.append('../../toolbox/')
 from robot_def import *
 
+<<<<<<< HEAD
 R1_dataset_date='0926'
 R2_dataset_date='0926'
 S1_dataset_date='0926'
+=======
+>>>>>>> 35d91bf1ed6712c626e1a41df1408d9d8105a0ff
 R1_ph_dataset_date='0801'
 R2_ph_dataset_date='0725'
 S1_ph_dataset_date='0725'
@@ -23,6 +26,7 @@ S1_tcp_marker_dir=config_dir+'positioner_tcp_marker_config/'
 
 robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',d=15,tool_file_path=config_dir+'torch.csv',\
 	pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',\
+<<<<<<< HEAD
     base_marker_config_file=R1_marker_dir+'MA2010_'+R1_dataset_date+'_marker_config.yaml',\
     tool_marker_config_file=weldgun_marker_dir+'weldgun_'+R1_dataset_date+'_marker_config.yaml')
 
@@ -35,6 +39,17 @@ positioner=positioner_obj('D500B',def_path=config_dir+'D500B_robot_default_confi
     base_transformation_file=config_dir+'D500B_pose.csv',pulse2deg_file_path=config_dir+'D500B_pulse2deg_real.csv',\
     base_marker_config_file=S1_marker_dir+'D500B_'+S1_dataset_date+'_marker_config.yaml',\
     tool_marker_config_file=S1_tcp_marker_dir+'positioner_tcp_'+S1_dataset_date+'_marker_config.yaml')
+=======
+    base_marker_config_file=R1_marker_dir+'MA2010_marker_config.yaml',tool_marker_config_file=weldgun_marker_dir+'weldgun_marker_config.yaml')
+
+robot_scan=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.yml',tool_file_path=config_dir+'mti.csv',\
+	base_transformation_file=config_dir+'MA1440_pose.csv',pulse2deg_file_path=config_dir+'MA1440_A0_pulse2deg_real.csv',\
+    base_marker_config_file=R2_marker_dir+'MA1440_marker_config.yaml',tool_marker_config_file=mti_marker_dir+'mti_marker_config.yaml')
+
+positioner=positioner_obj('D500B',def_path=config_dir+'D500B_robot_default_config.yml',tool_file_path=config_dir+'positioner_tcp.csv',\
+    base_transformation_file=config_dir+'D500B_pose.csv',pulse2deg_file_path=config_dir+'D500B_pulse2deg_real.csv',\
+    base_marker_config_file=S1_marker_dir+'D500B_marker_config.yaml',tool_marker_config_file=S1_tcp_marker_dir+'positioner_tcp_marker_config.yaml')
+>>>>>>> 35d91bf1ed6712c626e1a41df1408d9d8105a0ff
 
 robot_scan_positioner_base = robot_scan.T_base_basemarker.inv()*positioner.T_base_basemarker*Transform(np.eye(3),[0,0,-380])
 positioner.upper_limit=np.radians(40000)

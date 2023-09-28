@@ -31,9 +31,15 @@ from math import ceil,floor
 
 from sklearn.cluster import DBSCAN
 
+<<<<<<< HEAD
 R1_ph_dataset_date='0926'
 R2_ph_dataset_date='0926'
 S1_ph_dataset_date='0926'
+=======
+R1_ph_dataset_date='0801'
+R2_ph_dataset_date='0801'
+S1_ph_dataset_date='0801'
+>>>>>>> 35d91bf1ed6712c626e1a41df1408d9d8105a0ff
 
 def get_slope(p1,p2):
     
@@ -67,6 +73,7 @@ robot_scan_base = robot_weld.T_base_basemarker.inv()*robot_scan.T_base_basemarke
 robot_scan.base_H = H_from_RT(robot_scan_base.R,robot_scan_base.p)
 positioner_base = robot_weld.T_base_basemarker.inv()*positioner.T_base_basemarker
 positioner.base_H = H_from_RT(positioner_base.R,positioner_base.p)
+<<<<<<< HEAD
 T_to_base = Transform(np.eye(3),[0,0,-380])
 positioner.base_H = np.matmul(positioner.base_H,H_from_RT(T_to_base.R,T_to_base.p))
 # input(positioner.base_H)
@@ -100,11 +107,50 @@ ph_param_r2=None
 # robot_scan.robot.H=deepcopy(robot_scan.calib_H)
 # positioner.robot.P=deepcopy(positioner.calib_P)
 # positioner.robot.H=deepcopy(positioner.calib_H)
+=======
+# T_to_base = Transform(np.eye(3),[0,0,-380])
+# positioner.base_H = np.matmul(positioner.base_H,H_from_RT(T_to_base.R,T_to_base.p))
+# input(positioner.base_H)
+
+#### load R1 kinematic model
+PH_data_dir='../../mocap/PH_grad_data/test'+R1_ph_dataset_date+'_R1/train_data_'
+with open(PH_data_dir+'calib_PH_q.pickle','rb') as file:
+    PH_q=pickle.load(file)
+nom_P=np.array([[0,0,0],[150,0,0],[0,0,760],\
+                   [1082,0,200],[0,0,0],[0,0,0],[100,0,0]]).T
+nom_H=np.array([[0,0,1],[0,1,0],[0,-1,0],\
+                [-1,0,0],[0,-1,0],[-1,0,0]]).T
+ph_param_r1=PH_Param(nom_P,nom_H)
+ph_param_r1.fit(PH_q,method='FBF')
+ph_param_r1=None
+#### load R2 kinematic model
+PH_data_dir='../../mocap/PH_grad_data/test'+R2_ph_dataset_date+'_R2/train_data_'
+with open(PH_data_dir+'calib_PH_q.pickle','rb') as file:
+    PH_q=pickle.load(file)
+nom_P=np.array([[0,0,0],[155,0,0],[0,0,614],\
+                   [640,0,200],[0,0,0],[0,0,0],[100,0,0]]).T
+nom_H=np.array([[0,0,1],[0,1,0],[0,-1,0],\
+                [-1,0,0],[0,-1,0],[-1,0,0]]).T
+ph_param_r2=PH_Param(nom_P,nom_H)
+ph_param_r2.fit(PH_q,method='FBF')
+ph_param_r2=None
+#### load S1 kinematic model
+robot_weld.robot.P=deepcopy(robot_weld.calib_P)
+robot_weld.robot.H=deepcopy(robot_weld.calib_H)
+robot_scan.robot.P=deepcopy(robot_scan.calib_P)
+robot_scan.robot.H=deepcopy(robot_scan.calib_H)
+positioner.robot.P=deepcopy(positioner.calib_P)
+positioner.robot.H=deepcopy(positioner.calib_H)
+>>>>>>> 35d91bf1ed6712c626e1a41df1408d9d8105a0ff
 
 dataset='circle_large/'
 sliced_alg='static_spiral/'
 curve_data_dir = '../../data/'+dataset+sliced_alg
+<<<<<<< HEAD
 data_dir=curve_data_dir+'weld_scan_2023_09_27_19_22_19'+'/'
+=======
+data_dir=curve_data_dir+'weld_scan_2023_09_20_21_11_14'+'/'
+>>>>>>> 35d91bf1ed6712c626e1a41df1408d9d8105a0ff
 with open(curve_data_dir+'slicing.yml', 'r') as file:
     slicing_meta = yaml.safe_load(file)
 
@@ -122,7 +168,14 @@ nominal_slice_increment=18
 scanner_lag_bp=int(slicing_meta['scanner_lag_breakpoints'])
 scanner_lag=slicing_meta['scanner_lag']
 end_layer_count = 7
+<<<<<<< HEAD
 offset_z = 0
+=======
+offset_z = 2.2
+
+# all_layers=[0,26,44,62,80,98,116,116]
+all_layers=[0,26,52,70,88,106,124,124]
+>>>>>>> 35d91bf1ed6712c626e1a41df1408d9d8105a0ff
 
 regen_pcd=False
 regen_dh=False
@@ -237,9 +290,15 @@ for layer_count in range(0,total_layer):
     q_out_exe=robot_js[:,7:]
     # robot_stamps=
     
+<<<<<<< HEAD
     if layer_count>=0:
         dbscan = DBSCAN(eps=0.5,min_samples=20)
         # dbscan = DBSCAN(eps=0.6,min_samples=20)
+=======
+    if layer_count>2:
+        # dbscan = DBSCAN(eps=0.5,min_samples=20)
+        dbscan = DBSCAN(eps=0.5,min_samples=20)
+>>>>>>> 35d91bf1ed6712c626e1a41df1408d9d8105a0ff
         fig = plt.figure()
         playback_speed=2
         
@@ -262,7 +321,10 @@ for layer_count in range(0,total_layer):
             mti_pcd_noise_remove=mti_pcd[cluster_id]
             
             n_clusters_ = len(set(dbscan.labels_))
+<<<<<<< HEAD
             print(n_clusters_)
+=======
+>>>>>>> 35d91bf1ed6712c626e1a41df1408d9d8105a0ff
             # transform to R2TCP
             T_R2TCP_S1TCP=positioner.fwd(q_out_exe[i*playback_speed][6:],world=True).inv()*robot_scan.fwd(q_out_exe[i*playback_speed][:6],world=True)
             # T_S1TCP_R2TCP = T_R2TCP_S1TCP.inv()
@@ -288,7 +350,11 @@ for layer_count in range(0,total_layer):
             for cluster_i in range(n_clusters_-1):
                 cluster_id = dbscan.labels_==cluster_i
                 plt.scatter(-1*mti_pcd[cluster_id][:,0],mti_pcd[cluster_id][:,1])
+<<<<<<< HEAD
             plt.scatter(-1*mti_pcd[:,0],mti_pcd[:,1])
+=======
+            # plt.scatter(-1*mti_pcd[:,0],mti_pcd[:,1])
+>>>>>>> 35d91bf1ed6712c626e1a41df1408d9d8105a0ff
             # plt.axhline(y = target_z[2], color = 'r', linestyle = '-')
             plt.axhline(y = point_location_z_R2TCP-delta_h, color = 'r', linestyle = '-')
             plt.xlim((-30,30))
