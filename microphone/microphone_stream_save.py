@@ -15,7 +15,7 @@ def new_frame(pipe_ep):
         audio_recording.extend(pipe_ep.ReceivePacket().audio_data)
 
 
-c = RRN.ConnectService('rr+tcp://192.168.55.20:60828?service=microphone')
+c = RRN.ConnectService('rr+tcp://192.168.55.15:60828?service=microphone')
 
 p = c.microphone_stream.Connect(-1)
 

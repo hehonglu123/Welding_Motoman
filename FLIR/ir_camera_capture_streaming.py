@@ -12,7 +12,7 @@ image_consts = None
 
 def main():
     now=time.time()
-    url='rr+tcp://192.168.55.10:60827/?service=camera'
+    url='rr+tcp://192.168.55.15:60827/?service=camera'
 
     c1=RRN.ConnectService(url)
 

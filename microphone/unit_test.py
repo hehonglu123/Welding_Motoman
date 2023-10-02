@@ -1,15 +1,14 @@
-import wave, time, traceback
+import wave, time, traceback, os
 from RobotRaconteur.Client import *
 import numpy as np
 import matplotlib.pyplot as plt
 # TODO: Read metadata for samplerate and channels
-samplerate = 44000
+samplerate = 44100
 channels = 1
 
 audio_recording=[]
 def new_frame(pipe_ep):
     global audio_recording
-    print('here')
     #Loop to get the newest frame
     while (pipe_ep.Available > 0):
         #Receive the packet
@@ -26,18 +25,19 @@ def save_frame(audio_recording,name):
         # Write the audio data to the WAV file
         wav_file.writeframes(first_channel_int16.tobytes())
 
-c = RRN.ConnectService('rr+tcp://192.168.55.20:60828?service=microphone')
+c = RRN.ConnectService('rr+tcp://192.168.55.15:60828?service=microphone')
 
 p = c.microphone_stream.Connect(-1)
 p.PacketReceivedEvent+=new_frame
-
+os.makedirs('recoreded_data/',exist_ok=True)
+counts=0
 while True:
-    time.sleep(5)
+    audio_recording=[]
+    time.sleep(20)
     try:
-        save_frame(audio_recording,'test')
-        print('audio length: ',len(audio_recording))
-        audio_recording=[]
+        save_frame(audio_recording,'recoreded_data/test'+str(counts))
+        print('audio length: ',len(audio_recording)) 
+        counts+=1
     except:
         traceback.print_exc()
-    finally:
         break
