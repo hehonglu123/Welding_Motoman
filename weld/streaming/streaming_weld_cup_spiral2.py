@@ -2,7 +2,6 @@ import sys, glob, wave, pickle
 from multiprocessing import Process
 from RobotRaconteur.Client import *
 from scipy.interpolate import interp1d
-from pathlib import Path
 sys.path.append('../../toolbox/')
 from utils import *
 from robot_def import *
@@ -12,7 +11,7 @@ from flir_toolbox import *
 from traj_manipulation import *
 from dx200_motion_program_exec_client import *
 from StreamingSend import *
-sys.path.append('../')
+sys.path.append('../../sensor_fusion/')
 from weldRRSensor import *
 
 
@@ -50,39 +49,7 @@ def new_frame(pipe_ep):
 		flir_logging.append(display_mat)
 		flir_ts.append(rr_img.image_info.data_header.ts['seconds']+rr_img.image_info.data_header.ts['nanoseconds']*1e-9)
 
-def save_data(recorded_dir,current_data,welding_data,audio_recording,robot_data,flir_logging,flir_ts,slice_num):
-	###MAKING DIR
-	layer_data_dir=recorded_dir+'layer_'+str(slice_num)+'/'
-	Path(layer_data_dir).mkdir(exist_ok=True)
 
-	####AUDIO SAVING
-	first_channel = np.concatenate(audio_recording)
-	first_channel_int16=(first_channel*32767).astype(np.int16)
-	with wave.open(layer_data_dir+'mic_recording.wav', 'wb') as wav_file:
-		# Set the WAV file parameters
-		wav_file.setnchannels(1)
-		wav_file.setsampwidth(2)  # 2 bytes per sample (16-bit)
-		wav_file.setframerate(44100)
-		# Write the audio data to the WAV file
-		wav_file.writeframes(first_channel_int16.tobytes())
-
-	####CURRENT SAVING
-	np.savetxt(layer_data_dir + 'current.csv',current_data, delimiter=',',header='timestamp,current', comments='')
-
-	####FRONIUS SAVING
-	np.savetxt(layer_data_dir + 'welding.csv',welding_data, delimiter=',',header='timestamp,voltage,current,feedrate,energy', comments='')
-	
-
-	####ROBOT JOINT SAVING
-	np.savetxt(layer_data_dir+'joint_recording.csv',robot_data,delimiter=',')
-
-	###FLIR SAVING
-	flir_ts=np.array(flir_ts)
-	with open(layer_data_dir+'ir_recording.pickle','wb') as file:
-			pickle.dump(np.array(flir_logging),file)
-	np.savetxt(layer_data_dir + "ir_stamps.csv",flir_ts-flir_ts[0],delimiter=',')
-	
-	return
 
 def main():
 	dataset='cup/'
@@ -416,7 +383,7 @@ def main():
 	rr_sensors.stop_all_sensors()
 
 	for i in range(len(slice_logging_all)):
-		save_data(recorded_dir,current_logging_all[i],weld_logging_all[i],audio_logging_all[i],robot_logging_all[i],flir_logging_all[i],flir_ts_logging_all[i],slice_logging_all[i])
+		rr_sensors.save_data_streaming(recorded_dir,current_logging_all[i],weld_logging_all[i],audio_logging_all[i],robot_logging_all[i],flir_logging_all[i],flir_ts_logging_all[i],slice_logging_all[i])
 
 
 
