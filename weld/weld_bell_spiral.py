@@ -23,12 +23,12 @@ def wire_cb(sub, value, ts):
 	feedrate.append(value.wire_speed)
 	energy.append(value.welding_energy)
 
-dataset='cup/'
+dataset='bell/'
 sliced_alg='circular_slice/'
 data_dir='../data/'+dataset+sliced_alg
 with open(data_dir+'slicing.yml', 'r') as file:
 	slicing_meta = yaml.safe_load(file)
-recorded_dir='recorded_data/cup_ER316L/'
+recorded_dir='recorded_data/bell_ER316L/'
 
 waypoint_distance=5 	###waypoint separation
 layer_height_num=int(1.5/slicing_meta['line_resolution'])
@@ -58,15 +58,15 @@ layer_start=1
 layer_end=70
 num_layer_start=int(layer_start*layer_height_num)
 num_layer_end=int(min(layer_end*layer_height_num,slicing_meta['num_layers']-1))
-q_prev=client.getJointAnglesDB(positioner.pulse2deg)
-# q_prev=[0,0]
+# q_prev=client.getJointAnglesDB(positioner.pulse2deg)
+q_prev=[0,0]
 
 
 
 ###set up control parameters
 job_offset=400 		###200 for Aluminum ER4043, 300 for Steel Alloy ER70S-6, 400 for Stainless Steel ER316L
 nominal_feedrate=200
-nominal_vd_relative=12
+nominal_vd_relative=5
 nominal_wire_length=25 #pixels
 nominal_temp_below=500
 base_feedrate_cmd=300
@@ -75,7 +75,7 @@ feedrate_cmd=nominal_feedrate
 vd_relative=nominal_vd_relative
 vd_relative_base=10
 feedrate_gain=0.5
-feedrate_min=200
+feedrate_min=150
 feedrate_max=300
 nominal_slice_increment=int(1.3/slicing_meta['line_resolution'])
 slice_inc_gain=3.
@@ -171,12 +171,12 @@ for slice_num in range(num_layer_start,num_layer_end,nominal_slice_increment):
 		continue
 	
 	###TRJAECTORY WARPING
-	if slice_num>layer_start:
+	if slice_num>num_layer_start:
 		rob1_js_prev=copy.deepcopy(rob1_js_all_slices[slice_num-nominal_slice_increment])
 		rob2_js_prev=copy.deepcopy(rob2_js_all_slices[slice_num-nominal_slice_increment])
 		positioner_js_prev=copy.deepcopy(positioner_js_all_slices[slice_num-nominal_slice_increment])
 		rob1_js,rob2_js,positioner_js=warp_traj(rob1_js,rob2_js,positioner_js,rob1_js_prev,rob2_js_prev,positioner_js_prev,reversed=True)
-	if slice_num<layer_end-nominal_slice_increment:
+	if slice_num<num_layer_end-nominal_slice_increment:
 		rob1_js_next=copy.deepcopy(rob1_js_all_slices[slice_num+nominal_slice_increment])
 		rob2_js_next=copy.deepcopy(rob2_js_all_slices[slice_num+nominal_slice_increment])
 		positioner_js_next=copy.deepcopy(positioner_js_all_slices[slice_num+nominal_slice_increment])
