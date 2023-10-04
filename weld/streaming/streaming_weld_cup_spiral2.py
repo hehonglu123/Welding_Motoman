@@ -70,7 +70,7 @@ def main():
 		pulse2deg_file_path='../../config/D500B_pulse2deg_real.csv',base_transformation_file='../../config/D500B_pose.csv')
 
 	########################################################RR Microphone########################################################
-	microphone = RRN.ConnectService('rr+tcp://192.168.55.20:60828?service=microphone')
+	microphone = RRN.ConnectService('rr+tcp://192.168.55.15:60828?service=microphone')
 	########################################################RR FLIR########################################################
 	flir=RRN.ConnectService('rr+tcp://192.168.55.10:60827/?service=camera')
 	flir.setf_param("focus_pos", RR.VarValue(int(2000),"int32"))
