@@ -25,7 +25,7 @@ def save_frame(audio_recording,name):
         # Write the audio data to the WAV file
         wav_file.writeframes(first_channel_int16.tobytes())
 
-c = RRN.ConnectService('rr+tcp://192.168.55.15:60828?service=microphone')
+c = RRN.ConnectService('rr+tcp://127.0.0.1:60828?service=microphone')
 
 p = c.microphone_stream.Connect(-1)
 p.PacketReceivedEvent+=new_frame
