@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from scipy.signal import find_peaks, peak_widths
 
 # Step 1: Read CSV and get the 'current' column
-base_path = '../data/wall_weld_test/70S_model_120ipm_2023_09_23_21_27_03/layer_5/'
+base_path = '../data/wall_weld_test/ER4043_correction_100ipm_2023_09_27_20_53_05/layer_7/'
 filename = 'current.csv'
 df = pd.read_csv(base_path + filename)
 currents = df['current'].values  # Assuming the title of the column is 'current'
@@ -27,6 +27,8 @@ extracted_data = currents[start_index:end_index + 1]  # extract data between fir
 extracted_df = pd.DataFrame(extracted_data, columns=['extracted_current'])
 extracted_df.to_csv(base_path + 'extracted_current.csv', index=False)
 
+print('extracted_data.shape', extracted_data.shape)
+window_length = int(extracted_data.shape[0]/40)
 # If you want to view or further process the extracted data, it is stored in 'extracted_data' variable
 
 # Find peaks
@@ -37,7 +39,7 @@ results_df = pd.DataFrame()
 
 # Iterate over each possible window
 for i in range(len(extracted_data)):
-    window_data = extracted_data[i:i + 10]
+    window_data = extracted_data[i:i + window_length]
     window_peaks, properties = find_peaks(window_data, height=10)
     
     # Calculate peak widths if there are peaks in the window
@@ -73,6 +75,6 @@ for col in results_df.columns:
     plt.plot(results_df.index, results_df[col], label=col)
     plt.title(col)
     plt.xlabel('Window Start Index')
-    plt.ylabel(col)
+    plt.ylabel('Current '+col)
     plt.legend()
     plt.show()

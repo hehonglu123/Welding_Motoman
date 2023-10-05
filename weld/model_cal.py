@@ -135,7 +135,7 @@ for dataset in datasets:
     if dataset=='baseline':
         data_dir = '../data/wall_weld_test/baseline_weld_scan_2023_06_06_15_28_31/'
     elif dataset=='full_test':
-        data_dir = '../data/wall_weld_test/316L_model_220_2023_06_07_17_16_01/'
+        data_dir = '../data/wall_weld_test/ER4043_correction_100ipm_2023_09_27_20_53_05/'
     print('data_dir',data_dir)
     forward_flag=False
     all_profile_height=[]
@@ -422,20 +422,14 @@ for dataset in datasets:
 
     print(len(all_profile_height))
     for profile_height in all_profile_height:
-        if i in all_correction_layer:
-            if i==all_correction_layer[0]:
-                plt.scatter(profile_height[:,0],profile_height[:,1],s=3,c='tab:green',label='Corrected Layer')
-            else:
-                plt.scatter(profile_height[:,0],profile_height[:,1],s=3,c='tab:green')
+        if i==0:
+            plt.scatter(profile_height[:,0],profile_height[:,1],s=3,c='tab:blue',label='Forward (Right to Left)')
+        elif i==1:
+            plt.scatter(profile_height[:,0],profile_height[:,1],s=3,c='tab:orange',label='Backward (Left to Right)')
+        elif i%2==0:
+            plt.scatter(profile_height[:,0],profile_height[:,1],s=3,c='tab:blue')
         else:
-            if i==0:
-                plt.scatter(profile_height[:,0],profile_height[:,1],s=3,c='tab:blue',label='Forward (Right to Left)')
-            elif i==1:
-                plt.scatter(profile_height[:,0],profile_height[:,1],s=3,c='tab:orange',label='Backward (Left to Right)')
-            elif i%2==0:
-                plt.scatter(profile_height[:,0],profile_height[:,1],s=3,c='tab:blue')
-            else:
-                plt.scatter(profile_height[:,0],profile_height[:,1],s=3,c='tab:orange')
+            plt.scatter(profile_height[:,0],profile_height[:,1],s=3,c='tab:orange')
         i+=1
     plt.xlabel('X-axis (Lambda) (mm)')
     plt.ylabel('height (mm)')

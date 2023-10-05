@@ -24,7 +24,8 @@ mean_co1 = []
 mean_co2 = []
 mean_value_co1 = []
 mean_value_co2 = []
-base_path = '../data/wall_weld_test/weld_scan_correction_2023_09_21_08_51_15/'
+window_length = []
+base_path = '../data/wall_weld_test/ER4043_correction_100ipm_2023_09_27_20_53_05/'
 
 if os.path.exists(base_path):
     # 获取指定路径下的所有子目录
@@ -91,15 +92,16 @@ if os.path.exists(base_path):
             mean_value_co2 = np.mean(mfccs[1])
             mean_co1.append(mean_value_co1)
             mean_co2.append(mean_value_co2)  
-            mean_mov_co1 = moving_average(mfccs[0],60)
-            mean_mov_co2 = moving_average(mfccs[1],60)   
+            window_length = int(mfccs.shape[1]/40)
+            mean_mov_co1 = moving_average(mfccs[0],window_length)
+            mean_mov_co2 = moving_average(mfccs[1],window_length)   
             x_labels = range(len(mean_mov_co1))
             plt.figure(figsize=(6, 6))
             plt.plot(x_labels, mean_mov_co1, marker='o', linestyle='-',color="blue", label = 'mean_mov_co1')
             plt.plot(x_labels, mean_mov_co2, marker='o', linestyle='-',color="orange",label = 'mean_mov_co2')
             ax = plt.gca()  # 获取当前的axes对象
             ax.xaxis.set_major_locator(MaxNLocator(integer=True))  # 强制x轴刻度为整数
-            plt.xlabel('Index of samples (60samples/per)')
+            plt.xlabel(f'Index of samples ({window_length}samples/per)')
             plt.ylabel("MFCC coefficient mean_mov of")
             plt.title(f"Mean_mov of the MFCC of {layer_dir}")
             plt.legend()
@@ -125,8 +127,8 @@ x_labels = range(len(std_co1))
 plt.figure(figsize=(6, 6))
 plt.plot(x_labels, std_co1, marker='o', linestyle='-',color="blue", label = 'std_co1')
 plt.plot(x_labels, std_co2, marker='o', linestyle='-',color="orange",label = 'std_co2')
-plt.axhline(y=20, color='blue', linestyle='-', label=f'MFCC co1_std_thres')
-plt.axhline(y=20, color='orange', linestyle='-', label=f'MFCC co2_std_thres')
+plt.axhline(y=15, color='blue', linestyle='-', label=f'MFCC co1_std_thres')
+plt.axhline(y=12, color='orange', linestyle='-', label=f'MFCC co2_std_thres')
 ax = plt.gca()  # 获取当前的axes对象
 ax.xaxis.set_major_locator(MaxNLocator(integer=True))  # 强制x轴刻度为整数
 plt.xlabel('Index of layers')
