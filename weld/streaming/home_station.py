@@ -1,4 +1,4 @@
-import sys, glob
+import sys, glob, copy
 from RobotRaconteur.Client import *
 from scipy.interpolate import interp1d
 sys.path.append('../../toolbox/')
@@ -24,4 +24,28 @@ streaming_rate=125.
 point_distance=0.04		###STREAMING POINT INTERPOLATED DISTANCE
 SS=StreamingSend(RR_robot,RR_robot_state,RobotJointCommand,streaming_rate)
 
-SS.jog2q(np.zeros(14),point_distance=2)
+
+res, robot_state, _ = RR_robot_state.TryGetInValue()
+q14=robot_state.joint_position
+qd=copy.deepcopy(q14)
+qd[-1]=0
+point_distance=2
+q_cmd=[]
+q_record=[]
+ts_record=[]
+
+num_points_jogging=SS.streaming_rate*np.max(np.abs(q14-qd))/point_distance
+
+try:
+    for j in range(int(num_points_jogging)):
+        q_target = (q14*(num_points_jogging-j))/num_points_jogging+qd*j/num_points_jogging
+        ts,js=SS.position_cmd(q_target,time.time())
+        q_cmd.append(q_target[-1])
+        q_record.append(js[-1])
+        ts_record.append(ts)
+        
+    ###init point wait
+    for i in range(20):
+        SS.position_cmd(qd,time.time())
+except:
+    np.savetxt('streaming_debug.csv',np.vstack((ts_record,q_record,q_cmd)).T,delimiter=',')

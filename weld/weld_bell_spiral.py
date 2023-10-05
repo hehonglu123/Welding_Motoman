@@ -31,8 +31,8 @@ with open(data_dir+'slicing.yml', 'r') as file:
 recorded_dir='recorded_data/bell_ER316L/'
 
 waypoint_distance=5 	###waypoint separation
-layer_height_num=int(1.5/slicing_meta['line_resolution'])
-layer_width_num=int(4/slicing_meta['line_resolution'])
+layer_height_num=int(1.2/slicing_meta['line_resolution'])
+layer_width_num=int(2/slicing_meta['line_resolution'])
 
 
 robot=robot_obj('MA2010_A0',def_path='../config/MA2010_A0_robot_default_config.yml',tool_file_path='../config/torch.csv',\
@@ -58,28 +58,27 @@ layer_start=1
 layer_end=70
 num_layer_start=int(layer_start*layer_height_num)
 num_layer_end=int(min(layer_end*layer_height_num,slicing_meta['num_layers']-1))
-# q_prev=client.getJointAnglesDB(positioner.pulse2deg)
-q_prev=[0,0]
+q_prev=client.getJointAnglesDB(positioner.pulse2deg)
+# q_prev=[0,0]
 
 
 
 ###set up control parameters
 job_offset=400 		###200 for Aluminum ER4043, 300 for Steel Alloy ER70S-6, 400 for Stainless Steel ER316L
-nominal_feedrate=200
-nominal_vd_relative=5
+nominal_feedrate=130
+nominal_vd_relative=1
 nominal_wire_length=25 #pixels
 nominal_temp_below=500
 base_feedrate_cmd=300
-base_vd=3
+base_vd=5
 feedrate_cmd=nominal_feedrate
 vd_relative=nominal_vd_relative
-vd_relative_base=10
 feedrate_gain=0.5
-feedrate_min=150
+feedrate_min=130
 feedrate_max=300
-nominal_slice_increment=int(1.3/slicing_meta['line_resolution'])
+nominal_slice_increment=int(1.2/slicing_meta['line_resolution'])
 slice_inc_gain=3.
-vd_max=12
+vd_max=10
 
 ######################################################BASE LAYER##########################################################################################
 # slice_num=0
@@ -111,7 +110,7 @@ vd_max=12
 # 		num_points_layer=max(2,int(lam_relative[-1]/waypoint_distance))
 # 		breakpoints=np.linspace(0,len(rob1_js)-1,num=num_points_layer).astype(int)
 
-# 		s1_all,s2_all=calc_individual_speed(vd_relative_base,lam1,lam2,lam_relative,breakpoints)
+# 		s1_all,s2_all=calc_individual_speed(base_vd,lam1,lam2,lam_relative,breakpoints)
 
 # 		###find closest %2pi
 # 		num2p=np.round((q_prev-positioner_js[0])/(2*np.pi))
@@ -137,21 +136,20 @@ vd_max=12
 # 		primitives.extend(['movel']*(num_points_layer-1))
 
 # 	q_prev=positioner_js[breakpoints[-1]]
-# 	timestamp_robot,joint_recording,job_line,_=ws.weld_segment_dual(primitives,robot,positioner,q1_all,q2_all,v1_all,v2_all,cond_all,arc=False)
+# 	timestamp_robot,joint_recording,job_line,_=ws.weld_segment_dual(primitives,robot,positioner,q1_all,q2_all,v1_all,v2_all,cond_all,arc=True)
 
 # except:
 # 	traceback.print_exc()
 
 
 ##################################################### LAYER Welding##########################################################################################
-# ####PRELOAD ALL SLICES TO SAVE INPROCESS TIME
+####PRELOAD ALL SLICES TO SAVE INPROCESS TIME
 rob1_js_all_slices=[]
 rob2_js_all_slices=[]
 positioner_js_all_slices=[]
 lam_relative_all_slices=[]
 lam_relative_dense_all_slices=[]
 for i in range(0,slicing_meta['num_layers']-1):
-	print(i)
 	rob1_js_all_slices.append(np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(i)+'_0.csv',delimiter=','))
 	rob2_js_all_slices.append(np.loadtxt(data_dir+'curve_sliced_js/MA1440_js'+str(i)+'_0.csv',delimiter=','))
 	positioner_js_all_slices.append(np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(i)+'_0.csv',delimiter=','))
@@ -203,29 +201,25 @@ for slice_num in range(num_layer_start,num_layer_end,nominal_slice_increment):
 		v2_all.append(5)
 		cond_all.append(0)
 		primitives.append('movej')
-
-
 	
 
 	q1_all.extend(rob1_js[breakpoints[1:]].tolist())
 	q2_all.extend(positioner_js[breakpoints[1:]].tolist())
-	v1_all.extend(s1_all)
+	# v1_all.extend(s1_all)
+	v1_all.extend([1]*len(s1_all))
 	cond_all.extend([int(feedrate_cmd/10)+job_offset]*(num_points_layer-1))
 	primitives.extend(['movel']*(num_points_layer-1))
 
-	if slice_num<30:
-		v2_all.extend([0]*len(s2_all))
-	else:
-		for j in range(1,len(breakpoints)):
-			positioner_w=vd_relative/np.linalg.norm(curve_sliced_relative[breakpoints[j]][:2])
-			v2_all.append(min(100,100*positioner_w/positioner.joint_vel_limit[1]))
+	for j in range(1,len(breakpoints)):
+		positioner_w=vd_relative/np.linalg.norm(curve_sliced_relative[breakpoints[j]][:2])
+		v2_all.append(min(100,100*positioner_w/positioner.joint_vel_limit[1]))
 	
-	feedrate_cmd-=20
-	vd_relative+=2
+	feedrate_cmd-=10
+	vd_relative+=1
 	vd_relative=min(vd_max,vd_relative)
 	feedrate_cmd=max(feedrate_cmd,feedrate_min)
 	print('FEEDRATE: ',feedrate_cmd,'VD: ',vd_relative)
 
 	q_prev=copy.deepcopy(positioner_js[-1])
 
-timestamp_robot,joint_recording,job_line,_=ws.weld_segment_dual(primitives,robot,positioner,q1_all,q2_all,v1_all,v2_all,cond_all,arc=False)
+timestamp_robot,joint_recording,job_line,_=ws.weld_segment_dual(primitives,robot,positioner,q1_all,q2_all,v1_all,v2_all,cond_all,arc=True)
