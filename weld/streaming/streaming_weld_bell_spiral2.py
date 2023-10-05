@@ -183,209 +183,209 @@ def main():
 
 	welding_started=False
 	######################################################BASE LAYER##########################################################################################
-	slice_num=0
-	num_sections=len(glob.glob(data_dir+'curve_sliced_relative/slice'+str(slice_num)+'_*.csv'))
-	try:
-		for x in range(0,num_sections,layer_width_num):
-			rob1_js=np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(slice_num)+'_'+str(x)+'.csv',delimiter=',')
-			rob2_js=np.loadtxt(data_dir+'curve_sliced_js/MA1440_js'+str(slice_num)+'_'+str(x)+'.csv',delimiter=',')
-			positioner_js=np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(slice_num)+'_'+str(x)+'.csv',delimiter=',')
-			curve_sliced_relative=np.loadtxt(data_dir+'curve_sliced_relative/slice'+str(slice_num)+'_'+str(x)+'.csv',delimiter=',')
-			if positioner_js.shape==(2,) and rob1_js.shape==(6,):
-				continue
-			if x>0:
-				rob1_js_prev=np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(slice_num)+'_'+str(x-layer_width_num)+'.csv',delimiter=',')
-				rob2_js_prev=np.loadtxt(data_dir+'curve_sliced_js/MA1440_js'+str(slice_num)+'_'+str(x-layer_width_num)+'.csv',delimiter=',')
-				positioner_js_prev=np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(slice_num)+'_'+str(x-layer_width_num)+'.csv',delimiter=',')
-				rob1_js,rob2_js,positioner_js=warp_traj(rob1_js,rob2_js,positioner_js,rob1_js_prev,rob2_js_prev,positioner_js_prev,reversed=True)
-				if x<num_sections-layer_width_num:
-					rob1_js_next=np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(slice_num)+'_'+str(x+layer_width_num)+'.csv',delimiter=',')
-					rob2_js_next=np.loadtxt(data_dir+'curve_sliced_js/MA1440_js'+str(slice_num)+'_'+str(x+layer_width_num)+'.csv',delimiter=',')
-					positioner_js_next=np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(slice_num)+'_'+str(x+layer_width_num)+'.csv',delimiter=',')
-					rob1_js,rob2_js,positioner_js=warp_traj(rob1_js,rob2_js,positioner_js,rob1_js_next,rob2_js_next,positioner_js_next,reversed=False)
+	# slice_num=0
+	# num_sections=len(glob.glob(data_dir+'curve_sliced_relative/slice'+str(slice_num)+'_*.csv'))
+	# try:
+	# 	for x in range(0,num_sections,layer_width_num):
+	# 		rob1_js=np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(slice_num)+'_'+str(x)+'.csv',delimiter=',')
+	# 		rob2_js=np.loadtxt(data_dir+'curve_sliced_js/MA1440_js'+str(slice_num)+'_'+str(x)+'.csv',delimiter=',')
+	# 		positioner_js=np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(slice_num)+'_'+str(x)+'.csv',delimiter=',')
+	# 		curve_sliced_relative=np.loadtxt(data_dir+'curve_sliced_relative/slice'+str(slice_num)+'_'+str(x)+'.csv',delimiter=',')
+	# 		if positioner_js.shape==(2,) and rob1_js.shape==(6,):
+	# 			continue
+	# 		if x>0:
+	# 			rob1_js_prev=np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(slice_num)+'_'+str(x-layer_width_num)+'.csv',delimiter=',')
+	# 			rob2_js_prev=np.loadtxt(data_dir+'curve_sliced_js/MA1440_js'+str(slice_num)+'_'+str(x-layer_width_num)+'.csv',delimiter=',')
+	# 			positioner_js_prev=np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(slice_num)+'_'+str(x-layer_width_num)+'.csv',delimiter=',')
+	# 			rob1_js,rob2_js,positioner_js=warp_traj(rob1_js,rob2_js,positioner_js,rob1_js_prev,rob2_js_prev,positioner_js_prev,reversed=True)
+	# 			if x<num_sections-layer_width_num:
+	# 				rob1_js_next=np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(slice_num)+'_'+str(x+layer_width_num)+'.csv',delimiter=',')
+	# 				rob2_js_next=np.loadtxt(data_dir+'curve_sliced_js/MA1440_js'+str(slice_num)+'_'+str(x+layer_width_num)+'.csv',delimiter=',')
+	# 				positioner_js_next=np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(slice_num)+'_'+str(x+layer_width_num)+'.csv',delimiter=',')
+	# 				rob1_js,rob2_js,positioner_js=warp_traj(rob1_js,rob2_js,positioner_js,rob1_js_next,rob2_js_next,positioner_js_next,reversed=False)
 			
-			###find closest %2pi
-			num2p=np.round((q14[-1]-positioner_js[0,1])/(2*np.pi))
-			positioner_js[:,1]=positioner_js[:,1]+num2p*2*np.pi
+	# 		###find closest %2pi
+	# 		num2p=np.round((q14[-1]-positioner_js[0,1])/(2*np.pi))
+	# 		positioner_js[:,1]=positioner_js[:,1]+num2p*2*np.pi
 
-			lam_relative=calc_lam_cs(curve_sliced_relative)
-			lam_relative_dense=np.linspace(0,lam_relative[-1],num=int(lam_relative[-1]/point_distance))
-			curve_js_all_dense=interp1d(lam_relative,np.hstack((rob1_js,rob2_js,positioner_js)),kind='cubic',axis=0)(lam_relative_dense)
-			breakpoints=SS.get_breakpoints(lam_relative_dense,base_vd)
+	# 		lam_relative=calc_lam_cs(curve_sliced_relative)
+	# 		lam_relative_dense=np.linspace(0,lam_relative[-1],num=int(lam_relative[-1]/point_distance))
+	# 		curve_js_all_dense=interp1d(lam_relative,np.hstack((rob1_js,rob2_js,positioner_js)),kind='cubic',axis=0)(lam_relative_dense)
+	# 		breakpoints=SS.get_breakpoints(lam_relative_dense,base_vd)
 
-			###start welding at the first layer, then non-stop
-			fronius_client.job_number = int(base_feedrate_cmd/10)+job_offset
-			if not welding_started:
-				SS.jog2q(curve_js_all_dense[breakpoints[0]])
-				welding_started=True
-				fronius_client.start_weld()
+	# 		###start welding at the first layer, then non-stop
+	# 		fronius_client.job_number = int(base_feedrate_cmd/10)+job_offset
+	# 		if not welding_started:
+	# 			SS.jog2q(curve_js_all_dense[breakpoints[0]])
+	# 			welding_started=True
+	# 			fronius_client.start_weld()
 
-			SS.traj_streaming(curve_js_all_dense[breakpoints],ctrl_joints=np.ones(14))
-	except:
-		traceback.print_exc()
-	finally:
-		fronius_client.stop_weld()
+	# 		SS.traj_streaming(curve_js_all_dense[breakpoints],ctrl_joints=np.ones(14))
+	# except:
+	# 	traceback.print_exc()
+	# finally:
+	# 	fronius_client.stop_weld()
 
 
 	######################################################LAYER WELDING##########################################################################################
-	# ###memory logging
-	# robot_logging_all=[]
-	# weld_logging_all=[]
-	# current_logging_all=[]
-	# audio_logging_all=[]
-	# flir_logging_all=[]
-	# flir_ts_logging_all=[]
-	# slice_logging_all=[]
-	# # now=None
+	###memory logging
+	robot_logging_all=[]
+	weld_logging_all=[]
+	current_logging_all=[]
+	audio_logging_all=[]
+	flir_logging_all=[]
+	flir_ts_logging_all=[]
+	slice_logging_all=[]
+	# now=None
 
-	# ####PRELOAD ALL SLICES TO SAVE INPROCESS TIME
-	# rob1_js_all_slices=[]
-	# rob2_js_all_slices=[]
-	# positioner_js_all_slices=[]
-	# lam_relative_all_slices=[]
-	# lam_relative_dense_all_slices=[]
-	# for i in range(0,slicing_meta['num_layers']-1):
-	# 	print(i)
-	# 	rob1_js_all_slices.append(np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(i)+'_0.csv',delimiter=','))
-	# 	rob2_js_all_slices.append(np.loadtxt(data_dir+'curve_sliced_js/MA1440_js'+str(i)+'_0.csv',delimiter=','))
-	# 	positioner_js_all_slices.append(np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(i)+'_0.csv',delimiter=','))
-	# 	curve_sliced_relative=np.loadtxt(data_dir+'curve_sliced_relative/slice'+str(i)+'_0.csv',delimiter=',')
-	# 	lam_relative=calc_lam_cs(curve_sliced_relative)
-	# 	lam_relative_all_slices.append(lam_relative)
-	# 	lam_relative_dense_all_slices.append(np.linspace(0,lam_relative[-1],num=int(lam_relative[-1]/point_distance)))
+	####PRELOAD ALL SLICES TO SAVE INPROCESS TIME
+	rob1_js_all_slices=[]
+	rob2_js_all_slices=[]
+	positioner_js_all_slices=[]
+	lam_relative_all_slices=[]
+	lam_relative_dense_all_slices=[]
+	for i in range(0,slicing_meta['num_layers']-1):
+		print(i)
+		rob1_js_all_slices.append(np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(i)+'_0.csv',delimiter=','))
+		rob2_js_all_slices.append(np.loadtxt(data_dir+'curve_sliced_js/MA1440_js'+str(i)+'_0.csv',delimiter=','))
+		positioner_js_all_slices.append(np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(i)+'_0.csv',delimiter=','))
+		curve_sliced_relative=np.loadtxt(data_dir+'curve_sliced_relative/slice'+str(i)+'_0.csv',delimiter=',')
+		lam_relative=calc_lam_cs(curve_sliced_relative)
+		lam_relative_all_slices.append(lam_relative)
+		lam_relative_dense_all_slices.append(np.linspace(0,lam_relative[-1],num=int(lam_relative[-1]/point_distance)))
 
-	# print("PRELOAD FINISHED")
-	# #################################################NON STOP SPIRAL WELDING##########################################################################################
-	# slice_num=10
-	# while slice_num<slicing_meta['num_layers']:
-	# 	###change feedrate
-	# 	fronius_client.async_set_job_number(int(feedrate_cmd/10)+job_offset, my_handler)
-	# 	x=0
-	# 	rob1_js=copy.deepcopy(rob1_js_all_slices[slice_num])
-	# 	rob2_js=copy.deepcopy(rob2_js_all_slices[slice_num])
-	# 	positioner_js=copy.deepcopy(positioner_js_all_slices[slice_num])
-	# 	if positioner_js.shape==(2,) and rob1_js.shape==(6,):	###if only a single point
-	# 		continue
-	# 	###TRJAECTORY WARPING
-	# 	if slice_num>10:
-	# 		rob1_js_prev=copy.deepcopy(rob1_js_all_slices[slice_num-nominal_slice_increment])
-	# 		rob2_js_prev=copy.deepcopy(rob2_js_all_slices[slice_num-nominal_slice_increment])
-	# 		positioner_js_prev=copy.deepcopy(positioner_js_all_slices[slice_num-nominal_slice_increment])
-	# 		rob1_js,rob2_js,positioner_js=warp_traj(rob1_js,rob2_js,positioner_js,rob1_js_prev,rob2_js_prev,positioner_js_prev,reversed=True)
-	# 	if slice_num<slicing_meta['num_layers']-nominal_slice_increment:
-	# 		rob1_js_next=copy.deepcopy(rob1_js_all_slices[slice_num+nominal_slice_increment])
-	# 		rob2_js_next=copy.deepcopy(rob2_js_all_slices[slice_num+nominal_slice_increment])
-	# 		positioner_js_next=copy.deepcopy(positioner_js_all_slices[slice_num+nominal_slice_increment])
-	# 		rob1_js,rob2_js,positioner_js=warp_traj(rob1_js,rob2_js,positioner_js,rob1_js_next,rob2_js_next,positioner_js_next,reversed=False)
+	print("PRELOAD FINISHED")
+	#################################################NON STOP SPIRAL WELDING##########################################################################################
+	slice_num=10
+	while slice_num<slicing_meta['num_layers']:
+		###change feedrate
+		fronius_client.async_set_job_number(int(feedrate_cmd/10)+job_offset, my_handler)
+		x=0
+		rob1_js=copy.deepcopy(rob1_js_all_slices[slice_num])
+		rob2_js=copy.deepcopy(rob2_js_all_slices[slice_num])
+		positioner_js=copy.deepcopy(positioner_js_all_slices[slice_num])
+		if positioner_js.shape==(2,) and rob1_js.shape==(6,):	###if only a single point
+			continue
+		###TRJAECTORY WARPING
+		if slice_num>10:
+			rob1_js_prev=copy.deepcopy(rob1_js_all_slices[slice_num-nominal_slice_increment])
+			rob2_js_prev=copy.deepcopy(rob2_js_all_slices[slice_num-nominal_slice_increment])
+			positioner_js_prev=copy.deepcopy(positioner_js_all_slices[slice_num-nominal_slice_increment])
+			rob1_js,rob2_js,positioner_js=warp_traj(rob1_js,rob2_js,positioner_js,rob1_js_prev,rob2_js_prev,positioner_js_prev,reversed=True)
+		if slice_num<slicing_meta['num_layers']-nominal_slice_increment:
+			rob1_js_next=copy.deepcopy(rob1_js_all_slices[slice_num+nominal_slice_increment])
+			rob2_js_next=copy.deepcopy(rob2_js_all_slices[slice_num+nominal_slice_increment])
+			positioner_js_next=copy.deepcopy(positioner_js_all_slices[slice_num+nominal_slice_increment])
+			rob1_js,rob2_js,positioner_js=warp_traj(rob1_js,rob2_js,positioner_js,rob1_js_next,rob2_js_next,positioner_js_next,reversed=False)
 		
-	# 	###find closest %2pi
-	# 	num2p=np.round((q14[-1]-positioner_js[0,1])/(2*np.pi))
-	# 	positioner_js[:,1]=positioner_js[:,1]+num2p*2*np.pi
-	# 	curve_js_all_dense=interp1d(lam_relative_all_slices[slice_num],np.hstack((rob1_js,rob2_js,positioner_js)),kind='cubic',axis=0)(lam_relative_dense_all_slices[slice_num])
-	# 	breakpoints=SS.get_breakpoints(lam_relative_dense_all_slices[slice_num],vd_relative)
-	# 	###monitoring parameters
-	# 	wire_length=[]
-	# 	temp_below=[]
-	# 	robot_ts=[]
-	# 	robot_js=[]
-	# 	flir_logging=[]
-	# 	flir_ts=[]
+		###find closest %2pi
+		num2p=np.round((q14[-1]-positioner_js[0,1])/(2*np.pi))
+		positioner_js[:,1]=positioner_js[:,1]+num2p*2*np.pi
+		curve_js_all_dense=interp1d(lam_relative_all_slices[slice_num],np.hstack((rob1_js,rob2_js,positioner_js)),kind='cubic',axis=0)(lam_relative_dense_all_slices[slice_num])
+		breakpoints=SS.get_breakpoints(lam_relative_dense_all_slices[slice_num],vd_relative)
+		###monitoring parameters
+		wire_length=[]
+		temp_below=[]
+		robot_ts=[]
+		robot_js=[]
+		flir_logging=[]
+		flir_ts=[]
 		
-	# 	###start welding at the first layer, then non-stop
-	# 	if not welding_started:
-	# 		rr_sensors.start_all_sensors()
-	# 		#jog above
-	# 		waypoint_pose=robot.fwd(curve_js_all_dense[0,:6])
-	# 		waypoint_pose.p[-1]+=50
-	# 		waypoint_q=robot.inv(waypoint_pose.p,waypoint_pose.R,curve_js_all_dense[breakpoints[0],:6])[0]
-	# 		SS.jog2q(np.hstack((waypoint_q,curve_js_all_dense[0,6:])))
-	# 		SS.jog2q(curve_js_all_dense[breakpoints[0]])
-	# 		welding_started=True
-	# 		fronius_client.start_weld()
-	# 		time.sleep(0.2)
+		###start welding at the first layer, then non-stop
+		if not welding_started:
+			rr_sensors.start_all_sensors()
+			#jog above
+			waypoint_pose=robot.fwd(curve_js_all_dense[0,:6])
+			waypoint_pose.p[-1]+=50
+			waypoint_q=robot.inv(waypoint_pose.p,waypoint_pose.R,curve_js_all_dense[breakpoints[0],:6])[0]
+			SS.jog2q(np.hstack((waypoint_q,curve_js_all_dense[0,6:])))
+			SS.jog2q(curve_js_all_dense[breakpoints[0]])
+			welding_started=True
+			fronius_client.start_weld()
+			time.sleep(0.2)
 
-	# 	# if now:
-	# 	# 	print(time.time()-now)
+		# if now:
+		# 	print(time.time()-now)
 		
-	# 	try:
-	# 		###start logging
-	# 		rr_sensors.clear_all_sensors()
-	# 		for bp_idx in range(len(breakpoints)):
+		try:
+			###start logging
+			rr_sensors.clear_all_sensors()
+			for bp_idx in range(len(breakpoints)):
 				
-	# 			if bp_idx<10:	###streaming 10 points before process FLIR monitoring
-	# 				robot_timestamp,q14=SS.position_cmd(curve_js_all_dense[breakpoints[bp_idx]],time.time())
-	# 				point_stream_start_time=time.time()
-	# 			else:
-	# 				####################################FLIR PROCESSING####################################
-	# 				#TODO: make sure processing time within 8ms
-	# 				centroid, bbox=flame_detection(flir_logging[-1])
-	# 				if centroid is not None:
-	# 					bbox_below_size=5
-	# 					centroid_below=(int(centroid[0]+bbox[2]/2+bbox_below_size/2),centroid[1])
-	# 					temp_in_bbox=counts2temp(flir_logging[-1][int(centroid_below[1]-bbox_below_size):int(centroid_below[1]+bbox_below_size),int(centroid_below[0]-bbox_below_size):int(centroid_below[0]+bbox_below_size)].flatten(),6.39661118e+03, 1.40469989e+03, 1.00000008e+00, 8.69393436e+00, 8.40029488e+03,Emiss=0.13)
-	# 					temp_below.append(np.average(temp_in_bbox))
-	# 					wire_length.append(centroid[0]-139)
+				if bp_idx<10:	###streaming 10 points before process FLIR monitoring
+					robot_timestamp,q14=SS.position_cmd(curve_js_all_dense[breakpoints[bp_idx]],time.time())
+					point_stream_start_time=time.time()
+				else:
+					####################################FLIR PROCESSING####################################
+					#TODO: make sure processing time within 8ms
+					centroid, bbox=flame_detection(flir_logging[-1])
+					if centroid is not None:
+						bbox_below_size=5
+						centroid_below=(int(centroid[0]+bbox[2]/2+bbox_below_size/2),centroid[1])
+						temp_in_bbox=counts2temp(flir_logging[-1][int(centroid_below[1]-bbox_below_size):int(centroid_below[1]+bbox_below_size),int(centroid_below[0]-bbox_below_size):int(centroid_below[0]+bbox_below_size)].flatten(),6.39661118e+03, 1.40469989e+03, 1.00000008e+00, 8.69393436e+00, 8.40029488e+03,Emiss=0.13)
+						temp_below.append(np.average(temp_in_bbox))
+						wire_length.append(centroid[0]-139)
 					
-	# 				if bp_idx<len(breakpoints)-1: ###no wait at last point
-	# 					###busy wait for accurate 8ms streaming
-	# 					while time.time()-point_stream_start_time<1/SS.streaming_rate-0.0005:
-	# 						continue
+					if bp_idx<len(breakpoints)-1: ###no wait at last point
+						###busy wait for accurate 8ms streaming
+						while time.time()-point_stream_start_time<1/SS.streaming_rate-0.0005:
+							continue
 						
-	# 				point_stream_start_time=time.time()
-	# 				robot_timestamp,q14=SS.position_cmd(curve_js_all_dense[breakpoints[bp_idx]])
+					point_stream_start_time=time.time()
+					robot_timestamp,q14=SS.position_cmd(curve_js_all_dense[breakpoints[bp_idx]])
 					
-	# 				robot_ts.append(robot_timestamp)
-	# 				robot_js.append(q14)
+					robot_ts.append(robot_timestamp)
+					robot_js.append(q14)
 		
-	# 		###end LOGGING, non-blocking saving, takes ~1s
-	# 		# rr_sensors.stop_all_sensors()
-	# 		# welding_data=np.array([(rr_sensors.weld_timestamp-rr_sensors.weld_timestamp[0])/1e6, rr_sensors.weld_voltage, rr_sensors.weld_current, rr_sensors.weld_feedrate, rr_sensors.weld_energy]).T
-	# 		# process = Process(target=save_data,args=(recorded_dir,welding_data,rr_sensors.audio_recording,robot_ts,robot_js,flir_logging,flir_ts,slice_num))
-	# 		# process.start()
+			###end LOGGING, non-blocking saving, takes ~1s
+			# rr_sensors.stop_all_sensors()
+			# welding_data=np.array([(rr_sensors.weld_timestamp-rr_sensors.weld_timestamp[0])/1e6, rr_sensors.weld_voltage, rr_sensors.weld_current, rr_sensors.weld_feedrate, rr_sensors.weld_energy]).T
+			# process = Process(target=save_data,args=(recorded_dir,welding_data,rr_sensors.audio_recording,robot_ts,robot_js,flir_logging,flir_ts,slice_num))
+			# process.start()
 
-	# 		###save in memory,
-	# 		# now=time.time()
-	# 		current_timestamp=np.array(rr_sensors.current_timestamp).flatten()-rr_sensors.current_timestamp[0]
-	# 		min_length=min(len(current_timestamp),len(rr_sensors.current))
-	# 		current_data=np.array([current_timestamp[:min_length], rr_sensors.current[:min_length]]).T
+			###save in memory,
+			# now=time.time()
+			current_timestamp=np.array(rr_sensors.current_timestamp).flatten()-rr_sensors.current_timestamp[0]
+			min_length=min(len(current_timestamp),len(rr_sensors.current))
+			current_data=np.array([current_timestamp[:min_length], rr_sensors.current[:min_length]]).T
 
-	# 		weld_timestamp=np.array(rr_sensors.weld_timestamp).flatten()-rr_sensors.weld_timestamp[0]
-	# 		min_length=min(len(current_timestamp),len(rr_sensors.weld_voltage),len(rr_sensors.weld_current),len(rr_sensors.weld_feedrate),len(rr_sensors.weld_energy))
-	# 		welding_data=np.array([weld_timestamp[:min_length], rr_sensors.weld_voltage[:min_length], rr_sensors.weld_current[:min_length], rr_sensors.weld_feedrate[:min_length], rr_sensors.weld_energy[:min_length]]).T
+			weld_timestamp=np.array(rr_sensors.weld_timestamp).flatten()-rr_sensors.weld_timestamp[0]
+			min_length=min(len(current_timestamp),len(rr_sensors.weld_voltage),len(rr_sensors.weld_current),len(rr_sensors.weld_feedrate),len(rr_sensors.weld_energy))
+			welding_data=np.array([weld_timestamp[:min_length], rr_sensors.weld_voltage[:min_length], rr_sensors.weld_current[:min_length], rr_sensors.weld_feedrate[:min_length], rr_sensors.weld_energy[:min_length]]).T
 			
-	# 		robot_ts=np.array(robot_ts)
-	# 		robot_ts=robot_ts-robot_ts[0]
-	# 		robot_js=np.array(robot_js)
-	# 		flir_ts=np.array(flir_ts)
-	# 		flir_ts=flir_ts-flir_ts[0]
-	# 		robot_logging_all.append(np.hstack((robot_ts.reshape(-1, 1),robot_js)))
-	# 		weld_logging_all.append(welding_data)
-	# 		current_logging_all.append(current_data)
-	# 		audio_logging_all.append(rr_sensors.audio_recording)
-	# 		flir_logging_all.append(flir_logging)
-	# 		flir_ts_logging_all.append(flir_ts)
-	# 		slice_logging_all.append(slice_num)
+			robot_ts=np.array(robot_ts)
+			robot_ts=robot_ts-robot_ts[0]
+			robot_js=np.array(robot_js)
+			flir_ts=np.array(flir_ts)
+			flir_ts=flir_ts-flir_ts[0]
+			robot_logging_all.append(np.hstack((robot_ts.reshape(-1, 1),robot_js)))
+			weld_logging_all.append(welding_data)
+			current_logging_all.append(current_data)
+			audio_logging_all.append(rr_sensors.audio_recording)
+			flir_logging_all.append(flir_logging)
+			flir_ts_logging_all.append(flir_ts)
+			slice_logging_all.append(slice_num)
 
 			
-	# 		####CONTROL PARAMETERS
-	# 		feedrate_cmd-=20
-	# 		vd_relative+=1
-	# 		vd_relative=min(vd_max,vd_relative)
-	# 		feedrate_cmd=max(feedrate_cmd,feedrate_min)
-	# 		slice_num+=int(nominal_slice_increment)
-	# 		print('FEEDRATE: ',feedrate_cmd,'VD: ',vd_relative)
+			####CONTROL PARAMETERS
+			feedrate_cmd-=20
+			vd_relative+=1
+			vd_relative=min(vd_max,vd_relative)
+			feedrate_cmd=max(feedrate_cmd,feedrate_min)
+			slice_num+=int(nominal_slice_increment)
+			print('FEEDRATE: ',feedrate_cmd,'VD: ',vd_relative)
 
 
-	# 	except:
-	# 		traceback.print_exc()
-	# 		fronius_client.stop_weld()
-	# 		rr_sensors.stop_all_sensors()
-	# 		break
-	# fronius_client.stop_weld()
-	# rr_sensors.stop_all_sensors()
+		except:
+			traceback.print_exc()
+			fronius_client.stop_weld()
+			rr_sensors.stop_all_sensors()
+			break
+	fronius_client.stop_weld()
+	rr_sensors.stop_all_sensors()
 
-	# for i in range(len(slice_logging_all)):
-	# 	rr_sensors.save_data_streaming(recorded_dir,current_logging_all[i],weld_logging_all[i],audio_logging_all[i],robot_logging_all[i],flir_logging_all[i],flir_ts_logging_all[i],slice_logging_all[i])
+	for i in range(len(slice_logging_all)):
+		rr_sensors.save_data_streaming(recorded_dir,current_logging_all[i],weld_logging_all[i],audio_logging_all[i],robot_logging_all[i],flir_logging_all[i],flir_ts_logging_all[i],slice_logging_all[i])
 
 
 
