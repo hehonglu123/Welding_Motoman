@@ -5,7 +5,6 @@ import copy
 import pickle
 import wave
 from matplotlib import pyplot as plt
-from pathlib import Path
 
 class WeldRRSensor(object):
 	def __init__(self,weld_service=None,\
@@ -84,21 +83,25 @@ class WeldRRSensor(object):
 			self.start_current_cb=True
 	
 	def clear_all_sensors(self):
-		if self.mic_service:
-			self.clean_mic_record()
 		if self.weld_service:
 			self.clean_weld_record()
 		if self.cam_ser:
 			self.clean_ir_record()
+		if self.mic_service:
+			self.clean_mic_record()
 		if self.current_service:
 			self.clean_current_record()
 
 	def stop_all_sensors(self):
 
-		self.start_weld_cb=False
-		self.start_ir_cb=False
-		self.start_mic_cb=False
-		self.start_current_cb=False
+		if self.weld_service:
+			self.start_weld_cb=False
+		if self.cam_ser:
+			self.start_ir_cb=False
+		if self.mic_service:
+			self.start_mic_cb=False
+		if self.current_service:
+			self.start_current_cb=False
 	
 	def save_all_sensors(self,filedir):
 
@@ -162,12 +165,12 @@ class WeldRRSensor(object):
 	
 	def save_weld_file(self,filedir):
 		np.savetxt(filedir + 'welding.csv',
-				np.array([(np.array(self.weld_timestamp)-self.weld_timestamp[0])/1e6, self.weld_voltage, self.weld_current, self.weld_feedrate, self.weld_energy]).T, delimiter=',',
+				np.array([(self.weld_timestamp-self.weld_timestamp[0])/1e6, self.weld_voltage, self.weld_current, self.weld_feedrate, self.weld_energy]).T, delimiter=',',
 				header='timestamp,voltage,current,feedrate,energy', comments='')
 		
 	def save_current_file(self,filedir):
 		np.savetxt(filedir + 'current.csv',
-				np.array([(np.array(self.current_timestamp)-self.current_timestamp[0]), self.current]).T, delimiter=',',
+				np.array([(self.current_timestamp-self.current_timestamp[0]), self.current]).T, delimiter=',',
 				header='timestamp,current', comments='')
 	
 	def clean_ir_record(self):
@@ -180,47 +183,51 @@ class WeldRRSensor(object):
 		while (pipe_ep.Available > 0):
 			# Receive the packet
 			rr_img = pipe_ep.ReceivePacket()
-			if self.start_ir_cb:
-				if rr_img.image_info.encoding == self.ir_image_consts["ImageEncoding"]["mono8"]:
-					# Simple uint8 image
-					mat = rr_img.data.reshape([rr_img.image_info.height, rr_img.image_info.width], order='C')
-				elif rr_img.image_info.encoding == self.ir_image_consts["ImageEncoding"]["mono16"]:
-					data_u16 = np.array(rr_img.data.view(np.uint16))
-					mat = data_u16.reshape([rr_img.image_info.height, rr_img.image_info.width], order='C')
+			if not self.start_ir_cb:
+				continue
+			if rr_img.image_info.encoding == self.ir_image_consts["ImageEncoding"]["mono8"]:
+				# Simple uint8 image
+				mat = rr_img.data.reshape([rr_img.image_info.height, rr_img.image_info.width], order='C')
+			elif rr_img.image_info.encoding == self.ir_image_consts["ImageEncoding"]["mono16"]:
+				data_u16 = np.array(rr_img.data.view(np.uint16))
+				mat = data_u16.reshape([rr_img.image_info.height, rr_img.image_info.width], order='C')
 
-				ir_format = rr_img.image_info.extended["ir_format"].data
+			ir_format = rr_img.image_info.extended["ir_format"].data
 
-				if ir_format == "temperature_linear_10mK":
-					display_mat = (mat * 0.01) - 273.15
-				elif ir_format == "temperature_linear_100mK":
-					display_mat = (mat * 0.1) - 273.15
-				else:
-					display_mat = mat
+			if ir_format == "temperature_linear_10mK":
+				display_mat = (mat * 0.01) - 273.15
+			elif ir_format == "temperature_linear_100mK":
+				display_mat = (mat * 0.1) - 273.15
+			else:
+				display_mat = mat
 
-				# Convert the packet to an image and set the global variable
-				self.ir_recording.append(copy.deepcopy(display_mat))
-				self.ir_timestamp.append(rr_img.image_info.data_header.ts['seconds']+rr_img.image_info.data_header.ts['nanoseconds']*1e-9)
+			# Convert the packet to an image and set the global variable
+			self.ir_recording.append(copy.deepcopy(display_mat))
+			self.ir_timestamp.append(rr_img.image_info.data_header.ts['seconds']+rr_img.image_info.data_header.ts['nanoseconds']*1e-9)
 	
 	def save_ir_file(self,filedir):
 
 		with open(filedir+'ir_recording.pickle','wb') as file:
 				pickle.dump(np.array(self.ir_recording),file)
-		np.savetxt(filedir + "ir_stamps.csv",np.array(self.ir_timestamp)-self.ir_timestamp[0],delimiter=',')
+		np.savetxt(filedir + "ir_stamps.csv",self.ir_timestamp-self.ir_timestamp[0],delimiter=',')
 	
 	def clean_mic_record(self):
+
 		self.audio_recording=[]
 	
 	def microphone_cb(self,pipe_ep):
 
 		#Loop to get the newest frame
 		while (pipe_ep.Available > 0):
-			if self.start_mic_cb:
-				#Receive the packet
-				self.audio_recording.extend(pipe_ep.ReceivePacket().audio_data)
+			audio = pipe_ep.ReceivePacket().audio_data
+			if not self.start_mic_cb:
+				continue
+			#Receive the packet
+			self.audio_recording.extend(audio)
 	
 	def save_mic_file(self,filedir):
 
-		# print("Mic length:",len(self.audio_recording))
+		print("Mic length:",len(self.audio_recording))
 
 		try:
 			first_channel = np.concatenate(self.audio_recording)
@@ -236,37 +243,3 @@ class WeldRRSensor(object):
 				wav_file.writeframes(first_channel_int16.tobytes())
 		except:
 			print("Mic has no recording!!!")
-
-	def save_data_streaming(self,recorded_dir,current_data,welding_data,audio_recording,robot_data,flir_logging,flir_ts,slice_num,section_num=0):
-		###MAKING DIR
-		layer_data_dir=recorded_dir+'layer_'+str(slice_num)+'_'+str(section_num)+'/'
-		Path(layer_data_dir).mkdir(exist_ok=True)
-
-		####AUDIO SAVING
-		first_channel = np.concatenate(audio_recording)
-		first_channel_int16=(first_channel*32767).astype(np.int16)
-		with wave.open(layer_data_dir+'mic_recording.wav', 'wb') as wav_file:
-			# Set the WAV file parameters
-			wav_file.setnchannels(1)
-			wav_file.setsampwidth(2)  # 2 bytes per sample (16-bit)
-			wav_file.setframerate(44100)
-			# Write the audio data to the WAV file
-			wav_file.writeframes(first_channel_int16.tobytes())
-
-		####CURRENT SAVING
-		np.savetxt(layer_data_dir + 'current.csv',current_data, delimiter=',',header='timestamp,current', comments='')
-
-		####FRONIUS SAVING
-		np.savetxt(layer_data_dir + 'welding.csv',welding_data, delimiter=',',header='timestamp,voltage,current,feedrate,energy', comments='')
-		
-
-		####ROBOT JOINT SAVING
-		np.savetxt(layer_data_dir+'joint_recording.csv',robot_data,delimiter=',')
-
-		###FLIR SAVING
-		flir_ts=np.array(flir_ts)
-		with open(layer_data_dir+'ir_recording.pickle','wb') as file:
-				pickle.dump(np.array(flir_logging),file)
-		np.savetxt(layer_data_dir + "ir_stamps.csv",flir_ts-flir_ts[0],delimiter=',')
-		
-		return

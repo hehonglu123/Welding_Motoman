@@ -2,6 +2,7 @@ import sys, glob, wave, pickle
 from multiprocessing import Process
 from RobotRaconteur.Client import *
 from scipy.interpolate import interp1d
+from pathlib import Path
 sys.path.append('../../toolbox/')
 from utils import *
 from robot_def import *
@@ -9,7 +10,6 @@ from lambda_calc import *
 from multi_robot import *
 from flir_toolbox import *
 from traj_manipulation import *
-from dx200_motion_program_exec_client import *
 from StreamingSend import *
 sys.path.append('../../sensor_fusion/')
 from weldRRSensor import *
@@ -252,7 +252,7 @@ def main():
 		lam_relative=calc_lam_cs(curve_sliced_relative)
 		lam_relative_all_slices.append(lam_relative)
 		lam_relative_dense_all_slices.append(np.linspace(0,lam_relative[-1],num=int(lam_relative[-1]/point_distance)))
-
+	print('PRELOAD FINISHED')
 	#################################################NON STOP SPIRAL WELDING##########################################################################################
 	slice_num=10
 	while slice_num<slicing_meta['num_layers']:

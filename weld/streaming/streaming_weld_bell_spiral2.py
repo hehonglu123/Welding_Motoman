@@ -2,6 +2,7 @@ import sys, glob, wave, pickle
 from multiprocessing import Process
 from RobotRaconteur.Client import *
 from scipy.interpolate import interp1d
+from pathlib import Path
 sys.path.append('../../toolbox/')
 from utils import *
 from robot_def import *
@@ -9,7 +10,6 @@ from lambda_calc import *
 from multi_robot import *
 from flir_toolbox import *
 from traj_manipulation import *
-from dx200_motion_program_exec_client import *
 from StreamingSend import *
 sys.path.append('../../sensor_fusion/')
 from weldRRSensor import *
@@ -245,7 +245,6 @@ def main():
 	lam_relative_all_slices=[]
 	lam_relative_dense_all_slices=[]
 	for i in range(0,slicing_meta['num_layers']-1):
-		print(i)
 		rob1_js_all_slices.append(np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(i)+'_0.csv',delimiter=','))
 		rob2_js_all_slices.append(np.loadtxt(data_dir+'curve_sliced_js/MA1440_js'+str(i)+'_0.csv',delimiter=','))
 		positioner_js_all_slices.append(np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(i)+'_0.csv',delimiter=','))
