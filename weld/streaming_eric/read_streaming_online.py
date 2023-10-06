@@ -67,6 +67,7 @@ positioner=positioner_obj('D500B',def_path=config_dir+'D500B_robot_default_confi
 robot_scan_base = robot_weld.T_base_basemarker.inv()*robot_scan.T_base_basemarker
 robot_scan.base_H = H_from_RT(robot_scan_base.R,robot_scan_base.p)
 positioner_base = robot_weld.T_base_basemarker.inv()*positioner.T_base_basemarker
+positioner_origin_base = deepcopy(positioner.base_H)
 positioner.base_H = H_from_RT(positioner_base.R,positioner_base.p)
 T_to_base = Transform(np.eye(3),[0,0,-380])
 positioner.base_H = np.matmul(positioner.base_H,H_from_RT(T_to_base.R,T_to_base.p))
@@ -203,8 +204,12 @@ height_all=[]
 error_all=[]
 
 dh_layer=[]
+r1v_layer=[]
+r1v_planned_layer=[]
 height_layer=[]
 lam_layer=[]
+last_r1_p = None
+last_stamp=None
 for layer_count in range(end_layer_count):
     base_layer=True if layer_count<base_layer_N else False # baselayer flag
     vd_relative = base_nominal_vd_relative if base_layer else nominal_vd_relative # set feedrate
@@ -237,8 +242,6 @@ for layer_count in range(end_layer_count):
     ## streaming
     read_recording_cnt=0
     bp_status=0
-    print(len(mti_recording_all[layer_count]))
-    print(len(robot_js_all[layer_count]))
     for seg_i in range(len(segment_bp)-1):
         
         # Feedback control. TODO: get the correct delta segments
@@ -258,12 +261,33 @@ for layer_count in range(end_layer_count):
         
         ###start logging
         bp_cnt=0
+        r1_v_seg = []
         for bp in breakpoints:
             #################################### READ MTI and joints####################################
             robot_timestamp=robot_js_all[layer_count][read_recording_cnt][0]
             q14=robot_js_all[layer_count][read_recording_cnt][1:]
             mti_points = mti_recording_all[layer_count][read_recording_cnt]
             read_recording_cnt+=1
+            
+            ## get real R1 velocity
+            calib_base = deepcopy(positioner.base_H)
+            positioner.base_H = deepcopy(positioner_origin_base)
+            if last_r1_p is None:
+                last_r1_p = positioner.fwd(q14[-2:],world=True).inv()*robot_weld.fwd(q14[:6])
+                last_r1_p = last_r1_p.p
+                last_stamp = robot_timestamp
+            this_r1_p=positioner.fwd(q14[-2:],world=True).inv()*robot_weld.fwd(q14[:6])
+            this_r1_p=this_r1_p.p
+            r1_v = np.linalg.norm((this_r1_p-last_r1_p))/(robot_timestamp-last_stamp)
+            # print(this_r1_p)
+            # print(last_r1_p)
+            # print("===")
+            r1_v_seg.append(r1_v)
+            
+            last_r1_p=deepcopy(this_r1_p)
+            last_stamp=robot_timestamp
+            positioner.base_H = deepcopy(calib_base)
+            #############
             
             ## Get the delta h. TODO: get the correct target p
             # if bp<len(lam_relative_dense)/2:
@@ -292,6 +316,8 @@ for layer_count in range(end_layer_count):
         lam_layer.append(this_lam)
         dh_layer.append(deepcopy(this_dh))
         height_layer.append(deepcopy(this_height))
+        r1v_layer.append(np.mean(r1_v_seg))
+        r1v_planned_layer.append(vd_relative)
         #########################
     
     if layer_count>0:
@@ -303,18 +329,38 @@ for layer_count in range(end_layer_count):
             error_lambda.append(np.mean(h_arr)-delta_h_star)
         for h_arr in height_layer:
             height_lambda.append(np.mean(h_arr))
-        plt.scatter(lam_layer,dh_lambda)
-        plt.title("Delta h of Layer "+str(layer_count))
+        fig, ax1 = plt.subplots()
+        ax2 = ax1.twinx()
+        ax1.scatter(lam_layer, dh_lambda, label='delta h')
+        # if layer_count>1:
+        ax2.plot(lam_layer, r1v_planned_layer, 'tab:orange',label='Lambda dot Planned')
+        ax2.plot(lam_layer, r1v_layer, 'g-',label='Lambda dot Execute')
+        ax1.set_ylabel("delta h (mm)")
+        ax2.set_ylabel("R1 Lambda dot (mm/sec)")
+        ax2.axis(ymin=0,ymax=15)
+        ax1.legend(loc=2)
+        ax2.legend(loc=1)
+        
+        # plt.scatter(lam_layer,dh_lambda)
+        plt.title("Delta h and Speed of Layer "+str(layer_count))
         plt.xlabel("Lambda (mm)")
-        plt.ylabel("delta h (mm)")
+        
         plt.show()
         lam_all.append(lam_layer)
         dh_all.append(dh_lambda)
         error_all.append(error_lambda)
         height_all.append(height_lambda)
+        
+        last2_r1v_layer = deepcopy(last_r1v_layer)
+        last2_r1v_planned_layer = deepcopy(last_r1v_planned_layer)
+        
     dh_layer=[]
     lam_layer=[]
     height_layer=[]
+    last_r1v_layer = deepcopy(r1v_layer)
+    last_r1v_planned_layer = deepcopy(r1v_planned_layer)
+    r1v_layer=[]
+    r1v_planned_layer = []
 
 ## streaming final for scanner lagging
 layer_count=end_layer_count
