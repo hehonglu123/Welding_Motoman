@@ -60,7 +60,7 @@ def main():
 	recorded_dir='recorded_data/'
 	Path(recorded_dir).mkdir(exist_ok=True)
 
-	layer_width_num=int(4/slicing_meta['line_resolution'])
+	layer_width_num=int(2/slicing_meta['line_resolution'])
 
 	robot=robot_obj('MA2010_A0',def_path='../../config/MA2010_A0_robot_default_config.yml',tool_file_path='../../config/torch.csv',\
 		pulse2deg_file_path='../../config/MA2010_A0_pulse2deg_real.csv',d=15)
@@ -70,9 +70,9 @@ def main():
 		pulse2deg_file_path='../../config/D500B_pulse2deg_real.csv',base_transformation_file='../../config/D500B_pose.csv')
 
 	########################################################RR Microphone########################################################
-	microphone = RRN.ConnectService('rr+tcp://192.168.55.15:60828?service=microphone')
+	microphone = RRN.ConnectService('rr+tcp://localhost:60828?service=microphone')
 	########################################################RR FLIR########################################################
-	flir=RRN.ConnectService('rr+tcp://192.168.55.10:60827/?service=camera')
+	flir=RRN.ConnectService('rr+tcp://localhost:60827/?service=camera')
 	flir.setf_param("focus_pos", RR.VarValue(int(2000),"int32"))
 	flir.setf_param("object_distance", RR.VarValue(0.4,"double"))
 	flir.setf_param("reflected_temperature", RR.VarValue(291.15,"double"))
@@ -105,7 +105,7 @@ def main():
 	########################################################RR CURRENT########################################################
 	current_sub=RRN.SubscribeService('rr+tcp://192.168.55.21:12182?service=Current')
 	########################################################RR STREAMING########################################################
-	RR_robot_sub = RRN.SubscribeService('rr+tcp://192.168.55.15:59945?service=robot')
+	RR_robot_sub = RRN.SubscribeService('rr+tcp://localhost:59945?service=robot')
 	RR_robot_state = RR_robot_sub.SubscribeWire('robot_state')
 	RR_robot = RR_robot_sub.GetDefaultClientWait(1)
 	robot_const = RRN.GetConstants("com.robotraconteur.robotics.robot", RR_robot)
@@ -142,7 +142,7 @@ def main():
 	###set up control parameters
 	job_offset=400 		###200 for Aluminum ER4043, 300 for Steel Alloy ER70S-6, 400 for Stainless Steel ER316L
 	nominal_feedrate=80
-	nominal_vd_relative=0.1
+	nominal_vd_relative=0.01
 	nominal_wire_length=25 #pixels
 	nominal_temp_below=500
 	base_feedrate_cmd=300
@@ -150,11 +150,11 @@ def main():
 	feedrate_cmd=nominal_feedrate
 	vd_relative=nominal_vd_relative
 	feedrate_gain=0.5
-	feedrate_min=100
+	feedrate_min=80
 	feedrate_max=300
-	nominal_slice_increment=int(1.45/slicing_meta['line_resolution'])
+	nominal_slice_increment=int(1.2/slicing_meta['line_resolution'])
 	slice_inc_gain=3.
-	vd_max=6
+	vd_max=8
 
 	###set up control parameters
 	# job_offset=300 		###200 for Aluminum ER4043, 300 for Steel Alloy ER70S-6, 400 for Stainless Steel ER316L
@@ -183,7 +183,7 @@ def main():
 
 	welding_started=False
 	######################################################BASE LAYER##########################################################################################
-	# slice_num=0
+	slice_num=0
 	# num_sections=len(glob.glob(data_dir+'curve_sliced_relative/slice'+str(slice_num)+'_*.csv'))
 	# try:
 	# 	for x in range(0,num_sections,layer_width_num):
@@ -344,31 +344,31 @@ def main():
 
 			###save in memory,
 			# now=time.time()
-			current_timestamp=np.array(rr_sensors.current_timestamp).flatten()-rr_sensors.current_timestamp[0]
-			min_length=min(len(current_timestamp),len(rr_sensors.current))
-			current_data=np.array([current_timestamp[:min_length], rr_sensors.current[:min_length]]).T
+			# current_timestamp=np.array(rr_sensors.current_timestamp).flatten()-rr_sensors.current_timestamp[0]
+			# min_length=min(len(current_timestamp),len(rr_sensors.current))
+			# current_data=np.array([current_timestamp[:min_length], rr_sensors.current[:min_length]]).T
 
-			weld_timestamp=np.array(rr_sensors.weld_timestamp).flatten()-rr_sensors.weld_timestamp[0]
-			min_length=min(len(current_timestamp),len(rr_sensors.weld_voltage),len(rr_sensors.weld_current),len(rr_sensors.weld_feedrate),len(rr_sensors.weld_energy))
-			welding_data=np.array([weld_timestamp[:min_length], rr_sensors.weld_voltage[:min_length], rr_sensors.weld_current[:min_length], rr_sensors.weld_feedrate[:min_length], rr_sensors.weld_energy[:min_length]]).T
+			# weld_timestamp=np.array(rr_sensors.weld_timestamp).flatten()-rr_sensors.weld_timestamp[0]
+			# min_length=min(len(current_timestamp),len(rr_sensors.weld_voltage),len(rr_sensors.weld_current),len(rr_sensors.weld_feedrate),len(rr_sensors.weld_energy))
+			# welding_data=np.array([weld_timestamp[:min_length], rr_sensors.weld_voltage[:min_length], rr_sensors.weld_current[:min_length], rr_sensors.weld_feedrate[:min_length], rr_sensors.weld_energy[:min_length]]).T
 			
-			robot_ts=np.array(robot_ts)
-			robot_ts=robot_ts-robot_ts[0]
-			robot_js=np.array(robot_js)
-			flir_ts=np.array(flir_ts)
-			flir_ts=flir_ts-flir_ts[0]
-			robot_logging_all.append(np.hstack((robot_ts.reshape(-1, 1),robot_js)))
-			weld_logging_all.append(welding_data)
-			current_logging_all.append(current_data)
-			audio_logging_all.append(rr_sensors.audio_recording)
-			flir_logging_all.append(flir_logging)
-			flir_ts_logging_all.append(flir_ts)
-			slice_logging_all.append(slice_num)
+			# robot_ts=np.array(robot_ts)
+			# robot_ts=robot_ts-robot_ts[0]
+			# robot_js=np.array(robot_js)
+			# flir_ts=np.array(flir_ts)
+			# flir_ts=flir_ts-flir_ts[0]
+			# robot_logging_all.append(np.hstack((robot_ts.reshape(-1, 1),robot_js)))
+			# weld_logging_all.append(welding_data)
+			# current_logging_all.append(current_data)
+			# audio_logging_all.append(rr_sensors.audio_recording)
+			# flir_logging_all.append(flir_logging)
+			# flir_ts_logging_all.append(flir_ts)
+			# slice_logging_all.append(slice_num)
 
 			
 			####CONTROL PARAMETERS
-			feedrate_cmd-=20
-			vd_relative+=1
+			# feedrate_cmd-=20
+			vd_relative+=0.2
 			vd_relative=min(vd_max,vd_relative)
 			feedrate_cmd=max(feedrate_cmd,feedrate_min)
 			slice_num+=int(nominal_slice_increment)
