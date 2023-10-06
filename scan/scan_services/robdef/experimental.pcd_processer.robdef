@@ -1,0 +1,41 @@
+service experimental.pcd_noise_remover
+
+using com.robotraconteur.pointcloud.PointCloudf as PointCloud
+using com.robotraconteur.geometry.Point
+using com.robotraconteur.geometry.Transform
+
+struct NoiseRemoveCloudInput
+    field PointCloud input_cloud
+    field bool voxel_down_flag
+    field double voxel_size
+    field double crop_flag
+    field double[] min_bound
+    field double[] max_bound
+    field bool outlier_remove
+    field double nb_neighbors
+    field double std_ratio
+    field bool cluster_based_outlier_remove
+    field double cluster_neighbor
+    field double min_points
+end
+
+namedarray PositionNormal
+    field double x
+    field double y
+    field double z
+    field double nx
+    field double ny
+    field double nz
+end
+
+struct PathCloudInput
+    field PointCloud input_cloud
+    field PositionNormal[] path
+end
+
+object PCProcesser
+    pipe NoiseRemoveCloudInput input_noise_cloud [writeonly]
+    pipe PointCloud output_cloud [readonly]
+    pipe PathCloudInput input_path_cloud [writeonly]
+    pipe double[] height [readonly]
+end

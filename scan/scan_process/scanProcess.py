@@ -196,7 +196,6 @@ class ScanProcess():
         return pcd_combined
     
     def pcd_noise_remove(self,pcd_combined,voxel_down_flag=True,voxel_size=0.1,crop_flag=True,min_bound=(-50,-30,-10),max_bound=(50,30,50),\
-                         crop_path_flag=False,curve_relative=None,\
                          outlier_remove=True,nb_neighbors=40,std_ratio=0.5,cluster_based_outlier_remove=True,cluster_neighbor=0.75,min_points=50*4):
 
         # visualize_pcd([pcd_combined])
