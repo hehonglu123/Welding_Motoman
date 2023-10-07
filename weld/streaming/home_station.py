@@ -48,4 +48,5 @@ try:
     for i in range(20):
         SS.position_cmd(qd,time.time())
 except:
-    np.savetxt('streaming_debug.csv',np.vstack((ts_record,q_record,q_cmd)).T,delimiter=',')
+    # np.savetxt('streaming_debug.csv',np.vstack((ts_record,q_record,q_cmd)).T,delimiter=',')
+    print("streaming failed")

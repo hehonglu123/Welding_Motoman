@@ -38,24 +38,31 @@ with open(data_dir+'slicing.yml', 'r') as file:
 	slicing_meta = yaml.safe_load(file)
 recorded_dir='recorded_data/cup_ER316L/'
 
-waypoint_distance=5 	###waypoint separation
-layer_height_num=int(1.5/slicing_meta['line_resolution'])
-layer_width_num=int(4/slicing_meta['line_resolution'])
+
 
 
 robot=robot_obj('MA2010_A0',def_path='../config/MA2010_A0_robot_default_config.yml',tool_file_path='../config/torch.csv',\
 	pulse2deg_file_path='../config/MA2010_A0_pulse2deg_real.csv',d=15)
-positioner=positioner_obj('D500B',def_path='../config/D500B_robot_default_config.yml',tool_file_path='../config/positioner_tcp.csv',\
+positioner=positioner_obj('D500B',def_path='../config/D500B_robot_extended_config.yml',tool_file_path='../config/positioner_tcp.csv',\
 	pulse2deg_file_path='../config/D500B_pulse2deg_real.csv',base_transformation_file='../config/D500B_pose.csv')
 
 client=MotionProgramExecClient()
 ws=WeldSend(client)
 
+###set up control parameters
+job_offset=400 		###200 for Aluminum ER4043, 300 for Steel Alloy ER70S-6, 400 for Stainless Steel ER316L
+feedrate_cmd=150
+vd_relative=5
+waypoint_distance=5 	###waypoint separation
+layer_height_num=int(1.2/slicing_meta['line_resolution'])
+layer_width_num=int(4/slicing_meta['line_resolution'])
+
+
 ###########################################layer welding############################################
-num_layer_start=int(0*layer_height_num)	###modify layer num here
-num_layer_end=int(1*layer_height_num)
-q_prev=client.getJointAnglesDB(positioner.pulse2deg)
-# q_prev=np.array([9.53E-02,-2.71E+00])	###for motosim tests only
+num_layer_start=int(1*layer_height_num)	###modify layer num here
+num_layer_end=int(50*layer_height_num)
+# q_prev=client.getJointAnglesDB(positioner.pulse2deg)
+q_prev=np.array([9.53E-02,-2.71E+00])	###for motosim tests only
 
 if num_layer_start<=1*layer_height_num:
 	num_sections=len(glob.glob(data_dir+'curve_sliced_relative/slice0_*.csv'))
@@ -125,7 +132,7 @@ for layer in range(num_layer_start,num_layer_end,layer_height_num):
 			feedrate=[]
 			energy=[]
 
-		timestamp_robot,joint_recording,job_line,_=ws.weld_segment_dual(primitives,robot,positioner,q1_all,q2_all,v1_all,v2_all,cond_all=[200],arc=True)
+		timestamp_robot,joint_recording,job_line,_=ws.weld_segment_dual(primitives,robot,positioner,q1_all,q2_all,v1_all,v2_all,cond_all=[int(feedrate_cmd/10)+job_offset],arc=True)
 
 		if logging:
 			np.savetxt(local_recorded_dir +'welder_info.csv',
