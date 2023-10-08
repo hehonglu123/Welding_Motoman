@@ -251,6 +251,7 @@ def main():
 	lam_relative_all_slices=[]
 	lam_relative_dense_all_slices=[]
 	for i in range(0,slicing_meta['num_layers']-1):
+		print(i)
 		rob1_js_all_slices.append(np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(i)+'_0.csv',delimiter=','))
 		rob2_js_all_slices.append(np.loadtxt(data_dir+'curve_sliced_js/MA1440_js'+str(i)+'_0.csv',delimiter=','))
 		positioner_js_all_slices.append(np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(i)+'_0.csv',delimiter=','))

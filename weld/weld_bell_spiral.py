@@ -64,12 +64,12 @@ q_prev=client.getJointAnglesDB(positioner.pulse2deg)
 
 ###set up control parameters
 job_offset=200 		###200 for Aluminum ER4043, 300 for Steel Alloy ER70S-6, 400 for Stainless Steel ER316L
-nominal_feedrate=100
-nominal_vd_relative=3
+nominal_feedrate=150
+nominal_vd_relative=5
 nominal_wire_length=25 #pixels
 nominal_temp_below=500
 base_feedrate_cmd=300
-base_vd=5
+base_vd=8
 feedrate_cmd=nominal_feedrate
 vd_relative=nominal_vd_relative
 feedrate_gain=0.5
@@ -78,8 +78,8 @@ feedrate_max=300
 nominal_slice_increment=int(1.0/slicing_meta['line_resolution'])
 slice_inc_gain=3.
 vd_max=9
-feedrate_cmd_adjustment=-10
-vd_relative_adjustment=1
+feedrate_cmd_adjustment=-50
+vd_relative_adjustment=2
 
 # ###set up control parameters
 # job_offset=400 		###200 for Aluminum ER4043, 300 for Steel Alloy ER70S-6, 400 for Stainless Steel ER316L
@@ -170,9 +170,9 @@ positioner_js_all_slices=[]
 lam_relative_all_slices=[]
 lam_relative_dense_all_slices=[]
 for i in range(0,slicing_meta['num_layers']-1):
-	rob1_js_all_slices.append(np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(i)+'_0.csv',delimiter=','))
-	rob2_js_all_slices.append(np.loadtxt(data_dir+'curve_sliced_js/MA1440_js'+str(i)+'_0.csv',delimiter=','))
-	positioner_js_all_slices.append(np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(i)+'_0.csv',delimiter=','))
+	rob1_js_all_slices.append(np.flip(np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(i)+'_0.csv',delimiter=','),axis=0))
+	rob2_js_all_slices.append(np.flip(np.loadtxt(data_dir+'curve_sliced_js/MA1440_js'+str(i)+'_0.csv',delimiter=','),axis=0))
+	positioner_js_all_slices.append(np.flip(np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(i)+'_0.csv',delimiter=','),axis=0))
 	
 print("PRELOAD FINISHED")
 
@@ -234,8 +234,8 @@ for slice_num in range(num_layer_start,num_layer_end,nominal_slice_increment):
 		positioner_w=vd_relative/np.linalg.norm(curve_sliced_relative[breakpoints[j]][:2])
 		v2_all.append(min(100,100*positioner_w/positioner.joint_vel_limit[1]))
 	
-	feedrate_cmd-=10
-	vd_relative+=1
+	feedrate_cmd+=feedrate_cmd_adjustment
+	vd_relative+=vd_relative_adjustment
 	vd_relative=min(vd_max,vd_relative)
 	feedrate_cmd=max(feedrate_cmd,feedrate_min)
 	print('FEEDRATE: ',feedrate_cmd,'VD: ',vd_relative)
