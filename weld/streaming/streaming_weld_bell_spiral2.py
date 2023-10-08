@@ -122,44 +122,29 @@ def main():
 	SS=StreamingSend(RR_robot,RR_robot_state,RobotJointCommand,streaming_rate)
 
 
-	# ###set up control parameters for AL ER4043
-	# job_offset=200
-	# nominal_feedrate=170
-	# nominal_vd_relative=0.5
-	# nominal_wire_length=25 #pixels
-	# nominal_temp_below=500
-	# base_feedrate_cmd=300
-	# base_vd=10
-	# feedrate_cmd=nominal_feedrate
-	# vd_relative=nominal_vd_relative
-	# feedrate_gain=0.5
-	# feedrate_min=100
-	# feedrate_max=300
-	# nominal_slice_increment=int(1.8/slicing_meta['line_resolution'])
-	# slice_inc_gain=3.
-	# vd_max=10
-
-	###set up control parameters
-	job_offset=400 		###200 for Aluminum ER4043, 300 for Steel Alloy ER70S-6, 400 for Stainless Steel ER316L
-	nominal_feedrate=80
-	nominal_vd_relative=0.01
+	###set up control parameters for AL ER4043
+	job_offset=200
+	nominal_feedrate=250
+	nominal_vd_relative=0.1
 	nominal_wire_length=25 #pixels
 	nominal_temp_below=500
 	base_feedrate_cmd=300
-	base_vd=3
+	base_vd=5
 	feedrate_cmd=nominal_feedrate
 	vd_relative=nominal_vd_relative
 	feedrate_gain=0.5
-	feedrate_min=80
+	feedrate_min=100
 	feedrate_max=300
-	nominal_slice_increment=int(1.2/slicing_meta['line_resolution'])
+	nominal_slice_increment=int(1.35/slicing_meta['line_resolution'])
 	slice_inc_gain=3.
-	vd_max=8
+	vd_max=5
+	feedrate_cmd_adjustment=-20
+	vd_relative_adjustment=0.5
 
-	###set up control parameters
-	# job_offset=300 		###200 for Aluminum ER4043, 300 for Steel Alloy ER70S-6, 400 for Stainless Steel ER316L
-	# nominal_feedrate=150
-	# nominal_vd_relative=0.1
+	# ###set up control parameters
+	# job_offset=400 		###200 for Aluminum ER4043, 300 for Steel Alloy ER70S-6, 400 for Stainless Steel ER316L
+	# nominal_feedrate=80
+	# nominal_vd_relative=0.01
 	# nominal_wire_length=25 #pixels
 	# nominal_temp_below=500
 	# base_feedrate_cmd=300
@@ -167,11 +152,32 @@ def main():
 	# feedrate_cmd=nominal_feedrate
 	# vd_relative=nominal_vd_relative
 	# feedrate_gain=0.5
-	# feedrate_min=120
+	# feedrate_min=80
+	# feedrate_max=300
+	# nominal_slice_increment=int(1.2/slicing_meta['line_resolution'])
+	# slice_inc_gain=3.
+	# vd_max=8
+	# feedrate_cmd_adjustment=0
+	# vd_relative_adjustment=0.2
+
+	###set up control parameters
+	# job_offset=300 		###200 for Aluminum ER4043, 300 for Steel Alloy ER70S-6, 400 for Stainless Steel ER316L
+	# nominal_feedrate=250
+	# nominal_vd_relative=0.1
+	# nominal_wire_length=25 #pixels
+	# nominal_temp_below=500
+	# base_feedrate_cmd=300
+	# base_vd=5
+	# feedrate_cmd=nominal_feedrate
+	# vd_relative=nominal_vd_relative
+	# feedrate_gain=0.5
+	# feedrate_min=100
 	# feedrate_max=300
 	# nominal_slice_increment=int(1.3/slicing_meta['line_resolution'])
 	# slice_inc_gain=3.
 	# vd_max=5
+	# feedrate_cmd_adjustment=-20
+	# vd_relative_adjustment=0.5
 
 	##########################################SENSORS LOGGIGN########################################################
 	rr_sensors = WeldRRSensor(weld_service=fronius_sub,cam_service=None,microphone_service=microphone,current_service=current_sub)
@@ -367,8 +373,8 @@ def main():
 
 			
 			####CONTROL PARAMETERS
-			# feedrate_cmd-=20
-			vd_relative+=0.2
+			feedrate_cmd+=feedrate_cmd_adjustment
+			vd_relative+=vd_relative_adjustment
 			vd_relative=min(vd_max,vd_relative)
 			feedrate_cmd=max(feedrate_cmd,feedrate_min)
 			slice_num+=int(nominal_slice_increment)
