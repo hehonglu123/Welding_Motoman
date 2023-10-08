@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from scipy.signal import find_peaks, peak_widths
 
 # Step 1: Read CSV and get the 'current' column
-base_path = '../data/wall_weld_test/70S_model_120ipm_2023_09_23_21_27_03/layer_5/'
+base_path = '../data/wall_weld_test/316L_model_140ipm_2023_09_27_21_43_22/layer_3/'
 filename = 'current.csv'
 df = pd.read_csv(base_path + filename)
 currents = df['current'].values  # Assuming the title of the column is 'current'
@@ -30,7 +30,7 @@ extracted_df.to_csv(base_path + 'extracted_current.csv', index=False)
 # If you want to view or further process the extracted data, it is stored in 'extracted_data' variable
 
 # Find peaks
-slice_size = len(extracted_data) // 1300
+slice_size = len(extracted_data) // 40
 
 # Initialize a DataFrame to store the results
 results_df = pd.DataFrame()
