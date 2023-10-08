@@ -8,8 +8,8 @@ from WeldSend import *
 from RobotRaconteur.Client import *
 
 
-dataset='cup/'
-sliced_alg='circular_slice_shifted/'
+dataset='bell/'
+sliced_alg='circular_slice/'
 data_dir='../data/'+dataset+sliced_alg
 with open(data_dir+'slicing.yml', 'r') as file:
 	slicing_meta = yaml.safe_load(file)
@@ -39,7 +39,7 @@ vd_relative=nominal_vd_relative
 feedrate_gain=0.5
 feedrate_min=80
 feedrate_max=300
-nominal_slice_increment=int(1.23/slicing_meta['line_resolution'])
+nominal_slice_increment=int(1.2/slicing_meta['line_resolution'])
 slice_inc_gain=3.
 vd_max=10
 feedrate_cmd_adjustment=0

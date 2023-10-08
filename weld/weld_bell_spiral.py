@@ -32,7 +32,7 @@ recorded_dir='recorded_data/bell_ER316L/'
 
 waypoint_distance=5 	###waypoint separation
 layer_height_num=int(1.2/slicing_meta['line_resolution'])
-layer_width_num=int(2/slicing_meta['line_resolution'])
+layer_width_num=int(3/slicing_meta['line_resolution'])
 
 
 robot=robot_obj('MA2010_A0',def_path='../config/MA2010_A0_robot_default_config.yml',tool_file_path='../config/torch.csv',\
@@ -63,9 +63,28 @@ q_prev=client.getJointAnglesDB(positioner.pulse2deg)
 
 
 ###set up control parameters
-job_offset=200 		###200 for Aluminum ER4043, 300 for Steel Alloy ER70S-6, 400 for Stainless Steel ER316L
-nominal_feedrate=150
-nominal_vd_relative=5
+# job_offset=200 		###200 for Aluminum ER4043, 300 for Steel Alloy ER70S-6, 400 for Stainless Steel ER316L
+# nominal_feedrate=150
+# nominal_vd_relative=5
+# nominal_wire_length=25 #pixels
+# nominal_temp_below=500
+# base_feedrate_cmd=300
+# base_vd=8
+# feedrate_cmd=nominal_feedrate
+# vd_relative=nominal_vd_relative
+# feedrate_gain=0.5
+# feedrate_min=100
+# feedrate_max=300
+# nominal_slice_increment=int(1.0/slicing_meta['line_resolution'])
+# slice_inc_gain=3.
+# vd_max=9
+# feedrate_cmd_adjustment=-50
+# vd_relative_adjustment=2
+
+###set up control parameters
+job_offset=400 		###200 for Aluminum ER4043, 300 for Steel Alloy ER70S-6, 400 for Stainless Steel ER316L
+nominal_feedrate=80
+nominal_vd_relative=2
 nominal_wire_length=25 #pixels
 nominal_temp_below=500
 base_feedrate_cmd=300
@@ -73,32 +92,13 @@ base_vd=8
 feedrate_cmd=nominal_feedrate
 vd_relative=nominal_vd_relative
 feedrate_gain=0.5
-feedrate_min=100
+feedrate_min=80
 feedrate_max=300
-nominal_slice_increment=int(1.0/slicing_meta['line_resolution'])
+nominal_slice_increment=int(1.2/slicing_meta['line_resolution'])
 slice_inc_gain=3.
 vd_max=9
-feedrate_cmd_adjustment=-50
-vd_relative_adjustment=2
-
-# ###set up control parameters
-# job_offset=400 		###200 for Aluminum ER4043, 300 for Steel Alloy ER70S-6, 400 for Stainless Steel ER316L
-# nominal_feedrate=130
-# nominal_vd_relative=1
-# nominal_wire_length=25 #pixels
-# nominal_temp_below=500
-# base_feedrate_cmd=300
-# base_vd=5
-# feedrate_cmd=nominal_feedrate
-# vd_relative=nominal_vd_relative
-# feedrate_gain=0.5
-# feedrate_min=130
-# feedrate_max=300
-# nominal_slice_increment=int(1.2/slicing_meta['line_resolution'])
-# slice_inc_gain=3.
-# vd_max=10
-# feedrate_cmd_adjustment=-10
-# vd_relative_adjustment=1
+feedrate_cmd_adjustment=1
+vd_relative_adjustment=1
 
 ######################################################BASE LAYER##########################################################################################
 # slice_num=0
@@ -170,9 +170,12 @@ positioner_js_all_slices=[]
 lam_relative_all_slices=[]
 lam_relative_dense_all_slices=[]
 for i in range(0,slicing_meta['num_layers']-1):
-	rob1_js_all_slices.append(np.flip(np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(i)+'_0.csv',delimiter=','),axis=0))
-	rob2_js_all_slices.append(np.flip(np.loadtxt(data_dir+'curve_sliced_js/MA1440_js'+str(i)+'_0.csv',delimiter=','),axis=0))
-	positioner_js_all_slices.append(np.flip(np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(i)+'_0.csv',delimiter=','),axis=0))
+	rob1_js_all_slices.append(np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(i)+'_0.csv',delimiter=','))
+	rob2_js_all_slices.append(np.loadtxt(data_dir+'curve_sliced_js/MA1440_js'+str(i)+'_0.csv',delimiter=','))
+	positioner_js_all_slices.append(np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(i)+'_0.csv',delimiter=','))
+	# rob1_js_all_slices.append(np.flip(np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(i)+'_0.csv',delimiter=','),axis=0))
+	# rob2_js_all_slices.append(np.flip(np.loadtxt(data_dir+'curve_sliced_js/MA1440_js'+str(i)+'_0.csv',delimiter=','),axis=0))
+	# positioner_js_all_slices.append(np.flip(np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(i)+'_0.csv',delimiter=','),axis=0))
 	
 print("PRELOAD FINISHED")
 
