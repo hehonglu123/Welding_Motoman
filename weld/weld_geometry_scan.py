@@ -242,7 +242,7 @@ while True:
     forward=True if layer_count%2==0 else False
 
     ####### Load previous data if start from middle #######
-    if layer_count!=-1 and len(last_layer_curve_relative)==0:
+    if layer_count>=0 and len(last_layer_curve_relative)==0:
         read_layer=0 if layer<0 else layer
         
         if baselayer:
