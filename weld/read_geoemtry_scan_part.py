@@ -24,9 +24,9 @@ import glob
 import yaml
 from math import ceil,floor
 
-R1_ph_dataset_date='0801'
-R2_ph_dataset_date='0801'
-S1_ph_dataset_date='0801'
+R1_ph_dataset_date='0926'
+R2_ph_dataset_date='0926'
+S1_ph_dataset_date='0926'
 
 zero_config=np.zeros(6)
 # 0. robots.
@@ -53,38 +53,38 @@ robot_scan_base = robot_weld.T_base_basemarker.inv()*robot_scan.T_base_basemarke
 robot_scan.base_H = H_from_RT(robot_scan_base.R,robot_scan_base.p)
 positioner_base = robot_weld.T_base_basemarker.inv()*positioner.T_base_basemarker
 positioner.base_H = H_from_RT(positioner_base.R,positioner_base.p)
-# T_to_base = Transform(np.eye(3),[0,0,-380])
-# positioner.base_H = np.matmul(positioner.base_H,H_from_RT(T_to_base.R,T_to_base.p))
+T_to_base = Transform(np.eye(3),[0,0,-380])
+positioner.base_H = np.matmul(positioner.base_H,H_from_RT(T_to_base.R,T_to_base.p))
 # input(positioner.base_H)
 
-robot_weld.robot.P=deepcopy(robot_weld.calib_P)
-robot_weld.robot.H=deepcopy(robot_weld.calib_H)
-robot_scan.robot.P=deepcopy(robot_scan.calib_P)
-robot_scan.robot.H=deepcopy(robot_scan.calib_H)
-positioner.robot.P=deepcopy(positioner.calib_P)
-positioner.robot.H=deepcopy(positioner.calib_H)
+# robot_weld.robot.P=deepcopy(robot_weld.calib_P)
+# robot_weld.robot.H=deepcopy(robot_weld.calib_H)
+# robot_scan.robot.P=deepcopy(robot_scan.calib_P)
+# robot_scan.robot.H=deepcopy(robot_scan.calib_H)
+# positioner.robot.P=deepcopy(positioner.calib_P)
+# positioner.robot.H=deepcopy(positioner.calib_H)
 
 #### load R1 kinematic model
-PH_data_dir='../mocap/PH_grad_data/test'+R1_ph_dataset_date+'_R1/train_data_'
-with open(PH_data_dir+'calib_PH_q.pickle','rb') as file:
-    PH_q=pickle.load(file)
-nom_P=np.array([[0,0,0],[150,0,0],[0,0,760],\
-                   [1082,0,200],[0,0,0],[0,0,0],[100,0,0]]).T
-nom_H=np.array([[0,0,1],[0,1,0],[0,-1,0],\
-                [-1,0,0],[0,-1,0],[-1,0,0]]).T
-ph_param_r1=PH_Param(nom_P,nom_H)
-ph_param_r1.fit(PH_q,method='FBF')
+# PH_data_dir='../mocap/PH_grad_data/test'+R1_ph_dataset_date+'_R1/train_data_'
+# with open(PH_data_dir+'calib_PH_q.pickle','rb') as file:
+#     PH_q=pickle.load(file)
+# nom_P=np.array([[0,0,0],[150,0,0],[0,0,760],\
+#                    [1082,0,200],[0,0,0],[0,0,0],[100,0,0]]).T
+# nom_H=np.array([[0,0,1],[0,1,0],[0,-1,0],\
+#                 [-1,0,0],[0,-1,0],[-1,0,0]]).T
+# ph_param_r1=PH_Param(nom_P,nom_H)
+# ph_param_r1.fit(PH_q,method='FBF')
 ph_param_r1=None
 #### load R2 kinematic model
-PH_data_dir='../mocap/PH_grad_data/test'+R2_ph_dataset_date+'_R2/train_data_'
-with open(PH_data_dir+'calib_PH_q.pickle','rb') as file:
-    PH_q=pickle.load(file)
-nom_P=np.array([[0,0,0],[155,0,0],[0,0,614],\
-                   [640,0,200],[0,0,0],[0,0,0],[100,0,0]]).T
-nom_H=np.array([[0,0,1],[0,1,0],[0,-1,0],\
-                [-1,0,0],[0,-1,0],[-1,0,0]]).T
-ph_param_r2=PH_Param(nom_P,nom_H)
-ph_param_r2.fit(PH_q,method='FBF')
+# PH_data_dir='../mocap/PH_grad_data/test'+R2_ph_dataset_date+'_R2/train_data_'
+# with open(PH_data_dir+'calib_PH_q.pickle','rb') as file:
+#     PH_q=pickle.load(file)
+# nom_P=np.array([[0,0,0],[155,0,0],[0,0,614],\
+#                    [640,0,200],[0,0,0],[0,0,0],[100,0,0]]).T
+# nom_H=np.array([[0,0,1],[0,1,0],[0,-1,0],\
+#                 [-1,0,0],[0,-1,0],[-1,0,0]]).T
+# ph_param_r2=PH_Param(nom_P,nom_H)
+# ph_param_r2.fit(PH_q,method='FBF')
 ph_param_r2=None
 
 #### data directory
@@ -122,14 +122,28 @@ ph_param_r2=None
 # layer=0
 # x=0
 
-dataset='circle_large/'
-sliced_alg='static_stepwise_split/'
+# dataset='circle_large/'
+# sliced_alg='static_stepwise_split/'
+# curve_data_dir = '../data/'+dataset+sliced_alg
+# data_dir=curve_data_dir+'weld_scan_2023_09_12_17_58_14'+'/'
+# baselayer=False
+# last_layer=153
+# layer=176
+# x=0
+
+dataset='blade0.1/'
+sliced_alg='auto_slice/'
 curve_data_dir = '../data/'+dataset+sliced_alg
-data_dir=curve_data_dir+'weld_scan_2023_09_12_17_58_14'+'/'
+data_dir=curve_data_dir+'weld_scan_2023_10_09_16_01_52'+'/'
 baselayer=False
-last_layer=153
-layer=176
+last_layer=1
+layer=0
 x=0
+
+Transz0_H=np.array([[ 9.99964994e-01, -4.94535500e-05, -8.36709340e-03,  8.57506654e-04],
+ [-4.94535500e-05,  9.99930136e-01, -1.18203430e-02,  1.21141504e-03],
+ [ 8.36709340e-03,  1.18203430e-02,  9.99895130e-01, -1.02474860e-01],
+ [ 0.00000000e+00,  0.00000000e+00,  0.00000000e+00,  1.00000000e+00]])
 
 use_actual = False
 regen_pcd = True
@@ -200,24 +214,27 @@ else:
 visualize_pcd([pcd])
 
 # last pcd
-if regen_pcd:
-    with open(last_out_scan_dir+'mti_scans.pickle', 'rb') as file:
-        mti_recording=pickle.load(file)
-    q_out_exe=np.loadtxt(last_out_scan_dir+'scan_js_exe.csv',delimiter=',')
-    robot_stamps=np.loadtxt(last_out_scan_dir+'scan_robot_stamps.csv',delimiter=',')
-    #### scanning process: processing point cloud and get h
-    curve_sliced_relative=np.array(curve_sliced_relative)
-    crop_extend=15
-    crop_min=tuple(np.min(curve_sliced_relative[:,:3],axis=0)-crop_extend)
-    crop_max=tuple(np.max(curve_sliced_relative[:,:3],axis=0)+crop_extend)
-    last_pcd = scan_process.pcd_register_mti(mti_recording,q_out_exe,robot_stamps,use_calib=True,ph_param=ph_param_r2)
-    # pcd = scan_process.pcd_register_mti(mti_recording,q_out_exe,robot_stamps,use_calib=False)
-    # visualize_pcd([last_pcd])
-    last_pcd = scan_process.pcd_noise_remove(last_pcd,nb_neighbors=40,std_ratio=1.5,\
-                                        min_bound=crop_min,max_bound=crop_max,outlier_remove=True,cluster_based_outlier_remove=True,cluster_neighbor=1,min_points=300)
-else:
-    last_pcd=o3d.io.read_point_cloud(last_out_scan_dir+'processed_pcd.pcd')
+# if regen_pcd:
+#     with open(last_out_scan_dir+'mti_scans.pickle', 'rb') as file:
+#         mti_recording=pickle.load(file)
+#     q_out_exe=np.loadtxt(last_out_scan_dir+'scan_js_exe.csv',delimiter=',')
+#     robot_stamps=np.loadtxt(last_out_scan_dir+'scan_robot_stamps.csv',delimiter=',')
+#     #### scanning process: processing point cloud and get h
+#     curve_sliced_relative=np.array(curve_sliced_relative)
+#     crop_extend=15
+#     crop_min=tuple(np.min(curve_sliced_relative[:,:3],axis=0)-crop_extend)
+#     crop_max=tuple(np.max(curve_sliced_relative[:,:3],axis=0)+crop_extend)
+#     last_pcd = scan_process.pcd_register_mti(mti_recording,q_out_exe,robot_stamps,use_calib=True,ph_param=ph_param_r2)
+#     # pcd = scan_process.pcd_register_mti(mti_recording,q_out_exe,robot_stamps,use_calib=False)
+#     # visualize_pcd([last_pcd])
+#     last_pcd = scan_process.pcd_noise_remove(last_pcd,nb_neighbors=40,std_ratio=1.5,\
+#                                         min_bound=crop_min,max_bound=crop_max,outlier_remove=True,cluster_based_outlier_remove=True,cluster_neighbor=1,min_points=300)
+# else:
+#     last_pcd=o3d.io.read_point_cloud(last_out_scan_dir+'processed_pcd.pcd')
 # visualize_pcd([last_pcd])
+
+pcd,Transz0_H = scan_process.pcd_calib_z(pcd,Transz0_H=Transz0_H)
+print("Transz0_H:",Transz0_H)
 
 if use_actual:
     profile_height = scan_process.pcd2dh(pcd,last_pcd,curve_sliced_relative,drawing=True)
