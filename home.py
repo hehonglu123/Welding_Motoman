@@ -30,5 +30,5 @@ mp.MoveJ(q2,5,0)
 robot_client.execute_motion_program(mp)
 
 mp = MotionProgram(ROBOT_CHOICE='ST1', pulse2deg=positioner.pulse2deg)
-mp.MoveJ(q3,90,0)
+mp.MoveJ(q3,40,0)
 robot_client.execute_motion_program(mp)

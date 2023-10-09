@@ -67,33 +67,33 @@ T_to_base = Transform(np.eye(3),[0,0,-380])
 positioner.base_H = np.matmul(positioner.base_H,H_from_RT(T_to_base.R,T_to_base.p))
 # exit()
 
-#### load R1 kinematic model
-PH_data_dir='../mocap/PH_grad_data/test'+R1_ph_dataset_date+'_R1/train_data_'
-with open(PH_data_dir+'calib_PH_q.pickle','rb') as file:
-    PH_q=pickle.load(file)
 r1_nom_P=np.array([[0,0,0],[150,0,0],[0,0,760],\
                    [1082,0,200],[0,0,0],[0,0,0],[100,0,0]]).T
 r1_nom_H=np.array([[0,0,1],[0,1,0],[0,-1,0],\
                 [-1,0,0],[0,-1,0],[-1,0,0]]).T
-ph_param_r1=PH_Param(r1_nom_P,r1_nom_H)
-ph_param_r1.fit(PH_q,method='FBF')
-ph_param_r1=None
-#### load R2 kinematic model
-PH_data_dir='../mocap/PH_grad_data/test'+R2_ph_dataset_date+'_R2/train_data_'
-with open(PH_data_dir+'calib_PH_q.pickle','rb') as file:
-    PH_q=pickle.load(file)
 r2_nom_P=np.array([[0,0,0],[155,0,0],[0,0,614],\
                    [640,0,200],[0,0,0],[0,0,0],[100,0,0]]).T
 r2_nom_H=np.array([[0,0,1],[0,1,0],[0,-1,0],\
                 [-1,0,0],[0,-1,0],[-1,0,0]]).T
-ph_param_r2=PH_Param(r2_nom_P,r2_nom_H)
-ph_param_r2.fit(PH_q,method='FBF')
+#### load R1 kinematic model
+# PH_data_dir='../mocap/PH_grad_data/test'+R1_ph_dataset_date+'_R1/train_data_'
+# with open(PH_data_dir+'calib_PH_q.pickle','rb') as file:
+#     PH_q=pickle.load(file)
+# ph_param_r1=PH_Param(r1_nom_P,r1_nom_H)
+# ph_param_r1.fit(PH_q,method='FBF')
+ph_param_r1=None
+#### load R2 kinematic model
+# PH_data_dir='../mocap/PH_grad_data/test'+R2_ph_dataset_date+'_R2/train_data_'
+# with open(PH_data_dir+'calib_PH_q.pickle','rb') as file:
+#     PH_q=pickle.load(file)
+# ph_param_r2=PH_Param(r2_nom_P,r2_nom_H)
+# ph_param_r2.fit(PH_q,method='FBF')
 ph_param_r2=None
 # robot_scan.robot.P=deepcopy(robot_scan.calib_P)
 # robot_scan.robot.H=deepcopy(robot_scan.calib_H)
 # robot_weld.robot.P=deepcopy(robot_weld.calib_P)
 # robot_weld.robot.H=deepcopy(robot_weld.calib_H)
-#### load S1 kinematic model
+# ### load S1 kinematic model
 # positioner.robot.P=deepcopy(positioner.calib_P)
 # positioner.robot.H=deepcopy(positioner.calib_H)
 
@@ -111,8 +111,8 @@ formatted_time = current_time.strftime('%Y_%m_%d_%H_%M_%S.%f')[:-7]
 
 data_date = input("Use old data directory? (Enter or put time e.g. 2023_07_11_16_25_30): ")
 if data_date == '':
-    data_dir=curve_data_dir+'weld_scan_'+formatted_time+'/'
-    # data_dir=curve_data_dir+'weld_scan_2023_09_19_18_03_53/'
+    # data_dir=curve_data_dir+'weld_scan_'+formatted_time+'/'
+    data_dir=curve_data_dir+'weld_scan_2023_10_09_16_01_52/'
 else:
     data_dir=curve_data_dir+'weld_scan_'+data_date+'/'
 print("Use data directory:",data_dir)
@@ -126,7 +126,7 @@ total_baselayer = slicing_meta['num_baselayers']
 
 ## weldind parameters
 weld_mode=100
-des_job=200
+des_job=210
 
 des_dh = 2.3420716473455623
 des_v = round(dh2v_loglog(des_dh,weld_mode),1)
@@ -166,7 +166,7 @@ robot_client=MotionProgramExecClient()
 ws=WeldSend(robot_client)
 # weld state logging
 weld_ser = RRN.SubscribeService('rr+tcp://192.168.55.10:60823?service=welder')
-mic_ser = RRN.ConnectService('rr+tcp://192.168.55.20:60828?service=microphone')
+# mic_ser = RRN.ConnectService('rr+tcp://192.168.55.10:60828?service=microphone')
 ## RR sensor objects
 rr_sensors = WeldRRSensor(weld_service=weld_ser)
 # MTI connect to RR
@@ -176,16 +176,18 @@ mti_sub.ClientConnectFailed += connect_failed
 mti_client=mti_sub.GetDefaultClientWait(1)
 mti_client.setExposureTime("25")
 ###################################
-start_feedback=3
+start_feedback=3 # with correction
 ### preplanned v,height for first few layer
 planned_layer=999
 ## 300 260 250 240 ... 100
 # planned_v=np.ones(planned_layer)*8
 planned_v=np.array([8,8,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5])
-# planned_job=np.ones(planned_layer)*215
+planned_v=np.append(planned_v,np.ones(planned_layer)*5)
+planned_v=planned_v.astype(int)
+
 # base ipm: 250
-planned_job=np.array([225,225,200,200,200,200,200,200,200,200,200,200,200,200,200])
-planned_job=np.append(planned_job,np.ones(planned_layer)*200)
+planned_job=np.array([225,225,210,210,210,210,210,210,210,210,210,210,210,210,210])
+planned_job=np.append(planned_job,np.ones(planned_layer)*210)
 planned_job=planned_job.astype(int)
 
 print_min_dh = 0.5 # mm
@@ -196,21 +198,21 @@ save_output_points=True
 last_layer_curve_relative = []
 last_layer_curve_height = []
 
-layer=-1
-last_layer=-1
-layer_count=-1
-start_weld_layer=0
+# layer=-1
+# last_layer=-1
+# layer_count=-1
+# start_weld_layer=0
 
-# layer=442
-# last_layer=419
-# layer_count=19
-# start_weld_layer=466
+layer=491
+last_layer=468
+layer_count=25
+start_weld_layer=492
 
-Transz0_H=None
-# Transz0_H=np.array([[ 1.00000000e+00, -3.44596496e-09,  1.06792503e-05, -2.89186618e-05],
-#  [-3.44596496e-09,  9.99999792e-01,  6.45357024e-04, -1.74758162e-03],
-#  [-1.06792503e-05, -6.45357024e-04,  9.99999792e-01, -2.70792939e+00],
-#  [ 0.00000000e+00,  0.00000000e+00,  0.00000000e+00,  1.00000000e+00]])
+# Transz0_H=None
+Transz0_H=np.array([[ 9.99977849e-01, -4.63425601e-05, -6.65580373e-03,  5.00206395e-03],
+ [-4.63425601e-05,  9.99903047e-01, -1.39246294e-02,  1.04648348e-02],
+ [ 6.65580373e-03,  1.39246294e-02,  9.99880895e-01, -7.51444661e-01],
+ [ 0.00000000e+00,  0.00000000e+00,  0.00000000e+00,  1.00000000e+00]])
 
 # try:
 #     layer_count=len(glob.glob(data_dir+'layer_*_0'))+1
@@ -218,10 +220,11 @@ Transz0_H=None
 #     pass
 
 manual_dh=False
-correction=True
-recal_dh=True
+correction=False
+recal_dh=False
 
 start_shift=False # if true then always add odd layers
+draw_dh=False
 
 print("Planned V (first 10):",planned_v[:10])
 print("Planned Job (first 10):",planned_job[:10])
@@ -256,7 +259,10 @@ while True:
             if baselayer:
                 last_scan_dir=data_dir+'baselayer_'+str(read_layer)+'_'+str(x)+'/scans/'
             else:
-                last_scan_dir=data_dir+'layer_'+str(read_layer)+'_'+str(x)+'/scans/'
+                if layer_count==total_baselayer:
+                    last_scan_dir=data_dir+'baselayer_'+str(total_baselayer-1)+'_'+str(x)+'/scans/'
+                else:
+                    last_scan_dir=data_dir+'layer_'+str(read_layer)+'_'+str(x)+'/scans/'
                 
             # load previous curve
             last_layer_curve_relative.extend(np.loadtxt(curve_data_dir+'curve_sliced_relative/slice'+str(read_layer)+'_'+str(x)+'.csv',delimiter=','))
@@ -272,7 +278,7 @@ while True:
         # load previous height
         # if layer!=-1:
         #     layer_curve_dh = np.load(data_dir+'layer_'+str(read_layer)+'_0/scans/'+'height_profile.npy')
-        visualize_pcd([last_pcd_layer])
+        # visualize_pcd([last_pcd_layer])
     
     ####### Decide which layer to print #######
     if baselayer:
@@ -299,7 +305,8 @@ while True:
             else:
                 print("enforce odd dlayer")
                 dlayer = int(np.ceil(mean_layer_dh/line_resolution/2)*2-1) # enforce a odd dlayer for shift
-            dlayer = max(9,dlayer)
+            dlayer = max(15,dlayer)
+            dlayer = min(35,dlayer)
             last_layer=layer
             layer = layer+dlayer # update layer
             print("Last Mean dh:",mean_layer_dh)
@@ -334,7 +341,7 @@ while True:
         
     #### welding
     start_section=0
-    if layer>=start_weld_layer and not baselayer:
+    if layer>=start_weld_layer:
         for x in range(start_section,num_sections):
             print("Print Layer",layer,"Sec.",x)
 
@@ -378,7 +385,7 @@ while True:
                     layer_curve_dh = profile_dh
                     last_layer_curve_relative=deepcopy(curve_sliced_relative)
 
-                layer_curve_dh=np.roll(layer_curve_dh,4)
+                # layer_curve_dh=np.roll(layer_curve_dh,4)
 
                 #### correction strategy
                 this_weld_v,all_dh=\
@@ -391,20 +398,20 @@ while True:
                 print("Corrected V:",this_weld_v)
                 print(len(curve_sliced_relative))
 
-                fig, ax1 = plt.subplots()
-                ax2 = ax1.twinx()
-                ax1.scatter(lam_relative[breakpoints],all_dh,c='blue',label='Height Layer '+str(layer))
-                for bp_i in range(len(breakpoints)-1):
-                    ax2.plot([lam_relative[breakpoints[bp_i]],lam_relative[breakpoints[bp_i+1]]],[this_weld_v[bp_i],this_weld_v[bp_i]],'-o')
-                ax1.set_xlabel('X-axis (Lambda) (mm)')
-                ax1.set_ylabel('dH (mm)', color='g')
-                ax2.set_ylabel('Speed (mm/sec)', color='b')
-                ax1.legend(loc=0)
-                ax2.legend(loc=0)
-                plt.title("dH and Speed, 40 MoveL")
-                plt.legend()
-                plt.ion()
-                plt.show(block=False)
+                # fig, ax1 = plt.subplots()
+                # ax2 = ax1.twinx()
+                # ax1.scatter(lam_relative[breakpoints],all_dh,c='blue',label='Height Layer '+str(layer))
+                # for bp_i in range(len(breakpoints)-1):
+                #     ax2.plot([lam_relative[breakpoints[bp_i]],lam_relative[breakpoints[bp_i+1]]],[this_weld_v[bp_i],this_weld_v[bp_i]],'-o')
+                # ax1.set_xlabel('X-axis (Lambda) (mm)')
+                # ax1.set_ylabel('dH (mm)', color='g')
+                # ax2.set_ylabel('Speed (mm/sec)', color='b')
+                # ax1.legend(loc=0)
+                # ax2.legend(loc=0)
+                # plt.title("dH and Speed, 40 MoveL")
+                # plt.legend()
+                # plt.ion()
+                # plt.show(block=False)
 
                 # plt.scatter(all_profile_height[:,0],all_profile_height[:,1],c='blue')
                 # for bp_i in range(len(breakpoints)-1):
@@ -426,11 +433,14 @@ while True:
             # if num_sections!=num_sections_prev:
             waypoint_pose=robot_weld.fwd(curve_sliced_js[breakpoints[0]])
             waypoint_pose.p[-1]+=50
-            robot_weld.robot.P=deepcopy(r1_nom_P)
-            robot_weld.robot.H=deepcopy(r1_nom_H)
-            q1=robot_weld.inv(waypoint_pose.p,waypoint_pose.R,curve_sliced_js[breakpoints[0]])[0]
-            robot_weld.robot.P=deepcopy(robot_weld.calib_P)
-            robot_weld.robot.H=deepcopy(robot_weld.calib_H)
+            try:
+                q1=robot_weld.inv(waypoint_pose.p,waypoint_pose.R,curve_sliced_js[breakpoints[0]])[0]
+            except: # if use calib PH
+                robot_weld.robot.P=deepcopy(r1_nom_P)
+                robot_weld.robot.H=deepcopy(r1_nom_H)
+                q1=robot_weld.inv(waypoint_pose.p,waypoint_pose.R,curve_sliced_js[breakpoints[0]])[0]
+                robot_weld.robot.P=deepcopy(robot_weld.calib_P)
+                robot_weld.robot.H=deepcopy(robot_weld.calib_H)
             q2=positioner_js[breakpoints[0]]
 
             if go_weld:
@@ -520,9 +530,9 @@ while True:
             num_points_layer=max(2,int(lam_relative[-1]/scan_waypoint_distance))
             ## using forward/backward technique
             if forward:
-                breakpoints=np.linspace(0,len(curve_sliced_js)-1,num=num_points_layer).astype(int)
+                breakpoints=np.linspace(0,len(lam_relative)-1,num=num_points_layer).astype(int)
             else:
-                breakpoints=np.linspace(len(curve_sliced_js)-1,0,num=num_points_layer).astype(int)
+                breakpoints=np.linspace(len(lam_relative)-1,0,num=num_points_layer).astype(int)
             
             ###find which end to start depending on how close to the current positioner pose
             q_prev=ws.client.getJointAnglesDB(positioner.pulse2deg)
@@ -640,7 +650,8 @@ while True:
             while True:
                 pcd_new = scan_process.pcd_noise_remove(pcd,nb_neighbors=40,std_ratio=1.5,\
                                                     min_bound=crop_min,max_bound=crop_max,outlier_remove=True,cluster_based_outlier_remove=True,cluster_neighbor=1,min_points=cluser_minp)
-                visualize_pcd([pcd_new])
+                # visualize_pcd([pcd_new])
+                break
                 while True:
                     q=input("Continue?")
                     if q=='':
@@ -661,7 +672,7 @@ while True:
             # record dh and curve relative
             if layer!=-1:
                 # profile_dh = scan_process.pcd2dh(pcd,last_pcd_layer,curve_sliced_relative,robot_weld,rob_js_plan,ph_param=ph_param_r1,drawing=True)
-                profile_dh = scan_process.pcd2dh(pcd,curve_sliced_relative,drawing=True)
+                profile_dh = scan_process.pcd2dh(pcd,curve_sliced_relative,drawing=draw_dh)
             
                 if len(layer_curve_dh)!=0:
                     profile_dh[:,0]=profile_dh[:,0]+layer_curve_dh[-1][0]
@@ -678,19 +689,19 @@ while True:
         # update
         last_pcd_layer=deepcopy(pcd_layer)
         last_layer_curve_relative=np.array(layer_curve_relative)
-
-        curve_i=0
         layer_curve_dh=np.array(layer_curve_dh)
-        total_curve_i = len(layer_curve_dh)
-        ax = plt.figure().add_subplot()
-        for curve_i in range(total_curve_i):
-            color_dist = plt.get_cmap("rainbow")(float(curve_i)/total_curve_i)
-            ax.scatter(layer_curve_dh[curve_i,0],layer_curve_dh[curve_i,1],c=color_dist)
-        ax.set_xlabel('Lambda')
-        ax.set_ylabel('dh to Layer N (mm)')
-        ax.set_title("dH Profile")
-        plt.ion()
-        plt.show(block=False)
+
+        # curve_i=0
+        # total_curve_i = len(layer_curve_dh)
+        # ax = plt.figure().add_subplot()
+        # for curve_i in range(total_curve_i):
+        #     color_dist = plt.get_cmap("rainbow")(float(curve_i)/total_curve_i)
+        #     ax.scatter(layer_curve_dh[curve_i,0],layer_curve_dh[curve_i,1],c=color_dist)
+        # ax.set_xlabel('Lambda')
+        # ax.set_ylabel('dh to Layer N (mm)')
+        # ax.set_title("dH Profile")
+        # plt.ion()
+        # plt.show(block=False)
         
         # curve_i=0
         # total_curve_i = len(layer_curve_height)
