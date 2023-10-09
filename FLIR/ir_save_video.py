@@ -12,46 +12,60 @@ image_consts = None
 
 def main():
     cv2.namedWindow("IR Recording", cv2.WINDOW_NORMAL)
-    cmap = cv2.COLORMAP_INFERNO
 
-    now=time.time()
-    url='rr+tcp://192.168.55.10:60827/?service=camera'
+    url = 'rr+tcp://192.168.55.10:60827/?service=camera'
 
-    c1=RRN.ConnectService(url)
+    c1 = RRN.ConnectService(url)
 
-    global image_consts, ts
-    ts=0
+    c1.setf_param("focus_pos", RR.VarValue(int(1600),"int32"))
+    c1.setf_param("object_distance", RR.VarValue(0.4,"double"))
+    c1.setf_param("reflected_temperature", RR.VarValue(291.15,"double"))
+    c1.setf_param("atmospheric_temperature", RR.VarValue(293.15,"double"))
+    c1.setf_param("relative_humidity", RR.VarValue(50,"double"))
+    c1.setf_param("ext_optics_temperature", RR.VarValue(293.15,"double"))
+    c1.setf_param("ext_optics_transmission", RR.VarValue(0.99,"double"))
+    c1.setf_param("current_case", RR.VarValue(2,"int32"))
+    c1.setf_param("ir_format", RR.VarValue("radiometric","string"))
+    c1.setf_param("object_emissivity", RR.VarValue(0.13,"double"))
+    c1.setf_param("scale_limit_low", RR.VarValue(293.15,"double"))
+    c1.setf_param("scale_limit_upper", RR.VarValue(5000,"double"))
+
+    global image_consts, ts, current_mat
+    ts = 0
     image_consts = RRN.GetConstants('com.robotraconteur.image', c1)
 
-    p=c1.frame_stream.Connect(-1)
+    p = c1.frame_stream.Connect(-1)
 
-    #Set the callback for when a new pipe packet is received to the
-    #new_frame function
-    p.PacketReceivedEvent+=new_frame
+    p.PacketReceivedEvent += new_frame
     try:
         c1.start_streaming()
-    except: pass
-
+    except:
+        pass
 
     fig = plt.figure(1)
-    
+
+    # Initializing the VideoWriter
+    fourcc = cv2.VideoWriter_fourcc(*'XVID')
+    out = cv2.VideoWriter('output.avi', fourcc, 20.0, (640, 480))  # Adjust frame size if necessary
+
     try:
         while True:
             if current_mat is not None:
-                # print(c1.getf_param('focus_pos').data[0])
-                # print(1/(time.time()-now))
-                # now=time.time()
                 ir_normalized = ((current_mat - np.min(current_mat)) / (np.max(current_mat) - np.min(current_mat))) * 255
                 ir_bgr = cv2.applyColorMap(ir_normalized.astype(np.uint8), cv2.COLORMAP_INFERNO)
-                cv2.imshow("IR Recording", cv2.rotate(ir_bgr,cv2.ROTATE_90_CLOCKWISE))
-                if cv2.waitKey(1) == 27: 
+                cv2.imshow("IR Recording", cv2.rotate(ir_bgr, cv2.ROTATE_90_CLOCKWISE))
+                # Write frame to video file
+                out.write(cv2.rotate(ir_bgr, cv2.ROTATE_90_CLOCKWISE))
+                if cv2.waitKey(1) == 27:
                     break  # esc to quit
     finally:
         try:
             p.Close()
             cv2.destroyAllWindows()
+            out.release()
+        except:
+            pass
 
-        except: pass
 
 
 current_mat = None
