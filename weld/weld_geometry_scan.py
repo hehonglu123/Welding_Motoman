@@ -34,9 +34,9 @@ def connect_failed(s, client_id, url, err):
     mti_sub=RRN.SubscribeService(url)
     mti_client=mti_sub.GetDefaultClientWait(1)
 
-R1_ph_dataset_date='0801'
-R2_ph_dataset_date='0801'
-S1_ph_dataset_date='0801'
+R1_ph_dataset_date='0926'
+R2_ph_dataset_date='0926'
+S1_ph_dataset_date='0926'
 
 zero_config=np.zeros(6)
 # 0. robots.
@@ -63,8 +63,8 @@ robot_scan_base = robot_weld.T_base_basemarker.inv()*robot_scan.T_base_basemarke
 robot_scan.base_H = H_from_RT(robot_scan_base.R,robot_scan_base.p)
 positioner_base = robot_weld.T_base_basemarker.inv()*positioner.T_base_basemarker
 positioner.base_H = H_from_RT(positioner_base.R,positioner_base.p)
-# T_to_base = Transform(np.eye(3),[0,0,-380])
-# positioner.base_H = np.matmul(positioner.base_H,H_from_RT(T_to_base.R,T_to_base.p))
+T_to_base = Transform(np.eye(3),[0,0,-380])
+positioner.base_H = np.matmul(positioner.base_H,H_from_RT(T_to_base.R,T_to_base.p))
 # exit()
 
 #### load R1 kinematic model
@@ -89,21 +89,21 @@ r2_nom_H=np.array([[0,0,1],[0,1,0],[0,-1,0],\
 ph_param_r2=PH_Param(r2_nom_P,r2_nom_H)
 ph_param_r2.fit(PH_q,method='FBF')
 ph_param_r2=None
-robot_scan.robot.P=deepcopy(robot_scan.calib_P)
-robot_scan.robot.H=deepcopy(robot_scan.calib_H)
-robot_weld.robot.P=deepcopy(robot_weld.calib_P)
-robot_weld.robot.H=deepcopy(robot_weld.calib_H)
+# robot_scan.robot.P=deepcopy(robot_scan.calib_P)
+# robot_scan.robot.H=deepcopy(robot_scan.calib_H)
+# robot_weld.robot.P=deepcopy(robot_weld.calib_P)
+# robot_weld.robot.H=deepcopy(robot_weld.calib_H)
 #### load S1 kinematic model
-positioner.robot.P=deepcopy(positioner.calib_P)
-positioner.robot.H=deepcopy(positioner.calib_H)
+# positioner.robot.P=deepcopy(positioner.calib_P)
+# positioner.robot.H=deepcopy(positioner.calib_H)
 
 #### data directory
 # dataset='cup/'
 # sliced_alg='circular_slice_shifted/'
-# dataset='blade0.1/'
-# sliced_alg='auto_slice/'
-dataset='circle_large/'
-sliced_alg='static_stepwise_zero/'
+dataset='blade0.1/'
+sliced_alg='auto_slice/'
+# dataset='circle_large/'
+# sliced_alg='static_stepwise_zero/'
 curve_data_dir = '../data/'+dataset+sliced_alg
 
 current_time = datetime.datetime.now()
@@ -111,8 +111,8 @@ formatted_time = current_time.strftime('%Y_%m_%d_%H_%M_%S.%f')[:-7]
 
 data_date = input("Use old data directory? (Enter or put time e.g. 2023_07_11_16_25_30): ")
 if data_date == '':
-    # data_dir=curve_data_dir+'weld_scan_'+formatted_time+'/'
-    data_dir=curve_data_dir+'weld_scan_2023_09_19_18_03_53/'
+    data_dir=curve_data_dir+'weld_scan_'+formatted_time+'/'
+    # data_dir=curve_data_dir+'weld_scan_2023_09_19_18_03_53/'
 else:
     data_dir=curve_data_dir+'weld_scan_'+data_date+'/'
 print("Use data directory:",data_dir)
@@ -134,7 +134,7 @@ print("The Desired speed (according to desired h",des_dh,"will be",\
       des_v,"mm/sec")
 des_dw = 4
 waypoint_distance=1.625 	###waypoint separation (calculate from 40moveL/95mm, where we did the test)
-waypoint_distance=1
+# waypoint_distance=1
 layer_height_num=int(des_dh/line_resolution) # preplanned
 layer_width_num=int(des_dw/line_resolution) # preplanned
 
@@ -176,7 +176,7 @@ mti_sub.ClientConnectFailed += connect_failed
 mti_client=mti_sub.GetDefaultClientWait(1)
 mti_client.setExposureTime("25")
 ###################################
-start_feedback=2
+start_feedback=3
 ### preplanned v,height for first few layer
 planned_layer=999
 ## 300 260 250 240 ... 100
@@ -196,25 +196,21 @@ save_output_points=True
 last_layer_curve_relative = []
 last_layer_curve_height = []
 
-## forward/backward, baselayer/regular layers
-# forward = True
-# baselayer = False
+layer=-1
+last_layer=-1
+layer_count=-1
+start_weld_layer=0
 
-# layer=-1
-# last_layer=-1
-# layer_count=-1
-# start_weld_layer=0
+# layer=442
+# last_layer=419
+# layer_count=19
+# start_weld_layer=466
 
-layer=442
-last_layer=419
-layer_count=19
-start_weld_layer=466
-
-# Transz0_H=None
-Transz0_H=np.array([[ 1.00000000e+00, -3.44596496e-09,  1.06792503e-05, -2.89186618e-05],
- [-3.44596496e-09,  9.99999792e-01,  6.45357024e-04, -1.74758162e-03],
- [-1.06792503e-05, -6.45357024e-04,  9.99999792e-01, -2.70792939e+00],
- [ 0.00000000e+00,  0.00000000e+00,  0.00000000e+00,  1.00000000e+00]])
+Transz0_H=None
+# Transz0_H=np.array([[ 1.00000000e+00, -3.44596496e-09,  1.06792503e-05, -2.89186618e-05],
+#  [-3.44596496e-09,  9.99999792e-01,  6.45357024e-04, -1.74758162e-03],
+#  [-1.06792503e-05, -6.45357024e-04,  9.99999792e-01, -2.70792939e+00],
+#  [ 0.00000000e+00,  0.00000000e+00,  0.00000000e+00,  1.00000000e+00]])
 
 # try:
 #     layer_count=len(glob.glob(data_dir+'layer_*_0'))+1
@@ -225,7 +221,7 @@ manual_dh=False
 correction=True
 recal_dh=True
 
-start_shift=True
+start_shift=False # if true then always add odd layers
 
 print("Planned V (first 10):",planned_v[:10])
 print("Planned Job (first 10):",planned_job[:10])
@@ -503,7 +499,6 @@ while True:
                 curve_sliced_js=np.loadtxt(curve_data_dir+'curve_sliced_js/MA2010_base_js'+str(read_layer)+'_'+str(x)+'.csv',delimiter=',').reshape((-1,6))
                 positioner_js=np.loadtxt(curve_data_dir+'curve_sliced_js/D500B_base_js'+str(read_layer)+'_'+str(x)+'.csv',delimiter=',')
             rob_js_plan = np.hstack((curve_sliced_js,positioner_js))
-            layer_curve_relative
 
             # if len(curve_sliced_relative)<2:
             #     continue
@@ -520,13 +515,14 @@ while True:
             
             ## get breakpoints
             lam_relative=calc_lam_cs(scan_p)
-            scan_waypoint_distance=10 ## mm
-            breakpoints=[0]
-            for path_i in range(0,len(lam_relative)):
-                if (lam_relative[path_i]-lam_relative[breakpoints[-1]])>=scan_waypoint_distance:
-                    breakpoints.append(path_i)
-            if breakpoints[-1]!=len(lam_relative)-1:
-                breakpoints.append(len(lam_relative)-1)
+            # scan_waypoint_distance=10 ## mm
+            scan_waypoint_distance=waypoint_distance ## mm
+            num_points_layer=max(2,int(lam_relative[-1]/scan_waypoint_distance))
+            ## using forward/backward technique
+            if forward:
+                breakpoints=np.linspace(0,len(curve_sliced_js)-1,num=num_points_layer).astype(int)
+            else:
+                breakpoints=np.linspace(len(curve_sliced_js)-1,0,num=num_points_layer).astype(int)
             
             ###find which end to start depending on how close to the current positioner pose
             q_prev=ws.client.getJointAnglesDB(positioner.pulse2deg)
@@ -552,11 +548,17 @@ while True:
             ## move to mid point and start 
             waypoint_pose=robot_scan.fwd(q_bp1[0][0])
             waypoint_pose.p[-1]+=50
-            robot_scan.robot.P=deepcopy(r2_nom_P)
-            robot_scan.robot.H=deepcopy(r2_nom_H)
-            q1=robot_scan.inv(waypoint_pose.p,waypoint_pose.R,q_bp1[0][0])[0]
-            robot_scan.robot.P=deepcopy(robot_scan.calib_P)
-            robot_scan.robot.H=deepcopy(robot_scan.calib_H)
+            
+            try:
+                q1=robot_scan.inv(waypoint_pose.p,waypoint_pose.R,q_bp1[0][0])[0]
+            except:
+                print("Use nom PH for ik")
+                robot_scan.robot.P=deepcopy(r2_nom_P)
+                robot_scan.robot.H=deepcopy(r2_nom_H)
+                q1=robot_scan.inv(waypoint_pose.p,waypoint_pose.R,q_bp1[0][0])[0]
+                robot_scan.robot.P=deepcopy(robot_scan.calib_P)
+                robot_scan.robot.H=deepcopy(robot_scan.calib_H)
+            
             q2=q_bp2[0][0]
             if x==0:
                 ws.jog_dual(robot_scan,positioner,[R2_mid,q1],q2,v=to_start_speed)
@@ -662,7 +664,7 @@ while True:
                 profile_dh = scan_process.pcd2dh(pcd,curve_sliced_relative,drawing=True)
             
                 if len(layer_curve_dh)!=0:
-                    profile_dh[:,0]+=layer_curve_dh[-1,0]
+                    profile_dh[:,0]=profile_dh[:,0]+layer_curve_dh[-1][0]
                 layer_curve_dh.extend(profile_dh)
             layer_curve_relative.extend(curve_sliced_relative)
             
@@ -671,7 +673,6 @@ while True:
                 o3d.io.write_point_cloud(out_scan_dir+'processed_pcd.pcd',pcd)
                 if layer!=-1:
                     np.save(out_scan_dir+'height_profile.npy',profile_dh)
-                    
             pcd_layer+=pcd
         
         # update
@@ -706,8 +707,8 @@ while True:
 
     input("Scan Move to Home")
     # move robot to home
-    # ws.jog_dual(robot_scan,positioner,[R2_mid,R2_home],[0,q_prev[1]],v=to_home_speed)
-    ws.jog_single(robot_scan,R2_home,v=to_home_speed)
+    ws.jog_dual(robot_scan,positioner,[R2_mid,R2_home],[0,q_prev[1]],v=to_home_speed)
+    # ws.jog_single(robot_scan,R2_home,v=to_home_speed)
     
     ## increase layer count
     layer_count+=1
