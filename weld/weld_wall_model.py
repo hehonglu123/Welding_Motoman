@@ -142,9 +142,9 @@ rr_sensors = WeldRRSensor(weld_service=weld_ser,cam_service=cam_ser,microphone_s
 
 
 # ## test sensor (camera, microphone)
-print("Test 3 Sec.")
-rr_sensors.test_all_sensors()
-print(len(rr_sensors.ir_recording))
+# print("Test 3 Sec.")
+# rr_sensors.test_all_sensors()
+# print(len(rr_sensors.ir_recording))
 # exit()
 ###############
 
