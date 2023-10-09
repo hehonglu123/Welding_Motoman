@@ -25,7 +25,7 @@ mean_co2 = []
 mean_value_co1 = []
 mean_value_co2 = []
 window_length = []
-base_path = '../data/wall_weld_test/ER4043_correction_100ipm_2023_09_27_20_53_05/'
+base_path = '../data/wall_weld_test/316L_model_140ipm_2023_09_27_21_43_22/'
 
 if os.path.exists(base_path):
     # 获取指定路径下的所有子目录
