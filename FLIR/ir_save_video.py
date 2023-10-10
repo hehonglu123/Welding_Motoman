@@ -45,8 +45,9 @@ def main():
     fig = plt.figure(1)
 
     # Initializing the VideoWriter
-    fourcc = cv2.VideoWriter_fourcc(*'XVID')
-    out = cv2.VideoWriter('output.avi', fourcc, 20.0, (640, 480))  # Adjust frame size if necessary
+    result = cv2.VideoWriter('output.avi', 
+                         cv2.VideoWriter_fourcc(*'X264'),
+                         30, (240,320))
 
     try:
         while True:
@@ -55,14 +56,14 @@ def main():
                 ir_bgr = cv2.applyColorMap(ir_normalized.astype(np.uint8), cv2.COLORMAP_INFERNO)
                 cv2.imshow("IR Recording", cv2.rotate(ir_bgr, cv2.ROTATE_90_CLOCKWISE))
                 # Write frame to video file
-                out.write(cv2.rotate(ir_bgr, cv2.ROTATE_90_CLOCKWISE))
+                result.write(cv2.rotate(ir_bgr, cv2.ROTATE_90_CLOCKWISE))
                 if cv2.waitKey(1) == 27:
                     break  # esc to quit
     finally:
         try:
             p.Close()
             cv2.destroyAllWindows()
-            out.release()
+            result.release()
         except:
             pass
 
