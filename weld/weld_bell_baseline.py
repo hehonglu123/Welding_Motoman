@@ -15,7 +15,7 @@ with open(data_dir+'slicing.yml', 'r') as file:
 	slicing_meta = yaml.safe_load(file)
 recorded_dir='recorded_data/cup_ER316L/'
 waypoint_distance=5
-layer_width_num=int(2/slicing_meta['line_resolution'])
+layer_width_num=int(3/slicing_meta['line_resolution'])
 
 
 robot=robot_obj('MA2010_A0',def_path='../config/MA2010_A0_robot_default_config.yml',tool_file_path='../config/torch.csv',\
@@ -27,23 +27,42 @@ client=MotionProgramExecClient()
 ws=WeldSend(client)
 
 ###set up control parameters
-job_offset=400 		###200 for Aluminum ER4043, 300 for Steel Alloy ER70S-6, 400 for Stainless Steel ER316L
-nominal_feedrate=130
-nominal_vd_relative=8
+job_offset=200 		###200 for Aluminum ER4043, 300 for Steel Alloy ER70S-6, 400 for Stainless Steel ER316L
+nominal_feedrate=110
+nominal_vd_relative=9
 nominal_wire_length=25 #pixels
 nominal_temp_below=500
 base_feedrate_cmd=300
-base_vd=5
+base_vd=9
 feedrate_cmd=nominal_feedrate
 vd_relative=nominal_vd_relative
 feedrate_gain=0.5
-feedrate_min=80
+feedrate_min=100
 feedrate_max=300
-nominal_slice_increment=int(1.2/slicing_meta['line_resolution'])
+nominal_slice_increment=int(1.15/slicing_meta['line_resolution'])
 slice_inc_gain=3.
 vd_max=10
 feedrate_cmd_adjustment=0
 vd_relative_adjustment=0
+
+# ###set up control parameters
+# job_offset=400 		###200 for Aluminum ER4043, 300 for Steel Alloy ER70S-6, 400 for Stainless Steel ER316L
+# nominal_feedrate=130
+# nominal_vd_relative=8
+# nominal_wire_length=25 #pixels
+# nominal_temp_below=500
+# base_feedrate_cmd=300
+# base_vd=5
+# feedrate_cmd=nominal_feedrate
+# vd_relative=nominal_vd_relative
+# feedrate_gain=0.5
+# feedrate_min=80
+# feedrate_max=300
+# nominal_slice_increment=int(1.2/slicing_meta['line_resolution'])
+# slice_inc_gain=3.
+# vd_max=10
+# feedrate_cmd_adjustment=0
+# vd_relative_adjustment=0
 
 ###########################################BASE layer welding############################################
 # num_layer_start=int(0*nominal_slice_increment)	###modify layer num here
@@ -92,7 +111,7 @@ vd_relative_adjustment=0
 # 			primitives.append('movel')
 
 # 		q_prev=positioner_js[breakpoints[-1]]
-# 		timestamp_robot,joint_recording,job_line,_=ws.weld_segment_dual(primitives,robot,positioner,q1_all,q2_all,v1_all,v2_all,cond_all=[int(base_feedrate_cmd/10)+job_offset],arc=False)
+# 		timestamp_robot,joint_recording,job_line,_=ws.weld_segment_dual(primitives,robot,positioner,q1_all,q2_all,v1_all,v2_all,cond_all=[int(base_feedrate_cmd/10)+job_offset],arc=True)
 
 ###########################################layer welding############################################
 num_layer_start=int(1*nominal_slice_increment)	###modify layer num here
