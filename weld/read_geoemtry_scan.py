@@ -24,9 +24,9 @@ import glob
 import yaml
 from math import ceil,floor
 
-R1_ph_dataset_date='0801'
-R2_ph_dataset_date='0801'
-S1_ph_dataset_date='0801'
+R1_ph_dataset_date='0926'
+R2_ph_dataset_date='0926'
+S1_ph_dataset_date='0926'
 
 zero_config=np.zeros(6)
 # 0. robots.
@@ -53,49 +53,54 @@ robot_scan_base = robot_weld.T_base_basemarker.inv()*robot_scan.T_base_basemarke
 robot_scan.base_H = H_from_RT(robot_scan_base.R,robot_scan_base.p)
 positioner_base = robot_weld.T_base_basemarker.inv()*positioner.T_base_basemarker
 positioner.base_H = H_from_RT(positioner_base.R,positioner_base.p)
-# T_to_base = Transform(np.eye(3),[0,0,-380])
-# positioner.base_H = np.matmul(positioner.base_H,H_from_RT(T_to_base.R,T_to_base.p))
+T_to_base = Transform(np.eye(3),[0,0,-380])
+positioner.base_H = np.matmul(positioner.base_H,H_from_RT(T_to_base.R,T_to_base.p))
 # input(positioner.base_H)
 
-robot_weld.robot.P=deepcopy(robot_weld.calib_P)
-robot_weld.robot.H=deepcopy(robot_weld.calib_H)
-robot_scan.robot.P=deepcopy(robot_scan.calib_P)
-robot_scan.robot.H=deepcopy(robot_scan.calib_H)
-positioner.robot.P=deepcopy(positioner.calib_P)
-positioner.robot.H=deepcopy(positioner.calib_H)
+# robot_weld.robot.P=deepcopy(robot_weld.calib_P)
+# robot_weld.robot.H=deepcopy(robot_weld.calib_H)
+# robot_scan.robot.P=deepcopy(robot_scan.calib_P)
+# robot_scan.robot.H=deepcopy(robot_scan.calib_H)
+# positioner.robot.P=deepcopy(positioner.calib_P)
+# positioner.robot.H=deepcopy(positioner.calib_H)
 
 #### load R1 kinematic model
-PH_data_dir='../mocap/PH_grad_data/test'+R1_ph_dataset_date+'_R1/train_data_'
-with open(PH_data_dir+'calib_PH_q.pickle','rb') as file:
-    PH_q=pickle.load(file)
-nom_P=np.array([[0,0,0],[150,0,0],[0,0,760],\
-                   [1082,0,200],[0,0,0],[0,0,0],[100,0,0]]).T
-nom_H=np.array([[0,0,1],[0,1,0],[0,-1,0],\
-                [-1,0,0],[0,-1,0],[-1,0,0]]).T
-ph_param_r1=PH_Param(nom_P,nom_H)
-ph_param_r1.fit(PH_q,method='FBF')
+# PH_data_dir='../mocap/PH_grad_data/test'+R1_ph_dataset_date+'_R1/train_data_'
+# with open(PH_data_dir+'calib_PH_q.pickle','rb') as file:
+#     PH_q=pickle.load(file)
+# nom_P=np.array([[0,0,0],[150,0,0],[0,0,760],\
+#                    [1082,0,200],[0,0,0],[0,0,0],[100,0,0]]).T
+# nom_H=np.array([[0,0,1],[0,1,0],[0,-1,0],\
+#                 [-1,0,0],[0,-1,0],[-1,0,0]]).T
+# ph_param_r1=PH_Param(nom_P,nom_H)
+# ph_param_r1.fit(PH_q,method='FBF')
 ph_param_r1=None
 #### load R2 kinematic model
-PH_data_dir='../mocap/PH_grad_data/test'+R2_ph_dataset_date+'_R2/train_data_'
-with open(PH_data_dir+'calib_PH_q.pickle','rb') as file:
-    PH_q=pickle.load(file)
-nom_P=np.array([[0,0,0],[155,0,0],[0,0,614],\
-                   [640,0,200],[0,0,0],[0,0,0],[100,0,0]]).T
-nom_H=np.array([[0,0,1],[0,1,0],[0,-1,0],\
-                [-1,0,0],[0,-1,0],[-1,0,0]]).T
-ph_param_r2=PH_Param(nom_P,nom_H)
-ph_param_r2.fit(PH_q,method='FBF')
+# PH_data_dir='../mocap/PH_grad_data/test'+R2_ph_dataset_date+'_R2/train_data_'
+# with open(PH_data_dir+'calib_PH_q.pickle','rb') as file:
+#     PH_q=pickle.load(file)
+# nom_P=np.array([[0,0,0],[155,0,0],[0,0,614],\
+#                    [640,0,200],[0,0,0],[0,0,0],[100,0,0]]).T
+# nom_H=np.array([[0,0,1],[0,1,0],[0,-1,0],\
+#                 [-1,0,0],[0,-1,0],[-1,0,0]]).T
+# ph_param_r2=PH_Param(nom_P,nom_H)
+# ph_param_r2.fit(PH_q,method='FBF')
 ph_param_r2=None
 #### load S1 kinematic model
 
 regen_pcd = False
 
 #### data directory
-dataset='circle_large/'
-sliced_alg='static_stepwise_shift/'
+# dataset='circle_large/'
+# sliced_alg='static_stepwise_shift/'
+# curve_data_dir = '../data/'+dataset+sliced_alg
+# # data_dir=curve_data_dir+'weld_scan_baseline_2023_09_18_16_17_34'+'/'
+# data_dir=curve_data_dir+'weld_scan_correction_2023_09_19_16_32_31'+'/'
+
+dataset='blade0.1/'
+sliced_alg='auto_slice/'
 curve_data_dir = '../data/'+dataset+sliced_alg
-# data_dir=curve_data_dir+'weld_scan_baseline_2023_09_18_16_17_34'+'/'
-data_dir=curve_data_dir+'weld_scan_correction_2023_09_19_16_32_31'+'/'
+data_dir=curve_data_dir+'weld_scan_2023_10_09_16_01_52'+'/'
 
 #### welding spec, goal
 with open(curve_data_dir+'slicing.yml', 'r') as file:
@@ -124,9 +129,15 @@ last_curve_relative = []
 last_curve_height = []
 all_pcd=o3d.geometry.PointCloud()
 viz_obj=[]
-Transz0_H=None
+
+# Transz0_H=None
+Transz0_H=np.array([[ 9.99977850e-01, -4.63363649e-05, -6.65562283e-03,  5.00198327e-03],
+ [-4.63363649e-05,  9.99903067e-01, -1.39231465e-02,  1.04638361e-02],
+ [ 6.65562283e-03,  1.39231465e-02,  9.99880917e-01, -7.51452982e-01],
+ [ 0.00000000e+00,  0.00000000e+00,  0.00000000e+00,  1.00000000e+00]])
 
 dh_std=[]
+all_layer_dh=[]
 for layer_count in range(0,total_count):
     baselayer=False
     # if layer_count!= 0 and layer_count<=total_baselayer:
@@ -195,18 +206,16 @@ for layer_count in range(0,total_count):
                 if q=='':
                     break
             pcd=pcd_new
-                    
+            pcd,Transz0_H = scan_process.pcd_calib_z(pcd,Transz0_H=Transz0_H)
         else:
             pcd=o3d.io.read_point_cloud(out_scan_dir+'processed_pcd.pcd')
-        
-        pcd,Transz0_H = scan_process.pcd_calib_z(pcd,Transz0_H=Transz0_H)
         
         # dh plot
         if layer!=-1:
             # profile_height = scan_process.pcd2dh(pcd,last_pcd,curve_sliced_relative,robot_weld,rob_js_plan,ph_param=ph_param_r1,drawing=True)
             profile_height = scan_process.pcd2dh(pcd,curve_sliced_relative,drawing=False)
             if len(layer_curve_dh)!=0:
-                profile_height[:,0]+=layer_curve_dh[-1,0]
+                profile_height[:,0]+=layer_curve_dh[-1][0]
             layer_curve_dh.extend(profile_height)
         layer_curve_relative.extend(curve_sliced_relative)
 
@@ -241,6 +250,8 @@ for layer_count in range(0,total_count):
     # viz_obj.extend(path_viz_frames)
 
     layer_curve_dh=np.array(layer_curve_dh)
+    all_layer_dh.append(layer_curve_dh)
+    
     # curve_i=0
     # total_curve_i = len(layer_curve_dh)
     # ax = plt.figure().add_subplot()
@@ -274,8 +285,14 @@ for layer_count in range(0,total_count):
     if layer!=-1:
         dh_std.append(np.std(layer_curve_dh[:,1]))
 
+draw_l_count=0
+for lh in all_layer_dh:
+    plt.scatter(lh[:,0],lh[:,1]+layer_num[draw_l_count]/10.)
+    draw_l_count+=1
+plt.show()
+
 # save std data
-np.save(data_dir+'height_std.npy',dh_std)
+# np.save(data_dir+'height_std.npy',dh_std)
 
 # viz_obj.append(all_pcd)
 # visualize_pcd(viz_obj)

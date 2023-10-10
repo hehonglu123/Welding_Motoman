@@ -136,13 +136,15 @@ sliced_alg='auto_slice/'
 curve_data_dir = '../data/'+dataset+sliced_alg
 data_dir=curve_data_dir+'weld_scan_2023_10_09_16_01_52'+'/'
 baselayer=False
-last_layer=1
-layer=0
+last_layer=0
+layer=402 # 314 358 402 424
 x=0
 
-Transz0_H=np.array([[ 9.99964994e-01, -4.94535500e-05, -8.36709340e-03,  8.57506654e-04],
- [-4.94535500e-05,  9.99930136e-01, -1.18203430e-02,  1.21141504e-03],
- [ 8.36709340e-03,  1.18203430e-02,  9.99895130e-01, -1.02474860e-01],
+calib_z=True
+# Transz0_H=None
+Transz0_H=np.array([[ 9.99977850e-01, -4.63363649e-05, -6.65562283e-03,  5.00198327e-03],
+ [-4.63363649e-05,  9.99903067e-01, -1.39231465e-02,  1.04638361e-02],
+ [ 6.65562283e-03,  1.39231465e-02,  9.99880917e-01, -7.51452982e-01],
  [ 0.00000000e+00,  0.00000000e+00,  0.00000000e+00,  1.00000000e+00]])
 
 use_actual = False
@@ -160,37 +162,40 @@ else:
 out_scan_dir = layer_data_dir+'scans/'
 last_out_scan_dir = last_layer_data_dir+'scans/'
 
+readlayer=layer if layer>=0 else 0 
 if not baselayer:
-    curve_sliced_relative=np.loadtxt(curve_data_dir+'curve_sliced_relative/slice'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
-    curve_sliced_js=np.loadtxt(curve_data_dir+'curve_sliced_js/MA2010_js'+str(layer)+'_'+str(x)+'.csv',delimiter=',').reshape((-1,6))
-    positioner_js=np.loadtxt(curve_data_dir+'curve_sliced_js/D500B_js'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
+    curve_sliced_relative=np.loadtxt(curve_data_dir+'curve_sliced_relative/slice'+str(readlayer)+'_'+str(x)+'.csv',delimiter=',')
+    curve_sliced_js=np.loadtxt(curve_data_dir+'curve_sliced_js/MA2010_js'+str(readlayer)+'_'+str(x)+'.csv',delimiter=',').reshape((-1,6))
+    positioner_js=np.loadtxt(curve_data_dir+'curve_sliced_js/D500B_js'+str(readlayer)+'_'+str(x)+'.csv',delimiter=',')
 else:
-    curve_sliced_relative=np.loadtxt(curve_data_dir+'curve_sliced_relative/baselayer'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
-    curve_sliced_js=np.loadtxt(curve_data_dir+'curve_sliced_js/MA2010_base_js'+str(layer)+'_'+str(x)+'.csv',delimiter=',').reshape((-1,6))
-    positioner_js=np.loadtxt(curve_data_dir+'curve_sliced_js/D500B_base_js'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
+    curve_sliced_relative=np.loadtxt(curve_data_dir+'curve_sliced_relative/baselayer'+str(readlayer)+'_'+str(x)+'.csv',delimiter=',')
+    curve_sliced_js=np.loadtxt(curve_data_dir+'curve_sliced_js/MA2010_base_js'+str(readlayer)+'_'+str(x)+'.csv',delimiter=',').reshape((-1,6))
+    positioner_js=np.loadtxt(curve_data_dir+'curve_sliced_js/D500B_base_js'+str(readlayer)+'_'+str(x)+'.csv',delimiter=',')
 rob_js_plan = np.hstack((curve_sliced_js,positioner_js))
 
 ### robot 1
-weld_q_exe = np.loadtxt(layer_data_dir+'weld_js_exe.csv',delimiter=',')
 if use_actual:
+    # weld_q_exe = np.loadtxt(layer_data_dir+'weld_js_exe.csv',delimiter=',')
     curve_sliced_relative=[]
-    for q_out in weld_q_exe[::-1]:
+    for q_out in rob_js_plan:
         Table_home_T = positioner.fwd(q_out[-2:])
         T_S1TCP_R1Base = np.matmul(positioner.base_H,H_from_RT(Table_home_T.R,Table_home_T.p))
         T_R1Base_S1TCP = np.linalg.inv(T_S1TCP_R1Base)
         ### R1 fwd
-        opt_P,opt_H = ph_param_r1.predict(q_out[1:3])
-        robot_weld.robot.P=opt_P
-        robot_weld.robot.H=opt_H
+        if ph_param_r1 is not None:
+            opt_P,opt_H = ph_param_r1.predict(q_out[1:3])
+            robot_weld.robot.P=opt_P
+            robot_weld.robot.H=opt_H
         robot_T = robot_weld.fwd(q_out[:6])
         ###
         T_R1TCP_S1TCP = np.matmul(T_R1Base_S1TCP,H_from_RT(robot_T.R,robot_T.p))
+        curve_sliced_relative.append(np.append(T_R1TCP_S1TCP[:3,-1],T_R1TCP_S1TCP[:3,2]))
         # print(robot_T)
         # input(T_R1TCP_S1TCP[:3,-1])
-        if len(curve_sliced_relative)==0 or np.linalg.norm(T_R1TCP_S1TCP[:3,-1]-curve_sliced_relative[-1][:3])>0.8:
-            if len(curve_sliced_relative)==0 or np.fabs(T_R1TCP_S1TCP[2,-1]-curve_sliced_relative[-1][2])<0.4:
-                curve_sliced_relative.append(np.append(T_R1TCP_S1TCP[:3,-1],T_R1TCP_S1TCP[:3,2]))
-    curve_sliced_relative=curve_sliced_relative[::-1]
+        # if len(curve_sliced_relative)==0 or np.linalg.norm(T_R1TCP_S1TCP[:3,-1]-curve_sliced_relative[-1][:3])>0.8:
+        #     if len(curve_sliced_relative)==0 or np.fabs(T_R1TCP_S1TCP[2,-1]-curve_sliced_relative[-1][2])<0.4:
+        #         curve_sliced_relative.append(np.append(T_R1TCP_S1TCP[:3,-1],T_R1TCP_S1TCP[:3,2]))
+    curve_sliced_relative=np.array(curve_sliced_relative)
     print("curve len:",len(curve_sliced_relative))
 ###########
 
@@ -211,7 +216,7 @@ if regen_pcd:
                                         min_bound=crop_min,max_bound=crop_max,outlier_remove=True,cluster_based_outlier_remove=True,cluster_neighbor=1,min_points=300)
 else:
     pcd=o3d.io.read_point_cloud(out_scan_dir+'processed_pcd.pcd')
-visualize_pcd([pcd])
+# visualize_pcd([pcd])
 
 # last pcd
 # if regen_pcd:
@@ -233,11 +238,12 @@ visualize_pcd([pcd])
 #     last_pcd=o3d.io.read_point_cloud(last_out_scan_dir+'processed_pcd.pcd')
 # visualize_pcd([last_pcd])
 
-pcd,Transz0_H = scan_process.pcd_calib_z(pcd,Transz0_H=Transz0_H)
-print("Transz0_H:",Transz0_H)
+if calib_z:
+    pcd,Transz0_H = scan_process.pcd_calib_z(pcd,Transz0_H=Transz0_H)
+    print("Transz0_H:",Transz0_H)
 
 if use_actual:
-    profile_height = scan_process.pcd2dh(pcd,last_pcd,curve_sliced_relative,drawing=True)
+    profile_height = scan_process.pcd2dh(pcd,curve_sliced_relative,drawing=True)
 else:
     # profile_height = scan_process.pcd2dh(pcd,last_pcd,curve_sliced_relative,robot_weld,rob_js_plan,ph_param=ph_param_r1,drawing=True)
     # profile_height = scan_process.pcd2dh(pcd,last_pcd,curve_sliced_relative)
