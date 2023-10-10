@@ -112,7 +112,7 @@ formatted_time = current_time.strftime('%Y_%m_%d_%H_%M_%S.%f')[:-7]
 data_date = input("Use old data directory? (Enter or put time e.g. 2023_07_11_16_25_30): ")
 if data_date == '':
     # data_dir=curve_data_dir+'weld_scan_'+formatted_time+'/'
-    data_dir=curve_data_dir+'weld_scan_2023_10_09_16_01_52/'
+    data_dir=curve_data_dir+'weld_scan_2023_10_10_16_56_32/'
 else:
     data_dir=curve_data_dir+'weld_scan_'+data_date+'/'
 print("Use data directory:",data_dir)
@@ -138,8 +138,11 @@ waypoint_distance=1.625 	###waypoint separation (calculate from 40moveL/95mm, wh
 layer_height_num=int(des_dh/line_resolution) # preplanned
 layer_width_num=int(des_dw/line_resolution) # preplanned
 
-weld_min_v=2.5
-weld_max_v=10
+# weld_min_v=2.5
+# weld_max_v=10
+weld_min_v=des_v/2.
+weld_max_v=des_v*2
+print(weld_min_v,weld_max_v)
 
 # 2. Scanning parameters
 ### scan parameters
@@ -203,10 +206,10 @@ last_layer_curve_height = []
 # layer_count=-1
 # start_weld_layer=0
 
-layer=491
-last_layer=468
-layer_count=25
-start_weld_layer=492
+layer=318
+last_layer=297
+layer_count=18
+start_weld_layer=340
 
 # Transz0_H=None
 Transz0_H=np.array([[ 9.99977849e-01, -4.63425601e-05, -6.65580373e-03,  5.00206395e-03],
@@ -220,7 +223,7 @@ Transz0_H=np.array([[ 9.99977849e-01, -4.63425601e-05, -6.65580373e-03,  5.00206
 #     pass
 
 manual_dh=False
-correction=False
+correction=True
 recal_dh=False
 
 start_shift=False # if true then always add odd layers
