@@ -138,8 +138,8 @@ waypoint_distance=1.625 	###waypoint separation (calculate from 40moveL/95mm, wh
 layer_height_num=int(des_dh/line_resolution) # preplanned
 layer_width_num=int(des_dw/line_resolution) # preplanned
 
-weld_min_v=1
-weld_max_v=20
+weld_min_v=2.5
+weld_max_v=10
 
 # 2. Scanning parameters
 ### scan parameters
