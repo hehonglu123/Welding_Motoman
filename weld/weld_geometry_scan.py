@@ -639,8 +639,13 @@ while True:
                 if not mti_break_flag:
                     break
                 print("MTI break during robot move")
-                input("MTI reconnect ready?")
-                generate_mti_rr()
+                while True:
+                    try:
+                        input("MTI reconnect ready?")
+                        generate_mti_rr()
+                        break
+                    except:
+                        pass
             
             mti_recording=np.array(mti_recording)
             joint_recording=np.array(joint_recording)
