@@ -100,7 +100,8 @@ regen_pcd = False
 dataset='blade0.1/'
 sliced_alg='auto_slice/'
 curve_data_dir = '../data/'+dataset+sliced_alg
-data_dir=curve_data_dir+'weld_scan_2023_10_09_16_01_52'+'/'
+data_dir=curve_data_dir+'weld_scan_baseline_2023_10_09_16_01_52'+'/'
+# data_dir=curve_data_dir+'weld_scan_correction_2023_10_10_16_56_32'+'/'
 
 #### welding spec, goal
 with open(curve_data_dir+'slicing.yml', 'r') as file:
@@ -130,6 +131,8 @@ last_curve_height = []
 all_pcd=o3d.geometry.PointCloud()
 viz_obj=[]
 
+des_dh = 2.3420716473455623
+
 # Transz0_H=None
 Transz0_H=np.array([[ 9.99977850e-01, -4.63363649e-05, -6.65562283e-03,  5.00198327e-03],
  [-4.63363649e-05,  9.99903067e-01, -1.39231465e-02,  1.04638361e-02],
@@ -137,7 +140,10 @@ Transz0_H=np.array([[ 9.99977850e-01, -4.63363649e-05, -6.65562283e-03,  5.00198
  [ 0.00000000e+00,  0.00000000e+00,  0.00000000e+00,  1.00000000e+00]])
 
 dh_std=[]
+dh_norm=[]
+dh_rmse=[]
 all_layer_dh=[]
+all_layer_deviation=[]
 for layer_count in range(0,total_count):
     baselayer=False
     # if layer_count!= 0 and layer_count<=total_baselayer:
@@ -189,11 +195,12 @@ for layer_count in range(0,total_count):
             pcd = scan_process.pcd_register_mti(mti_recording,q_out_exe,robot_stamps,use_calib=True,ph_param=ph_param_r2)
             # pcd = scan_process.pcd_register_mti(mti_recording,q_out_exe,robot_stamps,use_calib=False)
             # visualize_pcd([pcd])
-            cluser_minp = 300
+            cluser_minp = 325
             while True:
                 pcd_new = scan_process.pcd_noise_remove(pcd,nb_neighbors=40,std_ratio=1.5,\
                                                     min_bound=crop_min,max_bound=crop_max,outlier_remove=True,cluster_based_outlier_remove=True,cluster_neighbor=1,min_points=cluser_minp)
-                visualize_pcd([pcd_new])
+                break
+                # visualize_pcd([pcd_new])
                 while True:
                     q=input("Continue?")
                     if q=='':
@@ -213,9 +220,20 @@ for layer_count in range(0,total_count):
         # dh plot
         if layer!=-1:
             # profile_height = scan_process.pcd2dh(pcd,last_pcd,curve_sliced_relative,robot_weld,rob_js_plan,ph_param=ph_param_r1,drawing=True)
-            profile_height = scan_process.pcd2dh(pcd,curve_sliced_relative,drawing=False)
-            if len(layer_curve_dh)!=0:
-                profile_height[:,0]+=layer_curve_dh[-1][0]
+            if layer_count<total_count-8:
+                profile_height = scan_process.pcd2dh(pcd,curve_sliced_relative,drawing=False)
+            else:
+                profile_height = scan_process.pcd2dh(pcd,curve_sliced_relative,drawing=False)
+            
+            # if len(layer_curve_dh)!=0:
+            #     profile_height[:,0]+=layer_curve_dh[-1][0]
+            ## correct the lambda based on previous
+            if layer>0:
+                closest_id = np.argmin(np.linalg.norm(last_curve_relative[:,:3]-curve_sliced_relative[0,:3],axis=1))
+                start_lambda = all_layer_dh[-1][closest_id,0]
+                print("Start lambda:",start_lambda)
+                profile_height[:,0]+=start_lambda
+                
             layer_curve_dh.extend(profile_height)
         layer_curve_relative.extend(curve_sliced_relative)
 
@@ -234,6 +252,7 @@ for layer_count in range(0,total_count):
     all_pcd=all_pcd+last_pcd
     
     layer_curve_relative=np.array(layer_curve_relative)
+    last_curve_relative=deepcopy(layer_curve_relative)
     
     # curve_p=[]
     # curve_R=[]
@@ -251,6 +270,9 @@ for layer_count in range(0,total_count):
 
     layer_curve_dh=np.array(layer_curve_dh)
     all_layer_dh.append(layer_curve_dh)
+    layer_curve_deviation = np.array(layer_curve_dh)
+    layer_curve_deviation[:,1] = des_dh-layer_curve_deviation[:,1]
+    all_layer_deviation.append(layer_curve_deviation)
     
     # curve_i=0
     # total_curve_i = len(layer_curve_dh)
@@ -280,19 +302,30 @@ for layer_count in range(0,total_count):
     # input("Continue? ")
     # viz_list=deepcopy(viz_obj)
     # viz_list.append(all_pcd)
-    # visualize_pcd(viz_list)
+    # visualize_pcd([all_pcd])
     
     if layer!=-1:
         dh_std.append(np.std(layer_curve_dh[:,1]))
+        dh_norm.append(np.linalg.norm(layer_curve_deviation[:,1]))
+        rmse = np.sqrt(np.sum(layer_curve_deviation[:,1]**2)/len(layer_curve_deviation[:,1]))
+        dh_rmse.append(rmse)
 
 draw_l_count=0
 for lh in all_layer_dh:
-    plt.scatter(lh[:,0],lh[:,1]+layer_num[draw_l_count]/10.)
+    draw_color='tab:blue' if draw_l_count%2==0 else 'tab:orange'
+    plt.scatter(lh[:,0],lh[:,1]+layer_num[draw_l_count]/10.,c=draw_color)
     draw_l_count+=1
+plt.xlabel("Path length (lambda) (mm)",fontsize=16)
+plt.ylabel("Height (mm)",fontsize=16)
+plt.xticks(fontsize=16)
+plt.yticks(fontsize=16)
+plt.title("Layer Height (Baseline)",fontsize=20)
 plt.show()
 
 # save std data
-# np.save(data_dir+'height_std.npy',dh_std)
+np.save(data_dir+'height_std.npy',dh_std)
+np.save(data_dir+'height_error_norm.npy',dh_norm)
+np.save(data_dir+'height_rmse.npy',dh_rmse)
 
-# viz_obj.append(all_pcd)
-# visualize_pcd(viz_obj)
+viz_obj.append(all_pcd)
+visualize_pcd(viz_obj)
