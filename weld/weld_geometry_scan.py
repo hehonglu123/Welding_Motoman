@@ -121,8 +121,8 @@ formatted_time = current_time.strftime('%Y_%m_%d_%H_%M_%S.%f')[:-7]
 
 data_date = input("Use old data directory? (Enter or put time e.g. 2023_07_11_16_25_30): ")
 if data_date == '':
-    # data_dir=curve_data_dir+'weld_scan_'+formatted_time+'/'
-    data_dir=curve_data_dir+'weld_scan_2023_10_10_16_56_32/'
+    data_dir=curve_data_dir+'weld_scan_'+formatted_time+'/'
+    # data_dir=curve_data_dir+'weld_scan_2023_10_10_16_56_32/'
 else:
     data_dir=curve_data_dir+'weld_scan_'+data_date+'/'
 print("Use data directory:",data_dir)
@@ -212,15 +212,15 @@ save_output_points=True
 last_layer_curve_relative = []
 last_layer_curve_height = []
 
-# layer=-1
-# last_layer=-1
-# layer_count=-1
-# start_weld_layer=0
+layer=-1
+last_layer=-1
+layer_count=-1
+start_weld_layer=0
 
-layer=318
-last_layer=297
-layer_count=18
-start_weld_layer=340
+# layer=318
+# last_layer=297
+# layer_count=18
+# start_weld_layer=340
 
 # Transz0_H=None
 Transz0_H=np.array([[ 9.99977849e-01, -4.63425601e-05, -6.65580373e-03,  5.00206395e-03],
@@ -293,7 +293,7 @@ while True:
         # if layer!=-1:
         #     layer_curve_dh = np.load(data_dir+'layer_'+str(read_layer)+'_0/scans/'+'height_profile.npy')
         # visualize_pcd([last_pcd_layer])
-    
+
     ####### Decide which layer to print #######
     if baselayer:
         last_layer = layer
@@ -632,13 +632,14 @@ while True:
                         try:
                             mti_recording.append(deepcopy(np.array([mti_client.lineProfile.X_data,mti_client.lineProfile.Z_data])))
                         except Exception as e:
-                            print(e)
+                            if not mti_break_flag:
+                                print(e)
                             mti_break_flag=True
                 ws.client.servoMH(False)
                 
                 if not mti_break_flag:
                     break
-                print("MTI break during robot move")
+                print("MTI broke during robot move")
                 while True:
                     try:
                         input("MTI reconnect ready?")
@@ -683,7 +684,7 @@ while True:
             while True:
                 pcd_new = scan_process.pcd_noise_remove(pcd,nb_neighbors=40,std_ratio=1.5,\
                                                     min_bound=crop_min,max_bound=crop_max,outlier_remove=True,cluster_based_outlier_remove=True,cluster_neighbor=1,min_points=cluser_minp)
-                # visualize_pcd([pcd_new])
+                visualize_pcd([pcd_new])
                 break
                 while True:
                     q=input("Continue?")
