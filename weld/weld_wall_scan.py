@@ -92,18 +92,18 @@ final_h_std_thres=999999999
 weld_z_height=[0,6,7] # two base layer height to first top layer
 weld_z_height=np.append(weld_z_height,np.arange(weld_z_height[-1],final_height,1)+1)
 # job_number=[115,115]
-job_number=[215,215]
-model_job_nuber = 100
-job_number=np.append(job_number,np.ones(len(weld_z_height)-2)*(int(model_job_nuber)/10 + 200)) # ER4043
-# job_number=np.append(job_number,np.ones(len(weld_z_height)-2)*206) # 160 ipm
-# job_number=np.append(job_number,np.ones(len(weld_z_height)-2)*212) # 220 ipm
+job_number=[330,330]
+model_job_nuber = 130
+# job_number=np.append(job_number,np.ones(len(weld_z_height)-2)*(int(model_job_nuber)/10 + 200)) # ER4043
+job_number=np.append(job_number,np.ones(len(weld_z_height)-2)*(int(model_job_nuber)/10 + 300)) # ER70S-6
+# job_number=np.append(job_number,np.ones(len(weld_z_height)-2)*(int(model_job_nuber)/10 + 400)) # 316L
 print(weld_z_height)
 print(job_number)
 
-ipm_mode=100
+ipm_mode=400
 
 weld_velocity=[5,5]
-weld_v=5
+weld_v=8
 print("input dh:",v2dh_loglog(weld_v,ipm_mode))
 for i in range(len(weld_z_height)-2):
     weld_velocity.append(weld_v)
@@ -122,7 +122,7 @@ start_correction_layer=3
 
 current_time = datetime.datetime.now()
 formatted_time = current_time.strftime('%Y_%m_%d_%H_%M_%S.%f')[:-7]
-data_dir=f'../data/wall_weld_test/ER4043_correction_{model_job_nuber}ipm_'  +formatted_time+'/'
+data_dir=f'../data/wall_weld_test/70S_correction_{model_job_nuber}ipm_'  +formatted_time+'/'
 
 ### read cmd
 use_previous_cmd=False
@@ -134,8 +134,8 @@ ws=WeldSend(robot_client)
 # weld state logging
 current_ser=RRN.SubscribeService('rr+tcp://192.168.55.21:12182?service=Current')
 weld_ser = RRN.SubscribeService('rr+tcp://192.168.55.10:60823?service=welder')
-cam_ser=RRN.ConnectService('rr+tcp://192.168.55.10:60827/?service=camera')
-mic_ser = RRN.ConnectService('rr+tcp://192.168.55.15:60828?service=microphone')
+cam_ser= RRN.ConnectService('rr+tcp://localhost:60827/?service=camera')
+mic_ser = RRN.ConnectService('rr+tcp://localhost:60828?service=microphone')
 ## RR sensor objects
 rr_sensors = WeldRRSensor(weld_service=weld_ser,cam_service=cam_ser,microphone_service=mic_ser,current_service=current_ser)
 
@@ -277,9 +277,10 @@ for i in range(0,end_layer):
             # max_v=75
             # h_std_thres=0.5
 
-            min_v=-1
-            max_v=1000
+            min_v=3
+            max_v=10
             h_std_thres=-1
+
 
             nominal_v=weld_v
             curve_sliced_relative,path_T_S1,this_weld_v,all_dh,last_mean_h,scan_flag=\
@@ -335,7 +336,7 @@ for i in range(0,end_layer):
         ws.jog_single(robot_weld,path_q[0],to_start_speed)
         
         weld_motion_weld_st = time.time()
-        input("Press Enter and start welding.")
+        # input("Press Enter and start welding.")
         # mp=MotionProgram(ROBOT_CHOICE='RB1',pulse2deg=robot_weld.pulse2deg)
         # mp.MoveL(np.degrees(path_q[1]), 10, 0)
         # mp.setArc(select, int(this_job_number))
@@ -563,7 +564,8 @@ for i in range(0,end_layer):
         np.save(out_scan_dir+'height_profile.npy',profile_height)
     # visualize_pcd([pcd])
     plt.scatter(profile_height[:,0],profile_height[:,1])
-    plt.show()
+    # plt.show()
+    # plt.close()
     # exit()
 
     if np.mean(profile_height[:,1])>final_height and np.std(profile_height[:,1])<final_h_std_thres and (not use_previous_cmd):

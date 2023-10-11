@@ -176,7 +176,7 @@ class WeldRRSensor(object):
 		
 	def save_current_file(self,filedir):
 		np.savetxt(filedir + 'current.csv',
-				np.array([(self.current_timestamp-self.current_timestamp[0]), self.current]).T, delimiter=',',
+				np.array([(np.array(self.current_timestamp)-self.current_timestamp[0]), self.current]).T, delimiter=',',
 				header='timestamp,current', comments='')
 	
 	def clean_ir_record(self):

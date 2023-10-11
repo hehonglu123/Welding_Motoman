@@ -135,7 +135,7 @@ for dataset in datasets:
     if dataset=='baseline':
         data_dir = '../data/wall_weld_test/baseline_weld_scan_2023_06_06_15_28_31/'
     elif dataset=='full_test':
-        data_dir = '../data/wall_weld_test/ER4043_model_120ipm_2023_10_07_14_29_36/'
+        data_dir = '../data/wall_weld_test/ER4043_model_170ipm_2023_10_08_08_52_58/'
     print('data_dir',data_dir)
     forward_flag=False
     all_profile_height=[]

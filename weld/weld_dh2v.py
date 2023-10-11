@@ -7,9 +7,14 @@ def v2dh_loglog(v,mode=140):
         # log(Δh)=-0.5068*log(V)+1.643
         logdh = -0.5068*np.log(v)+1.643
     elif mode==100:
+        # ER4043s
         # 100 ipm
         # log(Δh)=-0.6201508222063208∗log(V)+1.8491301017700346
         logdh = -0.6201508222063208*np.log(v)+1.8491301017700346
+        # # 316L
+        # # 100 ipm
+        # # log(Δh)=-0.6201508222063208∗log(V)+1.8491301017700346
+        # logdh = -0.27943327*np.log(v)+0.82598745
     elif mode==160:
         # 160 ipm
         # log(Δh)=-0.4619*log(V)+1.647 
@@ -22,6 +27,14 @@ def v2dh_loglog(v,mode=140):
         # 220 ipm
         # log(Δh)=-0.5699*log(V)+1.985 
         logdh = -0.5699*np.log(v)+1.985
+    elif mode==300:
+        # 220 ipm
+        # log(Δh)=-0.5699*log(V)+1.985 
+        logdh = -0.33658666*np.log(v)+0.93355497
+    elif mode==400:
+        # 220 ipm
+        # log(Δh)=-0.5699*log(V)+1.985 
+        logdh = -0.31630631*np.log(v)+0.70834374
     
     dh = np.exp(logdh)
     return dh
@@ -49,8 +62,25 @@ def dh2v_loglog(dh,mode=140):
     elif mode==220:
         # 220 ipm
         logv = (logdh-1.985)/(-0.5699)
-    
-    v = np.exp(logv)
+    elif mode==300:
+        # 220 ipm
+        # log(Δh)=-0.5699*log(V)+1.985 
+        logv = (logdh-0.93355497)/(-0.33658666)
+    elif mode==400:
+        # 220 ipm
+        # log(Δh)=-0.5699*log(V)+1.985 
+        logv = (logdh-0.70834374)/(-0.31630631)
+
+    if mode == 300:
+        v_raw = np.exp(logv)
+        if v_raw == 8:
+            v = v_raw
+        elif v_raw > 8:
+            v = v_raw - (0.8 * (v_raw - 8))
+        elif v_raw < 8:
+            v = v_raw + (0.8 * (8 - v_raw))
+    else:
+        v = np.exp(logv)
     return v
 
 def dh2v_quadratic(dh,mode=140):
@@ -102,9 +132,14 @@ if __name__=='__main__':
     # print(v2dh_loglog(75,220))
 
     # print(v2dh_loglog(5,100))
-    print(v2dh_loglog(10,160))
-    print(v2dh_loglog(10,180))
-    print(v2dh_loglog(9.411764,160))
+    print(v2dh_loglog(2,300))
+    print(v2dh_loglog(5,300))
+    print(v2dh_loglog(10,300))
+    print(v2dh_loglog(15,300))
+    print(v2dh_loglog(20,300))
+    print(v2dh_loglog(25,300))
+    # print(v2dh_loglog(10,180))
+    # print(v2dh_loglog(9.411764,160))
     # print(v2dh_loglog(6,100))
     # print(v2dh_loglog(10,100))
     # print(dh2v_loglog(5,100))
