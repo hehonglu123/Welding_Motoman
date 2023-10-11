@@ -34,6 +34,16 @@ def connect_failed(s, client_id, url, err):
     mti_sub=RRN.SubscribeService(url)
     mti_client=mti_sub.GetDefaultClientWait(1)
 
+def generate_mti_rr():
+    
+    global mti_sub,mti_client
+    
+    mti_sub=RRN.SubscribeService("rr+tcp://192.168.55.10:60830/?service=MTI2D")
+    mti_sub.ClientConnectFailed += connect_failed
+    mti_client=mti_sub.GetDefaultClientWait(1)
+    mti_client.setExposureTime("25")
+
+
 R1_ph_dataset_date='0926'
 R2_ph_dataset_date='0926'
 S1_ph_dataset_date='0926'
@@ -174,10 +184,11 @@ weld_ser = RRN.SubscribeService('rr+tcp://192.168.55.10:60823?service=welder')
 rr_sensors = WeldRRSensor(weld_service=weld_ser)
 # MTI connect to RR
 # mti_client = RRN.ConnectService("rr+tcp://192.168.55.10:60830/?service=MTI2D")
-mti_sub=RRN.SubscribeService("rr+tcp://192.168.55.10:60830/?service=MTI2D")
-mti_sub.ClientConnectFailed += connect_failed
-mti_client=mti_sub.GetDefaultClientWait(1)
-mti_client.setExposureTime("25")
+# mti_sub=RRN.SubscribeService("rr+tcp://192.168.55.10:60830/?service=MTI2D")
+# mti_sub.ClientConnectFailed += connect_failed
+# mti_client=mti_sub.GetDefaultClientWait(1)
+# mti_client.setExposureTime("25")
+generate_mti_rr()
 ###################################
 start_feedback=3 # with correction
 ### preplanned v,height for first few layer
@@ -531,91 +542,105 @@ while True:
             # scan_waypoint_distance=10 ## mm
             scan_waypoint_distance=waypoint_distance ## mm
             num_points_layer=max(2,int(lam_relative[-1]/scan_waypoint_distance))
+            
             ## using forward/backward technique
-            if forward:
-                breakpoints=np.linspace(0,len(lam_relative)-1,num=num_points_layer).astype(int)
-            else:
-                breakpoints=np.linspace(len(lam_relative)-1,0,num=num_points_layer).astype(int)
-            
-            ###find which end to start depending on how close to the current positioner pose
-            q_prev=ws.client.getJointAnglesDB(positioner.pulse2deg)
-            if np.linalg.norm(q_prev-q_out2[0])>np.linalg.norm(q_prev-q_out2[-1]):
-                breakpoints=breakpoints[::-1]
+            # if forward:
+            #     breakpoints=np.linspace(0,len(lam_relative)-1,num=num_points_layer).astype(int)
+            # else:
+            #     breakpoints=np.linspace(len(lam_relative)-1,0,num=num_points_layer).astype(int)
 
-            # generate motion program
-            q_bp1,q_bp2,s1_all,s2_all=spg.gen_motion_program(q_out1,q_out2,scan_p,scan_speed,breakpoints=breakpoints,init_sync_move=0)
-            v1_all=[1]
-            v2_all=[1]
-            primitives=['movej']
-            for j in range(1,len(breakpoints)):
-                v1_all.append(max(s1_all[j-1],0.1))
-                positioner_w=scan_speed/np.linalg.norm(scan_p[breakpoints[j]][:2])
-                v2_all.append(min(100,100*positioner_w/positioner.joint_vel_limit[1]))
-                primitives.append('movel')
-            #######################################
-
-            ######## scanning motion #########
-            ### execute motion ###
-
-            input("Scan Move to Start")
-            ## move to mid point and start 
-            waypoint_pose=robot_scan.fwd(q_bp1[0][0])
-            waypoint_pose.p[-1]+=50
-            
-            try:
-                q1=robot_scan.inv(waypoint_pose.p,waypoint_pose.R,q_bp1[0][0])[0]
-            except:
-                print("Use nom PH for ik")
-                robot_scan.robot.P=deepcopy(r2_nom_P)
-                robot_scan.robot.H=deepcopy(r2_nom_H)
-                q1=robot_scan.inv(waypoint_pose.p,waypoint_pose.R,q_bp1[0][0])[0]
-                robot_scan.robot.P=deepcopy(robot_scan.calib_P)
-                robot_scan.robot.H=deepcopy(robot_scan.calib_H)
-            
-            q2=q_bp2[0][0]
-            if x==0:
-                ws.jog_dual(robot_scan,positioner,[R2_mid,q1],q2,v=to_start_speed)
-            else:
-                ws.jog_dual(robot_scan,positioner,q1,q2,v=to_start_speed)
-            
-            input("Start Scan")
-            mp = MotionProgram(ROBOT_CHOICE='RB2',ROBOT_CHOICE2='ST1',pulse2deg=robot_scan.pulse2deg,pulse2deg_2=positioner.pulse2deg)
-            target2=['MOVJ',np.degrees(q_bp2[0][0]),to_start_speed]
-            mp.MoveJ(np.degrees(q_bp1[0][0]), to_start_speed, 0, target2=target2)
-            ws.client.execute_motion_program(mp)
-
-            ## motion start
-            mp = MotionProgram(ROBOT_CHOICE='RB2',ROBOT_CHOICE2='ST1',pulse2deg=robot_scan.pulse2deg,pulse2deg_2=positioner.pulse2deg)
-            # routine motion
-            for path_i in range(1,len(q_bp1)-1):
-                target2=['MOVJ',np.degrees(q_bp2[path_i][0]),v2_all[path_i]]
-                mp.MoveL(np.degrees(q_bp1[path_i][0]), v1_all[path_i], target2=target2)
-            target2=['MOVJ',np.degrees(q_bp2[-1][0]),v2_all[-1]]
-            mp.MoveL(np.degrees(q_bp1[-1][0]), v1_all[-1], 0, target2=target2)
-
-            ws.client.execute_motion_program_nonblocking(mp)
-            ###streaming
-            ws.client.StartStreaming()
-            start_time=time.time()
-            state_flag=0
-            joint_recording=[]
-            robot_stamps=[]
-            mti_recording=None
-            mti_recording=[]
-            r_pulse2deg = np.append(robot_scan.pulse2deg,positioner.pulse2deg)
             while True:
-                if state_flag & STATUS_RUNNING == 0 and time.time()-start_time>1.:
-                    break 
-                res, fb_data = ws.client.fb.try_receive_state_sync(ws.client.controller_info, 0.001)
-                if res:
-                    joint_angle=np.hstack((fb_data.group_state[0].feedback_position,fb_data.group_state[1].feedback_position,fb_data.group_state[2].feedback_position))
-                    state_flag=fb_data.controller_flags
-                    joint_recording.append(joint_angle)
-                    timestamp=fb_data.time
-                    robot_stamps.append(timestamp)
-                    ###MTI scans YZ point from tool frame
-                    mti_recording.append(deepcopy(np.array([mti_client.lineProfile.X_data,mti_client.lineProfile.Z_data])))
-            ws.client.servoMH(False)
+                ###find which end to start depending on how close to the current positioner pose
+                breakpoints=np.linspace(0,len(lam_relative)-1,num=num_points_layer).astype(int)
+                q_prev=ws.client.getJointAnglesDB(positioner.pulse2deg)
+                if np.linalg.norm(q_prev-q_out2[0])>np.linalg.norm(q_prev-q_out2[-1]):
+                    breakpoints=breakpoints[::-1]
+                # generate motion program
+                q_bp1,q_bp2,s1_all,s2_all=spg.gen_motion_program(q_out1,q_out2,scan_p,scan_speed,breakpoints=breakpoints,init_sync_move=0)
+                v1_all=[1]
+                v2_all=[1]
+                primitives=['movej']
+                for j in range(1,len(breakpoints)):
+                    v1_all.append(max(s1_all[j-1],0.1))
+                    positioner_w=scan_speed/np.linalg.norm(scan_p[breakpoints[j]][:2])
+                    v2_all.append(min(100,100*positioner_w/positioner.joint_vel_limit[1]))
+                    primitives.append('movel')
+                #######################################
+
+                ######## scanning motion #########
+                ### execute motion ###
+
+                input("Scan Move to Start")
+                ## move to mid point and start 
+                waypoint_pose=robot_scan.fwd(q_bp1[0][0])
+                waypoint_pose.p[-1]+=50
+                
+                try:
+                    q1=robot_scan.inv(waypoint_pose.p,waypoint_pose.R,q_bp1[0][0])[0]
+                except:
+                    print("Use nom PH for ik")
+                    robot_scan.robot.P=deepcopy(r2_nom_P)
+                    robot_scan.robot.H=deepcopy(r2_nom_H)
+                    q1=robot_scan.inv(waypoint_pose.p,waypoint_pose.R,q_bp1[0][0])[0]
+                    robot_scan.robot.P=deepcopy(robot_scan.calib_P)
+                    robot_scan.robot.H=deepcopy(robot_scan.calib_H)
+                
+                q2=q_bp2[0][0]
+                if x==0:
+                    ws.jog_dual(robot_scan,positioner,[R2_mid,q1],q2,v=to_start_speed)
+                else:
+                    ws.jog_dual(robot_scan,positioner,q1,q2,v=to_start_speed)
+                
+                input("Start Scan")
+                mp = MotionProgram(ROBOT_CHOICE='RB2',ROBOT_CHOICE2='ST1',pulse2deg=robot_scan.pulse2deg,pulse2deg_2=positioner.pulse2deg)
+                target2=['MOVJ',np.degrees(q_bp2[0][0]),to_start_speed]
+                mp.MoveJ(np.degrees(q_bp1[0][0]), to_start_speed, 0, target2=target2)
+                ws.client.execute_motion_program(mp)
+
+                ## motion start
+                mp = MotionProgram(ROBOT_CHOICE='RB2',ROBOT_CHOICE2='ST1',pulse2deg=robot_scan.pulse2deg,pulse2deg_2=positioner.pulse2deg)
+                # routine motion
+                for path_i in range(1,len(q_bp1)-1):
+                    target2=['MOVJ',np.degrees(q_bp2[path_i][0]),v2_all[path_i]]
+                    mp.MoveL(np.degrees(q_bp1[path_i][0]), v1_all[path_i], target2=target2)
+                target2=['MOVJ',np.degrees(q_bp2[-1][0]),v2_all[-1]]
+                mp.MoveL(np.degrees(q_bp1[-1][0]), v1_all[-1], 0, target2=target2)
+
+                
+                mti_break_flag=False
+                ws.client.execute_motion_program_nonblocking(mp)
+                ###streaming
+                ws.client.StartStreaming()
+                start_time=time.time()
+                state_flag=0
+                joint_recording=[]
+                robot_stamps=[]
+                mti_recording=None
+                mti_recording=[]
+                r_pulse2deg = np.append(robot_scan.pulse2deg,positioner.pulse2deg)
+                while True:
+                    if state_flag & STATUS_RUNNING == 0 and time.time()-start_time>1.:
+                        break 
+                    res, fb_data = ws.client.fb.try_receive_state_sync(ws.client.controller_info, 0.001)
+                    if res:
+                        joint_angle=np.hstack((fb_data.group_state[0].feedback_position,fb_data.group_state[1].feedback_position,fb_data.group_state[2].feedback_position))
+                        state_flag=fb_data.controller_flags
+                        joint_recording.append(joint_angle)
+                        timestamp=fb_data.time
+                        robot_stamps.append(timestamp)
+                        ###MTI scans YZ point from tool frame
+                        try:
+                            mti_recording.append(deepcopy(np.array([mti_client.lineProfile.X_data,mti_client.lineProfile.Z_data])))
+                        except Exception as e:
+                            print(e)
+                            mti_break_flag=True
+                ws.client.servoMH(False)
+                
+                if not mti_break_flag:
+                    break
+                print("MTI break during robot move")
+                input("MTI reconnect ready?")
+                generate_mti_rr()
             
             mti_recording=np.array(mti_recording)
             joint_recording=np.array(joint_recording)
