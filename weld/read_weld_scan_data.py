@@ -443,7 +443,7 @@ for dataset in datasets:
     plt.xlabel('x-axis (mm)', fontsize=20)
     plt.ylabel('height (mm)', fontsize=20)
     
-    plt.title("Height Profile of 100ipm MFCC Control Test", fontsize=20)
+    plt.title(f"Height Profile of {data_dir}", fontsize=20)
     plt.tight_layout()
     
 
