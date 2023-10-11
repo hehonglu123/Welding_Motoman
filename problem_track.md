@@ -11,7 +11,9 @@ TBD
 TBD
 
 ## MTI Disconnection
-Restart RR driver
+1. Add `try catch` in the python script
+2. Restart RR driver when catch disconnect
+3. The robot should rescan the last printed layer
 
 # Robot Problem
 ## Robot Joint Overload Error
