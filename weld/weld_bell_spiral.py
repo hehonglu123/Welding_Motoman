@@ -64,7 +64,7 @@ q_prev=client.getJointAnglesDB(positioner.pulse2deg)
 
 ###set up control parameters
 job_offset=200 		###200 for Aluminum ER4043, 300 for Steel Alloy ER70S-6, 400 for Stainless Steel ER316L
-nominal_feedrate=150
+nominal_feedrate=180
 nominal_vd_relative=5
 nominal_wire_length=25 #pixels
 nominal_temp_below=500
@@ -77,7 +77,7 @@ feedrate_min=100
 feedrate_max=300
 nominal_slice_increment=int(1.0/slicing_meta['line_resolution'])
 slice_inc_gain=3.
-vd_max=9.5
+vd_max=9
 feedrate_cmd_adjustment=-50
 vd_relative_adjustment=2
 
