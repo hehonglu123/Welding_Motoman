@@ -135,7 +135,7 @@ for dataset in datasets:
     if dataset=='baseline':
         data_dir = '../data/wall_weld_test/baseline_weld_scan_2023_06_06_15_28_31/'
     elif dataset=='full_test':
-        data_dir = '../data/wall_weld_test/ER4043_model_240ipm_2023_10_08_09_23_37/'
+        data_dir = '../data/wall_weld_test/ER4043_model_130ipm_2023_10_08_07_52_48/'
     print('data_dir',data_dir)
     forward_flag=False
     all_profile_height=[]
@@ -494,8 +494,12 @@ print('loglog-coeffs',coeffs)
 x_fit = np.linspace(log_x.min(), log_x.max(), 500)
 # 使用多项式对象计算出 y 值
 y_fit = p(x_fit)
-plt.plot(log_x, log_y, 'o')
-plt.plot(x_fit, y_fit, '-')
+plt.plot(log_x, log_y, 'o',label='data_points')
+plt.plot(x_fit, y_fit, '-', label = 'loglog_fit_model')
+plt.legend()
+plt.xlabel('log(v) (log(mm/s))')
+plt.ylabel('log(delta_h) (log(mm))')
+plt.title(f"loglog_plot of {data_dir}")
 plt.show()
 plt.close()
 

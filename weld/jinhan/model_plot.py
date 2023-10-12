@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-model = 'ER_4043s'
+model = 'ER_4043'
 # Define the models
 if model == 'ER_4043':
     models = {

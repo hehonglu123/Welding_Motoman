@@ -141,7 +141,7 @@ for dataset in datasets:
     elif dataset=='repeat 2':
         data_dir = '../data/wall_weld_test/moveL_100_repeat_weld_scan_2023_08_02_17_07_02/'
     elif dataset =='test':
-        data_dir = '../data/wall_weld_test/70S_correction_130ipm_2023_10_10_15_29_58/'
+        data_dir = '../data/wall_weld_test/ER4043_baseline_100ipm_2023_07_07_15_20_56/'
     forward_flag=False
     all_profile_height=[]
     all_correction_layer=[]
@@ -473,6 +473,7 @@ for dataset in datasets:
     datasets_h_mean[dataset]=np.array(all_h_mean)
     datasets_h_std[dataset]=np.array(all_h_std)
 
+
 for dataset in datasets:
     plt.plot(np.arange(len(datasets_h_mean[dataset])),datasets_h_mean[dataset],'-o',label=dataset)
 plt.legend()
@@ -481,7 +482,7 @@ plt.ylabel('Mean Height (mm)', fontsize=20)
 plt.title("Mean Height", fontsize=20)
 plt.tight_layout()
 plt.show()
-
+print('mean std:', np.mean(datasets_h_std[dataset]))
 for dataset in datasets:
     plt.plot(np.arange(len(datasets_h_std[dataset])),datasets_h_std[dataset],'-o',label=dataset)
 # plt.axhline(y = 0.48, color = 'r', linestyle = '-')
