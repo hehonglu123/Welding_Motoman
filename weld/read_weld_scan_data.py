@@ -99,9 +99,9 @@ path_R=np.array([[-0.7071, 0.7071, -0.    ],
 R_S1TCP = np.matmul(T_S1TCP_R1Base[:3,:3],path_R)
 
 build_height_profile=False
-plot_correction=True
-# show_layer = []
-show_layer = [12]
+plot_correction=False
+show_layer = []
+# show_layer = [12]
 
 x_lower = -99999
 x_upper = 999999
@@ -112,8 +112,8 @@ x_upper = 999999
 start_id=75
 end_id=-75
 
-# datasets=['baseline','correction']
-datasets=['correction']
+datasets=['baseline','correction']
+# datasets=['correction']
 
 # datasets=['correction','repeat 1','repeat 2']
 # datasets=['baseline','correction','repeat 1','repeat 2']
@@ -288,11 +288,11 @@ for dataset in datasets:
                     all_dh.append(this_dh)
                     seg_mean_h.append(this_mean_h)
                 
-                print("Mean H:",mean_h)
-                print("Target H:",h_target)
-                # print("Seg mean h:",seg_mean_h)
-                print("dh:",all_dh)
-                print("v:",this_weld_v)
+                # print("Mean H:",mean_h)
+                # print("Target H:",h_target)
+                # # print("Seg mean h:",seg_mean_h)
+                # print("dh:",all_dh)
+                # print("v:",this_weld_v)
                 
                 plt.scatter(profile_height[:,0],profile_height[:,1])
                 plt.xlabel('X-axis (Lambda) (mm)',fontsize=26)
@@ -471,8 +471,10 @@ plt.title("Mean Height")
 plt.tight_layout()
 plt.show()
 
+print("Average/Std of height std")
 for dataset in datasets:
     plt.plot(np.arange(len(datasets_h_std[dataset])),datasets_h_std[dataset],'-o',label=dataset)
+    print(dataset,':',round(np.mean(datasets_h_std[dataset]),5),round(np.std(datasets_h_std[dataset]),5))
 # plt.axhline(y = 0.48, color = 'r', linestyle = '-')
 plt.legend(fontsize=12)
 plt.xlabel('Layer',fontsize=15)
@@ -482,6 +484,7 @@ plt.yticks(fontsize=12)
 plt.title("Height STD",fontsize=18)
 plt.tight_layout()
 plt.show()
+print("==================")
 
 datasets_dh_mean={}
 for dataset in datasets:
