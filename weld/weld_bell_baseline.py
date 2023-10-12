@@ -13,7 +13,7 @@ sliced_alg='circular_slice/'
 data_dir='../data/'+dataset+sliced_alg
 with open(data_dir+'slicing.yml', 'r') as file:
 	slicing_meta = yaml.safe_load(file)
-recorded_dir='recorded_data/cup_ER316L/'
+# recorded_dir='recorded_data/cup_ER316L/'
 waypoint_distance=5
 layer_width_num=int(3/slicing_meta['line_resolution'])
 
@@ -39,7 +39,7 @@ vd_relative=nominal_vd_relative
 feedrate_gain=0.5
 feedrate_min=100
 feedrate_max=300
-nominal_slice_increment=int(1.15/slicing_meta['line_resolution'])
+nominal_slice_increment=int(1.05/slicing_meta['line_resolution'])
 slice_inc_gain=3.
 vd_max=10
 feedrate_cmd_adjustment=0
@@ -115,7 +115,8 @@ vd_relative_adjustment=0
 
 ###########################################layer welding############################################
 num_layer_start=int(1*nominal_slice_increment)	###modify layer num here
-num_layer_end=int(70*nominal_slice_increment)
+num_layer_end=slicing_meta['num_layers']
+
 # q_prev=client.getJointAnglesDB(positioner.pulse2deg)
 q_prev=np.array([9.53E-02,-2.71E+00])	###for motosim tests only
 num_sections_prev=5

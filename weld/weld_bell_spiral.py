@@ -55,36 +55,17 @@ cond_all=[]
 primitives=[]
 arcon_set=False
 layer_start=1
-layer_end=70
+layer_end=100
 num_layer_start=int(layer_start*layer_height_num)
-num_layer_end=int(min(layer_end*layer_height_num,slicing_meta['num_layers']-1))
+num_layer_end=slicing_meta['num_layers']
 q_prev=client.getJointAnglesDB(positioner.pulse2deg)
 # q_prev=[0,0]
 
 
 ###set up control parameters
-# job_offset=200 		###200 for Aluminum ER4043, 300 for Steel Alloy ER70S-6, 400 for Stainless Steel ER316L
-# nominal_feedrate=150
-# nominal_vd_relative=5
-# nominal_wire_length=25 #pixels
-# nominal_temp_below=500
-# base_feedrate_cmd=300
-# base_vd=8
-# feedrate_cmd=nominal_feedrate
-# vd_relative=nominal_vd_relative
-# feedrate_gain=0.5
-# feedrate_min=100
-# feedrate_max=300
-# nominal_slice_increment=int(1.0/slicing_meta['line_resolution'])
-# slice_inc_gain=3.
-# vd_max=9
-# feedrate_cmd_adjustment=-50
-# vd_relative_adjustment=2
-
-###set up control parameters
-job_offset=400 		###200 for Aluminum ER4043, 300 for Steel Alloy ER70S-6, 400 for Stainless Steel ER316L
-nominal_feedrate=80
-nominal_vd_relative=2
+job_offset=200 		###200 for Aluminum ER4043, 300 for Steel Alloy ER70S-6, 400 for Stainless Steel ER316L
+nominal_feedrate=150
+nominal_vd_relative=5
 nominal_wire_length=25 #pixels
 nominal_temp_below=500
 base_feedrate_cmd=300
@@ -92,13 +73,51 @@ base_vd=8
 feedrate_cmd=nominal_feedrate
 vd_relative=nominal_vd_relative
 feedrate_gain=0.5
-feedrate_min=80
+feedrate_min=100
 feedrate_max=300
-nominal_slice_increment=int(1.2/slicing_meta['line_resolution'])
+nominal_slice_increment=int(1.0/slicing_meta['line_resolution'])
 slice_inc_gain=3.
-vd_max=9
-feedrate_cmd_adjustment=1
-vd_relative_adjustment=1
+vd_max=9.5
+feedrate_cmd_adjustment=-50
+vd_relative_adjustment=2
+
+###set up control parameters
+# job_offset=300 		###200 for Aluminum ER4043, 300 for Steel Alloy ER70S-6, 400 for Stainless Steel ER316L
+# nominal_feedrate=90
+# nominal_vd_relative=2
+# nominal_wire_length=25 #pixels
+# nominal_temp_below=500
+# base_feedrate_cmd=300
+# base_vd=8
+# feedrate_cmd=nominal_feedrate
+# vd_relative=nominal_vd_relative
+# feedrate_gain=0.5
+# feedrate_min=90
+# feedrate_max=120
+# nominal_slice_increment=int(0.85/slicing_meta['line_resolution'])
+# slice_inc_gain=3.
+# vd_max=8
+# feedrate_cmd_adjustment=1
+# vd_relative_adjustment=0.5
+
+# ###set up control parameters
+# job_offset=400 		###200 for Aluminum ER4043, 300 for Steel Alloy ER70S-6, 400 for Stainless Steel ER316L
+# nominal_feedrate=80
+# nominal_vd_relative=2
+# nominal_wire_length=25 #pixels
+# nominal_temp_below=500
+# base_feedrate_cmd=300
+# base_vd=8
+# feedrate_cmd=nominal_feedrate
+# vd_relative=nominal_vd_relative
+# feedrate_gain=0.5
+# feedrate_min=80
+# feedrate_max=300
+# nominal_slice_increment=int(1.15/slicing_meta['line_resolution'])
+# slice_inc_gain=3.
+# vd_max=9
+# feedrate_cmd_adjustment=1
+# vd_relative_adjustment=1
 
 ######################################################BASE LAYER##########################################################################################
 # slice_num=0
@@ -163,7 +182,7 @@ vd_relative_adjustment=1
 
 
 ##################################################### LAYER Welding##########################################################################################
-####PRELOAD ALL SLICES TO SAVE INPROCESS TIME
+###PRELOAD ALL SLICES TO SAVE INPROCESS TIME
 rob1_js_all_slices=[]
 rob2_js_all_slices=[]
 positioner_js_all_slices=[]
@@ -240,7 +259,7 @@ for slice_num in range(num_layer_start,num_layer_end,nominal_slice_increment):
 	feedrate_cmd+=feedrate_cmd_adjustment
 	vd_relative+=vd_relative_adjustment
 	vd_relative=min(vd_max,vd_relative)
-	feedrate_cmd=max(feedrate_cmd,feedrate_min)
+	feedrate_cmd=min(feedrate_max,max(feedrate_cmd,feedrate_min))
 	print('FEEDRATE: ',feedrate_cmd,'VD: ',vd_relative)
 
 	q_prev=copy.deepcopy(positioner_js[-1])

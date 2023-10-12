@@ -26,7 +26,7 @@ class WeldRRSensor(object):
 		if cam_service:
 			self.ir_image_consts = RRN.GetConstants('com.robotraconteur.image', self.cam_ser)
 
-			self.cam_ser.setf_param("focus_pos", RR.VarValue(int(1600),"int32"))
+			self.cam_ser.setf_param("focus_pos", RR.VarValue(int(1900),"int32"))
 			self.cam_ser.setf_param("object_distance", RR.VarValue(0.4,"double"))
 			self.cam_ser.setf_param("reflected_temperature", RR.VarValue(291.15,"double"))
 			self.cam_ser.setf_param("atmospheric_temperature", RR.VarValue(293.15,"double"))
