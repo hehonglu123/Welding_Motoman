@@ -21,7 +21,7 @@ all_frames = []
 # Initialize data mode (0 for ir_recording, 1 for temperature)
 data_mode = 0
 # Local folder path
-main_folder_path = '../data/wall_weld_test/weld_scan_100ipm_cool_2023_08_10_11_28_20'
+main_folder_path = '../data/wall_weld_test/ER4043_correction_100ipm_2023_09_27_20_53_05'
 
 for folder_name in os.listdir(main_folder_path):
     if folder_name.startswith('layer_'):

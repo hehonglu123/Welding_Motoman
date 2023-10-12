@@ -96,7 +96,7 @@ def audio_MFCC(file_path):
         print(f"Path '{file_path}' does not exist!")
         
 if __name__ == "__main__":
-    data_dir='../data/wall_weld_test/316L_model_140ipm_2023_09_27_21_43_22/'
+    data_dir='../data/wall_weld_test/ER4043_correction_100ipm_2023_09_27_20_53_05/'
     if os.path.exists(data_dir):
         subdirs = [d for d in os.listdir(data_dir) if os.path.isdir(os.path.join(data_dir, d))]
         layer_dirs = [d for d in subdirs if re.match(r'layer_\d+', d)]
