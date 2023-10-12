@@ -684,7 +684,7 @@ while True:
             while True:
                 pcd_new = scan_process.pcd_noise_remove(pcd,nb_neighbors=40,std_ratio=1.5,\
                                                     min_bound=crop_min,max_bound=crop_max,outlier_remove=True,cluster_based_outlier_remove=True,cluster_neighbor=1,min_points=cluser_minp)
-                visualize_pcd([pcd_new])
+                # visualize_pcd([pcd_new])
                 break
                 while True:
                     q=input("Continue?")
