@@ -560,7 +560,7 @@ class ScanProcess():
             draw_obj = []
             draw_obj.extend(path_viz_frames)
             draw_obj.extend([scanned_points_draw,path_points])
-            visualize_pcd(draw_obj)
+            # visualize_pcd(draw_obj)
         
         return profile_height
     
