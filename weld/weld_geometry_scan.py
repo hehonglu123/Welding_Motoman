@@ -170,9 +170,15 @@ mti_Rpath = np.array([[ -1.,0.,0.],
 # 3. Motion Parameters
 to_start_speed=7
 to_home_speed=10
-R1_home = np.radians([10,0,0,0,0,0])
+# R1_home = np.radians([10,0,0,0,0,0])
+# R2_mid = np.radians([6,20,-10,0,0,0])
+# R2_home = np.radians([70,10,-5,0,0,0])
+
+R1_mid = np.radians([10,0,0,0,0,0])
+R1_home = np.radians([-45,0,0,0,0,0])
 R2_mid = np.radians([6,20,-10,0,0,0])
-R2_home = np.radians([70,10,-5,0,0,0])
+R2_home = np.radians([30,20,-10,0,0,0])
+
 scan_process = ScanProcess(robot_scan,positioner)
 # ## rr drivers and all other drivers
 robot_client=MotionProgramExecClient()
@@ -366,12 +372,14 @@ while True:
                 if len(curve_sliced_js)<2:
                     continue
                 positioner_js=np.loadtxt(curve_data_dir+'curve_sliced_js/D500B_js'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
+                ir_js = np.loadtxt(curve_data_dir+'curve_sliced_js/MA1440_js'+str(layer)+'_'+str(x)+'.csv',delimiter=',').reshape((-1,6))
                 curve_sliced_relative=np.loadtxt(curve_data_dir+'curve_sliced_relative/slice'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
             else: # baselayer
                 curve_sliced_js=np.loadtxt(curve_data_dir+'curve_sliced_js/MA2010_base_js'+str(layer)+'_'+str(x)+'.csv',delimiter=',').reshape((-1,6))
                 if len(curve_sliced_js)<2:
                     continue
                 positioner_js=np.loadtxt(curve_data_dir+'curve_sliced_js/D500B_base_js'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
+                ir_js = np.loadtxt(curve_data_dir+'curve_sliced_js/MA1440_base_js'+str(layer)+'_'+str(x)+'.csv',delimiter=',').reshape((-1,6))
                 curve_sliced_relative=np.loadtxt(curve_data_dir+'curve_sliced_relative/baselayer'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
 
             #### convert to R1 and S1 motion
@@ -458,18 +466,21 @@ while True:
             q2=positioner_js[breakpoints[0]]
 
             if go_weld:
-                ws.jog_dual(robot_weld,positioner,q1,q2,v=to_start_speed)
+                # ws.jog_dual(robot_weld,positioner,q1,q2,v=to_start_speed)
+                ws.jog_tri(robot_weld,positioner,robot_scan,[R1_mid,q1],q2,ir_js[breakpoints[0]],v=to_start_speed)
 
             ######################################################
             ########### Do welding #############
             q1_all=[curve_sliced_js[breakpoints[0]]]
             q2_all=[positioner_js[breakpoints[0]]]
+            qir_all=[ir_js[breakpoints[0]]]
             v1_all=[1]
             v2_all=[10]
             primitives=['movej']
             for j in range(1,len(breakpoints)):
                 q1_all.append(curve_sliced_js[breakpoints[j]])
                 q2_all.append(positioner_js[breakpoints[j]])
+                qir_all.append(ir_js[breakpoints[j]])
                 v1_all.append(max(s1_all[j-1],0.1))
                 
                 positioner_w=this_weld_v[j-1]/np.linalg.norm(curve_sliced_relative[breakpoints[j]][:2])
@@ -481,7 +492,8 @@ while True:
             if go_weld:
                 ####DATA LOGGING
                 rr_sensors.start_all_sensors()
-                rob_stamps,rob_js_exe,_,_=ws.weld_segment_dual(primitives,robot_weld,positioner,q1_all,q2_all,v1_all,v2_all,cond_all=[weld_job],arc=arc_on)
+                # rob_stamps,rob_js_exe,_,_=ws.weld_segment_dual(primitives,robot_weld,positioner,q1_all,q2_all,v1_all,v2_all,cond_all=[weld_job],arc=arc_on)
+                rob_stamps,rob_js_exe,_,_=ws.weld_segment_tri(primitives,robot_weld,positioner,robot_scan,q1_all,q2_all,qir_all,v1_all,v2_all,cond_all=[weld_job],arc=arc_on)
                 rr_sensors.stop_all_sensors()
 
                 if save_weld_record:
@@ -498,7 +510,7 @@ while True:
     ## move R1 back to home
     # print(q1_all)
     input("Weld Move to Home")
-    ws.jog_single(robot_weld,R1_home,v=to_home_speed)
+    ws.jog_single(robot_weld,[R1_mid,R1_home],v=to_home_speed)
 
     #### scanning
     if True:
@@ -684,7 +696,7 @@ while True:
             while True:
                 pcd_new = scan_process.pcd_noise_remove(pcd,nb_neighbors=40,std_ratio=1.5,\
                                                     min_bound=crop_min,max_bound=crop_max,outlier_remove=True,cluster_based_outlier_remove=True,cluster_neighbor=1,min_points=cluser_minp)
-                visualize_pcd([pcd_new])
+                # visualize_pcd([pcd_new])
                 break
                 while True:
                     q=input("Continue?")

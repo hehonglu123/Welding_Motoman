@@ -321,8 +321,6 @@ for dataset in datasets:
                 plt.title("Height and Speed, 40 MoveL",fontsize=32)
                 plt.show()
                 
-                
-
             ### plot velocity and actual velocity
             next_weld_dir=data_dir+'layer_'+str(i+1)+'/'
             next_weld_q=np.loadtxt(next_weld_dir+'weld_js_exe.csv',delimiter=',')

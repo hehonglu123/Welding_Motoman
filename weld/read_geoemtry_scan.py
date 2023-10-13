@@ -13,7 +13,9 @@ from scan_continuous import *
 from scanPathGen import *
 from scanProcess import *
 from PH_interp import *
+from utils import *
 from weldCorrectionStrategy import *
+from weld_dh2v import *
 
 from general_robotics_toolbox import *
 import matplotlib.pyplot as plt
@@ -100,8 +102,8 @@ regen_pcd = False
 dataset='blade0.1/'
 sliced_alg='auto_slice/'
 curve_data_dir = '../data/'+dataset+sliced_alg
-data_dir=curve_data_dir+'weld_scan_baseline_2023_10_09_16_01_52'+'/'
-# data_dir=curve_data_dir+'weld_scan_correction_2023_10_10_16_56_32'+'/'
+# data_dir=curve_data_dir+'weld_scan_baseline_2023_10_09_16_01_52'+'/'
+data_dir=curve_data_dir+'weld_scan_correction_2023_10_10_16_56_32'+'/'
 
 #### welding spec, goal
 with open(curve_data_dir+'slicing.yml', 'r') as file:
@@ -131,7 +133,9 @@ last_curve_height = []
 all_pcd=o3d.geometry.PointCloud()
 viz_obj=[]
 
-des_dh = 2.3420716473455623
+ipm_mode=100
+nominal_v = 5
+des_dh = v2dh_loglog(nominal_v,mode=ipm_mode)
 
 # Transz0_H=None
 Transz0_H=np.array([[ 9.99977850e-01, -4.63363649e-05, -6.65562283e-03,  5.00198327e-03],
@@ -144,6 +148,7 @@ dh_norm=[]
 dh_rmse=[]
 all_layer_dh=[]
 all_layer_deviation=[]
+all_layer_ldot=[]
 for layer_count in range(0,total_count):
     baselayer=False
     # if layer_count!= 0 and layer_count<=total_baselayer:
@@ -161,6 +166,7 @@ for layer_count in range(0,total_count):
     
     layer_curve_relative=[]
     layer_curve_dh=[]
+    layer_ldot=[]
     for x in range(num_sections):
         layer_sec_data_dir=layer_data_dir+str(x)+'/'
         out_scan_dir = layer_sec_data_dir+'scans/'
@@ -228,6 +234,7 @@ for layer_count in range(0,total_count):
             # if len(layer_curve_dh)!=0:
             #     profile_height[:,0]+=layer_curve_dh[-1][0]
             ## correct the lambda based on previous
+            start_lambda=0
             if layer>0:
                 closest_id = np.argmin(np.linalg.norm(last_curve_relative[:,:3]-curve_sliced_relative[0,:3],axis=1))
                 start_lambda = all_layer_dh[-1][closest_id,0]
@@ -238,6 +245,44 @@ for layer_count in range(0,total_count):
         layer_curve_relative.extend(curve_sliced_relative)
 
         pcd_layer+=pcd
+        
+        ## load weld js exe
+        weld_js_exe = np.loadtxt(layer_sec_data_dir+'weld_js_exe.csv',delimiter=',')
+        weld_stamps = np.loadtxt(layer_sec_data_dir+'weld_robot_stamps.csv',delimiter=',')
+        ldot=[0]
+        lam=[0]
+        last_p=None
+        js_id=0
+        for js in weld_js_exe:
+            R1TCP = robot_weld.fwd(js[:6])
+            S1TCP_R1BASE = positioner.fwd(js[-2:],world=True)
+            R1TCP_S1TCP = S1TCP_R1BASE.inv()*R1TCP
+            if last_p is not None:
+                lam.append(lam[-1]+np.linalg.norm(R1TCP_S1TCP.p-last_p))
+                ldot.append(np.linalg.norm(R1TCP_S1TCP.p-last_p)/(weld_stamps[js_id]-weld_stamps[js_id-1]))
+                # ldot.append(np.linalg.norm(R1TCP_S1TCP.p-last_p)/0.004)
+            last_p=deepcopy(R1TCP_S1TCP.p)
+            js_id+=1
+        lam=np.array(lam)
+        ldot=np.array(ldot)
+        ldot_smooth = moving_average(ldot, n=21, padding=True)
+        weld_start_id = np.argmin(ldot_smooth[100:250])+100
+        ldot=ldot[weld_start_id:]
+        ldot_smooth=ldot_smooth[weld_start_id:]
+        lam=lam[weld_start_id:]
+        lam=lam-lam[0]+start_lambda
+        
+        if layer_count%2==1:
+            lam=lam[::-1]
+            lam=lam[0]+lam[-1]-lam
+            ldot=ldot[::-1]
+            ldot_smooth=ldot_smooth[::-1]
+        
+        # plt.scatter(lam,ldot)
+        # plt.plot(lam,ldot_smooth,c='tab:orange')
+        # plt.show()
+        ldot_lam = np.array([lam,ldot_smooth]).T
+        layer_ldot.extend(ldot_lam)
     
     # get the full layer height
     # if layer!=-1:
@@ -273,6 +318,8 @@ for layer_count in range(0,total_count):
     layer_curve_deviation = np.array(layer_curve_dh)
     layer_curve_deviation[:,1] = des_dh-layer_curve_deviation[:,1]
     all_layer_deviation.append(layer_curve_deviation)
+    layer_ldot=np.array(layer_ldot)
+    all_layer_ldot.append(layer_ldot)
     
     # curve_i=0
     # total_curve_i = len(layer_curve_dh)
@@ -319,7 +366,19 @@ plt.xlabel("Path length (lambda) (mm)",fontsize=16)
 plt.ylabel("Height (mm)",fontsize=16)
 plt.xticks(fontsize=16)
 plt.yticks(fontsize=16)
-plt.title("Layer Height (Baseline)",fontsize=20)
+plt.title("Layer Height",fontsize=20)
+plt.show()
+
+draw_l_count=0
+for ldot in all_layer_ldot:
+    draw_color='tab:blue' if draw_l_count%2==0 else 'tab:orange'
+    plt.plot(ldot[:,0],ldot[:,1]+draw_l_count*(nominal_v*2),c=draw_color)
+    draw_l_count+=1
+plt.xlabel("Path length (lambda) (mm)",fontsize=16)
+plt.ylabel("Layer #",fontsize=16)
+plt.xticks(fontsize=16)
+plt.yticks(np.arange(draw_l_count)*(nominal_v*2),np.arange(1,draw_l_count+1),fontsize=16)
+plt.title("Layer Ldot vs lambda",fontsize=20)
 plt.show()
 
 # save std data
