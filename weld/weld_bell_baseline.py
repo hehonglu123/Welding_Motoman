@@ -27,42 +27,42 @@ client=MotionProgramExecClient()
 ws=WeldSend(client)
 
 ###set up control parameters
-job_offset=200 		###200 for Aluminum ER4043, 300 for Steel Alloy ER70S-6, 400 for Stainless Steel ER316L
-nominal_feedrate=110
-nominal_vd_relative=9
-nominal_wire_length=25 #pixels
-nominal_temp_below=500
-base_feedrate_cmd=300
-base_vd=9
-feedrate_cmd=nominal_feedrate
-vd_relative=nominal_vd_relative
-feedrate_gain=0.5
-feedrate_min=100
-feedrate_max=300
-nominal_slice_increment=int(1.05/slicing_meta['line_resolution'])
-slice_inc_gain=3.
-vd_max=10
-feedrate_cmd_adjustment=0
-vd_relative_adjustment=0
-
-# ###set up control parameters
-# job_offset=400 		###200 for Aluminum ER4043, 300 for Steel Alloy ER70S-6, 400 for Stainless Steel ER316L
-# nominal_feedrate=130
-# nominal_vd_relative=8
+# job_offset=200 		###200 for Aluminum ER4043, 300 for Steel Alloy ER70S-6, 400 for Stainless Steel ER316L
+# nominal_feedrate=110
+# nominal_vd_relative=9
 # nominal_wire_length=25 #pixels
 # nominal_temp_below=500
 # base_feedrate_cmd=300
-# base_vd=5
+# base_vd=9
 # feedrate_cmd=nominal_feedrate
 # vd_relative=nominal_vd_relative
 # feedrate_gain=0.5
-# feedrate_min=80
+# feedrate_min=100
 # feedrate_max=300
-# nominal_slice_increment=int(1.2/slicing_meta['line_resolution'])
+# nominal_slice_increment=int(1.05/slicing_meta['line_resolution'])
 # slice_inc_gain=3.
 # vd_max=10
 # feedrate_cmd_adjustment=0
 # vd_relative_adjustment=0
+
+###set up control parameters
+job_offset=400 		###200 for Aluminum ER4043, 300 for Steel Alloy ER70S-6, 400 for Stainless Steel ER316L
+nominal_feedrate=100
+nominal_vd_relative=8
+nominal_wire_length=25 #pixels
+nominal_temp_below=500
+base_feedrate_cmd=300
+base_vd=5
+feedrate_cmd=nominal_feedrate
+vd_relative=nominal_vd_relative
+feedrate_gain=0.5
+feedrate_min=80
+feedrate_max=300
+nominal_slice_increment=int(0.85/slicing_meta['line_resolution'])
+slice_inc_gain=3.
+vd_max=10
+feedrate_cmd_adjustment=0
+vd_relative_adjustment=0
 
 ###########################################BASE layer welding############################################
 # num_layer_start=int(0*nominal_slice_increment)	###modify layer num here
@@ -126,6 +126,7 @@ else:
 	num_sections=1
 
 for layer in range(num_layer_start,num_layer_end,nominal_slice_increment):
+	print("current layer: ", layer)
 	mp=MotionProgram(ROBOT_CHOICE='RB1',ROBOT_CHOICE2='ST1',pulse2deg=robot.pulse2deg,pulse2deg_2=positioner.pulse2deg, tool_num = 12)
 
 	num_sections_prev=num_sections

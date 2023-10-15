@@ -19,12 +19,15 @@ def main():
     c1.setf_param("relative_humidity", RR.VarValue(50,"double"))
     c1.setf_param("ext_optics_temperature", RR.VarValue(293.15,"double"))
     c1.setf_param("ext_optics_transmission", RR.VarValue(0.99,"double"))
-    # c1.setf_param("current_case", RR.VarValue(2,"int32"))
+    c1.setf_param("current_case", RR.VarValue(2,"int32"))
     c1.setf_param("ir_format", RR.VarValue("radiometric","string"))
     c1.setf_param("object_emissivity", RR.VarValue(0.13,"double"))
     c1.setf_param("scale_limit_low", RR.VarValue(293.15,"double"))
     c1.setf_param("scale_limit_upper", RR.VarValue(5000,"double"))
     image_consts = RRN.GetConstants('com.robotraconteur.image', c1)
+    # threshold=10000 ##10000 for AL
+    threshold=30000 ##30000 for Steel
+
     counts=0
     time.sleep(1)
     while True:
@@ -37,7 +40,7 @@ def main():
                 data_u16 = np.array(rr_img.data.view(np.uint16))
                 current_mat = data_u16.reshape([rr_img.image_info.height, rr_img.image_info.width], order='C')
             #cap
-            current_mat[current_mat >10000] = 10000
+            current_mat[current_mat >threshold] = threshold
             ir_normalized = ((current_mat - np.min(current_mat)) / (np.max(current_mat) - np.min(current_mat))) * 255
             ir_bgr = cv2.applyColorMap(ir_normalized.astype(np.uint8), cv2.COLORMAP_INFERNO)
 
