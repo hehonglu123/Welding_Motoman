@@ -84,21 +84,7 @@ if robot_type=='GP1':
     output_tool_marker_config_file = config_dir+'ge_pointer1_'+dataset_date+'_marker_config.yaml'
     
 elif robot_type=='GP2':
-    base_marker_config_file=config_dir+'MA2010_marker_config.yaml'
-    tool_marker_config_file=config_dir+'weldgun_marker_config.yaml'
-    robot=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path=config_dir+'torch.csv',\
-    base_marker_config_file=base_marker_config_file,tool_marker_config_file=tool_marker_config_file)
-
-    # only R matter
-    nominal_robot_base = Transform(np.array([[0,1,0],
-                                            [0,0,1],
-                                            [1,0,0]]),[0,0,0]) 
-    H_nom = np.matmul(nominal_robot_base.R,robot.robot.H)
-
-    jN=6
-    
-    output_base_marker_config_file = config_dir+'MA2010_'+dataset_date+'_marker_config.yaml'
-    output_tool_marker_config_file = config_dir+'weldgun_'+dataset_date+'_marker_config.yaml'
+    pass
     
 
 H_act = deepcopy(H_nom)
@@ -194,3 +180,12 @@ for j in range(6,0,-1):
         zero_P[:,i] = R@zero_P[:,i]
 print('P',np.round(zero_P[:,1:7],3).T)
 print('H',np.round(zero_H,3).T)
+
+# Find R^toolmarker_base
+# similar to the idea of "flange frame"
+rpy_tool_basemarker = []
+for Rtool in R_tool_basemarker:
+    rpy_tool_basemarker.append(np.array(R2rpy(Rtool)))
+rpy_tool_basemarker = np.mean(rpy_tool_basemarker,axis=0)
+R_tool_basemarker = rpy2R(rpy_tool_basemarker)
+R_tool_base = np.matmul(T_basemarker_base.R,R_tool_basemarker)

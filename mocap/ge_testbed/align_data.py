@@ -58,15 +58,17 @@ base_marker_config_file=robot_marker_dir+robot_name+'_marker_config.yaml',tool_m
 
 raw_data_dir='PH_grad_data/'+datasets
 
-# robot_q =np.loadtxt(raw_data_dir+'_robot_q_raw.csv',delimiter=',')
-# print(len(robot_q))
+robot_q =np.loadtxt(raw_data_dir+'_robot_q_raw.csv',delimiter=',')
 
-# robot_q_aligned = []
-# for q_id in range(0,len(robot_q),3):
-#     this_q = np.mean(robot_q[q_id:q_id+3],axis=0)
-#     robot_q_aligned.append(this_q)
-# print(len(robot_q_aligned))
-# np.savetxt(raw_data_dir+'_robot_q_align.csv',robot_q_aligned,delimiter=',')
+robot_q_align = []
+for q_id in range(0,len(robot_q),3):
+    this_q = np.mean(robot_q[q_id:q_id+3],axis=0)
+    robot_q_align.append(this_q)
+robot_q_align=np.array(robot_q_align)
+if robot_type=='R1':
+    robot_q_align=robot_q_align[:,:6]
+elif robot_type=='R2':
+    robot_q_align=robot_q_align[:,6:12]
 
 # exit()
 
@@ -117,7 +119,6 @@ for pose in tool_T:
     last_pose=deepcopy(pose)
 
 dist=np.array(dist)
-print(np.count_nonzero(dist>split_thres))
 split_id = np.where(dist>split_thres)[0]
 
 plt.plot(dist,'-o')
@@ -125,7 +126,6 @@ plt.show()
 
 split_id = np.append(0,split_id)
 split_id = np.append(split_id,len(tool_T))
-print(split_id)
 
 tool_T_align=[]
 span=200
@@ -141,5 +141,11 @@ for sid in range(len(split_id)-1):
     this_p = np.mean(this_p[:,:3],axis=0)
     thiq_p_q = np.append(this_p,R2q(rpy2R(this_rpy)))
     tool_T_align.append(thiq_p_q)
+tool_T_align=np.array(tool_T_align)
 
+remain_id=len(robot_q_align)%7
+robot_q_align=robot_q_align[:-1*remain_id]
+tool_T_align=tool_T_align[:-1*remain_id]
+print('Total q:',len(robot_q_align),', total T:',len(tool_T_align))
+np.savetxt(raw_data_dir+'_robot_q_align.csv',robot_q_align,delimiter=',')
 np.savetxt(raw_data_dir+'_tool_T_align.csv',tool_T_align,delimiter=',')

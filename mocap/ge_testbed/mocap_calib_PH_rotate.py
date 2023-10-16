@@ -195,7 +195,7 @@ def point_filtering(curve_p,curve_R,mocap_stamps,mocap_cond,tool_markers_id,cond
     
     return curve_p,curve_R,mocap_stamps,mocap_cond
 
-config_dir='../config/'
+config_dir='config/'
 
 robot_type='R1'
 # robot_type='R2'
@@ -203,12 +203,12 @@ robot_type='R1'
 # all_datasets=['train_data','valid_data_1','valid_data_2']
 dataset_date='0913'
 # all_datasets=['test'+dataset_date+'_R1_aftercalib/train_data']
-all_datasets=['test'+dataset_date+'_'+robot_type+'/train_data']
+# all_datasets=['test'+dataset_date+'_'+robot_type+'/train_data']
+all_datasets=[]
 
 cut_edge=False
 
 if robot_type=='R1':
-    config_dir='../../config/'
     robot_name='M10ia'
     tool_name='ge_R1_tool'
     robot_marker_dir=config_dir+robot_name+'_marker_config/'
@@ -223,7 +223,6 @@ if robot_type=='R1':
                                         [-1,0,0]]),[0,0,0]) 
 
 elif robot_type=='R2':
-    config_dir='../../config/'
     robot_name='LRMATE200id'
     tool_name='ge_R2_tool'
     robot_marker_dir=config_dir+robot_name+'_marker_config/'
@@ -241,6 +240,11 @@ print("Dataset Date:",dataset_date)
 
 robot=robot_obj(robot_name,def_path=config_dir+robot_name+'_robot_default_config.yml',tool_file_path=config_dir+tool_name+'.csv',\
 base_marker_config_file=robot_marker_dir+robot_name+'_marker_config.yaml',tool_marker_config_file=tool_marker_dir+tool_name+'_marker_config.yaml')
+
+# robot.robot.p_tool=np.zeros(3)
+# robot.robot.R_tool=np.eye(3)
+# print(robot.fwd(np.zeros(6)))
+# exit()
 
 cond_thres_marker=4
 cond_thres_rigid=16
@@ -379,6 +383,8 @@ for dataset in all_datasets:
             if i!=6:
                 H[:,i] = R@H[:,i]
             P[:,i] = R@P[:,i]
+    ## zeroing base
+    T_base_basemarker.R = T_base_basemarker.R@rot(np.array([0,0,1]),-1*calib_config_q[0])
     print("After zeroing PH")
     print('P',np.round(P,3).T)
     print('H',np.round(H,3).T)
@@ -388,48 +394,67 @@ for dataset in all_datasets:
     print("H:",H.T)
     print("====================")
 
-with open(robot_marker_dir+robot_name+'_marker_config.yaml','r') as file:
-    base_marker_data = yaml.safe_load(file)
-base_marker_data['H']=[]
-base_marker_data['P']=[]
-for j in range(len(H[0])):
-    this_H = {}
-    this_H['x']=float(H[0,j])
-    this_H['y']=float(H[1,j])
-    this_H['z']=float(H[2,j])
-    base_marker_data['H'].append(this_H)
-for j in range(len(P[0])):
-    this_P = {}
-    this_P['x']=float(P[0,j])
-    this_P['y']=float(P[1,j])
-    this_P['z']=float(P[2,j])
-    base_marker_data['P'].append(this_P)
+# with open(robot_marker_dir+robot_name+'_marker_config.yaml','r') as file:
+#     base_marker_data = yaml.safe_load(file)
+# base_marker_data['H']=[]
+# base_marker_data['P']=[]
+# for j in range(len(H[0])):
+#     this_H = {}
+#     this_H['x']=float(H[0,j])
+#     this_H['y']=float(H[1,j])
+#     this_H['z']=float(H[2,j])
+#     base_marker_data['H'].append(this_H)
+# for j in range(len(P[0])):
+#     this_P = {}
+#     this_P['x']=float(P[0,j])
+#     this_P['y']=float(P[1,j])
+#     this_P['z']=float(P[2,j])
+#     base_marker_data['P'].append(this_P)
 
-base_marker_data['calib_base_basemarker_pose'] = {}
-base_marker_data['calib_base_basemarker_pose']['position'] = {}
-base_marker_data['calib_base_basemarker_pose']['position']['x'] = float(T_base_basemarker.p[0])
-base_marker_data['calib_base_basemarker_pose']['position']['y'] = float(T_base_basemarker.p[1])
-base_marker_data['calib_base_basemarker_pose']['position']['z'] = float(T_base_basemarker.p[2])
-quat = R2q(T_base_basemarker.R)
-base_marker_data['calib_base_basemarker_pose']['orientation'] = {}
-base_marker_data['calib_base_basemarker_pose']['orientation']['w'] = float(quat[0])
-base_marker_data['calib_base_basemarker_pose']['orientation']['x'] = float(quat[1])
-base_marker_data['calib_base_basemarker_pose']['orientation']['y'] = float(quat[2])
-base_marker_data['calib_base_basemarker_pose']['orientation']['z'] = float(quat[3])
+# base_marker_data['calib_base_basemarker_pose'] = {}
+# base_marker_data['calib_base_basemarker_pose']['position'] = {}
+# base_marker_data['calib_base_basemarker_pose']['position']['x'] = float(T_base_basemarker.p[0])
+# base_marker_data['calib_base_basemarker_pose']['position']['y'] = float(T_base_basemarker.p[1])
+# base_marker_data['calib_base_basemarker_pose']['position']['z'] = float(T_base_basemarker.p[2])
+# quat = R2q(T_base_basemarker.R)
+# base_marker_data['calib_base_basemarker_pose']['orientation'] = {}
+# base_marker_data['calib_base_basemarker_pose']['orientation']['w'] = float(quat[0])
+# base_marker_data['calib_base_basemarker_pose']['orientation']['x'] = float(quat[1])
+# base_marker_data['calib_base_basemarker_pose']['orientation']['y'] = float(quat[2])
+# base_marker_data['calib_base_basemarker_pose']['orientation']['z'] = float(quat[3])
 
-with open(output_base_marker_config_file,'w') as file:
-    yaml.safe_dump(base_marker_data,file)
+# with open(output_base_marker_config_file,'w') as file:
+#     yaml.safe_dump(base_marker_data,file)
+
+robot=robot_obj(robot_name,def_path=config_dir+robot_name+'_robot_default_config.yml',tool_file_path=config_dir+tool_name+'.csv',\
+base_marker_config_file=output_base_marker_config_file,tool_marker_config_file=tool_marker_dir+tool_name+'_marker_config.yaml')
+
+P=deepcopy(robot.calib_P)
+H=deepcopy(robot.calib_H)
+T_base_basemarker=deepcopy(robot.T_base_basemarker)
+
+raw_data_dir = 'PH_rotate_data/'+'test'+dataset_date+'_'+robot_type+'/train_data'
 
 # calibrate tool (using zero config pose)
-tool_markers_id=robot.tool_markers_id.extend(robot.tool_rigid_id)
-curve_p,curve_R,mocap_stamps = read_and_convert_frame(raw_data_dir+'_zero',robot.base_rigid_id,tool_markers_id)
-curve_p,curve_R,mocap_stamps,mocap_cond = \
-            point_filtering(curve_p,curve_R,mocap_stamps,mocap_cond,tool_markers_id,cond_thres_marker,cond_thres_rigid,skip_ids)
+tool_markers_id=[deepcopy(robot.tool_rigid_id)]
+
+curve_p,curve_R,mocap_stamps,mocap_cond = read_and_convert_frame(raw_data_dir+'_zero','',tool_markers_id)
+
+# curve_p,curve_R,mocap_stamps,mocap_cond = \
+#             point_filtering(curve_p,curve_R,mocap_stamps,mocap_cond,tool_markers_id,cond_thres_marker,cond_thres_rigid,skip_ids)
 # read q
 with open(raw_data_dir+'_zero_robot_q.pickle', 'rb') as handle:
     calib_config_q = pickle.load(handle)
 calib_config_q=np.mean(calib_config_q,axis=0)
 
+if robot_type=='R1':
+    calib_config_q=calib_config_q[:6]
+elif robot_type=='R2':
+    calib_config_q=calib_config_q[6:12]
+calib_config_q[2]=calib_config_q[2]+calib_config_q[1]
+calib_config_q=np.radians(calib_config_q)
+
+T_basemarker_base=T_base_basemarker.inv()
 T_tool_flange = Transform(robot.robot.R_tool,robot.robot.p_tool)
 
 robot.robot.R_tool=np.eye(3)
@@ -468,7 +493,7 @@ toolmarker_flange_p = np.mean(all_toolmarker_flange_p,axis=0)
 toolmarker_flange_rpy = np.mean(all_toolmarker_flange_rpy,axis=0)
 T_toolmarker_flange=Transform(rpy2R(toolmarker_flange_rpy),toolmarker_flange_p)
 
-with open(tool_marker_dir,'r') as file:
+with open(tool_marker_dir+'ge_'+robot_type+'_tool_marker_config.yaml','r') as file:
     tool_marker_data = yaml.safe_load(file)
 tool_marker_data['calib_tool_toolmarker_pose'] = {}
 tool_marker_data['calib_tool_toolmarker_pose']['position'] = {}
