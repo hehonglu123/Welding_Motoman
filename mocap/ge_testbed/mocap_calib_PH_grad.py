@@ -57,6 +57,7 @@ data_dir='PH_grad_data/test'+dataset_date+'_'+robot_type+'_part2/train_data_'
 try:
     robot_q = np.loadtxt(data_dir+'robot_q_align.csv',delimiter=',')
     mocap_T = np.loadtxt(data_dir+'tool_T_align.csv',delimiter=',')
+    robot_q=np.radians(robot_q)
 except:
     exit()
 
@@ -75,10 +76,10 @@ print(train_set)
 plot_grad=False
 plot_error=True
 plot_block=False
-save_PH = False
+save_PH = True
 all_testing_pose=np.arange(N_per_pose)
-# max_iteration = 500
-max_iteration = 200
+max_iteration = 400
+# max_iteration = 200
 terminate_eps = 0.0002
 terminate_ori_error=999
 # terminate_ori_error=0.05
@@ -90,7 +91,8 @@ dH_up_range = np.radians(0.1)
 dH_low_range = np.radians(0.03)
 H_size = 6
 dH_rotate_axis = [[Rx,Ry],[Rz,Rx],[Rz,Rx],[Ry,Rz],[Rz,Rx],[Ry,Rz]]
-alpha=0.5
+# alpha=0.5
+alpha=1
 # weight_ori = 0.1
 weight_ori = 1
 weight_pos = 1
@@ -103,7 +105,6 @@ PH_q = {}
 # train_set=[]
 for N in train_set:
     print("Training #"+str(N),"at Pose (q2q3):", np.round(np.degrees(robot_q_sample[N,1:3])))
-    print(np.degrees(robot.robot.joint_lower_limit))
     print("Progress:",str(N)+"/"+str(total_pose),"Time Pass:",str(np.round(time.time()-start_t)))
 
     pos_error_progress = []
@@ -172,7 +173,8 @@ for N in train_set:
         for testing_pose in all_testing_pose:
             pose_ind=N*N_per_pose+testing_pose
             robot_init_T = robot.fwd(robot_q[pose_ind])
-            T_marker_base = Transform(q2R(mocap_T[pose_ind][3:]),mocap_T[pose_ind][:3])
+            T_marker_base = Transform(q2R(mocap_T[pose_ind][3:7]),mocap_T[pose_ind][:3])
+            
             T_tool_base = T_marker_base*robot.T_tool_toolmarker
             k,theta = R2rot(robot_init_T.R.T@T_tool_base.R)
             k=np.array(k)
@@ -231,44 +233,44 @@ for N in train_set:
             plt.close(fig)
         except:
             pass
-        # fig,axs = plt.subplots(2,3)
-        # axs[0,0].plot(np.array(pos_error_progress))
-        # axs[0,0].set_title("Position XYZ error of Pose 1")
-        # axs[0,1].plot(np.array(pos_error_norm_progress))
-        # axs[0,1].set_title("Position error norm of all poses")
-        # pos_error_diff = np.linalg.norm(np.diff(pos_error_norm_progress,axis=0),axis=1).flatten()
-        # axs[0,2].plot(np.array(pos_error_diff))
-        # axs[0,2].set_title("Position Error Norm Diff")
-        # axs[1,0].plot(np.array(ori_error_progress))
-        # axs[1,0].set_title("Orientation kdtheta error of Pose 1")
-        # axs[1,1].plot(np.array(ori_error_norm_progress))
-        # axs[1,1].set_title("Orientation error norm of all poses")
-        # ori_error_diff = np.linalg.norm(np.diff(ori_error_norm_progress,axis=0),axis=1).flatten()
-        # axs[1,2].plot(np.array(ori_error_diff))
-        # axs[1,2].set_title("Orientation Error Norm Diff")
-        # # fig.canvas.manager.window.wm_geometry("+%d+%d" % (1920+10,10))
-        # # fig.set_size_inches([13.95,7.92],forward=True)
-        # plt.tight_layout()
-        # plt.show(block=plot_block)
-        # plt.pause(0.01)
+        fig,axs = plt.subplots(2,3)
+        axs[0,0].plot(np.array(pos_error_progress))
+        axs[0,0].set_title("Position XYZ error of Pose 1")
+        axs[0,1].plot(np.array(pos_error_norm_progress))
+        axs[0,1].set_title("Position error norm of all poses")
+        pos_error_diff = np.linalg.norm(np.diff(pos_error_norm_progress,axis=0),axis=1).flatten()
+        axs[0,2].plot(np.array(pos_error_diff))
+        axs[0,2].set_title("Position Error Norm Diff")
+        axs[1,0].plot(np.array(ori_error_progress))
+        axs[1,0].set_title("Orientation kdtheta error of Pose 1")
+        axs[1,1].plot(np.array(ori_error_norm_progress))
+        axs[1,1].set_title("Orientation error norm of all poses")
+        ori_error_diff = np.linalg.norm(np.diff(ori_error_norm_progress,axis=0),axis=1).flatten()
+        axs[1,2].plot(np.array(ori_error_diff))
+        axs[1,2].set_title("Orientation Error Norm Diff")
+        # fig.canvas.manager.window.wm_geometry("+%d+%d" % (10,10))
+        # fig.set_size_inches([13.95,7.92],forward=True)
+        plt.tight_layout()
+        plt.show(block=plot_block)
+        plt.pause(0.01)
         
-        plt.errorbar(np.arange(len(pos_error_norm_progress)),np.mean(pos_error_norm_progress,axis=1),\
-            yerr=np.mean(pos_error_norm_progress,axis=1))
-        plt.xlabel('Iteration',fontsize=15)
-        plt.xticks(np.arange(0,len(pos_error_norm_progress),len(pos_error_norm_progress)/6).astype(int),fontsize=15)
-        plt.ylabel('Position Error Norm (mm)',fontsize=15)
-        plt.yticks(fontsize=15)
-        plt.title("Mean/Std of Position Error Norm of Poses",fontsize=18)
-        plt.show()
+        # plt.errorbar(np.arange(len(pos_error_norm_progress)),np.mean(pos_error_norm_progress,axis=1),\
+        #     yerr=np.mean(pos_error_norm_progress,axis=1))
+        # plt.xlabel('Iteration',fontsize=15)
+        # plt.xticks(np.arange(0,len(pos_error_norm_progress),len(pos_error_norm_progress)/6).astype(int),fontsize=15)
+        # plt.ylabel('Position Error Norm (mm)',fontsize=15)
+        # plt.yticks(fontsize=15)
+        # plt.title("Mean/Std of Position Error Norm of Poses",fontsize=18)
+        # plt.show()
         
-        plt.errorbar(np.arange(len(ori_error_norm_progress)),np.mean(ori_error_norm_progress,axis=1),\
-            yerr=np.mean(ori_error_norm_progress,axis=1))
-        plt.xlabel('Iteration',fontsize=15)
-        plt.xticks(np.arange(0,len(pos_error_norm_progress),len(pos_error_norm_progress)/6).astype(int),fontsize=15)
-        plt.ylabel('Orientation Error Norm (deg)',fontsize=15)
-        plt.yticks(fontsize=15)
-        plt.title("Mean/Std of Orientation Error Norm of Poses",fontsize=18)
-        plt.show()
+        # plt.errorbar(np.arange(len(ori_error_norm_progress)),np.mean(ori_error_norm_progress,axis=1),\
+        #     yerr=np.mean(ori_error_norm_progress,axis=1))
+        # plt.xlabel('Iteration',fontsize=15)
+        # plt.xticks(np.arange(0,len(pos_error_norm_progress),len(pos_error_norm_progress)/6).astype(int),fontsize=15)
+        # plt.ylabel('Orientation Error Norm (deg)',fontsize=15)
+        # plt.yticks(fontsize=15)
+        # plt.title("Mean/Std of Orientation Error Norm of Poses",fontsize=18)
+        # plt.show()
     
     if save_PH:
         q_key = tuple(robot_q_sample[N,1:3])

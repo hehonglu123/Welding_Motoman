@@ -63,6 +63,7 @@ robot_q =np.loadtxt(raw_data_dir+'_robot_q_raw.csv',delimiter=',')
 robot_q_align = []
 for q_id in range(0,len(robot_q),3):
     this_q = np.mean(robot_q[q_id:q_id+3],axis=0)
+    this_q[2]=this_q[2]+this_q[1]
     robot_q_align.append(this_q)
 robot_q_align=np.array(robot_q_align)
 if robot_type=='R1':
