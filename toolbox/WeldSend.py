@@ -42,9 +42,23 @@ class WeldSend(object):
 	
 	def jog_tri(self,robot1,positioner,robot2,q1,q_positioner,q2,v=1):
 		mp=MotionProgram(ROBOT_CHOICE=self.ROBOT_CHOICE_MAP[robot1.robot_name],ROBOT_CHOICE2=self.ROBOT_CHOICE_MAP[positioner.robot_name],ROBOT_CHOICE3=self.ROBOT_CHOICE_MAP[robot2.robot_name],pulse2deg=robot1.pulse2deg,pulse2deg_2=positioner.pulse2deg,pulse2deg_3=robot2.pulse2deg, tool_num=self.ROBOT_TOOL_MAP[robot1.robot_name])
-		mp.MoveJ(np.degrees(q1),v,None,target2=['MOVJ',np.degrees(q_positioner),None],target3=['MOVJ',np.degrees(q2),None])
-		self.client.execute_motion_program(mp)
+		
+		if len(np.array(q1).shape)==1:
+			q1=[q1]
+		if len(np.array(q2).shape)==1:
+			q2=[q2]
+		if len(np.array(q_positioner).shape)==1:
+			q_positioner=[q_positioner]
+		
+		max_total = max(max(len(q1),len(q2)),len(q_positioner))
+		print(max_total)
+		for wp_i in range(max_total):
+			wp_i_q1 = min(wp_i,len(q1)-1)
+			wp_i_q2 = min(wp_i,len(q2)-1)
+			wp_i_q_positioner = min(wp_i,len(q_positioner)-1)
+			mp.MoveJ(np.degrees(q1[wp_i_q1]),v,None,target2=['MOVJ',np.degrees(q_positioner[wp_i_q_positioner]),None],target3=['MOVJ',np.degrees(q2[wp_i_q2]),None])
 
+		self.client.execute_motion_program(mp)
 
 	def weld_segment_single(self,primitives,robot,q_all,v_all,cond_all,arc=False,wait=0):
 		###single arm weld segment 

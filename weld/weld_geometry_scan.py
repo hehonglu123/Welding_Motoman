@@ -121,8 +121,8 @@ formatted_time = current_time.strftime('%Y_%m_%d_%H_%M_%S.%f')[:-7]
 
 data_date = input("Use old data directory? (Enter or put time e.g. 2023_07_11_16_25_30): ")
 if data_date == '':
-    data_dir=curve_data_dir+'weld_scan_'+formatted_time+'/'
-    # data_dir=curve_data_dir+'weld_scan_2023_10_10_16_56_32/'
+    # data_dir=curve_data_dir+'weld_scan_'+formatted_time+'/'
+    data_dir=curve_data_dir+'weld_scan_2023_10_13_14_54_22/'
 else:
     data_dir=curve_data_dir+'weld_scan_'+data_date+'/'
 print("Use data directory:",data_dir)
@@ -135,13 +135,19 @@ total_layer = slicing_meta['num_layers']
 total_baselayer = slicing_meta['num_baselayers']
 
 ## weldind parameters
-weld_mode=100
-des_job=210
+weld_mode=160
+des_job=int(200+weld_mode/10)
 
-des_dh = 2.3420716473455623
-des_v = round(dh2v_loglog(des_dh,weld_mode),1)
-print("The Desired speed (according to desired h",des_dh,"will be",\
-      des_v,"mm/sec")
+# des_dh = 2.3420716473455623
+# des_v = round(dh2v_loglog(des_dh,weld_mode),1)
+# print("The Desired speed (according to desired h",des_dh,"will be",\
+#       des_v,"mm/sec")
+
+des_v = 8
+des_dh = round(v2dh_loglog(des_v,weld_mode),1)
+print("The Desired height (according to desired v",des_v,"mm/sec will be",\
+      des_dh,"mm")
+
 des_dw = 4
 waypoint_distance=1.625 	###waypoint separation (calculate from 40moveL/95mm, where we did the test)
 # waypoint_distance=1
@@ -151,7 +157,7 @@ layer_width_num=int(des_dw/line_resolution) # preplanned
 # weld_min_v=2.5
 # weld_max_v=10
 weld_min_v=des_v/2.
-weld_max_v=des_v*2
+weld_max_v=min(des_v*2,20)
 print(weld_min_v,weld_max_v)
 
 # 2. Scanning parameters
@@ -174,10 +180,10 @@ to_home_speed=10
 # R2_mid = np.radians([6,20,-10,0,0,0])
 # R2_home = np.radians([70,10,-5,0,0,0])
 
-R1_mid = np.radians([10,0,0,0,0,0])
-R1_home = np.radians([-45,0,0,0,0,0])
-R2_mid = np.radians([6,20,-10,0,0,0])
-R2_home = np.radians([30,20,-10,0,0,0])
+R1_mid = np.radians([-25,0,0,0,0,0])
+R1_home = np.radians([-60,0,0,0,0,0])
+R2_mid = np.radians([-6,20,-10,0,0,0])
+R2_home = np.radians([-30,20,-10,0,0,0])
 
 scan_process = ScanProcess(robot_scan,positioner)
 # ## rr drivers and all other drivers
@@ -201,13 +207,13 @@ start_feedback=3 # with correction
 planned_layer=999
 ## 300 260 250 240 ... 100
 # planned_v=np.ones(planned_layer)*8
-planned_v=np.array([8,8,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5])
-planned_v=np.append(planned_v,np.ones(planned_layer)*5)
+planned_v=np.array([8,8,des_v,des_v,des_v,des_v,des_v,des_v,des_v,des_v,des_v,des_v,des_v,des_v,des_v,des_v,des_v,des_v,des_v,des_v,des_v,des_v,des_v,des_v,des_v])
+planned_v=np.append(planned_v,np.ones(planned_layer)*des_v)
 planned_v=planned_v.astype(int)
 
 # base ipm: 250
-planned_job=np.array([225,225,210,210,210,210,210,210,210,210,210,210,210,210,210])
-planned_job=np.append(planned_job,np.ones(planned_layer)*210)
+planned_job=np.array([225,225,des_job,des_job,des_job,des_job,des_job,des_job,des_job,des_job,des_job,des_job,des_job,des_job,des_job])
+planned_job=np.append(planned_job,np.ones(planned_layer)*des_job)
 planned_job=planned_job.astype(int)
 
 print_min_dh = 0.5 # mm
@@ -218,15 +224,15 @@ save_output_points=True
 last_layer_curve_relative = []
 last_layer_curve_height = []
 
-layer=-1
-last_layer=-1
-layer_count=-1
-start_weld_layer=0
+# layer=-1
+# last_layer=-1
+# layer_count=-1
+# start_weld_layer=0
 
-# layer=318
-# last_layer=297
-# layer_count=18
-# start_weld_layer=340
+layer=0
+last_layer=1
+layer_count=3
+start_weld_layer=0
 
 # Transz0_H=None
 Transz0_H=np.array([[ 9.99977849e-01, -4.63425601e-05, -6.65580373e-03,  5.00206395e-03],
@@ -325,6 +331,7 @@ while True:
             else:
                 print("enforce odd dlayer")
                 dlayer = int(np.ceil(mean_layer_dh/line_resolution/2)*2-1) # enforce a odd dlayer for shift
+            # dlayer=23
             dlayer = max(15,dlayer)
             dlayer = min(35,dlayer)
             last_layer=layer
@@ -465,6 +472,7 @@ while True:
                 robot_weld.robot.H=deepcopy(robot_weld.calib_H)
             q2=positioner_js[breakpoints[0]]
 
+            R1_mid[0]=deepcopy(q1[0])
             if go_weld:
                 # ws.jog_dual(robot_weld,positioner,q1,q2,v=to_start_speed)
                 ws.jog_tri(robot_weld,positioner,robot_scan,[R1_mid,q1],q2,ir_js[breakpoints[0]],v=to_start_speed)
@@ -510,6 +518,8 @@ while True:
     ## move R1 back to home
     # print(q1_all)
     input("Weld Move to Home")
+    r1_current = ws.client.getJointAnglesMH(robot_weld.pulse2deg)
+    R1_mid[0]=deepcopy(r1_current[0])
     ws.jog_single(robot_weld,[R1_mid,R1_home],v=to_home_speed)
 
     #### scanning
