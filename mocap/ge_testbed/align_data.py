@@ -22,7 +22,7 @@ dataset_date='0913'
 datasets='test'+dataset_date+'_'+robot_type+'_part2/train_data'
 
 if robot_type=='R1':
-    config_dir='../../config/'
+    config_dir='config/'
     robot_name='M10ia'
     tool_name='ge_R1_tool'
     robot_marker_dir=config_dir+robot_name+'_marker_config/'
@@ -37,7 +37,7 @@ if robot_type=='R1':
                                         [-1,0,0]]),[0,0,0]) 
 
 elif robot_type=='R2':
-    config_dir='../../config/'
+    config_dir='config/'
     robot_name='LRMATE200id'
     tool_name='ge_R2_tool'
     robot_marker_dir=config_dir+robot_name+'_marker_config/'
@@ -54,7 +54,7 @@ elif robot_type=='R2':
 print("Dataset Date:",dataset_date)
 
 robot=robot_obj(robot_name,def_path=config_dir+robot_name+'_robot_default_config.yml',tool_file_path=config_dir+tool_name+'.csv',\
-base_marker_config_file=robot_marker_dir+robot_name+'_marker_config.yaml',tool_marker_config_file=tool_marker_dir+tool_name+'_marker_config.yaml')
+base_marker_config_file=robot_marker_dir+robot_name+'_'+dataset_date+'_marker_config.yaml',tool_marker_config_file=tool_marker_dir+tool_name+'_'+dataset_date+'_marker_config.yaml')
 
 raw_data_dir='PH_grad_data/'+datasets
 
@@ -124,6 +124,8 @@ split_id = np.where(dist>split_thres)[0]
 plt.plot(dist,'-o')
 plt.show()
 
+T_basemarker_base = robot.T_base_basemarker.inv()
+
 split_id = np.append(0,split_id)
 split_id = np.append(split_id,len(tool_T))
 
@@ -134,11 +136,14 @@ for sid in range(len(split_id)-1):
     id_range = np.arange(id_range-span,id_range+span).astype(int)
     
     this_rpy=[]
+    this_p=[]
     for tid in id_range:
-        this_rpy.append(R2rpy(q2R(tool_T[tid][3:7])))
+        this_T = Transform(q2R(tool_T[tid][3:7]),tool_T[tid][:3])
+        this_T = T_basemarker_base*this_T
+        this_rpy.append(R2rpy(this_T.R))
+        this_p.append(this_T.p)
     this_rpy = np.mean(this_rpy,axis=0)
-    this_p = deepcopy(tool_T[id_range])
-    this_p = np.mean(this_p[:,:3],axis=0)
+    this_p = np.mean(this_p,axis=0)
     thiq_p_q = np.append(this_p,R2q(rpy2R(this_rpy)))
     tool_T_align.append(thiq_p_q)
 tool_T_align=np.array(tool_T_align)

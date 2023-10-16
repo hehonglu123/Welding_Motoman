@@ -4,7 +4,7 @@ from general_robotics_toolbox import *
 import pickle
 import time
 import sys
-sys.path.append('../toolbox/')
+sys.path.append('../../toolbox/')
 from robot_def import *
 from matplotlib import pyplot as plt
 
@@ -19,27 +19,28 @@ Rz=np.array([0,0,1])
 
 dataset_date='0913'
 
-config_dir='../config/'
+config_dir='config/'
 
 robot_type = 'R1'
 
-if robot_type == 'R1':
-    robot_marker_dir=config_dir+'MA2010_marker_config/'
-    tool_marker_dir=config_dir+'weldgun_marker_config/'
-    robot=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',\
-                        tool_file_path=config_dir+'torch.csv',d=15,\
-                        #  tool_file_path='',d=0,\
-                        pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',\
-                        base_marker_config_file=robot_marker_dir+'MA2010_'+dataset_date+'_marker_config.yaml',\
-                        tool_marker_config_file=tool_marker_dir+'weldgun_'+dataset_date+'_marker_config.yaml')
-elif robot_type == 'R2':
-    robot_marker_dir=config_dir+'MA1440_marker_config/'
-    tool_marker_dir=config_dir+'mti_marker_config/'
-    robot=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.yml',\
-                        tool_file_path=config_dir+'mti.csv',\
-                        pulse2deg_file_path=config_dir+'MA1440_A0_pulse2deg_real.csv',\
-                        base_marker_config_file=robot_marker_dir+'MA1440_'+dataset_date+'_marker_config.yaml',\
-                        tool_marker_config_file=tool_marker_dir+'mti_'+dataset_date+'_marker_config.yaml')
+if robot_type=='R1':
+    robot_name='M10ia'
+    tool_name='ge_R1_tool'
+    robot_marker_dir=config_dir+robot_name+'_marker_config/'
+    tool_marker_dir=config_dir+tool_name+'_marker_config/'
+
+
+elif robot_type=='R2':
+    robot_name='LRMATE200id'
+    tool_name='ge_R2_tool'
+    robot_marker_dir=config_dir+robot_name+'_marker_config/'
+    tool_marker_dir=config_dir+tool_name+'_marker_config/'
+    
+
+print("Dataset Date:",dataset_date)
+
+robot=robot_obj(robot_name,def_path=config_dir+robot_name+'_robot_default_config.yml',tool_file_path=config_dir+tool_name+'.csv',\
+base_marker_config_file=robot_marker_dir+robot_name+'_'+dataset_date+'_marker_config.yaml',tool_marker_config_file=tool_marker_dir+tool_name+'_'+dataset_date+'_marker_config.yaml')
 
 #### using rigid body
 use_toolmaker=True
@@ -51,274 +52,13 @@ if use_toolmaker:
     robot.robot.p_tool = robot.T_toolmarker_flange.p
     robot.T_tool_toolmarker = Transform(np.eye(3),[0,0,0])
 
-data_dir='PH_grad_data/test'+dataset_date+'_'+robot_type+'/train_data_'
+data_dir='PH_grad_data/test'+dataset_date+'_'+robot_type+'_part2/train_data_'
 
 try:
-    use_raw=False
-    
     robot_q = np.loadtxt(data_dir+'robot_q_align.csv',delimiter=',')
-    mocap_T = np.loadtxt(data_dir+'mocap_T_align.csv',delimiter=',')
-    
-    if use_raw:
-        mocap_T=[]
-        toolrigid_raw = np.loadtxt(data_dir+'tool_T_raw.csv',delimiter=',')
-        baserigid_raw = np.loadtxt(data_dir+'base_T_raw.csv',delimiter=',')
-        
-        raw_id=0
-        same_pose_thres=0.1 #mm
-        pos_toolrigid=[]
-        pose_toolrigid_base=[]
-        while True:
-            if len(pos_toolrigid)==0:
-                pos_toolrigid.append(toolrigid_raw[raw_id][:3])
-            elif np.linalg.norm(np.mean(pos_toolrigid,axis=0)-toolrigid_raw[raw_id][:3])<same_pose_thres:
-                pos_toolrigid.append(toolrigid_raw[raw_id][:3])
-            else:
-                pose_toolrigid_base=np.array(pose_toolrigid_base)
-                if np.linalg.norm(np.degrees(np.max(pose_toolrigid_base[:,3:],axis=0)\
-                    -np.min(pose_toolrigid_base[:,3:],axis=0)))>0.1:
-                    print("RPY max min:",np.degrees(np.min(pose_toolrigid_base[:,3:],axis=0)),\
-                        np.degrees(np.max(pose_toolrigid_base[:,3:],axis=0)))
-                p_mean = np.mean(pose_toolrigid_base,axis=0)
-                this_T = np.append(p_mean[:3],R2q(rpy2R(p_mean[3:])))
-                mocap_T.append(this_T)
-                pos_toolrigid=[]
-                pose_toolrigid_base=[]
-                continue
-            
-            T_mocap_basemarker = Transform(q2R(baserigid_raw[raw_id][3:]),baserigid_raw[raw_id][:3]).inv()
-            T_marker_mocap = Transform(q2R(toolrigid_raw[raw_id][3:]),toolrigid_raw[raw_id][:3])
-            T_marker_basemarker = T_mocap_basemarker*T_marker_mocap
-            T_marker_base = T_basemarker_base*T_marker_basemarker
-            pose_toolrigid_base.append(np.append(T_marker_base.p,R2rpy(T_marker_base.R)))
-            raw_id+=1
-            
-            if raw_id>=len(toolrigid_raw):
-                pose_toolrigid_base=np.array(pose_toolrigid_base)
-                if np.linalg.norm(np.degrees(np.max(pose_toolrigid_base[:,3:],axis=0)\
-                    -np.min(pose_toolrigid_base[:,3:],axis=0)))>0.1:
-                    print("RPY max min:",np.degrees(np.min(pose_toolrigid_base[:,3:],axis=0)),\
-                        np.degrees(np.max(pose_toolrigid_base[:,3:],axis=0)))
-                p_mean = np.mean(pose_toolrigid_base,axis=0)
-                this_T = np.append(p_mean[:3],R2q(rpy2R(p_mean[3:])))
-                mocap_T.append(this_T)
-                pos_toolrigid=[]
-                break
-
+    mocap_T = np.loadtxt(data_dir+'tool_T_align.csv',delimiter=',')
 except:
-
-    with open(data_dir+'robot_q_cont.pickle', 'rb') as handle:
-        robot_q = pickle.load(handle)
-        robot_q = robot_q[:,:6]
-    with open(data_dir+'robot_timestamps_cont.pickle', 'rb') as handle:
-        robot_q_stamps = pickle.load(handle)
-    robot_qdot = np.divide(np.gradient(robot_q,axis=0),np.tile(np.gradient(robot_q_stamps),(6,1)).T)
-    robot_qdot_norm = np.linalg.norm(robot_qdot,axis=1)
-
-    marker_id = robot.tool_rigid_id
-    with open(data_dir+'mocap_p_cont.pickle', 'rb') as handle:
-        mocap_p = pickle.load(handle)
-        # static_mocap_marker = mocap_p[robot.base_markers_id[0]]
-        base_rigid_p = mocap_p[robot.base_rigid_id]
-        mocap_p = np.array(mocap_p[marker_id])
-    with open(data_dir+'mocap_R_cont.pickle', 'rb') as handle:
-        mocap_R = pickle.load(handle)
-        # static_mocap_marker = mocap_p[robot.base_markers_id[0]]
-        base_rigid_R = mocap_R[robot.base_rigid_id]
-        mocap_R = np.array(mocap_R[marker_id])
-    with open(data_dir+'mocap_timestamps_cont.pickle', 'rb') as handle:
-        mocap_stamps = pickle.load(handle)
-        base_rigid_stamps = np.array(mocap_stamps[marker_id])
-        mocap_stamps = np.array(mocap_stamps[marker_id])
-    mocap_pdot = np.divide(np.gradient(mocap_p,axis=0),np.tile(np.gradient(mocap_stamps),(3,1)).T)
-    mocap_pdot_norm = np.linalg.norm(mocap_pdot,axis=1)
-
-    print(len(mocap_p))
-    print(len(mocap_stamps))
-    print(len(base_rigid_p))
-
-    mocap_start_k = 1400
-    mocap_end_k = -110
-    mocap_R = mocap_R[mocap_start_k:mocap_end_k]
-    mocap_p = mocap_p[mocap_start_k:mocap_end_k]
-    mocap_stamps = mocap_stamps[mocap_start_k:mocap_end_k]
-    mocap_pdot = mocap_pdot[mocap_start_k:mocap_end_k]
-    mocap_pdot_norm = mocap_pdot_norm[mocap_start_k:mocap_end_k]
-    base_rigid_p=base_rigid_p[mocap_start_k:mocap_end_k]
-    base_rigid_R=base_rigid_R[mocap_start_k:mocap_end_k]
-    base_rigid_stamps=base_rigid_stamps[mocap_start_k:mocap_end_k]
-
-    plt.plot(robot_qdot_norm)
-    plt.show()
-    plt.plot(mocap_pdot_norm)
-    plt.show()
-    
-    timewindow = 0.3
-
-    # the robot stop 3 sec, 
-    # find "2 sec window" with smallest norm of velocity deviation
-    robot_vdev_thres = 0.005
-    robot_v_thres = 0.03
-    dt_ave_windown = 1000
-    robot_v_dev = []
-    robot_stop_k = []
-    v_dev_flag = False
-    v_dev_local = []
-    dK_robot = int(timewindow/np.mean(np.gradient(robot_q_stamps)))
-    all_dkrobot=[]
-    for i in range(0,len(robot_q)-dK_robot):
-        dt_lookahead = min([i+dt_ave_windown,len(robot_q)])
-        dK_robot = int(timewindow/np.mean(np.gradient(robot_q_stamps[i:dt_lookahead]))) 
-        robot_v_dev.append(np.std(robot_qdot_norm[i:i+dK_robot]))
-        if robot_v_dev[-1]<robot_vdev_thres and robot_qdot_norm[i]<robot_v_thres:
-            v_dev_flag=True
-            v_dev_local.append(robot_v_dev[-1])
-        else:
-            if v_dev_flag:
-                v_dev_flag=False
-                local_argmin = np.argmin(v_dev_local)
-                robot_stop_k.append(i-len(v_dev_local)+local_argmin)
-                all_dkrobot.append(dK_robot)
-                v_dev_local=[]
-    robot_v_dev=np.array(robot_v_dev)
-    robot_stop_k.append(np.argmin(robot_v_dev[robot_stop_k[-1]+dK_robot:])+robot_stop_k[-1]+dK_robot)
-    all_dkrobot.append(dK_robot)
-
-    mocap_vdev_thres = 10
-    mocap_v_thres = 50
-    dt_ave_mocap = np.mean(np.gradient(mocap_stamps))
-    dK_mocap = int(timewindow/dt_ave_mocap)
-    print(dt_ave_mocap)
-    print(dK_mocap)
-    mocap_v_dev = []
-    mocap_stop_k = []
-    v_dev_flag = False
-    v_dev_local = []
-    for i in range(0,len(mocap_pdot)-dK_mocap):
-        mocap_v_dev.append(np.std(mocap_pdot_norm[i:i+dK_mocap]))
-        if mocap_v_dev[-1]<mocap_vdev_thres and mocap_pdot_norm[i]<mocap_v_thres:
-            v_dev_flag=True
-            v_dev_local.append(mocap_v_dev[-1])
-        else:
-            if v_dev_flag:
-                v_dev_flag=False
-                local_argmin = np.argmin(v_dev_local)
-                mocap_stop_k.append(i-len(v_dev_local)+local_argmin)
-                v_dev_local=[]
-    mocap_v_dev = np.array(mocap_v_dev)
-    mocap_stop_k.append(np.argmin(mocap_v_dev[mocap_stop_k[-1]+dK_mocap:])+mocap_stop_k[-1]+dK_mocap)
-
-    # check 
-    plt.plot(robot_v_dev)
-    plt.scatter(robot_stop_k,robot_v_dev[robot_stop_k])
-    plt.plot(robot_qdot_norm,'blue')
-    for ki in range(len(robot_stop_k)):
-        k=robot_stop_k[ki]
-        dK_robot=all_dkrobot[ki]
-        plt.plot(np.arange(k,k+dK_robot),robot_qdot_norm[k:k+dK_robot])
-    plt.show()
-    plt.plot(mocap_v_dev)
-    plt.plot(mocap_pdot_norm,'blue')
-    for k in mocap_stop_k:
-        plt.plot(np.arange(k,k+dK_mocap),mocap_pdot_norm[k:k+dK_mocap])
-    plt.show()
-
-    # check total stop
-    print("Total robot stop:",len(robot_stop_k))
-    print("Total mocap stop:",len(mocap_stop_k))
-
-    # assert len(robot_stop_k)==len(mocap_stop_k), f"Mocap Stop and Robot Stop should be the same."
-
-    if len(robot_stop_k)!=len(mocap_stop_k):
-        # change robot PH to calib PH
-        robot.robot.P = robot.calib_P
-        robot.robot.H = robot.calib_H
-        # change to calibrated flange (tool rigidbody orientation)
-        robot.robot.T_flange = robot.T_tool_flange
-
-        threshold = 3
-        erase_robot_stop = []
-        mocap_start_offset = 0
-        for i in range(len(robot_stop_k)):
-            this_robot_q = np.mean(robot_q[robot_stop_k[i]:robot_stop_k[i]+all_dkrobot[i]],axis=0)
-            rob_T = robot.fwd(this_robot_q)
-
-            find_flag = False
-            for j in range(i-mocap_start_offset,i-mocap_start_offset+5):
-                if j>=len(mocap_stop_k):
-                    break
-                T_mocap_basemarker = Transform(q2R(base_rigid_R[mocap_stop_k[j]]),base_rigid_p[mocap_stop_k[j]]).inv()
-                T_marker_mocap = Transform(q2R(mocap_R[mocap_stop_k[j]]),mocap_p[mocap_stop_k[j]])
-                T_marker_base = T_basemarker_base*T_mocap_basemarker*T_marker_mocap
-                # print(rob_T)
-                # print(T_marker_base)
-                # print(np.linalg.norm(rob_T.p-T_marker_base.p))
-                # exit()
-                if np.round(np.linalg.norm(rob_T.p-T_marker_base.p))<threshold:
-                    find_flag=True
-                    break
-            if not find_flag:
-                erase_robot_stop.append(i)
-                mocap_start_offset+=1
-                print(erase_robot_stop)
-        robot_stop_k = np.delete(robot_stop_k,erase_robot_stop)
-        all_dkrobot = np.delete(all_dkrobot,erase_robot_stop)
-        
-        erase_both_stop=[]
-        robot_stop_k_groups=[]
-        all_dkrobot_groups=[]
-        mocap_stop_k_groups=[]
-        threshold = 1
-        i = 0
-        while True:
-            this_robot_q = np.mean(robot_q[robot_stop_k[i]:robot_stop_k[i]+all_dkrobot[i]],axis=0)
-            find_flag = False
-            for j in range(i+1,i+7):
-                if j>=len(robot_stop_k):
-                    find_flag=True
-                    break
-                compare_q = np.mean(robot_q[robot_stop_k[j]:robot_stop_k[j]+all_dkrobot[j]],axis=0)
-                if np.linalg.norm(np.degrees(this_robot_q[1:3]-compare_q[1:3]))>threshold:
-                    find_flag=True
-                    break
-            if not find_flag:
-                robot_stop_k_groups.extend(robot_stop_k[i:i+7])
-                all_dkrobot_groups.extend(all_dkrobot[i:i+7])
-                mocap_stop_k_groups.extend(mocap_stop_k[i:i+7])
-                i+=7
-            else:
-                i=j
-            
-            if i>=len(robot_stop_k):
-                break
-
-        robot_stop_k = robot_stop_k_groups
-        all_dkrobot = all_dkrobot_groups
-        mocap_stop_k = mocap_stop_k_groups
-
-    assert len(robot_stop_k)==len(mocap_stop_k), f"Mocap Stop and Robot Stop should be the same."
-
-    robot_stop_q = []
-    mocap_stop_T = []
-    for i in range(len(robot_stop_k)):
-        this_robot_q = np.mean(robot_q[robot_stop_k[i]:robot_stop_k[i]+all_dkrobot[i]],axis=0)
-        this_mocap_ori = []
-        this_mocap_p = []
-        for k in range(mocap_stop_k[i],min(mocap_stop_k[i]+dK_mocap,len(base_rigid_R))):
-            T_mocap_basemarker = Transform(q2R(base_rigid_R[k]),base_rigid_p[k]).inv()
-            T_marker_mocap = Transform(q2R(mocap_R[k]),mocap_p[k])
-            T_marker_base = T_basemarker_base*T_mocap_basemarker*T_marker_mocap
-            this_mocap_ori.append(R2rpy(T_marker_base.R))
-            this_mocap_p.append(T_marker_base.p)
-        this_mocap_p = np.mean(this_mocap_p,axis=0)
-        this_mocap_ori = R2q(rpy2R(np.mean(this_mocap_ori,axis=0)))
-        robot_stop_q.append(this_robot_q)
-        mocap_stop_T.append(np.append(this_mocap_p,this_mocap_ori))
-    robot_q = robot_stop_q
-    mocap_T = mocap_stop_T
-
-    np.savetxt(data_dir+'robot_q_align.csv',robot_q,delimiter=',')
-    np.savetxt(data_dir+'mocap_T_align.csv',mocap_T,delimiter=',')
+    exit()
 
 assert len(robot_q)==len(mocap_T), f"Need to have the same amount of robot_q and mocap_T"
 
