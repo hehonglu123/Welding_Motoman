@@ -121,8 +121,8 @@ formatted_time = current_time.strftime('%Y_%m_%d_%H_%M_%S.%f')[:-7]
 
 data_date = input("Use old data directory? (Enter or put time e.g. 2023_07_11_16_25_30): ")
 if data_date == '':
-    # data_dir=curve_data_dir+'weld_scan_'+formatted_time+'/'
-    data_dir=curve_data_dir+'weld_scan_2023_10_13_14_54_22/'
+    data_dir=curve_data_dir+'weld_scan_'+formatted_time+'/'
+    # data_dir=curve_data_dir+'weld_scan_2023_10_13_14_54_22/'
 else:
     data_dir=curve_data_dir+'weld_scan_'+data_date+'/'
 print("Use data directory:",data_dir)
@@ -135,7 +135,7 @@ total_layer = slicing_meta['num_layers']
 total_baselayer = slicing_meta['num_baselayers']
 
 ## weldind parameters
-weld_mode=160
+weld_mode=100
 des_job=int(200+weld_mode/10)
 
 # des_dh = 2.3420716473455623
@@ -143,7 +143,7 @@ des_job=int(200+weld_mode/10)
 # print("The Desired speed (according to desired h",des_dh,"will be",\
 #       des_v,"mm/sec")
 
-des_v = 8
+des_v = 5
 des_dh = round(v2dh_loglog(des_v,weld_mode),1)
 print("The Desired height (according to desired v",des_v,"mm/sec will be",\
       des_dh,"mm")
@@ -207,7 +207,7 @@ start_feedback=3 # with correction
 planned_layer=999
 ## 300 260 250 240 ... 100
 # planned_v=np.ones(planned_layer)*8
-planned_v=np.array([8,8,des_v,des_v,des_v,des_v,des_v,des_v,des_v,des_v,des_v,des_v,des_v,des_v,des_v,des_v,des_v,des_v,des_v,des_v,des_v,des_v,des_v,des_v,des_v])
+planned_v=np.array([5,8,des_v,des_v,des_v,des_v,des_v,des_v,des_v,des_v,des_v,des_v,des_v,des_v,des_v,des_v,des_v,des_v,des_v,des_v,des_v,des_v,des_v,des_v,des_v])
 planned_v=np.append(planned_v,np.ones(planned_layer)*des_v)
 planned_v=planned_v.astype(int)
 
@@ -217,22 +217,24 @@ planned_job=np.append(planned_job,np.ones(planned_layer)*des_job)
 planned_job=planned_job.astype(int)
 
 print_min_dh = 0.5 # mm
-arc_on=True
+
+arc_on=False
+
 save_weld_record=True
 save_output_points=True
 
 last_layer_curve_relative = []
 last_layer_curve_height = []
 
-# layer=-1
-# last_layer=-1
-# layer_count=-1
-# start_weld_layer=0
-
-layer=0
-last_layer=1
-layer_count=3
+layer=-1
+last_layer=-1
+layer_count=-1
 start_weld_layer=0
+
+# layer=0
+# last_layer=1
+# layer_count=3
+# start_weld_layer=0
 
 # Transz0_H=None
 Transz0_H=np.array([[ 9.99977849e-01, -4.63425601e-05, -6.65580373e-03,  5.00206395e-03],
@@ -368,6 +370,7 @@ while True:
         
     #### welding
     start_section=0
+    weld_st=time.time()
     if layer>=start_weld_layer:
         for x in range(start_section,num_sections):
             print("Print Layer",layer,"Sec.",x)
@@ -496,6 +499,7 @@ while True:
                 primitives.append('movel')
 
             input("Start Weld")
+            weld_weld_st=time.time()
 
             if go_weld:
                 ####DATA LOGGING
@@ -503,6 +507,7 @@ while True:
                 # rob_stamps,rob_js_exe,_,_=ws.weld_segment_dual(primitives,robot_weld,positioner,q1_all,q2_all,v1_all,v2_all,cond_all=[weld_job],arc=arc_on)
                 rob_stamps,rob_js_exe,_,_=ws.weld_segment_tri(primitives,robot_weld,positioner,robot_scan,q1_all,q2_all,qir_all,v1_all,v2_all,cond_all=[weld_job],arc=arc_on)
                 rr_sensors.stop_all_sensors()
+                print("Actual weld time:",time.time()-weld_weld_st)
 
                 if save_weld_record:
                     Path(data_dir).mkdir(exist_ok=True)
@@ -521,9 +526,11 @@ while True:
     r1_current = ws.client.getJointAnglesMH(robot_weld.pulse2deg)
     R1_mid[0]=deepcopy(r1_current[0])
     ws.jog_single(robot_weld,[R1_mid,R1_home],v=to_home_speed)
+    print("Weld time: ",time.time()-weld_st)
 
     #### scanning
     if True:
+        scan_st=time.time()
         if layer<0:
             read_layer=0
         else:
@@ -614,6 +621,7 @@ while True:
                     ws.jog_dual(robot_scan,positioner,q1,q2,v=to_start_speed)
                 
                 input("Start Scan")
+                scan_scan_st=time.time()
                 mp = MotionProgram(ROBOT_CHOICE='RB2',ROBOT_CHOICE2='ST1',pulse2deg=robot_scan.pulse2deg,pulse2deg_2=positioner.pulse2deg)
                 target2=['MOVJ',np.degrees(q_bp2[0][0]),to_start_speed]
                 mp.MoveJ(np.degrees(q_bp1[0][0]), to_start_speed, 0, target2=target2)
@@ -658,7 +666,7 @@ while True:
                                 print(e)
                             mti_break_flag=True
                 ws.client.servoMH(False)
-                
+                print("Actual scan time:",time.time()-scan_scan_st)
                 if not mti_break_flag:
                     break
                 print("MTI broke during robot move")
@@ -669,6 +677,7 @@ while True:
                         break
                     except:
                         pass
+                
             
             mti_recording=np.array(mti_recording)
             joint_recording=np.array(joint_recording)
@@ -695,6 +704,7 @@ while True:
                 print('Total scans:',len(mti_recording))
             ########################
 
+            pcd_procss_st = time.time()
             #### scanning process: processing point cloud and get h
             # curve_sliced_relative=np.array(curve_sliced_relative)
             crop_extend=15
@@ -741,6 +751,9 @@ while True:
                 if layer!=-1:
                     np.save(out_scan_dir+'height_profile.npy',profile_dh)
             pcd_layer+=pcd
+
+            pcd_process_dt=time.time()-pcd_procss_st
+            print("PCD process dt:",pcd_process_dt)
         
         # update
         last_pcd_layer=deepcopy(pcd_layer)
@@ -776,6 +789,7 @@ while True:
     # move robot to home
     ws.jog_dual(robot_scan,positioner,[R2_mid,R2_home],[0,q_prev[1]],v=to_home_speed)
     # ws.jog_single(robot_scan,R2_home,v=to_home_speed)
+    print("Scan motion time:",time.time()-scan_st-pcd_process_dt)
     
     ## increase layer count
     layer_count+=1
