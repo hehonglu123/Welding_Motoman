@@ -1,6 +1,8 @@
 import librosa
 import librosa.display
 import numpy as np
+import matplotlib
+matplotlib.use('TkAgg')
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
@@ -9,6 +11,8 @@ import sys
 import os
 import re
 from matplotlib.ticker import MaxNLocator
+from matplotlib.animation import FuncAnimation
+from moviepy.editor import VideoClip
 
 def moving_average(data_list, window_size):
     weights = np.ones(window_size) / window_size
@@ -25,7 +29,7 @@ mean_co2 = []
 mean_value_co1 = []
 mean_value_co2 = []
 window_length = []
-base_path = '../data/wall_weld_test/316L_model_140ipm_2023_09_27_21_43_22/'
+base_path = '../data/wall_weld_test/ER4043_correction_100ipm_2023_09_27_20_53_05/'
 
 if os.path.exists(base_path):
     # 获取指定路径下的所有子目录
@@ -70,18 +74,56 @@ if os.path.exists(base_path):
             plt.tight_layout()
             # plt.show()
             plt.close()
+            fig, ax = plt.subplots()
 
-            for i in range(2):
-                plt.plot(mfccs[i], label=f'MFCC co {i+1}')
-                plt.axhline(y=np.mean(mfccs[i]), color='r', linestyle='-', label=f'MFCC co_mean {i+1}')
-                plt.ylabel('MFCC Coefficients')
-                plt.xlabel('number of frames')
-                plt.title(f'MFCC 1st and 2nd coefficients of {layer_dir}')
+            # 设置y轴的范围为两组mfccs数据的最小值和最大值
+            ax.set_ylim(min(np.min(mfccs[0]), np.min(mfccs[1])) - 1, max(np.max(mfccs[0]), np.max(mfccs[1])) + 1)
 
-            # 如果你想要显示图例，可以使用以下命令：
-            plt.legend()
+            # 创建两个空的数据集来收集x和y的数据
+            xdata1, ydata1, xdata2, ydata2 = [], [], [], []
+            ln2, = ax.plot([], [], 'b-', animated=True, label='MFCC Coefficient 2')
+            ln1, = ax.plot([], [], 'g-', animated=True, label='MFCC Coefficient 1')
+
+            def init():
+                ax.set_xlim(0, max(len(mfccs[0]), len(mfccs[1])))
+                ax.set_ylabel('MFCC Coefficients')
+                ax.set_xlabel('number of frames')
+                ax.set_title(f'MFCC 1st and 2nd coefficients of {layer_dir}')
+                ax.legend(loc = 'lower right')
+                return ln1, ln2
+
+            def update(frame):
+                if frame < len(mfccs[0]):
+                    xdata1.append(frame)
+                    ydata1.append(mfccs[0][frame])
+                    ln1.set_data(xdata1, ydata1)
+                if frame < len(mfccs[1]):
+                    xdata2.append(frame)
+                    ydata2.append(mfccs[1][frame])
+                    ln2.set_data(xdata2, ydata2)
+                return ln1, ln2
+
+            total_time_milliseconds = 5000
+            total_frames = max(len(mfccs[0]), len(mfccs[1]))
+
+            interval_time = total_time_milliseconds / total_frames
+            
+            ani = FuncAnimation(fig, update, frames=range(total_frames), 
+                                init_func=init, blit=True, repeat=False, 
+                                interval=interval_time)
+
             plt.show()
+            # 将matplotlib动画转换为moviepy的VideoClip对象
+            duration = total_frames * (5000 / total_frames) / 1000.0
+            video_clip = VideoClip(lambda x: ani.to_rgba(x, bytes=True, norm=True), duration=duration)
+
+            # 保存为MP4
+            video_clip.write_videofile(f'{layer_dir}.mp4', fps=30)
             plt.close()
+            # 如果你想要显示图例，可以使用以下命令：
+            # plt.legend()
+            # plt.show()
+            # plt.close()
             std_value_co1 = np.std(mfccs[0])
             print('std_value_co1:',std_value_co1)
             std_value_co2 = np.std(mfccs[1])
@@ -105,7 +147,7 @@ if os.path.exists(base_path):
             plt.ylabel("MFCC coefficient mean_mov of")
             plt.title(f"Mean_mov of the MFCC of {layer_dir}")
             plt.legend()
-            plt.show()
+            # plt.show()
             plt.close()                  
             n += 1  
             # exit()
