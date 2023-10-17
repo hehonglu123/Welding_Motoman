@@ -115,7 +115,7 @@ feedrate_max=300
 nominal_slice_increment=int(1.1/slicing_meta['line_resolution'])
 slice_inc_gain=3.
 vd_max=8
-feedrate_cmd_adjustment=1
+feedrate_cmd_adjustment=0.7
 vd_relative_adjustment=1
 
 
