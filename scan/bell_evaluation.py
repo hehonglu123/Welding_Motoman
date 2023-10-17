@@ -85,6 +85,7 @@ sliced_alg='circular_slice/'
 data_dir='../data/'+dataset+sliced_alg
 with open(data_dir+'slicing.yml', 'r') as file:
 	slicing_meta = yaml.safe_load(file)
+height_threshold=np.loadtxt(data_dir+'curve_sliced/slice%i_0.csv'%slicing_meta['num_layers'],delimiter=',')[0,2]-0.8
 
 ###read target points
 target_points_pc=[]
@@ -101,11 +102,11 @@ target_points=o3d.geometry.PointCloud()
 target_points.points=o3d.utility.Vector3dVector(target_points_pc)
 
 
-scanned_dir='../../evaluation/Bell_ER4043/'
+scanned_dir='../../evaluation/Bell_ER316L/'
 ######## read the scanned stl
-scanned_mesh = o3d.io.read_triangle_mesh(scanned_dir+'ER4043_bell_optimized.stl')
+scanned_mesh = o3d.io.read_triangle_mesh(scanned_dir+'ER316L_bell_optimized2.stl')
 scanned_mesh.compute_vertex_normals()
-scanned_mesh_temp = o3d.io.read_triangle_mesh(scanned_dir+'ER4043_bell_optimized.stl')
+scanned_mesh_temp = o3d.io.read_triangle_mesh(scanned_dir+'ER316L_bell_optimized2.stl')
 
 
 
@@ -133,6 +134,8 @@ scanned_points=scanned_points.transform(H)
 
 target_points_transform=np.array(target_points.points)
 scanned_points_tranform=np.array(scanned_points.points)
+###thresholding top layers
+scanned_points_tranform=scanned_points_tranform[scanned_points_tranform[:,2]<height_threshold]
 
 left_indices,right_indices=separate(scanned_points_tranform,target_points_transform)
 print(len(left_indices),len(right_indices))
@@ -164,8 +167,9 @@ o3d.visualization.draw_geometries([target_points,collapsed_surface_pc,highlight_
 
 print('error max: ',error.max(),'error avg: ',np.mean(error))
 
+error_display_max=2
 print(error)
-error_normalized=error/np.max(error)
+error_normalized=error/error_display_max
 #convert normalized error map to color heat map
 error_color=cm.inferno(error_normalized)[:,:3]
 collapsed_surface_pc.colors=o3d.utility.Vector3dVector(error_color)
@@ -173,7 +177,7 @@ collapsed_surface_pc.colors=o3d.utility.Vector3dVector(error_color)
 
 z_rng = np.arange(error.max(), error.min(), (error.min()-error.max())/100)
 ax = plt.subplot()
-im = ax.imshow(np.vstack((z_rng, z_rng, z_rng, z_rng)).T, extent=(0,  (error.max()-error.min())/20, error.min(), error.max()), cmap='inferno')
+im = ax.imshow(np.vstack((z_rng, z_rng, z_rng, z_rng)).T, extent=(0,  error_display_max/20, 0,error_display_max), cmap='inferno')
 plt.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)
 plt.ylabel('error [mm]')
 plt.show()

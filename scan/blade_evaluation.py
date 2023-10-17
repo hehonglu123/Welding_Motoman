@@ -57,6 +57,15 @@ def calc_error(target_points,collapsed_points):
     
     return np.array(error_off), np.array(error_miss)
 
+def calc_error_projected(target_points,collapsed_points):
+    num_points=10
+    error=[]
+    for p in collapsed_points:
+        indices=np.argsort(np.linalg.norm(target_points-p,axis=1))[:num_points]
+        normal, centroid=fit_plane(target_points[indices])
+        error.append(np.linalg.norm(vector_to_plane(p, centroid, normal)))     ###vector from surface to left
+    return np.array(error)
+
 def separate(scanned_points,target_points):
     num_points=10
     left_indices=[]
@@ -113,10 +122,10 @@ def visualize_pcd(show_pcd_list,point_show_normal=False):
 
     
 data_dir='../data/blade0.1/'
-scanned_dir='../../evaluation/Blade_ER70S6/'
+scanned_dir='../../evaluation/Blade_ER4043/'
 ######## read the scanned stl
 target_mesh = o3d.io.read_triangle_mesh(data_dir+'surface.stl')
-scanned_mesh = o3d.io.read_triangle_mesh(scanned_dir+'no_base_layer.stl')
+scanned_mesh = o3d.io.read_triangle_mesh(scanned_dir+'ER4043_blade_optimized.stl')
 target_mesh.compute_vertex_normals()
 scanned_mesh.compute_vertex_normals()
 
@@ -171,16 +180,16 @@ collapsed_surface_pc.paint_uniform_color([0.7, 0.7, 0.0])
 
 print('\sigma(w): ',np.std(width),'\mu(w): ',np.average(width))
 
-error_off,error_miss=calc_error(target_points_transform,collapsed_surface)
+error=calc_error_projected(target_points_transform,collapsed_surface)
+
 highlight_pc=o3d.geometry.PointCloud()
-highlight_pc.points=o3d.utility.Vector3dVector([collapsed_surface[error_off.argmax()]])
+highlight_pc.points=o3d.utility.Vector3dVector([collapsed_surface[error.argmax()]])
 highlight_pc.paint_uniform_color([1.0, 0.0, 0.0])
 o3d.visualization.draw_geometries([target_mesh,collapsed_surface_pc,highlight_pc])
 
 
-# error_off=np.maximum(error_off-np.average(width),0)
-print('error max: ',error_off.max(),'error avg: ',np.mean(error_off))
-print(error_miss.max(),np.mean(error_miss))
+print('error max: ',error.max(),'error avg: ',np.mean(error))
+
 
 
 error_map=error_map_gen(collapsed_surface,target_points_transform)
