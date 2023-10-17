@@ -20,8 +20,13 @@ for i in range(total_datasets):
     method=collected_data[i]
     data_dir=curve_data_dir+method+'/'
     height_std = np.load(data_dir+'height_std.npy')
-    print(legends[i],':',round(np.mean(height_std),5),',',round(np.std(height_std),5))
+    print(legends[i],':',round(np.mean(height_std),2),',',round(np.std(height_std),2))
     plt.plot(height_std,'-o',label=legends[i])
+    if i==0:
+        baseline_performance=np.mean(height_std)
+    elif i==1:
+        correction_performance=np.mean(height_std)
+print("Improvements: ",round((baseline_performance-correction_performance)/baseline_performance*100),'%')
 plt.legend()
 plt.xlabel("Layer #")
 plt.ylabel("STD (mm)")
@@ -37,8 +42,13 @@ for i in range(total_datasets):
     method=collected_data[i]
     data_dir=curve_data_dir+method+'/'
     error_norm = np.load(data_dir+'height_error_norm.npy')
-    print(legends[i],':',round(np.mean(error_norm),5),',',round(np.std(error_norm),5))
+    print(legends[i],':',round(np.mean(error_norm),2),',',round(np.std(error_norm),2))
     plt.plot(error_norm,'-o',label=legends[i])
+    if i==0:
+        baseline_performance=np.mean(error_norm)
+    elif i==1:
+        correction_performance=np.mean(error_norm)
+print("Improvements: ",round((baseline_performance-correction_performance)/baseline_performance*100),'%')
 plt.legend()
 plt.xlabel("Layer #")
 plt.ylabel("Norm (mm)")
@@ -54,8 +64,13 @@ for i in range(total_datasets):
     method=collected_data[i]
     data_dir=curve_data_dir+method+'/'
     error_rmse = np.load(data_dir+'height_rmse.npy')
-    print(legends[i],':',round(np.mean(error_rmse),5),',',round(np.std(error_rmse),5))
+    print(legends[i],':',round(np.mean(error_rmse),2),',',round(np.std(error_rmse),2))
     plt.plot(error_rmse,'-o',label=legends[i])
+    if i==0:
+        baseline_performance=np.mean(error_rmse)
+    elif i==1:
+        correction_performance=np.mean(error_rmse)
+print("Improvements: ",round((baseline_performance-correction_performance)/baseline_performance*100),'%')
 plt.legend()
 plt.xlabel("Layer #")
 plt.ylabel("RMSE (mm)")
