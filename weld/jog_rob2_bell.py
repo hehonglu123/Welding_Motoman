@@ -17,7 +17,7 @@ with open(data_dir+'slicing.yml', 'r') as file:
 robot2=robot_obj('MA1440_A0',def_path='../config/MA1440_A0_robot_default_config.yml',tool_file_path='../config/flir.csv',\
 	pulse2deg_file_path='../config/MA1440_A0_pulse2deg_real.csv',base_transformation_file='../config/MA1440_pose.csv')
 
-rob2_js=np.loadtxt(data_dir+'curve_sliced_js/MA1440_js'+str(int(slicing_meta['num_layers']/2))+'_0.csv',delimiter=',').reshape((-1,6))
+rob2_js=np.loadtxt(data_dir+'curve_sliced_js/MA1440_js'+str(int(2*slicing_meta['num_layers']/3))+'_0.csv',delimiter=',').reshape((-1,6))
 
 client=MotionProgramExecClient()
 ws=WeldSend(client)
