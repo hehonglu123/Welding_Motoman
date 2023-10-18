@@ -1,7 +1,7 @@
 import numpy as np
 
-material = {'ER_4043':{},'ER_70S6':{},'316L':{}}
-material['ER_4043'] = {
+material_param = {}
+material_param['ER_4043'] = {
     #ER 4043
     "100ipm": [-0.62015, 1.84913],
     "110ipm": [-0.43334211,  1.23605507],
@@ -19,8 +19,7 @@ material['ER_4043'] = {
     "230ipm": [-0.5374, 1.848],
     "240ipm": [-0.46212367,  1.14990345],
 }
-
-material['ER_70S6'] = {
+material_param['ER_70S6'] = {
         #ER 70S-6
         "100ipm": [-0.31828998,  0.68503243],
         "110ipm": [-0.27499103,  0.63182495],
@@ -39,7 +38,7 @@ material['ER_70S6'] = {
         "240ipm": [-0.31196034,  1.03601865],
         "250ipm": [-0.27141449,  1.03156706]
     }
-material['316L'] = {   
+material_param['316L'] = {   
         #316L
         "100ipm": [-0.27943327,  0.82598745],
         "110ipm": [-0.27403046,  0.85567816],
@@ -61,7 +60,9 @@ material['316L'] = {
 
 def v2dh_loglog(v,mode=140,material='ER_4043'):
     
-    param = material[str(mode)+'ipm']
+    mode=int(mode)
+    print(str(mode)+'ipm')
+    param = material_param[material][str(mode)+'ipm']
     logdh = param[0]*np.log(v)+param[1]
     
     dh = np.exp(logdh)
@@ -69,7 +70,8 @@ def v2dh_loglog(v,mode=140,material='ER_4043'):
 
 def dh2v_loglog(dh,mode=140,material='ER_4043'):
     
-    param = material[str(mode)+'ipm']
+    mode=int(mode)
+    param = material_param[material][str(mode)+'ipm']
 
     logdh = np.log(dh)
     logv = (logdh-param[1])/param[0]

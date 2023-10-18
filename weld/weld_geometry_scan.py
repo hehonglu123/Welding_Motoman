@@ -121,8 +121,8 @@ formatted_time = current_time.strftime('%Y_%m_%d_%H_%M_%S.%f')[:-7]
 
 data_date = input("Use old data directory? (Enter or put time e.g. 2023_07_11_16_25_30): ")
 if data_date == '':
-    data_dir=curve_data_dir+'weld_scan_'+formatted_time+'/'
-    # data_dir=curve_data_dir+'weld_scan_2023_10_13_14_54_22/'
+    # data_dir=curve_data_dir+'weld_scan_'+formatted_time+'/'
+    data_dir=curve_data_dir+'weld_scan_2023_10_18_13_26_12/'
 else:
     data_dir=curve_data_dir+'weld_scan_'+data_date+'/'
 print("Use data directory:",data_dir)
@@ -144,7 +144,7 @@ des_job=int(200+weld_mode/10)
 #       des_v,"mm/sec")
 
 des_v = 5
-des_dh = round(v2dh_loglog(des_v,weld_mode),1)
+des_dh = v2dh_loglog(des_v,weld_mode)
 print("The Desired height (according to desired v",des_v,"mm/sec will be",\
       des_dh,"mm")
 
@@ -156,7 +156,9 @@ layer_width_num=int(des_dw/line_resolution) # preplanned
 
 # weld_min_v=2.5
 # weld_max_v=10
-weld_min_v=des_v/2.
+# weld_min_v=des_v/2.
+weld_min_v=des_v/1.5
+# weld_min_v=3.6
 weld_max_v=min(des_v*2,20)
 print(weld_min_v,weld_max_v)
 
@@ -191,15 +193,11 @@ robot_client=MotionProgramExecClient()
 ws=WeldSend(robot_client)
 # weld state logging
 weld_ser = RRN.SubscribeService('rr+tcp://192.168.55.10:60823?service=welder')
+cam_ser=RRN.ConnectService('rr+tcp://192.168.55.10:60827/?service=camera')
 # mic_ser = RRN.ConnectService('rr+tcp://192.168.55.10:60828?service=microphone')
 ## RR sensor objects
-rr_sensors = WeldRRSensor(weld_service=weld_ser)
+rr_sensors = WeldRRSensor(weld_service=weld_ser,cam_service=cam_ser)
 # MTI connect to RR
-# mti_client = RRN.ConnectService("rr+tcp://192.168.55.10:60830/?service=MTI2D")
-# mti_sub=RRN.SubscribeService("rr+tcp://192.168.55.10:60830/?service=MTI2D")
-# mti_sub.ClientConnectFailed += connect_failed
-# mti_client=mti_sub.GetDefaultClientWait(1)
-# mti_client.setExposureTime("25")
 generate_mti_rr()
 ###################################
 start_feedback=3 # with correction
@@ -207,7 +205,7 @@ start_feedback=3 # with correction
 planned_layer=999
 ## 300 260 250 240 ... 100
 # planned_v=np.ones(planned_layer)*8
-planned_v=np.array([5,8,des_v,des_v,des_v,des_v,des_v,des_v,des_v,des_v,des_v,des_v,des_v,des_v,des_v,des_v,des_v,des_v,des_v,des_v,des_v,des_v,des_v,des_v,des_v])
+planned_v=np.array([8,8,des_v,des_v,des_v,des_v,des_v,des_v,des_v,des_v,des_v,des_v,des_v,des_v,des_v,des_v,des_v,des_v,des_v,des_v,des_v,des_v,des_v,des_v,des_v])
 planned_v=np.append(planned_v,np.ones(planned_layer)*des_v)
 planned_v=planned_v.astype(int)
 
@@ -218,23 +216,24 @@ planned_job=planned_job.astype(int)
 
 print_min_dh = 0.5 # mm
 
-arc_on=False
+arc_on=True
 
+tri_robot=False
 save_weld_record=True
 save_output_points=True
 
 last_layer_curve_relative = []
 last_layer_curve_height = []
 
-layer=-1
-last_layer=-1
-layer_count=-1
-start_weld_layer=0
-
-# layer=0
-# last_layer=1
-# layer_count=3
+# layer=-1
+# last_layer=-1
+# layer_count=-1
 # start_weld_layer=0
+
+layer=1
+last_layer=0
+layer_count=2
+start_weld_layer=3
 
 # Transz0_H=None
 Transz0_H=np.array([[ 9.99977849e-01, -4.63425601e-05, -6.65580373e-03,  5.00206395e-03],
@@ -264,6 +263,10 @@ mean_layer_dh=None
 
 while True:
     print("Layer Count:",layer_count)
+    if layer_count<6:
+        weld_min_v=des_v/1.25
+    else:
+        weld_min_v=des_v/1.5
 
     ####### forward/backward, baselayer/regular layers #####
     if total_baselayer >0:
@@ -477,8 +480,10 @@ while True:
 
             R1_mid[0]=deepcopy(q1[0])
             if go_weld:
-                # ws.jog_dual(robot_weld,positioner,q1,q2,v=to_start_speed)
-                ws.jog_tri(robot_weld,positioner,robot_scan,[R1_mid,q1],q2,ir_js[breakpoints[0]],v=to_start_speed)
+                if tri_robot:
+                    ws.jog_tri(robot_weld,positioner,robot_scan,[R1_mid,q1],q2,ir_js[breakpoints[0]],v=to_start_speed)
+                else:
+                    ws.jog_dual(robot_weld,positioner,[R1_mid,q1],q2,v=to_start_speed)
 
             ######################################################
             ########### Do welding #############
@@ -504,8 +509,10 @@ while True:
             if go_weld:
                 ####DATA LOGGING
                 rr_sensors.start_all_sensors()
-                # rob_stamps,rob_js_exe,_,_=ws.weld_segment_dual(primitives,robot_weld,positioner,q1_all,q2_all,v1_all,v2_all,cond_all=[weld_job],arc=arc_on)
-                rob_stamps,rob_js_exe,_,_=ws.weld_segment_tri(primitives,robot_weld,positioner,robot_scan,q1_all,q2_all,qir_all,v1_all,v2_all,cond_all=[weld_job],arc=arc_on)
+                if tri_robot:
+                    rob_stamps,rob_js_exe,_,_=ws.weld_segment_tri(primitives,robot_weld,positioner,robot_scan,q1_all,q2_all,qir_all,v1_all,v2_all,cond_all=[weld_job],arc=arc_on)
+                else:
+                    rob_stamps,rob_js_exe,_,_=ws.weld_segment_dual(primitives,robot_weld,positioner,q1_all,q2_all,v1_all,v2_all,cond_all=[weld_job],arc=arc_on)
                 rr_sensors.stop_all_sensors()
                 print("Actual weld time:",time.time()-weld_weld_st)
 

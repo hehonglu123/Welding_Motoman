@@ -134,10 +134,10 @@ ph_param_r2=None
 dataset='blade0.1/'
 sliced_alg='auto_slice/'
 curve_data_dir = '../data/'+dataset+sliced_alg
-data_dir=curve_data_dir+'weld_scan_2023_10_09_16_01_52'+'/'
+data_dir=curve_data_dir+'weld_scan_2023_10_18_13_26_12'+'/'
 baselayer=False
 last_layer=0
-layer=402 # 314 358 402 424
+layer=129 # 314 358 402 424
 x=0
 
 calib_z=True
@@ -148,7 +148,7 @@ Transz0_H=np.array([[ 9.99977850e-01, -4.63363649e-05, -6.65562283e-03,  5.00198
  [ 0.00000000e+00,  0.00000000e+00,  0.00000000e+00,  1.00000000e+00]])
 
 use_actual = False
-regen_pcd = True
+regen_pcd = False
 
 if not baselayer:
     layer_data_dir=data_dir+'layer_'+str(layer)+'_'+str(x)+'/'
@@ -242,14 +242,8 @@ if calib_z:
     pcd,Transz0_H = scan_process.pcd_calib_z(pcd,Transz0_H=Transz0_H)
     print("Transz0_H:",Transz0_H)
 
-if use_actual:
-    profile_height = scan_process.pcd2dh(pcd,curve_sliced_relative,drawing=True)
-else:
-    # profile_height = scan_process.pcd2dh(pcd,last_pcd,curve_sliced_relative,robot_weld,rob_js_plan,ph_param=ph_param_r1,drawing=True)
-    # profile_height = scan_process.pcd2dh(pcd,last_pcd,curve_sliced_relative)
-    profile_height = scan_process.pcd2dh(pcd,curve_sliced_relative,drawing=True)
-
-
+profile_height = scan_process.pcd2dh(pcd,curve_sliced_relative,drawing=True)
+    
 curve_i=0
 total_curve_i = len(profile_height)
 for curve_i in range(total_curve_i):
