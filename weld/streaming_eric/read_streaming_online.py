@@ -212,7 +212,7 @@ last_r1_p = None
 last_stamp=None
 for layer_count in range(end_layer_count):
     base_layer=True if layer_count<base_layer_N else False # baselayer flag
-    vd_relative = base_nominal_vd_relative if base_layer else nominal_vd_relative # set feedrate
+    vd_relative = base_nominal_vd_relative if base_layer else nominal_vd_relative # set vd
     
     layer=all_layers[layer_count] # get current layer
     print("Layer:",layer,"#:",layer_count)
@@ -246,6 +246,12 @@ for layer_count in range(end_layer_count):
         
         # Feedback control. TODO: get the correct delta segments
         if not base_layer:
+            # use_seg_i=0
+            # while True:
+            #     this_state_dh = np.mean(x_state_dh[use_seg_i])
+            #     if this_state_dh>0:
+            #         break
+            #     use_seg_i+=1
             vd_relative = weld_controller_lambda(np.mean(x_state_dh[0]),weld_feedback_gain_K,nominal_feedrate)
         vd_relative=min(vd_relative,13)
         vd_relative=max(vd_relative,5)
@@ -278,10 +284,8 @@ for layer_count in range(end_layer_count):
                 last_stamp = robot_timestamp
             this_r1_p=positioner.fwd(q14[-2:],world=True).inv()*robot_weld.fwd(q14[:6])
             this_r1_p=this_r1_p.p
-            r1_v = np.linalg.norm((this_r1_p-last_r1_p))/(robot_timestamp-last_stamp)
-            # print(this_r1_p)
-            # print(last_r1_p)
-            # print("===")
+            # r1_v = np.linalg.norm((this_r1_p-last_r1_p))/(robot_timestamp-last_stamp)
+            r1_v = np.linalg.norm((this_r1_p-last_r1_p))/0.008
             r1_v_seg.append(r1_v)
             
             last_r1_p=deepcopy(this_r1_p)
