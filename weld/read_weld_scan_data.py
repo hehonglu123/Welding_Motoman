@@ -22,7 +22,6 @@ import time
 import datetime
 import numpy as np
 import open3d as o3d
-from matplotlib.animation import FuncAnimation
 
 # def moving_average(a,w=3):
     
@@ -142,7 +141,7 @@ for dataset in datasets:
     elif dataset=='repeat 2':
         data_dir = '../data/wall_weld_test/moveL_100_repeat_weld_scan_2023_08_02_17_07_02/'
     elif dataset =='test':
-        data_dir = '../data/wall_weld_test/ER4043_correction_100ipm_2023_09_27_20_53_05/'
+        data_dir = '../data/wall_weld_test/316L_model_130ipm_2023_10_16_22_25_33/'
     forward_flag=False
     all_profile_height=[]
     all_correction_layer=[]
@@ -446,6 +445,7 @@ for dataset in datasets:
     
     plt.title(f"Height Profile of {data_dir}", fontsize=20)
     plt.tight_layout()
+    
 
     # Set finer grid
     ax = plt.gca()
@@ -468,55 +468,12 @@ for dataset in datasets:
 
     # Adjust tick label fontsize
     ax.tick_params(axis="both", labelsize=18)  # Adjust fontsize as needed
-    # plt.show()
-    plt.close()
+    plt.show()
 
     datasets_h_mean[dataset]=np.array(all_h_mean)
     datasets_h_std[dataset]=np.array(all_h_std)
-    all_x = [point[0] for profile in all_profile_height for point in profile[start_id:end_id]]
-    all_y = [point[1] for profile in all_profile_height for point in profile[start_id:end_id]]
 
-    x_min, x_max = min(all_x), max(all_x)
-    y_min, y_max = min(all_y), max(all_y)
-    # 选取第6层的数据
-    sixth_layer_data = all_profile_height[5]
 
-    fig, ax = plt.subplots(figsize=(8, 5))
-
-    # 初始化函数：设置基本的标签和标题
-    def init():
-        ax.set_xlabel('x-axis (mm)', fontsize=20)
-        ax.set_ylabel('height (mm)', fontsize=20)
-        ax.set_title(f"Height Profile of {data_dir} - 6th Layer", fontsize=20)
-
-        # 绘制前5层的所有点
-        for i in range(5):
-            data = all_profile_height[i]
-            ax.scatter(data[:, 0], data[:, 1], s=10, c='tab:grey')  # 使用灰色或其他颜色来表示静态的点
-
-        # 设置坐标轴的范围，确保包含所有层的点
-        all_data = [point for profile in all_profile_height for point in profile]
-        ax.set_xlim(min(point[0] for point in all_data), max(point[0] for point in all_data))
-        ax.set_ylim(min(point[1] for point in all_data), max(point[1] for point in all_data))
-        return ax,
-
-    step = 10  # 使用步进处理数据
-
-    def update(frame):
-        start_idx = frame * step
-        end_idx = start_idx + step
-        for idx in range(start_idx, min(end_idx, len(sixth_layer_data))):
-            x, y = sixth_layer_data[idx]
-            color = 'tab:blue'  # 设置第6层的颜色
-            ax.scatter(x, y, s=10, c=color)
-
-        return ax,
-
-    # 更改frames参数，以匹配步进处理后的数据量
-    ani = FuncAnimation(fig, update, frames=len(sixth_layer_data) // step, init_func=init, blit=False, repeat=True, interval=10)
-    # ani.save('output_animation.mp4', writer='ffmpeg', fps=30) 
-    plt.show()
-# exit()
 for dataset in datasets:
     plt.plot(np.arange(len(datasets_h_mean[dataset])),datasets_h_mean[dataset],'-o',label=dataset)
 plt.legend()
@@ -524,7 +481,7 @@ plt.xlabel('Layer', fontsize=20)
 plt.ylabel('Mean Height (mm)', fontsize=20)
 plt.title("Mean Height", fontsize=20)
 plt.tight_layout()
-# plt.show()
+plt.show()
 print('mean std:', np.mean(datasets_h_std[dataset]))
 for dataset in datasets:
     plt.plot(np.arange(len(datasets_h_std[dataset])),datasets_h_std[dataset],'-o',label=dataset)
@@ -534,7 +491,7 @@ plt.xlabel('Layer')
 plt.ylabel('Height STD (mm)')
 plt.title("Height STD")
 plt.tight_layout()
-# plt.show()
+plt.show()
 
 datasets_dh_mean={}
 for dataset in datasets:
@@ -546,4 +503,4 @@ plt.xlabel('Layer')
 plt.ylabel('Height STD/Mean dh (%)')
 plt.title("Height STD/Mean dh (%)")
 plt.tight_layout()
-# plt.show()
+plt.show()

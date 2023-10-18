@@ -35,6 +35,10 @@ def v2dh_loglog(v,mode=140):
         # 220 ipm
         # log(Δh)=-0.5699*log(V)+1.985 
         logdh = -0.31630631*np.log(v)+0.70834374
+    elif mode==130:
+        # 220 ipm
+        # log(Δh)=-0.5699*log(V)+1.985 
+        logdh = -0.33658666*np.log(v)+0.93355497
     
     dh = np.exp(logdh)
     return dh
@@ -70,8 +74,12 @@ def dh2v_loglog(dh,mode=140):
         # 220 ipm
         # log(Δh)=-0.5699*log(V)+1.985 
         logv = (logdh-0.70834374)/(-0.31630631)
+    elif mode==130:
+        # 220 ipm
+        # log(Δh)=-0.5699*log(V)+1.985 
+        logv = (logdh-0.93355497)/(-0.33658666)
 
-    if mode == 300:
+    if mode == 400:
         v_raw = np.exp(logv)
         if v_raw == 8:
             v = v_raw

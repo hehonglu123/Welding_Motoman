@@ -92,15 +92,15 @@ final_h_std_thres=999999999
 weld_z_height=[0,6,7] # two base layer height to first top layer
 weld_z_height=np.append(weld_z_height,np.arange(weld_z_height[-1],final_height,1)+1)
 # job_number=[115,115]
-job_number=[330,330]
+job_number=[430,430]
 model_job_nuber = 130
 # job_number=np.append(job_number,np.ones(len(weld_z_height)-2)*(int(model_job_nuber)/10 + 200)) # ER4043
-job_number=np.append(job_number,np.ones(len(weld_z_height)-2)*(int(model_job_nuber)/10 + 300)) # ER70S-6
-# job_number=np.append(job_number,np.ones(len(weld_z_height)-2)*(int(model_job_nuber)/10 + 400)) # 316L
+# job_number=np.append(job_number,np.ones(len(weld_z_height)-2)*(int(model_job_nuber)/10 + 300)) # ER70S-6
+job_number=np.append(job_number,np.ones(len(weld_z_height)-2)*(int(model_job_nuber)/10 + 400)) # 316L
 print(weld_z_height)
 print(job_number)
 
-ipm_mode=400
+ipm_mode=300
 
 weld_velocity=[5,5]
 weld_v=8
@@ -122,7 +122,7 @@ start_correction_layer=3
 
 current_time = datetime.datetime.now()
 formatted_time = current_time.strftime('%Y_%m_%d_%H_%M_%S.%f')[:-7]
-data_dir=f'../data/wall_weld_test/70S_correction_{model_job_nuber}ipm_'  +formatted_time+'/'
+data_dir=f'../data/wall_weld_test/316_correction_{model_job_nuber}ipm_'  +formatted_time+'/'
 
 ### read cmd
 use_previous_cmd=False
@@ -139,6 +139,7 @@ mic_ser = RRN.ConnectService('rr+tcp://localhost:60828?service=microphone')
 ## RR sensor objects
 rr_sensors = WeldRRSensor(weld_service=weld_ser,cam_service=cam_ser,microphone_service=mic_ser,current_service=current_ser)
 
+# rr_sensors = WeldRRSensor(cam_service=cam_ser)
 
 # ## test sensor (camera, microphone)
 print("Test 3 Sec.")
