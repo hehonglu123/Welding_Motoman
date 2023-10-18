@@ -473,70 +473,50 @@ for dataset in datasets:
 
     datasets_h_mean[dataset]=np.array(all_h_mean)
     datasets_h_std[dataset]=np.array(all_h_std)
-    fig, ax = plt.subplots(figsize=(8, 5))
     all_x = [point[0] for profile in all_profile_height for point in profile[start_id:end_id]]
     all_y = [point[1] for profile in all_profile_height for point in profile[start_id:end_id]]
 
     x_min, x_max = min(all_x), max(all_x)
     y_min, y_max = min(all_y), max(all_y)
+    # 选取第6层的数据
+    sixth_layer_data = all_profile_height[5]
+
+    fig, ax = plt.subplots(figsize=(8, 5))
+
     # 初始化函数：设置基本的标签和标题
     def init():
-        ax.set_xlim(x_min, x_max)
-        ax.set_ylim(y_min, y_max)
         ax.set_xlabel('x-axis (mm)', fontsize=20)
         ax.set_ylabel('height (mm)', fontsize=20)
-        ax.set_title(f"Height Profile of {data_dir}", fontsize=20)
+        ax.set_title(f"Height Profile of {data_dir} - 6th Layer", fontsize=20)
+
+        # 绘制前5层的所有点
+        for i in range(5):
+            data = all_profile_height[i]
+            ax.scatter(data[:, 0], data[:, 1], s=10, c='tab:grey')  # 使用灰色或其他颜色来表示静态的点
+
+        # 设置坐标轴的范围，确保包含所有层的点
+        all_data = [point for profile in all_profile_height for point in profile]
+        ax.set_xlim(min(point[0] for point in all_data), max(point[0] for point in all_data))
+        ax.set_ylim(min(point[1] for point in all_data), max(point[1] for point in all_data))
         return ax,
 
-    # 生成所有数据点的顺序列表
-    all_points = []
-    for profile_height in all_profile_height:
-        for point in profile_height[start_id:end_id]:
-            all_points.append(point)
+    step = 10  # 使用步进处理数据
 
-    # 当前层和数据点的索引
-    current_layer = 0
-    current_point_in_layer = 0
-
-    # 更新函数：每次调用都会添加一个新的数据点
     def update(frame):
-        global current_layer, current_point_in_layer
-        
-        profile_height = all_profile_height[current_layer]
-        x, y = profile_height[current_point_in_layer]
-        
-        color = 'tab:blue'
-        if current_layer in all_correction_layer:
-            color = 'tab:green'
-        elif current_layer % 2 == 1:
-            color = 'tab:orange'
-            
-        label = None
-        if frame == 0:
-            label = 'Forward'
-        elif frame == 1:
-            label = 'Backward'
-        elif current_layer in all_correction_layer and current_layer == all_correction_layer[0]:
-            label = 'Corrected Layer'
-        
-        ax.scatter(x, y, s=5, c=color, label=label)
-        
-        if label:
-            ax.legend()
-        
-        # 更新当前数据点和层的索引
-        current_point_in_layer += 1
-        if current_point_in_layer >= len(profile_height):
-            current_point_in_layer = 0
-            current_layer += 1
+        start_idx = frame * step
+        end_idx = start_idx + step
+        for idx in range(start_idx, min(end_idx, len(sixth_layer_data))):
+            x, y = sixth_layer_data[idx]
+            color = 'tab:blue'  # 设置第6层的颜色
+            ax.scatter(x, y, s=10, c=color)
 
         return ax,
 
-    ani = FuncAnimation(fig, update, frames=len(all_points), init_func=init, blit=False, repeat=False,interval = 1)
-
-    plt.tight_layout()
+    # 更改frames参数，以匹配步进处理后的数据量
+    ani = FuncAnimation(fig, update, frames=len(sixth_layer_data) // step, init_func=init, blit=False, repeat=True, interval=10)
+    # ani.save('output_animation.mp4', writer='ffmpeg', fps=30) 
     plt.show()
-exit()
+# exit()
 for dataset in datasets:
     plt.plot(np.arange(len(datasets_h_mean[dataset])),datasets_h_mean[dataset],'-o',label=dataset)
 plt.legend()

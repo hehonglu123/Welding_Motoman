@@ -12,7 +12,6 @@ import os
 import re
 from matplotlib.ticker import MaxNLocator
 from matplotlib.animation import FuncAnimation
-from moviepy.editor import VideoClip
 
 def moving_average(data_list, window_size):
     weights = np.ones(window_size) / window_size
@@ -74,9 +73,22 @@ if os.path.exists(base_path):
             plt.tight_layout()
             # plt.show()
             plt.close()
-            fig, ax = plt.subplots()
 
+            
+            for i in range(2):
+                plt.plot(mfccs[i], label=f'MFCC co {i+1}')
+                plt.axhline(y=np.mean(mfccs[i]), color='r', linestyle='-', label=f'MFCC co_mean {i+1}')
+                plt.ylabel('MFCC Coefficients')
+                plt.xlabel('number of frames')
+                plt.title(f'MFCC 1st and 2nd coefficients of {layer_dir}')
+            # 如果你想要显示图例，可以使用以下命令：
+            plt.legend()
+            plt.show()
+            plt.close()
+            n += 1 
+            continue
             # 设置y轴的范围为两组mfccs数据的最小值和最大值
+            fig, ax = plt.subplots()
             ax.set_ylim(min(np.min(mfccs[0]), np.min(mfccs[1])) - 1, max(np.max(mfccs[0]), np.max(mfccs[1])) + 1)
 
             # 创建两个空的数据集来收集x和y的数据
