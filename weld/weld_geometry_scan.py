@@ -121,8 +121,8 @@ formatted_time = current_time.strftime('%Y_%m_%d_%H_%M_%S.%f')[:-7]
 
 data_date = input("Use old data directory? (Enter or put time e.g. 2023_07_11_16_25_30): ")
 if data_date == '':
-    # data_dir=curve_data_dir+'weld_scan_'+formatted_time+'/'
-    data_dir=curve_data_dir+'weld_scan_2023_10_18_13_26_12/'
+    data_dir=curve_data_dir+'weld_scan_'+formatted_time+'/'
+    # data_dir=curve_data_dir+'weld_scan_2023_10_18_13_26_12/'
 else:
     data_dir=curve_data_dir+'weld_scan_'+data_date+'/'
 print("Use data directory:",data_dir)
@@ -216,24 +216,24 @@ planned_job=planned_job.astype(int)
 
 print_min_dh = 0.5 # mm
 
-arc_on=True
+arc_on=False
 
-tri_robot=False
+tri_robot=True
 save_weld_record=True
 save_output_points=True
 
 last_layer_curve_relative = []
 last_layer_curve_height = []
 
-# layer=-1
-# last_layer=-1
-# layer_count=-1
-# start_weld_layer=0
+layer=-1
+last_layer=-1
+layer_count=-1
+start_weld_layer=0
 
-layer=1
-last_layer=0
-layer_count=2
-start_weld_layer=3
+# layer=1
+# last_layer=0
+# layer_count=2
+# start_weld_layer=3
 
 # Transz0_H=None
 Transz0_H=np.array([[ 9.99977849e-01, -4.63425601e-05, -6.65580373e-03,  5.00206395e-03],

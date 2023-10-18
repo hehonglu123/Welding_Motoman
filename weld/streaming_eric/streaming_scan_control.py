@@ -103,7 +103,7 @@ fronius_client = fronius_sub.GetDefaultClientWait(1)      #connect, timeout=30s
 hflags_const = RRN.GetConstants("experimental.fronius", fronius_client)["WelderStateHighFlags"]
 fronius_client.prepare_welder()
 ########################################################RR STREAMING########################################################
-RR_robot_sub = RRN.SubscribeService('rr+tcp://192.168.55.15:59945?service=robot')
+RR_robot_sub = RRN.SubscribeService('rr+tcp://192.168.55.10:59945?service=robot')
 RR_robot_state = RR_robot_sub.SubscribeWire('robot_state')
 RR_robot = RR_robot_sub.GetDefaultClientWait(1)
 robot_const = RRN.GetConstants("com.robotraconteur.robotics.robot", RR_robot)
@@ -144,7 +144,7 @@ offset_z=0
 weld_feedback_gain_K=1
 
 welding_started=False
-arc_on=True
+arc_on=False
 ##############################
 
 ### scan process object
@@ -309,12 +309,15 @@ for layer_count in range(0,end_layer_count):
             # exit()
             
             ###start logging
+            control_duration=[]
+            # print(breakpoints)
             for bp in breakpoints:
                 ####################################MTI PROCESSING####################################
                 if bp!=len(lam_relative_dense)-1: ###no wait at last point
                     ###busy wait for accurate 8ms streaming
                     while (time.time()-point_stream_start_time)<(1/SS.streaming_rate-0.0005):
                         continue
+                control_duration.append(time.time()-point_stream_start_time)
                 point_stream_start_time=time.time()
                 robot_timestamp,q14=SS.position_cmd(curve_js_all_dense[bp])
                 
@@ -338,6 +341,7 @@ for layer_count in range(0,end_layer_count):
                 ### record data
                 robot_ts.append(robot_timestamp)
                 robot_js.append(q14)
+            print("Average duration:",np.mean(control_duration))
             
             ### update x_state 
             x_state_location.pop(0)
