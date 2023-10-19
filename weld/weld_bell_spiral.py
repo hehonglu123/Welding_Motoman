@@ -61,23 +61,23 @@ q_prev=client.getJointAnglesDB(positioner.pulse2deg)
 
 
 ###set up control parameters
-# job_offset=200 		###200 for Aluminum ER4043, 300 for Steel Alloy ER70S-6, 400 for Stainless Steel ER316L
-# nominal_feedrate=180
-# nominal_vd_relative=5
-# nominal_wire_length=25 #pixels
-# nominal_temp_below=500
-# base_feedrate_cmd=300
-# base_vd=8
-# feedrate_cmd=nominal_feedrate
-# vd_relative=nominal_vd_relative
-# feedrate_gain=0.5
-# feedrate_min=100
-# feedrate_max=300
-# nominal_slice_increment=int(1.0/slicing_meta['line_resolution'])
-# slice_inc_gain=3.
-# vd_max=9
-# feedrate_cmd_adjustment=-50
-# vd_relative_adjustment=2
+job_offset=200 		###200 for Aluminum ER4043, 300 for Steel Alloy ER70S-6, 400 for Stainless Steel ER316L
+nominal_feedrate=170
+nominal_vd_relative=5
+nominal_wire_length=25 #pixels
+nominal_temp_below=500
+base_feedrate_cmd=300
+base_vd=8
+feedrate_cmd=nominal_feedrate
+vd_relative=nominal_vd_relative
+feedrate_gain=0.5
+feedrate_min=100
+feedrate_max=300
+nominal_slice_increment=int(1.0/slicing_meta['line_resolution'])
+slice_inc_gain=3.
+vd_max=9
+feedrate_cmd_adjustment=-50
+vd_relative_adjustment=2
 
 # ###set up control parameters, no baselayer needed for 70S6!!!!
 # job_offset=300 		###200 for Aluminum ER4043, 300 for Steel Alloy ER70S-6, 400 for Stainless Steel ER316L
@@ -99,24 +99,24 @@ q_prev=client.getJointAnglesDB(positioner.pulse2deg)
 # vd_relative_adjustment=2
 
 
-###set up control parameters, no baselayer needed for 316L!!!!
-job_offset=400 		###200 for Aluminum ER4043, 300 for Steel Alloy ER70S-6, 400 for Stainless Steel ER316L
-nominal_feedrate=80
-nominal_vd_relative=2
-nominal_wire_length=25 #pixels
-nominal_temp_below=500
-base_feedrate_cmd=300
-base_vd=8
-feedrate_cmd=nominal_feedrate
-vd_relative=nominal_vd_relative
-feedrate_gain=0.5
-feedrate_min=80
-feedrate_max=300
-nominal_slice_increment=int(1.1/slicing_meta['line_resolution'])
-slice_inc_gain=3.
-vd_max=8
-feedrate_cmd_adjustment=0.7
-vd_relative_adjustment=1
+# ###set up control parameters, no baselayer needed for 316L!!!!
+# job_offset=400 		###200 for Aluminum ER4043, 300 for Steel Alloy ER70S-6, 400 for Stainless Steel ER316L
+# nominal_feedrate=80
+# nominal_vd_relative=2
+# nominal_wire_length=25 #pixels
+# nominal_temp_below=500
+# base_feedrate_cmd=300
+# base_vd=8
+# feedrate_cmd=nominal_feedrate
+# vd_relative=nominal_vd_relative
+# feedrate_gain=0.5
+# feedrate_min=80
+# feedrate_max=300
+# nominal_slice_increment=int(1.1/slicing_meta['line_resolution'])
+# slice_inc_gain=3.
+# vd_max=8
+# feedrate_cmd_adjustment=0.7
+# vd_relative_adjustment=1
 
 
 ######################################################BASE LAYER##########################################################################################

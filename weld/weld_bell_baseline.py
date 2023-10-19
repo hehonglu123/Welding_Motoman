@@ -27,42 +27,62 @@ client=MotionProgramExecClient()
 ws=WeldSend(client)
 
 ###set up control parameters
-# job_offset=200 		###200 for Aluminum ER4043, 300 for Steel Alloy ER70S-6, 400 for Stainless Steel ER316L
-# nominal_feedrate=110
-# nominal_vd_relative=9
+job_offset=200 		###200 for Aluminum ER4043, 300 for Steel Alloy ER70S-6, 400 for Stainless Steel ER316L
+nominal_feedrate=110
+nominal_vd_relative=9
+nominal_wire_length=25 #pixels
+nominal_temp_below=500
+base_feedrate_cmd=300
+base_vd=9
+feedrate_cmd=nominal_feedrate
+vd_relative=nominal_vd_relative
+feedrate_gain=0.5
+feedrate_min=100
+feedrate_max=300
+nominal_slice_increment=int(1.05/slicing_meta['line_resolution'])
+slice_inc_gain=3.
+vd_max=10
+feedrate_cmd_adjustment=0
+vd_relative_adjustment=0
+
+# ###set up control parameters
+# job_offset=300 		###200 for Aluminum ER4043, 300 for Steel Alloy ER70S-6, 400 for Stainless Steel ER316L
+# nominal_feedrate=100
+# nominal_vd_relative=8
 # nominal_wire_length=25 #pixels
 # nominal_temp_below=500
 # base_feedrate_cmd=300
-# base_vd=9
+# base_vd=5
 # feedrate_cmd=nominal_feedrate
 # vd_relative=nominal_vd_relative
 # feedrate_gain=0.5
-# feedrate_min=100
+# feedrate_min=80
 # feedrate_max=300
-# nominal_slice_increment=int(1.05/slicing_meta['line_resolution'])
+# nominal_slice_increment=int(0.85/slicing_meta['line_resolution'])
 # slice_inc_gain=3.
 # vd_max=10
 # feedrate_cmd_adjustment=0
 # vd_relative_adjustment=0
 
-###set up control parameters
-job_offset=400 		###200 for Aluminum ER4043, 300 for Steel Alloy ER70S-6, 400 for Stainless Steel ER316L
-nominal_feedrate=100
-nominal_vd_relative=8
-nominal_wire_length=25 #pixels
-nominal_temp_below=500
-base_feedrate_cmd=300
-base_vd=5
-feedrate_cmd=nominal_feedrate
-vd_relative=nominal_vd_relative
-feedrate_gain=0.5
-feedrate_min=80
-feedrate_max=300
-nominal_slice_increment=int(0.85/slicing_meta['line_resolution'])
-slice_inc_gain=3.
-vd_max=10
-feedrate_cmd_adjustment=0
-vd_relative_adjustment=0
+# ###set up control parameters
+# job_offset=400 		###200 for Aluminum ER4043, 300 for Steel Alloy ER70S-6, 400 for Stainless Steel ER316L
+# nominal_feedrate=130
+# nominal_vd_relative=8
+# nominal_wire_length=25 #pixels
+# nominal_temp_below=500
+# base_feedrate_cmd=300
+# base_vd=5
+# feedrate_cmd=nominal_feedrate
+# vd_relative=nominal_vd_relative
+# feedrate_gain=0.5
+# feedrate_min=80
+# feedrate_max=300
+# nominal_slice_increment=int(1.2/slicing_meta['line_resolution'])
+# slice_inc_gain=3.
+# vd_max=10
+# feedrate_cmd_adjustment=0
+# vd_relative_adjustment=0
+
 
 ###########################################BASE layer welding############################################
 # num_layer_start=int(0*nominal_slice_increment)	###modify layer num here
@@ -114,8 +134,8 @@ vd_relative_adjustment=0
 # 		timestamp_robot,joint_recording,job_line,_=ws.weld_segment_dual(primitives,robot,positioner,q1_all,q2_all,v1_all,v2_all,cond_all=[int(base_feedrate_cmd/10)+job_offset],arc=True)
 
 ###########################################layer welding############################################
-num_layer_start=int(1*nominal_slice_increment)	###modify layer num here
-num_layer_end=slicing_meta['num_layers']
+num_layer_start=int(0*nominal_slice_increment)	###modify layer num here
+num_layer_end=min(70*nominal_slice_increment,slicing_meta['num_layers'])
 
 # q_prev=client.getJointAnglesDB(positioner.pulse2deg)
 q_prev=np.array([9.53E-02,-2.71E+00])	###for motosim tests only
