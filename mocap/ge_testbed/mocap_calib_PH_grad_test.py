@@ -31,8 +31,10 @@ for qkey in PH_q.keys():
     training_error.append(PH_q[qkey]['train_pos_error'])
 train_q=np.array(train_q)
 training_error_last=[]
+training_error_init=[]
 for te in training_error:
     training_error_last.append(np.mean(te[-1]))
+    training_error_init.append(np.mean(te[0]))
 training_error=training_error_last
 #####################
 
@@ -63,6 +65,8 @@ print("Training Data")
 markdown_str=''
 markdown_str+='||Mean (mm)|Std (mm)|Max (mm)|\n'
 markdown_str+='|-|-|-|-|\n'
+markdown_str+='|Nominal PH|'+format(round(np.mean(training_error_init),4),'.4f')+'|'+\
+    format(round(np.std(training_error_init),4),'.4f')+'|'+format(round(np.max(training_error_init),4),'.4f')+'|\n'
 markdown_str+='|One PH|'+format(round(np.mean(training_error_universal[-1]),4),'.4f')+'|'+\
     format(round(np.std(training_error_universal[-1]),4),'.4f')+'|'+format(round(np.max(training_error_universal[-1]),4),'.4f')+'|\n'
 markdown_str+='|Optimize PH|'+format(round(np.mean(training_error),4),'.4f')+'|'+\

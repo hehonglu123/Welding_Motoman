@@ -229,8 +229,9 @@
 ### Training Data
 ||Mean (mm)|Std (mm)|Max (mm)|
 |-|-|-|-|
-|One PH|0.2436|0.1387|0.8530|
-|Optimize PH|0.0431|0.0243|0.1006|
+|Nominal PH|1.3188|0.2347|1.8143|
+|One PH|0.2443|0.1398|0.8640|
+|Optimize PH|0.0581|0.0364|0.3700|
 
 ### Testing Data (Position)
 ||Mean (mm)|Std (mm)|Max (mm)|
@@ -365,8 +366,9 @@
 ### Training Data
 ||Mean (mm)|Std (mm)|Max (mm)|
 |-|-|-|-|
+|Nominal PH|1.7658|0.9394|4.1825|
 |One PH|0.5210|0.2964|1.5786|
-|Optimize PH|0.0401|0.0318|0.1017|
+|Optimize PH|0.0337|0.0177|0.1220|
 
 ### Testing Data (Position)
 ||Mean (mm)|Std (mm)|Max (mm)|
