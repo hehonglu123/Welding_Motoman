@@ -41,7 +41,7 @@ def main():
                 current_mat = data_u16.reshape([rr_img.image_info.height, rr_img.image_info.width], order='C')
             #cap
             current_mat[current_mat >threshold] = threshold
-            ir_normalized = ((current_mat - np.min(current_mat)) / (np.max(current_mat) - np.min(current_mat))) * 255
+            ir_normalized = ((current_mat - np.min(current_mat)) / (threshold - np.min(current_mat))) * 255
             ir_bgr = cv2.applyColorMap(ir_normalized.astype(np.uint8), cv2.COLORMAP_INFERNO)
 
             cv2.imwrite(recorded_dir+str(counts)+'.jpg', ir_bgr,[cv2.IMWRITE_JPEG_QUALITY, 100])
