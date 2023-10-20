@@ -16,11 +16,11 @@ Rx=np.array([1,0,0])
 Ry=np.array([0,1,0])
 Rz=np.array([0,0,1])
 
-ph_dataset_date='0804'
-test_dataset_date='0804'
+ph_dataset_date='0801'
+test_dataset_date='0801'
 config_dir='../config/'
 
-robot_type = 'R2'
+robot_type = 'R1'
 
 if robot_type == 'R1':
     robot_marker_dir=config_dir+'MA2010_marker_config/'
@@ -439,7 +439,7 @@ if plot_origin:
     plt.plot(train_error_pos_origin_norm,'-o',markersize=1,label='Origin PH')    
 plt.plot(train_error_pos_baseline_norm,'-o',markersize=1,label='CPA PH')
 # plt.plot(train_error_pos_PHZero_norm,'-o',markersize=1,label='Zero PH')
-# plt.plot(train_error_pos_onePH_norm,'-o',markersize=1,label='One PH')
+plt.plot(train_error_pos_onePH_norm,'-o',markersize=1,label='One PH')
 plt.plot(train_error_pos_near_norm,'-o',markersize=1,label='Optimized PH')
 # plt.plot(train_error_pos_lin_norm,'-o',markersize=1,label='Linear Interp PH')
 # plt.plot(train_error_pos_cub_norm,'-o',markersize=1,label='Cubic Interp PH')
@@ -531,6 +531,8 @@ markdown_str+='||Mean (mm)|Std (mm)|Max (mm)|\n'
 markdown_str+='|-|-|-|-|\n'
 markdown_str+='|Nominal PH|'+format(round(np.mean(train_error_pos_origin_norm),4),'.4f')+'|'+\
     format(round(np.std(train_error_pos_origin_norm),4),'.4f')+'|'+format(round(np.max(train_error_pos_origin_norm),4),'.4f')+'|\n'
+markdown_str+='|CPA|'+format(round(np.mean(train_error_pos_baseline_norm),4),'.4f')+'|'+\
+    format(round(np.std(train_error_pos_baseline_norm),4),'.4f')+'|'+format(round(np.max(train_error_pos_baseline_norm),4),'.4f')+'|\n'
 markdown_str+='|One PH|'+format(round(np.mean(training_error_universal[-1]),4),'.4f')+'|'+\
     format(round(np.std(training_error_universal[-1]),4),'.4f')+'|'+format(round(np.max(training_error_universal[-1]),4),'.4f')+'|\n'
 markdown_str+='|Optimize PH|'+format(round(np.mean(training_error),4),'.4f')+'|'+\

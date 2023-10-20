@@ -311,8 +311,10 @@
 ### Training Data
 ||Mean (mm)|Std (mm)|Max (mm)|
 |-|-|-|-|
-|One PH|0.5452|0.2807|1.5240|
-|Optimize PH|0.0542|0.0216|0.0920|
+|Nominal PH|1.7658|0.9394|4.1825|
+|CPA|1.5864|0.7866|3.2890|
+|One PH|0.5210|0.2964|1.5786|
+|Optimize PH|0.0337|0.0177|0.1220|
 
 ### Testing Data (Position)
 ||Mean (mm)|Std (mm)|Max (mm)|
