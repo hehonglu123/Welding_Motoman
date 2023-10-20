@@ -102,8 +102,8 @@ regen_pcd = False
 dataset='blade0.1/'
 sliced_alg='auto_slice/'
 curve_data_dir = '../data/'+dataset+sliced_alg
-# data_dir=curve_data_dir+'weld_scan_baseline_2023_10_09_16_01_52'+'/'
-data_dir=curve_data_dir+'weld_scan_correction_2023_10_10_16_56_32'+'/'
+data_dir=curve_data_dir+'weld_scan_baseline_2023_10_09_16_01_52'+'/'
+# data_dir=curve_data_dir+'weld_scan_correction_2023_10_10_16_56_32'+'/'
 
 #### welding spec, goal
 with open(curve_data_dir+'slicing.yml', 'r') as file:
@@ -362,11 +362,11 @@ for lh in all_layer_dh:
     draw_color='tab:blue' if draw_l_count%2==0 else 'tab:orange'
     plt.scatter(lh[:,0],lh[:,1]+layer_num[draw_l_count]/10.,c=draw_color)
     draw_l_count+=1
-plt.xlabel("Path length (lambda) (mm)",fontsize=16)
-plt.ylabel("Height (mm)",fontsize=16)
-plt.xticks(fontsize=16)
-plt.yticks(fontsize=16)
-plt.title("Layer Height",fontsize=20)
+plt.xlabel("Path length (lambda) (mm)",fontsize=20)
+plt.ylabel("Height (mm)",fontsize=20)
+plt.xticks(fontsize=20)
+plt.yticks(fontsize=20)
+plt.title("Layer Height",fontsize=24)
 plt.show()
 
 draw_l_count=0

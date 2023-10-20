@@ -16,11 +16,11 @@ Rx=np.array([1,0,0])
 Ry=np.array([0,1,0])
 Rz=np.array([0,0,1])
 
-ph_dataset_date='0801'
-test_dataset_date='0801'
+ph_dataset_date='0804'
+test_dataset_date='0804'
 config_dir='../config/'
 
-robot_type = 'R1'
+robot_type = 'R2'
 
 if robot_type == 'R1':
     robot_marker_dir=config_dir+'MA2010_marker_config/'
@@ -437,7 +437,7 @@ plt.show()
 plot_origin=True
 if plot_origin:
     plt.plot(train_error_pos_origin_norm,'-o',markersize=1,label='Origin PH')    
-plt.plot(train_error_pos_baseline_norm,'-o',markersize=1,label='CPA PH')
+# plt.plot(train_error_pos_baseline_norm,'-o',markersize=1,label='CPA PH')
 # plt.plot(train_error_pos_PHZero_norm,'-o',markersize=1,label='Zero PH')
 plt.plot(train_error_pos_onePH_norm,'-o',markersize=1,label='One PH')
 plt.plot(train_error_pos_near_norm,'-o',markersize=1,label='Optimized PH')

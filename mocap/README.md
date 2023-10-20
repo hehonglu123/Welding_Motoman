@@ -13,11 +13,69 @@ The algorithms and codes are designed to be independent of the specific motion c
 ### Optitrack
 
 #### RR Driver
-Please refer to [this repository](https://github.com/eric565648/optitrack_mocap_robotraconteur_driver) for the RR driver.
+Please refer to [this repository](https://github.com/robotraconteur-contrib/optitrack_mocap_robotraconteur_driver) for the RR driver.
 
-#### Mocap Listener
+### Phasesoace
+
+#### RR Driver
+Please refer to [this repository](https://github.com/robotraconteur-contrib/phasespace_mocap_robotraconteur_driver) for the RR driver.
+
+### Mocap Listener
 
 The file `MocapPoseListener.py` is a useful tool that can collect data points in the background as an RR client. It further converts the data points into a specified frame for the user. Please refer to the code for examples.
+
+## Circular-point-analysis (CPA)
+
+Calibrate the robot by rotating each joints to find the joint axis.
+
+### Run data collection
+
+```
+python3 mocap_calib_PH_rotate_datacollect.py
+```
+
+### Run calibration
+
+```
+python3 mocap_calib_PH_rotate.py
+```
+
+## Configuration dependent kinematic model calibration using numerical gradient descent
+
+Calibrate the robot at each configuration using numerical gradients.
+
+### Data Collection
+
+```
+python3 mocap_calib_PH_grad_datacollect.py
+```
+
+### Run calibration
+
+```
+python3 mocap_calib_PH_grad.py
+```
+
+### Run testing data collection
+
+```
+python3 mocap_calib_grad_test_datacollect.py
+```
+
+### Run testing data collection
+
+```
+python3 mocap_calib_grad_test.py
+```
+
+## Training Data
+
+The dataset is represented in the same format as the 'Testing Data'.
+
+During the data collection process, the robot traverses various configurations of `q2 q3`. Within each configuration, the robot samples `N` points around that configuration to ensure a rich dataset and prevent situations such as rolling off into null space during calibration. As a result, rows 1 to N represent the same 'q2 q3' configuration, rows N+1 to 2N represent another identical configuration, and so on.
+
+### Availabe Dataset
+- Dataset 1 [robot_q](https://github.com/hehonglu123/Welding_Motoman/blob/devel-eric/mocap/PH_grad_data/test0801_R1/train_data_robot_q_align.csv) [mocap_T](https://github.com/hehonglu123/Welding_Motoman/blob/devel-eric/mocap/PH_grad_data/test0801_R1/train_data_mocap_T_align.csv). Neighbor N=7.
 
 ## Testing Data
 
@@ -41,50 +99,5 @@ An example of mocap file. Column 1~3 are `xyz` and Column 4~7 are quaternion `qw
 ...
 ```
 
-#### Availabe Dataset
-- Testing Dataset 1 [robot_q](https://github.com/hehonglu123/Welding_Motoman/blob/devel-eric/mocap/kinematic_raw_data/test0516/robot_q_align.csv) [mocap_T](https://github.com/hehonglu123/Welding_Motoman/blob/devel-eric/mocap/kinematic_raw_data/test0516/mocap_T_align.csv)
-
-## Numerical Gradient Descent
-
-### Data
-
-The dataset is represented in the same format as the 'Testing Data'.
-
-During the data collection process, the robot traverses various configurations of `q2 q3`. Within each configuration, the robot samples `N` points around that configuration to ensure a rich dataset and prevent situations such as rolling off into null space during calibration. As a result, rows 1 to N represent the same 'q2 q3' configuration, rows N+1 to 2N represent another identical configuration, and so on.
-
-#### Availabe Dataset
-- Dataset 1 [robot_q](https://github.com/hehonglu123/Welding_Motoman/blob/devel-eric/mocap/PH_grad_data/test0516_R1/train_data_robot_q_align.csv) [mocap_T](https://github.com/hehonglu123/Welding_Motoman/blob/devel-eric/mocap/PH_grad_data/test0516_R1/train_data_mocap_T_align.csv). Neighbor N=7.
-
-### Run Calibration
-
-Run the following command:
-
-```
-python3 mocap_calib_PH_grad.py
-```
-
-### Data Collection
-
-Run the following command:
-
-```
-python3 mocap_calib_PH_grad_datacollect.py
-```
-
-## Rotating Joints Method
-
-### Run Estimation
-
-Run the following command:
-
-```
-python3 mocap_calib_PH_rotate.py
-```
-
-### Data Collection
-
-Run the following command:
-
-```
-python3 mocap_calib_PH_rotate_datacollect.py
-```
+### Availabe Dataset
+- Testing Dataset 1 [robot_q](https://github.com/hehonglu123/Welding_Motoman/blob/devel-eric/mocap/kinematic_raw_data/test0801/robot_q_align.csv) [mocap_T](https://github.com/hehonglu123/Welding_Motoman/blob/devel-eric/mocap/kinematic_raw_data/test0801/mocap_T_align.csv)
