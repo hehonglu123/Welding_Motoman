@@ -32,6 +32,13 @@ waypoint_distance=5 	###waypoint separation
 layer_height_num=int(1.5/slicing_meta['line_resolution'])
 layer_width_num=int(4/slicing_meta['line_resolution'])
 
+vd_relative=7
+base_vd_relative=8
+feedrate_cmd=150
+base_feedrate_cmd=250
+job_offset=200
+
+
 robot=robot_obj('MA2010_A0',def_path='../config/MA2010_A0_robot_default_config.yml',tool_file_path='../config/torch.csv',\
 	pulse2deg_file_path='../config/MA2010_A0_pulse2deg_real.csv',d=15)
 robot2=robot_obj('MA1440_A0',def_path='../config/MA1440_A0_robot_default_config.yml',tool_file_path='../config/flir.csv',\
@@ -59,7 +66,7 @@ primitives=[]
 # 		positioner_js=np.loadtxt(data_dir+'curve_sliced_js/D500B_base_js'+str(base_layer)+'_'+str(x)+'.csv',delimiter=',')
 # 		curve_sliced_relative=np.loadtxt(data_dir+'curve_sliced_relative/baselayer'+str(base_layer)+'_'+str(x)+'.csv',delimiter=',')
 
-# 		vd_relative=8
+# 		base_vd_relative=8
 # 		lam1=calc_lam_js(curve_sliced_js,robot)
 # 		lam2=calc_lam_js(positioner_js,positioner)
 # 		lam_relative=calc_lam_cs(curve_sliced_relative)
@@ -82,7 +89,7 @@ primitives=[]
 # 		q1_all.extend([q_start]+curve_sliced_js[breakpoints].tolist()+[q_end])
 # 		q2_all.extend([positioner_js[breakpoints[0]]]+positioner_js[breakpoints].tolist()+[positioner_js[breakpoints[-1]]])
 # 		v1_all.extend([1]+[s1_all[0]]+s1_all+[s1_all[-1]])
-# 		cond_all.extend([0]+[218]*(num_points_layer+1))					###extended baselayer welding
+# 		cond_all.extend([0]+[int(base_feedrate_cmd/10+job_offset)]*(num_points_layer+1))					###extended baselayer welding
 		
 
 # 		q_prev=curve_sliced_js[breakpoints[-1]]
@@ -90,6 +97,9 @@ primitives=[]
 ###########################################layer welding############################################
 # q_prev=np.array([-3.791544713877046391e-01,7.156749523014762637e-01,2.756772964158371586e-01,2.106493295914119712e-01,-7.865937103692784982e-01,-5.293956242391706368e-01])
 q_prev=client.getJointAnglesMH(robot.pulse2deg)
+
+
+
 
 num_layer_start=int(1*layer_height_num)
 num_layer_end=int(2*layer_height_num)
@@ -119,7 +129,7 @@ for layer in range(num_layer_start,num_layer_end,layer_height_num):
 		positioner_js=np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
 		curve_sliced_relative=np.loadtxt(data_dir+'curve_sliced_relative/slice'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
 
-		vd_relative=7
+		
 		lam1=calc_lam_js(rob1_js,robot)
 		lam2=calc_lam_js(positioner_js,positioner)
 		lam_relative=calc_lam_cs(curve_sliced_relative)
@@ -151,7 +161,7 @@ for layer in range(num_layer_start,num_layer_end,layer_height_num):
 		q2_all.extend(rob2_js[breakpoints].tolist())
 		positioner_all.extend(positioner_js[breakpoints].tolist())
 		v1_all.extend([1]+s1_all)
-		cond_all.extend([0]+[200]*(num_points_layer-1))
+		cond_all.extend([0]+[int(base_feedrate_cmd/10+job_offset)]*(num_points_layer-1))
 		primitives.extend(['movej']+['movel']*(num_points_layer-1))
 
 

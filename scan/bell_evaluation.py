@@ -85,7 +85,7 @@ sliced_alg='circular_slice/'
 data_dir='../data/'+dataset+sliced_alg
 with open(data_dir+'slicing.yml', 'r') as file:
 	slicing_meta = yaml.safe_load(file)
-height_threshold=np.loadtxt(data_dir+'curve_sliced/slice%i_0.csv'%slicing_meta['num_layers'],delimiter=',')[0,2]+0.1
+height_threshold=np.loadtxt(data_dir+'curve_sliced/slice%i_0.csv'%slicing_meta['num_layers'],delimiter=',')[0,2]+0.5
 
 ###read target points
 target_points_pc=[]
@@ -102,11 +102,11 @@ target_points=o3d.geometry.PointCloud()
 target_points.points=o3d.utility.Vector3dVector(target_points_pc)
 
 
-scanned_dir='../../evaluation/Bell_ER316L/'
+scanned_dir='../../evaluation/Bell_ER4043/'
 ######## read the scanned stl
-scanned_mesh = o3d.io.read_triangle_mesh(scanned_dir+'ER316L_bell_optimized3.stl')
+scanned_mesh = o3d.io.read_triangle_mesh(scanned_dir+'ER4043_bell_baseline3.stl')
 scanned_mesh.compute_vertex_normals()
-scanned_mesh_temp = o3d.io.read_triangle_mesh(scanned_dir+'ER316L_bell_optimized3.stl')
+scanned_mesh_temp = o3d.io.read_triangle_mesh(scanned_dir+'ER4043_bell_baseline3.stl')
 
 
 
