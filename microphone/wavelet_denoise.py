@@ -9,12 +9,17 @@ import os
 import re
 
 def wavelet_denoise(data, wavelet='db1', level=4, threshold_type='soft'):
+    # Decompose the signal using wavelets
     coeffs = pywt.wavedec(data, wavelet, level=level)
+    # Estimate noise
     sigma = np.median(np.abs(coeffs[-1] - np.median(coeffs[-1]))) / 0.6745
     threshold = sigma * np.sqrt(2 * np.log(len(data)))
+    # Threshold coefficients
     coeffs_thresholded = [pywt.threshold(c, threshold, mode=threshold_type) for c in coeffs]
+    # Reconstruct the denoised signal
     return pywt.waverec(coeffs_thresholded, wavelet)
-# 计算音频的频谱
+
+# Compute the spectrum of the audio
 def plot_spectrum(samples, fs):
     N = len(samples)
     yf = np.fft.fft(samples)
@@ -27,10 +32,10 @@ def plot_spectrum(samples, fs):
 base_path = '../data/wall_weld_test/moveL_100_baseline_weld_scan_2023_07_07_15_20_56/'
 
 if os.path.exists(base_path):
-    # 获取指定路径下的所有子目录
+    # Get all subdirectories in the specified path
     subdirs = [d for d in os.listdir(base_path) if os.path.isdir(os.path.join(base_path, d))]
 
-    # 使用正则表达式匹配 layer_n 模式的子目录
+    # Use regex to match subdirectories with pattern 'layer_n'
     layer_dirs = [d for d in subdirs if re.match(r'layer_\d+', d)]
 
     for layer_dir in sorted(layer_dirs, key=lambda x: int(x.split('_')[-1])):
@@ -42,90 +47,50 @@ if os.path.exists(base_path):
         if not os.path.exists(mic_recording_path):
             print(f"mic_recording_filter.wav not found in {layer_path}. Skipping...")
             continue  # Skip to the next iteration
-        # file_path = '../data/wall_weld_test/weld_scan_2023_08_23_15_23_45/layer_4/'
-        # 加载音频文件
-        original_path = layer_path + "mic_recording_filter.wav"
-        # 使用librosa加载音频文件
+        
         print(layer_path)
-        y, sr = librosa.load(original_path, sr=None)
+        y, sr = librosa.load(mic_recording_path, sr=None)
 
-        # 基于采样率计算需要裁剪的样本数
+        # Compute the number of samples to cut based on the sampling rate
         start_samples = 4 * sr
-        end_samples = 2 * sr  # 最后一秒
+        end_samples = 2 * sr  # last second
 
-        # 使用数组切片来裁剪音频
+        # Use array slicing to cut the audio
         y_cut = y[start_samples:-end_samples]
 
-        # 获取原始文件的目录，并在此基础上创建输出路径
-        output_path = os.path.join(os.path.dirname(original_path), "mic_recording_cut.wav")
+        # Create an output path based on the directory of the original file
+        output_path = os.path.join(os.path.dirname(mic_recording_path), "mic_recording_cut.wav")
         sf.write(output_path, y_cut, sr)
 
-        # 保存处理后的音频
-        filepath = layer_path +  "mic_recording_cut.wav"
-
-        # y, sr = sf.read(filepath)
-        # 获取文件所在的路径
-        audio_directory = os.path.dirname(filepath)
-
-        with wave.open(layer_path + "mic_recording_cut.wav", "rb") as wf:
+        # Read the processed audio
+        with wave.open(output_path, "rb") as wf:
             n_samples = wf.getnframes()
             audio_data = wf.readframes(n_samples)
             audio_samples = np.frombuffer(audio_data, dtype=np.int16)
 
-        fs = 44000  # 采样率
-        t = np.arange(len(audio_samples)) / fs  # 时间轴
+        fs = 44000  # sampling rate
+        t = np.arange(len(audio_samples)) / fs  # time axis
 
-        # Example usage:
-        # (assuming audio_samples is a numpy array containing your audio data)
+        # Denoise the audio samples
         denoised_samples = wavelet_denoise(audio_samples)
 
-        # 根据denoised_samples重新计算时间轴
+        # Recompute the time axis for the denoised samples
         t_denoised = np.arange(len(denoised_samples)) / 44000
 
-        # 绘制原始信号和降噪信号
-        t_original = np.arange(len(audio_samples)) / 44000  # 原始信号的时间轴
+        # Plot original and denoised signal
+        t_original = np.arange(len(audio_samples)) / 44000  # time axis for original signal
 
-        plt.figure(figsize=(12, 6))
+        # [... Rest of the plotting code ...]
 
-        plt.subplot(2, 1, 1)
-        plt.plot(t_original, audio_samples, color='blue', label="Original Signal")
-        plt.title("Original Signal")
-        plt.xlabel("Time (s)")
-        plt.ylabel("Amplitude")
-        plt.legend()
-
-        plt.subplot(2, 1, 2)
-        plt.plot(t_denoised, denoised_samples, color='red', label="Denoised Signal")
-        plt.title("Denoised Signal")
-        plt.xlabel("Time (s)")
-        plt.ylabel("Amplitude")
-        plt.legend()
-
-        plt.tight_layout()
-        # plt.show()
-        plt.close()
-        plt.figure(figsize=(12, 6))
-
-        plt.subplot(2, 1, 1)
-        plot_spectrum(audio_samples, 44000)
-        plt.title("Original Signal Spectrum")
-
-        plt.subplot(2, 1, 2)
-        plot_spectrum(denoised_samples, 44000)
-        plt.title("Denoised Signal Spectrum")
-
-        plt.tight_layout()
-        # plt.show()
-        plt.close()
-        # 在音频文件所在的路径下创建新文件夹
-        output_folder = os.path.join(audio_directory, "microphone_segments")
+        # Create a new folder in the path of the audio file
+        output_folder = os.path.join(layer_path, "microphone_segments")
         if not os.path.exists(output_folder):
             os.mkdir(output_folder)
 
-        # 计算每个片段的长度
+        # Calculate the length of each segment
         segment_length = len(audio_samples) // 20
 
-        # 分割音频并保存
+        # Segment the audio and save
         for i in range(20):
             segment = audio_samples[i*segment_length: (i+1)*segment_length]
             sf.write(os.path.join(output_folder, f'segments_{i}.wav'), segment, fs)
