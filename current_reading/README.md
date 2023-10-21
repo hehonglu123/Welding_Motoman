@@ -2,20 +2,6 @@
 
 This folder contains scripts and data related to current readings and data analysis algorithm.
 
-## Directory Structure
-current_reading/
-│
-├── analysis.py
-├── client.py
-├── comparison.py
-├── current_acoustic.py
-├── current_data_movingwindow.py
-├── current_data_segments.py
-├── current.csv
-├── README.md
-├── RR_current_reading.py
-└── test.py
-
 ## Script Descriptions
 
 - `current_acoustic.py`: Used to display current signals, acoustic signals, and an overview of the height between layers.
