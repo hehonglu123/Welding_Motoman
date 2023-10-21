@@ -39,13 +39,13 @@ layer_width_num=int(4/slicing_meta['line_resolution'])
 # base_feedrate_cmd=250
 # layer_height_num=int(1.2/slicing_meta['line_resolution'])
 
-# #######################################ER70S-6########################################################
-# job_offset=300
-# vd_relative=7
-# feedrate_cmd=150
-# base_vd_relative=5
-# base_feedrate_cmd=250
-# layer_height_num=int(1.2/slicing_meta['line_resolution'])
+#######################################ER70S-6########################################################
+job_offset=300
+vd_relative=7
+feedrate_cmd=120
+base_vd_relative=5
+base_feedrate_cmd=300
+layer_height_num=int(1.04/slicing_meta['line_resolution'])
 
 # #######################################ER316L THICK########################################################
 # job_offset=400
@@ -55,13 +55,13 @@ layer_width_num=int(4/slicing_meta['line_resolution'])
 # base_feedrate_cmd=250
 # layer_height_num=int(1.5/slicing_meta['line_resolution'])
 
-#######################################ER316L THIN########################################################
-job_offset=400
-vd_relative=7
-feedrate_cmd=140
-base_vd_relative=5
-base_feedrate_cmd=250
-layer_height_num=int(1.4/slicing_meta['line_resolution'])
+# #######################################ER316L THIN########################################################
+# job_offset=400
+# vd_relative=7
+# feedrate_cmd=140
+# base_vd_relative=5
+# base_feedrate_cmd=250
+# layer_height_num=int(1.4/slicing_meta['line_resolution'])
 
 
 robot=robot_obj('MA2010_A0',def_path='../config/MA2010_A0_robot_default_config.yml',tool_file_path='../config/torch.csv',\
@@ -121,14 +121,14 @@ primitives=[]
 # timestamp_robot,joint_recording,job_line,_=ws.weld_segment_dual(primitives,robot,positioner,q1_all,q2_all,v1_all,10*np.ones(len(v1_all)),cond_all,arc=True)
 
 ###########################################layer welding############################################
-q_prev=np.array([-3.791544713877046391e-01,7.156749523014762637e-01,2.756772964158371586e-01,2.106493295914119712e-01,-7.865937103692784982e-01,-5.293956242391706368e-01])
+# q_prev=np.array([-3.791544713877046391e-01,7.156749523014762637e-01,2.756772964158371586e-01,2.106493295914119712e-01,-7.865937103692784982e-01,-5.293956242391706368e-01])
 q_prev=client.getJointAnglesMH(robot.pulse2deg)
 
 
 
 
-num_layer_start=int(57*layer_height_num)
-num_layer_end=int(58*layer_height_num)
+num_layer_start=int(74*layer_height_num)
+num_layer_end=int(75*layer_height_num)
 num_sections=1
 for layer in range(num_layer_start,num_layer_end,layer_height_num):
 	num_sections_prev=num_sections
@@ -179,14 +179,14 @@ for layer in range(num_layer_start,num_layer_end,layer_height_num):
 			q1_all.append(waypoint_q)
 			q2_all.append(rob2_js[breakpoints[0]])
 			positioner_all.append(positioner_js[breakpoints[0]])
-			v1_all.append(5)
+			v1_all.append(8)
 			cond_all.append(0)
 			primitives.append('movej')
 
 		q1_all.extend(rob1_js[breakpoints].tolist())
 		q2_all.extend(rob2_js[breakpoints].tolist())
 		positioner_all.extend(positioner_js[breakpoints].tolist())
-		v1_all.extend([5]+s1_all)
+		v1_all.extend([8]+s1_all)
 		cond_all.extend([0]+[int(feedrate_cmd/10+job_offset)]*(num_points_layer-1))
 		primitives.extend(['movej']+['movel']*(num_points_layer-1))
 
