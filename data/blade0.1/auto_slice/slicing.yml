@@ -4,7 +4,9 @@ line_resolution: 0.1
 baselayer_thickness: 0
 point_distance: 0.5
 smooth_filter: False
-q_positioner_seed: None
+q_positioner_seed: 
+  - -5.576559852487238400e-01
+  - -2.643731968086909578e+00
 q_seed: 
   - -3.791544713877046391e-01
   - 7.156749523014762637e-01

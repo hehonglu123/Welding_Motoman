@@ -504,7 +504,7 @@ class positioner_obj(object):
 				return curve_js_all[0]
 			else:
 				curve_js_all=np.array(curve_js_all)
-
+				
 				diff_q0=np.abs(curve_js_all[:,0,0]-q_seed[0])
 				diff_q0_min_ind=np.nonzero(diff_q0==np.min(diff_q0))[0]
 				diff_q1=np.abs(curve_js_all[diff_q0_min_ind,0,1]-q_seed[1])

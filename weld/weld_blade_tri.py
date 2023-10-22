@@ -32,20 +32,20 @@ waypoint_distance=5 	###waypoint separation
 layer_width_num=int(4/slicing_meta['line_resolution'])
 
 # #######################################ER4043########################################################
-# job_offset=200
-# vd_relative=7
-# feedrate_cmd=150
-# base_vd_relative=5
-# base_feedrate_cmd=250
-# layer_height_num=int(1.2/slicing_meta['line_resolution'])
+job_offset=200
+vd_relative=8
+feedrate_cmd=110
+base_vd_relative=5
+base_feedrate_cmd=250
+layer_height_num=int(1.45/slicing_meta['line_resolution'])
 
 #######################################ER70S-6########################################################
-job_offset=300
-vd_relative=7
-feedrate_cmd=120
-base_vd_relative=5
-base_feedrate_cmd=300
-layer_height_num=int(1.04/slicing_meta['line_resolution'])
+# job_offset=300
+# vd_relative=7
+# feedrate_cmd=120
+# base_vd_relative=5
+# base_feedrate_cmd=300
+# layer_height_num=int(1.04/slicing_meta['line_resolution'])
 
 # #######################################ER316L THICK########################################################
 # job_offset=400
@@ -127,8 +127,8 @@ q_prev=client.getJointAnglesMH(robot.pulse2deg)
 
 
 
-num_layer_start=int(74*layer_height_num)
-num_layer_end=int(75*layer_height_num)
+num_layer_start=int(54*layer_height_num)
+num_layer_end=int(55*layer_height_num)
 num_sections=1
 for layer in range(num_layer_start,num_layer_end,layer_height_num):
 	num_sections_prev=num_sections

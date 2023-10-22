@@ -25,8 +25,8 @@ def main():
     c1.setf_param("scale_limit_low", RR.VarValue(293.15,"double"))
     c1.setf_param("scale_limit_upper", RR.VarValue(5000,"double"))
     image_consts = RRN.GetConstants('com.robotraconteur.image', c1)
-    # threshold=10000 ##10000 for AL
-    threshold=30000 ##30000 for Steel
+    threshold=10000 ##10000 for AL
+    # threshold=30000 ##30000 for Steel
 
     counts=0
     time.sleep(1)
