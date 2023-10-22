@@ -122,10 +122,10 @@ def visualize_pcd(show_pcd_list,point_show_normal=False):
 
     
 data_dir='../data/blade0.1/'
-scanned_dir='../../evaluation/Blade_ER4043/'
+scanned_dir='../../evaluation/Blade_ER70S6/'
 ######## read the scanned stl
 target_mesh = o3d.io.read_triangle_mesh(data_dir+'surface.stl')
-scanned_mesh = o3d.io.read_triangle_mesh(scanned_dir+'ER4043_blade_optimized.stl')
+scanned_mesh = o3d.io.read_triangle_mesh(scanned_dir+'ER70S6_blade_baseline.stl')
 target_mesh.compute_vertex_normals()
 scanned_mesh.compute_vertex_normals()
 
@@ -184,7 +184,7 @@ error=calc_error_projected(target_points_transform,collapsed_surface)
 
 highlight_pc=o3d.geometry.PointCloud()
 highlight_pc.points=o3d.utility.Vector3dVector([collapsed_surface[error.argmax()]])
-highlight_pc.paint_uniform_color([1.0, 0.0, 0.0])
+highlight_pc.paint_uniform_color([0.0, 1.0, 0.0])
 o3d.visualization.draw_geometries([target_mesh,collapsed_surface_pc,highlight_pc])
 
 
