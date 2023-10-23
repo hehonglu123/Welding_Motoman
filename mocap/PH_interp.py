@@ -215,7 +215,7 @@ class PH_Param(object):
         # plt.colorbar()
         # plt.axis("equal")
         # plt.title("Deviated Angle to Nominal (deg) of Rotation Axis")
-        fig.suptitle("Deviated Distance to Nominal Position Vector P (mm)")
+        fig.suptitle("Deviated Distance to Nominal Position Vector P (mm)",fontsize=16)
         plt.show()
         
         print(markdown_str)
@@ -264,7 +264,7 @@ class PH_Param(object):
         # plt.colorbar()
         # plt.axis("equal")
         # plt.title("Deviated Angle to Nominal (deg) of Rotation Axis")
-        fig.suptitle("Deviated Angle to Nominal Rotation Axis H (deg)")
+        fig.suptitle("Deviated Angle to Nominal Rotation Axis H (deg)",fontsize=16)
         plt.show()
         
         print(markdown_str)

@@ -16,11 +16,11 @@ Rx=np.array([1,0,0])
 Ry=np.array([0,1,0])
 Rz=np.array([0,0,1])
 
-ph_dataset_date='0801'
-test_dataset_date='0801'
+ph_dataset_date='0804'
+test_dataset_date='0804'
 config_dir='../config/'
 
-robot_type = 'R1'
+robot_type = 'R2'
 
 if robot_type == 'R1':
     robot_marker_dir=config_dir+'MA2010_marker_config/'
@@ -75,6 +75,14 @@ print(test_data_dir)
 use_raw=False
 test_robot_q = np.loadtxt(test_data_dir+'robot_q_align.csv',delimiter=',')
 test_mocap_T = np.loadtxt(test_data_dir+'mocap_T_align.csv',delimiter=',')
+
+train_robot_q = np.loadtxt(PH_data_dir+'robot_q_align.csv',delimiter=',')
+train_mocap_T = np.loadtxt(PH_data_dir+'mocap_T_align.csv',delimiter=',')
+
+split_index = len(train_robot_q)
+test_robot_q = np.vstack((train_robot_q,test_robot_q))
+test_mocap_T = np.vstack((train_mocap_T,test_mocap_T))
+
 if use_raw:
     test_mocap_T=[]
     toolrigid_raw = np.loadtxt(test_data_dir+'mocap_tool_T_raw.csv',delimiter=',')
@@ -138,8 +146,10 @@ try:
     training_error=np.array(training_error)
 except:
     training_error_last=[]
+    training_error_init=[]
     for te in training_error:
-        training_error_last=te[-1]
+        training_error_last.append(te[-1])
+        training_error_init.append(te[0])
     training_error=training_error_last
 #####################
 
@@ -211,7 +221,7 @@ error_ori_onePH = []
 error_pos_origin = []
 error_ori_origin = []
 q2q3=[]
-q1_all=[]
+q_all=[]
 pos_all=[]
 for N in range(total_test_N):
     test_q = test_robot_q[N]
@@ -321,13 +331,12 @@ for N in range(total_test_N):
     #     exit()
 
     q2q3.append(np.degrees(test_q[1]+-1*test_q[2]))
-    q1_all.append(np.degrees(test_q[0]))
+    q_all.append(np.degrees(test_q))
     pos_all.append(str(round(T_tool_base.p[0]))+'\n'+str(round(T_tool_base.p[1]))+'\n'\
                    +str(round(T_tool_base.p[2])))
 q2q3=np.array(q2q3)
-q1_all=np.array(q1_all)
-sort_q2q3_id = np.argsort(q2q3)
-q2q3=q2q3[sort_q2q3_id]
+q_all=np.array(q_all)
+
 error_pos_near_norm=np.linalg.norm(error_pos_near,ord=2,axis=1).flatten()
 error_pos_lin_norm=np.linalg.norm(error_pos_lin,ord=2,axis=1).flatten()
 error_pos_cub_norm=np.linalg.norm(error_pos_cub,ord=2,axis=1).flatten()
@@ -337,6 +346,26 @@ error_pos_PHZero_norm=np.linalg.norm(error_pos_PHZero,ord=2,axis=1).flatten()
 error_pos_onePH_norm=np.linalg.norm(error_pos_onePH,ord=2,axis=1).flatten()
 error_pos_baseline_norm=np.linalg.norm(error_pos_baseline,ord=2,axis=1).flatten()
 error_pos_origin_norm=np.linalg.norm(error_pos_origin,ord=2,axis=1).flatten()
+
+train_error_pos_near_norm=error_pos_near_norm[:split_index]
+train_error_pos_lin_norm=error_pos_lin_norm[:split_index]
+train_error_pos_cub_norm=error_pos_cub_norm[:split_index]
+train_error_pos_rbf_norm=error_pos_rbf_norm[:split_index]
+train_error_pos_fbf_norm=error_pos_fbf_norm[:split_index]
+train_error_pos_PHZero_norm=error_pos_PHZero_norm[:split_index]
+train_error_pos_onePH_norm=error_pos_onePH_norm[:split_index]
+train_error_pos_baseline_norm=error_pos_baseline_norm[:split_index]
+train_error_pos_origin_norm=error_pos_origin_norm[:split_index]
+
+error_pos_near_norm=error_pos_near_norm[split_index:]
+error_pos_lin_norm=error_pos_lin_norm[split_index:]
+error_pos_cub_norm=error_pos_cub_norm[split_index:]
+error_pos_rbf_norm=error_pos_rbf_norm[split_index:]
+error_pos_fbf_norm=error_pos_fbf_norm[split_index:]
+error_pos_PHZero_norm=error_pos_PHZero_norm[split_index:]
+error_pos_onePH_norm=error_pos_onePH_norm[split_index:]
+error_pos_baseline_norm=error_pos_baseline_norm[split_index:]
+error_pos_origin_norm=error_pos_origin_norm[split_index:]
 
 error_ori_near_norm=np.linalg.norm(error_ori_near,ord=2,axis=1).flatten()
 error_ori_lin_norm=np.linalg.norm(error_ori_lin,ord=2,axis=1).flatten()
@@ -348,23 +377,80 @@ error_ori_onePH_norm=np.linalg.norm(error_ori_onePH,ord=2,axis=1).flatten()
 error_ori_baseline_norm=np.linalg.norm(error_ori_baseline,ord=2,axis=1).flatten()
 error_ori_origin_norm=np.linalg.norm(error_ori_origin,ord=2,axis=1).flatten()
 
+q_all=q_all[split_index:]
+q2q3=q2q3[split_index:]
+print("Joint configuration and position error norm correlation")
+for j in range(6):
+    print("======J",str(j+1),"=======")
+    sort_q_id = np.argsort(q_all[:,j])
+    q_sort = q_all[sort_q_id,j]
+    error_qsort = error_pos_origin_norm[sort_q_id]
+    print(np.corrcoef(q_sort,error_qsort))
+print("========================================")
+for j in range(6):
+    print("======Abs J",str(j+1),"=======")
+    sort_q_id = np.argsort(np.fabs(q_all[:,j]))
+    q_sort = np.fabs(q_all[sort_q_id,j])
+    error_qsort = error_pos_origin_norm[sort_q_id]
+    print(np.corrcoef(q_sort,error_qsort))
+
+print("======J2 J3=======")
+sort_q_id = np.argsort(q2q3)
+q_sort = q2q3[sort_q_id]
+error_qsort = error_pos_origin_norm[sort_q_id]
+print(np.corrcoef(q_sort,error_qsort))
+
+ax = plt.figure().add_subplot(projection='3d')
+ax.scatter(q_all[:,1],q_all[:,2],error_pos_origin_norm)
+# ax.scatter(np.degrees(train_q[:,0]),np.degrees(train_q[:,1]),np.ones(len(train_q))*np.mean(error_pos_origin_norm))
+ax.set_xlabel('q2 (deg)',fontsize=16)
+ax.set_ylabel('q3 (deg)',fontsize=16)
+ax.set_zlabel('Position error norm (mm)',fontsize=16)
+ax.set_title(robot_type+' Position error norm vs q2 q3',fontsize=20)
+plt.show()
+
+# exit()
+
 plot_origin=True
 if plot_origin:
     plt.plot(error_pos_origin_norm,'-o',markersize=1,label='Origin PH')    
 plt.plot(error_pos_baseline_norm,'-o',markersize=1,label='CPA PH')
 # plt.plot(error_pos_PHZero_norm,'-o',markersize=1,label='Zero PH')
 # plt.plot(error_pos_onePH_norm,'-o',markersize=1,label='One PH')
-plt.plot(error_pos_near_norm,'-o',markersize=1,label='Nearest PH')
+# plt.plot(error_pos_near_norm,'-o',markersize=1,label='Nearest PH')
 plt.plot(error_pos_lin_norm,'-o',markersize=1,label='Linear Interp PH')
 # plt.plot(error_pos_cub_norm,'-o',markersize=1,label='Cubic Interp PH')
 # plt.plot(error_pos_rbf_norm,'-o',markersize=1,label='RBF Interp PH')
 plt.plot(error_pos_fbf_norm,'-o',markersize=1,label='Fourier Basis PH')
-plt.legend(fontsize=22)
-plt.title("Position Error using Optimized PH",fontsize=32)
+plt.legend(loc=1,fontsize=18)
+plt.title(robot_type+" Position Testing Error using Optimized PH",fontsize=32)
 # plt.xticks(np.arange(0,total_test_N,100),np.round(q1_all[::100]))
 # plt.xlabel("J1 Angle at each Pose (degrees)")
 # plt.xticks(np.arange(0,total_test_N,50),pos_all[::50])
-plt.xticks(np.arange(0,total_test_N,100),fontsize=22)
+plt.xticks(np.arange(0,total_test_N-split_index,100),fontsize=22)
+plt.yticks(fontsize=22)
+plt.xlabel("Testing pose index",fontsize=26)
+plt.ylabel("Position Error (mm)",fontsize=26)
+plt.tight_layout()
+plt.show()
+
+plot_origin=True
+if plot_origin:
+    plt.plot(train_error_pos_origin_norm,'-o',markersize=1,label='Origin PH')    
+# plt.plot(train_error_pos_baseline_norm,'-o',markersize=1,label='CPA PH')
+# plt.plot(train_error_pos_PHZero_norm,'-o',markersize=1,label='Zero PH')
+plt.plot(train_error_pos_onePH_norm,'-o',markersize=1,label='One PH')
+plt.plot(train_error_pos_near_norm,'-o',markersize=1,label='Optimized PH')
+# plt.plot(train_error_pos_lin_norm,'-o',markersize=1,label='Linear Interp PH')
+# plt.plot(train_error_pos_cub_norm,'-o',markersize=1,label='Cubic Interp PH')
+# plt.plot(train_error_pos_rbf_norm,'-o',markersize=1,label='RBF Interp PH')
+# plt.plot(train_error_pos_fbf_norm,'-o',markersize=1,label='Fourier Basis PH')
+plt.legend(loc=1,fontsize=18)
+plt.title(robot_type+" Position Training Error using Optimized PH",fontsize=32)
+# plt.xticks(np.arange(0,total_test_N,100),np.round(q1_all[::100]))
+# plt.xlabel("J1 Angle at each Pose (degrees)")
+# plt.xticks(np.arange(0,total_test_N,50),pos_all[::50])
+plt.xticks(np.arange(0,split_index,100),fontsize=22)
 plt.yticks(fontsize=22)
 plt.xlabel("Testing pose index",fontsize=26)
 plt.ylabel("Position Error (mm)",fontsize=26)
@@ -443,6 +529,10 @@ print("Training Data")
 markdown_str=''
 markdown_str+='||Mean (mm)|Std (mm)|Max (mm)|\n'
 markdown_str+='|-|-|-|-|\n'
+markdown_str+='|Nominal PH|'+format(round(np.mean(train_error_pos_origin_norm),4),'.4f')+'|'+\
+    format(round(np.std(train_error_pos_origin_norm),4),'.4f')+'|'+format(round(np.max(train_error_pos_origin_norm),4),'.4f')+'|\n'
+markdown_str+='|CPA|'+format(round(np.mean(train_error_pos_baseline_norm),4),'.4f')+'|'+\
+    format(round(np.std(train_error_pos_baseline_norm),4),'.4f')+'|'+format(round(np.max(train_error_pos_baseline_norm),4),'.4f')+'|\n'
 markdown_str+='|One PH|'+format(round(np.mean(training_error_universal[-1]),4),'.4f')+'|'+\
     format(round(np.std(training_error_universal[-1]),4),'.4f')+'|'+format(round(np.max(training_error_universal[-1]),4),'.4f')+'|\n'
 markdown_str+='|Optimize PH|'+format(round(np.mean(training_error),4),'.4f')+'|'+\
