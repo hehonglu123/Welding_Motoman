@@ -125,7 +125,7 @@ data_dir='../data/blade0.1/'
 scanned_dir='../../evaluation/Blade_ER70S6/'
 ######## read the scanned stl
 target_mesh = o3d.io.read_triangle_mesh(data_dir+'surface.stl')
-scanned_mesh = o3d.io.read_triangle_mesh(scanned_dir+'ER70S6_blade_baseline.stl')
+scanned_mesh = o3d.io.read_triangle_mesh(scanned_dir+'ER70S6_blade_optimized.stl')
 target_mesh.compute_vertex_normals()
 scanned_mesh.compute_vertex_normals()
 
