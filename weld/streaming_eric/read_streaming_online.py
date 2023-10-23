@@ -278,7 +278,8 @@ for layer_count in range(end_layer_count):
                 last_stamp = robot_timestamp
             this_r1_p=positioner.fwd(q14[-2:],world=True).inv()*robot_weld.fwd(q14[:6])
             this_r1_p=this_r1_p.p
-            r1_v = np.linalg.norm((this_r1_p-last_r1_p))/(robot_timestamp-last_stamp)
+            # r1_v = np.linalg.norm((this_r1_p-last_r1_p))/(robot_timestamp-last_stamp)
+            r1_v = np.linalg.norm((this_r1_p-last_r1_p))/0.008
             # print(this_r1_p)
             # print(last_r1_p)
             # print("===")
