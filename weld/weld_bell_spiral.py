@@ -159,7 +159,7 @@ vd_relative_adjustment=2
 # 			arcon_set=True
 # 			q1_all.append(rob1_js[breakpoints[0]])
 # 			q2_all.append(positioner_js[breakpoints[0]])
-# 			v1_all.append(20)
+# 			v1_all.append(5)
 # 			v2_all.append(5)
 # 			cond_all.append(0)
 # 			primitives.append('movej')

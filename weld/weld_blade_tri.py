@@ -127,8 +127,8 @@ q_prev=client.getJointAnglesMH(robot.pulse2deg)
 
 
 
-num_layer_start=int(54*layer_height_num)
-num_layer_end=int(55*layer_height_num)
+num_layer_start=int(0*layer_height_num)
+num_layer_end=int(50*layer_height_num)
 num_sections=1
 for layer in range(num_layer_start,num_layer_end,layer_height_num):
 	num_sections_prev=num_sections
