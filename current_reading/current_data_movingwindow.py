@@ -5,7 +5,7 @@ from scipy.signal import find_peaks, peak_widths
 from matplotlib.animation import FuncAnimation
 
 # Step 1: Read CSV and get the 'current' column
-base_path = '../data/wall_weld_test/ER4043_correction_100ipm_2023_09_27_20_53_05/layer_5/'
+base_path = '../data/wall_weld_test/316L_model_130ipm_2023_10_16_22_53_13/layer_14/'
 filename = 'current.csv'
 df = pd.read_csv(base_path + filename)
 currents = df['current'].values  # Assuming the title of the column is 'current'
@@ -70,20 +70,19 @@ for i in range(len(extracted_data)):
     results_df = pd.concat([results_df, pd.DataFrame([statistics])]).reset_index(drop=True)
 
 print('results_df.index:',len(results_df.index))
-frequency = 1800
-num_samples = 12814
 
-# 创建时间序列
-time_series = np.linspace(0, num_samples / frequency, num_samples)
+
+
 # Plot each statistic
 for col in results_df.columns:
     plt.figure(figsize=(10, 6))
-    plt.plot(time_series, results_df[col], label='Current of '+ col +' (A)')
-    plt.title('Current of '+ col + ' VS.  Time')
-    plt.xlabel('Time (s)')
-    plt.ylabel('Current of '+ col +' (A)')
+    plt.plot(results_df.index, results_df[col], label=col)
+    plt.title(col)
+    plt.xlabel('Window Start Index')
+    plt.ylabel(col)
     plt.legend()
     plt.show()
+
 
 # # Initialize data for animation
 # xdata, ydata = [], []
