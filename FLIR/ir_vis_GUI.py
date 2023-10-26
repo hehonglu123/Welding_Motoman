@@ -7,9 +7,9 @@ from matplotlib.colorbar import ColorbarBase
 from tkinter import *
 import time
 import os
-import glob
 sys.path.append('../toolbox/')
 from flir_toolbox import *
+
 freq=13
 vmin_value = 0
 vmax_value = 1300
@@ -21,7 +21,7 @@ all_frames = []
 # Initialize data mode (0 for ir_recording, 1 for temperature)
 data_mode = 0
 # Local folder path
-main_folder_path = '../data/wall_weld_test/ER4043_correction_100ipm_2023_09_27_20_53_05'
+main_folder_path = '../data/wall_weld_test/moveL_100_repeat_weld_scan_2023_08_02_17_07_02'
 
 for folder_name in os.listdir(main_folder_path):
     if folder_name.startswith('layer_'):
@@ -39,7 +39,6 @@ for folder_name in os.listdir(main_folder_path):
                         temp_all_frames.append(temp.astype(np.uint8))
                         print(np.max(temp))
                     counts_all_frames.extend(ir_recording)
-
 
 # Global parameters
 global interval
@@ -78,35 +77,29 @@ all_frames = temp_all_frames
 def update(frame):
     global frame_index
     im.set_array(all_frames[frame_index])
-    im.set_clim(vmin=vmin_value, vmax=vmax_value)  # 更新 vmin 和 vmax
+    im.set_clim(vmin=vmin_value, vmax=vmax_value)  
     time.sleep(interval)
     frame_index = (frame_index + direction) % len(all_frames)
     return im,
 
-# Create a separate figure for the colorbar
+# Create separate figure for the colorbar
 fig_cbar, ax_cbar = plt.subplots(figsize=(1, 4))
-fig_cbar.subplots_adjust(left=0.1, right=0.5)  # Adjust the layout as needed
+fig_cbar.subplots_adjust(left=0.1, right=0.5)
 norm = Normalize(vmin=vmin_value, vmax=vmax_value)
 cbar = ColorbarBase(ax_cbar, cmap="inferno", orientation="vertical", norm=norm)
 cbar.set_label('Temperature', rotation=270, labelpad=15)
 
-# Function to update colorbar
 def update_colorbar():
     norm.vmin = vmin_value
     norm.vmax = vmax_value
     cbar.update_normal(cbar.mappable)
     fig_cbar.canvas.draw()
-
 # Animation creation
 fig, ax = plt.subplots()
 plt.title(main_folder_path)
 im = ax.imshow(all_frames[0], animated=True, cmap="inferno", aspect='auto')
 im.set_clim(vmin=vmin_value, vmax=vmax_value)
 ani = animation.FuncAnimation(fig, update, frames=len(all_frames), interval=1, blit=True)
-
-
-
-
 
 # fig = plt.figure(1)
 # for i in range(len(ir_recording)):
@@ -174,7 +167,7 @@ vmax_slider.pack(side=LEFT)
 # vmax_slider.config(command=lambda val: [set_vmax(val), update_colorbar_limits(val)])
 
 # Button to toggle between original and temperature data
-toggle_button = Button(frame, text="Toggle Data", command=update_animation_data)
+toggle_button = Button(frame, text="Counts/Temperature mode", command=update_animation_data)
 toggle_button.pack(side=LEFT)
 # Show matplotlib window
 plt.show(block=False)

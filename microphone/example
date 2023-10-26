@@ -1,0 +1,23 @@
+profile_height = np.load(data_dir + 'scans/height_profile.npy')
+welding_length = profile_height[-1, 0] - profile_height[0, 0]
+
+welding_length_ext = welding_length * welding_duration_mic_ext / welding_duration_mic
+welding_ext_start = profile_height[0, 0] - welding_length_ext * start_welding_mic / welding_duration_mic_ext
+
+segment_width = welding_length / 40
+colors = plt.cm.viridis(np.linspace(0, 1, 40))  # 使用viridis colormap获取40个颜色
+
+for i in range(40):
+    start_x = welding_ext_start + i * segment_width
+    end_x = start_x + segment_width
+    mask = (profile_height[:, 0] >= start_x) & (profile_height[:, 0] < end_x)  # 创建mask选择当前segment的数据
+    segment_data = profile_height[mask]
+    
+    if i == 0:  # 只为第一个segment设置label
+        ax3.scatter(segment_data[:, 0], segment_data[:, 1], c=[colors[i]], label='Height Profile')
+    else:
+        ax3.scatter(segment_data[:, 0], segment_data[:, 1], c=[colors[i]])
+
+ax3.set_xlim(welding_ext_start, welding_ext_start + welding_length_ext)
+ax1.set_xlim(mic_ts[0], mic_ts[-1])
+ax3.set_xlabel('Distance (mm)')

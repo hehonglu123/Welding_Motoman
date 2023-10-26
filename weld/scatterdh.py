@@ -491,7 +491,6 @@ for dataset in datasets:
         plt.title(f'Layer {i + 1}')
         # 显示图像
         plt.show()
-
         # 创建新的figure
         plt.figure(figsize=(6, 6))
         plt.scatter(inter_arrays_diff[i], diff_arrays[i], color='blue', label='tip_d and delta_h scatter')
