@@ -51,7 +51,7 @@ def amplitude_envelope_test(audio_signal):
     plt.legend()
     plt.show()
 
-wavfile = wave.open('../data/wall_weld_test/moveL_100_repeat_weld_scan_2023_08_02_17_07_02/layer_10/mic_recording.wav', 'rb')
+wavfile = wave.open('../data/wall_weld_test/ER4043_correction_100ipm_2023_09_27_20_53_05/layer_7/mic_recording_cut.wav', 'rb')
 
 samplerate = 44000
 channels = 1

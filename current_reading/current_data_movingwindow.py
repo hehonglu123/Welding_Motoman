@@ -5,7 +5,7 @@ from scipy.signal import find_peaks, peak_widths
 from matplotlib.animation import FuncAnimation
 
 # Step 1: Read CSV and get the 'current' column
-base_path = '../data/wall_weld_test/ER4043_correction_100ipm_2023_09_27_20_53_05/layer_0/'
+base_path = '../data/wall_weld_test/ER4043_correction_100ipm_2023_09_27_20_53_05/layer_7/'
 filename = 'current.csv'
 df = pd.read_csv(base_path + filename)
 currents = df['current'].values  # Assuming the title of the column is 'current'
@@ -69,40 +69,44 @@ for i in range(len(extracted_data)):
     # Append the results to the DataFrame
     results_df = pd.concat([results_df, pd.DataFrame([statistics])]).reset_index(drop=True)
 
+print('results_df.index:',len(results_df.index))
+
+
 
 # Plot each statistic
-# for col in results_df.columns:
-#     plt.figure(figsize=(10, 6))
-#     plt.plot(results_df.index, results_df[col], label=col)
-#     plt.title(col)
-#     plt.xlabel('Window Start Index')
-#     plt.ylabel('Current '+col)
-#     plt.legend()
-    # plt.show()
+for col in results_df.columns:
+    plt.figure(figsize=(10, 6))
+    plt.plot(results_df.index, results_df[col], label=col)
+    plt.title(col)
+    plt.xlabel('Window Start Index')
+    plt.ylabel(col)
+    plt.legend()
+    plt.show()
 
-# Initialize data for animation
-xdata, ydata = [], []
 
-# Set up the figure for animation
-fig, ax = plt.subplots(figsize=(10, 6))
-ln, = ax.plot([], [], 'b-', animated=True, label='Window mean')
-ax.set_xlabel('Window Start Index')
-ax.set_ylabel('Current Window mean')
-ax.set_title('Window mean vs. Window Start Index')
+# # Initialize data for animation
+# xdata, ydata = [], []
 
-def init():
-    ax.set_xlim(0, len(extracted_data))
-    ax.set_ylim(results_df['Window mean'].min() - 1, results_df['Window mean'].max() + 1)
-    return ln,
+# # Set up the figure for animation
+# fig, ax = plt.subplots(figsize=(10, 6))
+# ln, = ax.plot([], [], 'b-', animated=True, label='Window mean')
+# ax.set_xlabel('Window Start Index')
+# ax.set_ylabel('Current Window mean')
+# ax.set_title('Window mean vs. Window Start Index')
 
-def update(frame):
-    xdata.append(frame)
-    ydata.append(results_df['Window mean'].iloc[frame])
-    ln.set_data(xdata, ydata)
-    return ln,
+# def init():
+#     ax.set_xlim(0, len(extracted_data))
+#     ax.set_ylim(results_df['Window mean'].min() - 1, results_df['Window mean'].max() + 1)
+#     return ln,
 
-# Create the animation
-ani = FuncAnimation(fig, update, frames=len(results_df), init_func=init, blit=True, repeat=False, interval=5000/len(extracted_data))
+# def update(frame):
+#     xdata.append(frame)
+#     ydata.append(results_df['Window mean'].iloc[frame])
+#     ln.set_data(xdata, ydata)
+#     return ln,
 
-plt.legend()
-plt.show()
+# # Create the animation
+# ani = FuncAnimation(fig, update, frames=len(results_df), init_func=init, blit=True, repeat=False, interval=5000/len(extracted_data))
+
+# plt.legend()
+# plt.show()
