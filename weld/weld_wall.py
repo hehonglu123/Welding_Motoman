@@ -66,5 +66,8 @@ for i in range(15,20):
 # 	primitives.extend(['movej','movel'])
 # 	cond_all.extend([0,210])
 
-
-ws.weld_segment_single(primitives,robot,q_all,v_all,cond_all,arc=False,wait=0.)
+print('primitives',primitives)
+print('q_all',q_all)
+print('v_all',v_all)
+print('cond_all',cond_all)
+# ws.weld_segment_single(primitives,robot,q_all,v_all,cond_all,arc=False,wait=0.)
