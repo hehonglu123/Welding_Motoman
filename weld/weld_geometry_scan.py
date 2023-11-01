@@ -122,7 +122,7 @@ formatted_time = current_time.strftime('%Y_%m_%d_%H_%M_%S.%f')[:-7]
 data_date = input("Use old data directory? (Enter or put time e.g. 2023_07_11_16_25_30): ")
 if data_date == '':
     data_dir=curve_data_dir+'weld_scan_'+formatted_time+'/'
-    # data_dir=curve_data_dir+'weld_scan_2023_10_18_13_26_12/'
+    # data_dir=curve_data_dir+'weld_scan_2023_10_23_15_55_05/'
 else:
     data_dir=curve_data_dir+'weld_scan_'+data_date+'/'
 print("Use data directory:",data_dir)
@@ -216,7 +216,7 @@ planned_job=planned_job.astype(int)
 
 print_min_dh = 0.5 # mm
 
-arc_on=False
+arc_on=True
 
 tri_robot=True
 save_weld_record=True
@@ -233,7 +233,7 @@ start_weld_layer=0
 # layer=1
 # last_layer=0
 # layer_count=2
-# start_weld_layer=3
+# start_weld_layer=0
 
 # Transz0_H=None
 Transz0_H=np.array([[ 9.99977849e-01, -4.63425601e-05, -6.65580373e-03,  5.00206395e-03],
@@ -339,6 +339,9 @@ while True:
             # dlayer=23
             dlayer = max(15,dlayer)
             dlayer = min(35,dlayer)
+            if layer_count<6:
+                dlayer = max(15,dlayer)
+                dlayer = min(30,dlayer)
             last_layer=layer
             layer = layer+dlayer # update layer
             print("Last Mean dh:",mean_layer_dh)
@@ -463,7 +466,7 @@ while True:
             else:
                 go_weld=False
 
-            input("Weld Move to Start")
+            # input("Weld Move to Start")
             ###move to intermidieate waypoint for collision avoidance if multiple section
             # if num_sections!=num_sections_prev:
             waypoint_pose=robot_weld.fwd(curve_sliced_js[breakpoints[0]])
@@ -503,14 +506,14 @@ while True:
                 v2_all.append(min(100,100*positioner_w/positioner.joint_vel_limit[1]))
                 primitives.append('movel')
 
-            input("Start Weld")
+            # input("Start Weld")
             weld_weld_st=time.time()
 
             if go_weld:
                 ####DATA LOGGING
                 rr_sensors.start_all_sensors()
                 if tri_robot:
-                    rob_stamps,rob_js_exe,_,_=ws.weld_segment_tri(primitives,robot_weld,positioner,robot_scan,q1_all,q2_all,qir_all,v1_all,v2_all,cond_all=[weld_job],arc=arc_on)
+                    rob_stamps,rob_js_exe,_,_=ws.weld_segment_tri(primitives,robot_weld,positioner,robot_scan,q1_all,q2_all,qir_all,v1_all,10*np.ones(len(v1_all)),cond_all=[weld_job],arc=arc_on)
                 else:
                     rob_stamps,rob_js_exe,_,_=ws.weld_segment_dual(primitives,robot_weld,positioner,q1_all,q2_all,v1_all,v2_all,cond_all=[weld_job],arc=arc_on)
                 rr_sensors.stop_all_sensors()
@@ -529,7 +532,7 @@ while True:
 
     ## move R1 back to home
     # print(q1_all)
-    input("Weld Move to Home")
+    # input("Weld Move to Home")
     r1_current = ws.client.getJointAnglesMH(robot_weld.pulse2deg)
     R1_mid[0]=deepcopy(r1_current[0])
     ws.jog_single(robot_weld,[R1_mid,R1_home],v=to_home_speed)
@@ -606,7 +609,7 @@ while True:
                 ######## scanning motion #########
                 ### execute motion ###
 
-                input("Scan Move to Start")
+                # input("Scan Move to Start")
                 ## move to mid point and start 
                 waypoint_pose=robot_scan.fwd(q_bp1[0][0])
                 waypoint_pose.p[-1]+=50
@@ -627,7 +630,7 @@ while True:
                 else:
                     ws.jog_dual(robot_scan,positioner,q1,q2,v=to_start_speed)
                 
-                input("Start Scan")
+                # input("Start Scan")
                 scan_scan_st=time.time()
                 mp = MotionProgram(ROBOT_CHOICE='RB2',ROBOT_CHOICE2='ST1',pulse2deg=robot_scan.pulse2deg,pulse2deg_2=positioner.pulse2deg)
                 target2=['MOVJ',np.degrees(q_bp2[0][0]),to_start_speed]
@@ -792,7 +795,7 @@ while True:
         # ax.set_title("Height Profile")
         # plt.show(block=False)
 
-    input("Scan Move to Home")
+    # input("Scan Move to Home")
     # move robot to home
     ws.jog_dual(robot_scan,positioner,[R2_mid,R2_home],[0,q_prev[1]],v=to_home_speed)
     # ws.jog_single(robot_scan,R2_home,v=to_home_speed)

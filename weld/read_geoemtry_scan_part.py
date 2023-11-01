@@ -134,10 +134,10 @@ ph_param_r2=None
 dataset='blade0.1/'
 sliced_alg='auto_slice/'
 curve_data_dir = '../data/'+dataset+sliced_alg
-data_dir=curve_data_dir+'weld_scan_2023_10_18_13_26_12'+'/'
+data_dir=curve_data_dir+'weld_scan_2023_10_23_16_11_37'+'/'
 baselayer=False
 last_layer=0
-layer=129 # 314 358 402 424
+layer=126 # 314 358 402 424
 x=0
 
 calib_z=True
