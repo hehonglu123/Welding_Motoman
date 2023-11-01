@@ -170,7 +170,7 @@ class WeldScan(object):
         curve_x_end = deepcopy(curve_scan[-1][0])
         
         z_height_start=curve_scan[0][2]-3
-        crop_extend=10
+        crop_extend=15
         crop_min=tuple(np.min(curve_scan,axis=0)-crop_extend)
         crop_max=np.max(curve_scan,axis=0)+crop_extend
         crop_max[2]+=20

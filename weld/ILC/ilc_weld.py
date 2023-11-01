@@ -161,29 +161,65 @@ for iter_i in range(total_iteration):
             =weldscan.robot_weld_scan(curve_sliced_relative,curve_sliced_relative[::-1],baselayer_u,ipm_weld,T_R1Base_S1TCP,\
                                 r1_mid,r1_home,s1_weld,r2_mid,r2_home,s1_scan,\
                                 arc_on=weld_arcon,ipm_calculation=ipm_for_calculation,Transz0_H=Transz0_H,draw_dh=draw_dh) # weld and scan
+        # save data
+        Path(data_dir).mkdir(exist_ok=True)
+        iter_data_dir=data_dir+'iteration_'+str(iter_i)+'/'
+        Path(iter_data_dir).mkdir(exist_ok=True)
+        half_data_dir=iter_data_dir+'half_'+str(half)+'/'
+        Path(half_data_dir).mkdir(exist_ok=True)
+        layer_data_dir=half_data_dir+'layer_0/'
+        Path(layer_data_dir).mkdir(exist_ok=True)
+        # save weld record
+        np.savetxt(layer_data_dir + 'curve.csv',curve_sliced_relative,delimiter=',')
+        np.savetxt(layer_data_dir + 'weld_js_exe.csv',weld_js_exe,delimiter=',')
+        np.savetxt(layer_data_dir + 'weld_robot_stamps.csv',weld_stamps,delimiter=',')
+        np.savetxt(layer_data_dir + 'scan_js_exe.csv',scan_js_exe,delimiter=',')
+        np.savetxt(layer_data_dir + 'scan_robot_stamps.csv',scan_stamps,delimiter=',')
+        with open(layer_data_dir + 'mti_scans.pickle', 'wb') as file:
+            pickle.dump(mti_recording, file)
+        o3d.io.write_point_cloud(layer_data_dir+'processed_pcd.pcd',pcd)
+        np.save(layer_data_dir+'height_profile.npy',profile_dh)
+        
         # weld first/second half
         this_curve_start=[30*(iter_i*2+half)-45,curve_start[1],dh,0,0,-1]
         this_curve_end=[30*(iter_i*2+half)-45,curve_end[1],dh,0,0,-1]
         curve_sliced_relative=np.linspace(this_curve_start,this_curve_end,seg_N+1)
+        ### ILC calculation
         if half==0: # first half
             uk_input = deepcopy(uk)
         else: # second half
             uk_input = deepcopy(uk)+ek_tilde
+            
         profile_dh,weld_js_exe,weld_stamps,scan_js_exe,scan_stamps,mti_recording,pcd,Transz0_H\
             =weldscan.robot_weld_scan(curve_sliced_relative,curve_sliced_relative[::-1],uk,ipm_weld,T_R1Base_S1TCP,\
                                 r1_mid,r1_home,s1_weld,r2_mid,r2_home,s1_scan,\
                                 arc_on=weld_arcon,ipm_calculation=ipm_for_calculation,Transz0_H=Transz0_H,draw_dh=draw_dh) # weld and scan
+        # save data
+        layer_data_dir=half_data_dir+'layer_1/'
+        Path(layer_data_dir).mkdir(exist_ok=True)
+        # save weld record
+        np.savetxt(layer_data_dir + 'curve.csv',curve_sliced_relative,delimiter=',')
+        np.savetxt(layer_data_dir + 'weld_js_exe.csv',weld_js_exe,delimiter=',')
+        np.savetxt(layer_data_dir + 'weld_robot_stamps.csv',weld_stamps,delimiter=',')
+        np.savetxt(layer_data_dir + 'scan_js_exe.csv',scan_js_exe,delimiter=',')
+        np.savetxt(layer_data_dir + 'scan_robot_stamps.csv',scan_stamps,delimiter=',')
+        with open(layer_data_dir + 'mti_scans.pickle', 'wb') as file:
+            pickle.dump(mti_recording, file)
+        o3d.io.write_point_cloud(layer_data_dir+'processed_pcd.pcd',pcd)
+        np.save(layer_data_dir+'height_profile.npy',profile_dh)
+        
+        ### ILC calculation
         if half==0: # first half
             yk = profile_dh[:,1]
             ek = yk-yk_d
             ek_tilde = np.flip(ek)
         else: # second half
             yk_prime = profile_dh[:,1]
+            
+        # save ILC data
+        np.savetxt(half_data_dir+'input_uk.csv',uk_input,delimiter=',')
     
     ### find gradient and update
     ek_prime=yk_prime-yk
     graduient_direction=np.flip(ek_prime)
     uk = uk-alpha*graduient_direction
-    
-    ### save everything
-    
