@@ -39,10 +39,10 @@ def compute_dh(base_path, layer_num):
     return dh
 
 base_path = '../data/wall_weld_test/ER4043_correction_100ipm_2023_09_27_20_53_05/layer_#/'
-layer_num = 4
+layer_num = 3
 dh = compute_dh(base_path, layer_num)
 tip_dis = (np.mean(dh) + 2.3420716473455623) - dh
-base_path = '../data/wall_weld_test/ER4043_correction_100ipm_2023_09_27_20_53_05/layer_4/'
+base_path = '../data/wall_weld_test/ER4043_correction_100ipm_2023_09_27_20_53_05/layer_3/'
 fs_wav, audio_data = wav.read(base_path + "mic_recording.wav")
 height_path = '../data/wall_weld_test/ER4043_correction_100ipm_2023_09_27_20_53_05/'
 
@@ -126,6 +126,12 @@ plt.ylabel('Height (mm)')
 plt.tight_layout()
 plt.show()
 
+# Saving the clipped current signal as a .npy file in the current directory
+clipped_current = current_signal[start_index:end_index]
+np.save(base_path + 'current_clipped.npy', clipped_current)
+np.save(base_path + 'audio_clipped.npy', audio_clipped)
+np.save(base_path + 'height_interpolated.npy', height_interpolated)
+
 # Start and end times
 t_start = 4.3
 t_end = t_start + 0.3
@@ -159,24 +165,24 @@ plt.ylabel('Current Value')
 plt.tight_layout()
 plt.show()
 
-# 1. Calculate energy of audio signal with respect to time
-frame_length = int(fs_wav * 0.02)  # 20 ms frames
-hop_length = int(fs_wav * 0.01)  # 10 ms overlap
-audio_clipped = audio_clipped.astype(np.float32) / np.iinfo(np.int16).max
+# # 1. Calculate energy of audio signal with respect to time
+# frame_length = int(fs_wav * 0.02)  # 20 ms frames
+# hop_length = int(fs_wav * 0.01)  # 10 ms overlap
+# audio_clipped = audio_clipped.astype(np.float32) / np.iinfo(np.int16).max
 
-# 2. Use the Librosa library to compute the short-time Fourier transform (STFT) of the audio signal
-S = np.abs(librosa.stft(audio_clipped, n_fft=1024, hop_length=hop_length, win_length=frame_length))
+# # 2. Use the Librosa library to compute the short-time Fourier transform (STFT) of the audio signal
+# S = np.abs(librosa.stft(audio_clipped, n_fft=1024, hop_length=hop_length, win_length=frame_length))
 
-# 3. Compute the energy of each frame
-energy = np.sum(S ** 2, axis=0)
+# # # 3. Compute the energy of each frame
+# energy = np.sum(S ** 2, axis=0)
 
-# 4. Plot the energy of the audio signal
-plt.figure(figsize=(10, 4))
-plt.plot(np.linspace(current_time_start, current_time_end, len(energy)), energy)
-plt.title('Energy of Audio Signal')
-plt.xlabel('Time (s)')
-plt.ylabel('Energy')
-plt.show()
+# # 4. Plot the energy of the audio signal
+# plt.figure(figsize=(10, 4))
+# plt.plot(np.linspace(current_time_start, current_time_end, len(energy)), energy)
+# plt.title('Energy of Audio Signal')
+# plt.xlabel('Time (s)')
+# plt.ylabel('Energy')
+# plt.show()
 
 # 5. Export the clipped audio signal as a WAV file
-wav.write(base_path + "clipped_audio.wav", fs_wav, audio_clipped.astype(np.int16))
+wav.write(base_path + "mic_recording_clipped.wav", fs_wav, audio_clipped.astype(np.int16))
