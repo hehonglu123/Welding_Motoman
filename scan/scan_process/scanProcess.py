@@ -454,7 +454,7 @@ class ScanProcess():
 
         # create the cropping polygon
         bounding_polygon=[]
-        radius_scale=0.55
+        radius_scale=0.8
         # radius_scale=0.2
         radius=np.mean(np.linalg.norm(np.diff(curve_relative[:,:3],axis=0),axis=1))*radius_scale
         print("height neighbor radius:",radius)
@@ -520,8 +520,8 @@ class ScanProcess():
             
             this_dh = np.nanmean(this_points_z)
 
-            dh_max=7
-            dh_min=-2
+            dh_max=10
+            dh_min=-10
             this_dh = max(min(this_dh,dh_max),dh_min)
             # if this_dh>dh_max:
             #     this_dh=np.nan

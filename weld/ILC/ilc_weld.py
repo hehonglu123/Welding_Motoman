@@ -8,6 +8,7 @@ sys.path.append('../../scan/scan_tools/')
 sys.path.append('../../scan/scan_plan/')
 sys.path.append('../../scan/scan_process/')
 from robot_def import *
+from utils import *
 from scan_utils import *
 from scan_continuous import *
 from scanPathGen import *
@@ -66,7 +67,7 @@ positioner=positioner_obj('D500B',def_path=config_dir+'D500B_robot_default_confi
 # print(robot_weld.fwd(zero_config))
 # exit()
 
-Table_home_T = positioner.fwd(np.radians([-15,180]))
+Table_home_T = positioner.fwd(np.radians([-15,0]))
 T_S1TCP_R1Base = np.linalg.inv(np.matmul(positioner.base_H,H_from_RT(Table_home_T.R,Table_home_T.p)))
 T_R1Base_S1TCP = np.linalg.inv(T_S1TCP_R1Base)
 
@@ -84,8 +85,9 @@ to_home_speed=5
 # r2 pose
 r1_home = np.zeros(6)
 r1_mid = None
-r2_home = np.radians([43.3469,36.0996,-63.0900,142.5838,-83.0429,-96.0737])
-r2_mid = np.radians([43.7851,20,-10,0,0,0])
+# r2_home = np.radians([38.1523,35.3321,-67.5745,145.4767,-87.9081,-96.3553])
+r2_home = np.radians([60,20,-10,0,0,0])
+r2_mid = np.radians([60,20,-10,0,0,0])
 # positioner pose
 s1_weld = np.radians([-15,0])
 s1_scan = np.radians([-15,-20])
@@ -95,21 +97,23 @@ ipm_weld=250
 ipm_for_calculation=210
 dh=2.5
 weld_z_height=[0,dh] # two base layer height to first top layer
-curve_start=np.array([0,-40,0])
+curve_start=np.array([0,-32,0])
 curve_end=np.array([0,40,0])
 seg_dist=1.6
-seg_N=int(np.linalg.norm(curve_end-curve_start)/seg_dist)+1
+seg_N=int(np.linalg.norm(curve_end-curve_start)/seg_dist)
+print("Total seg:",seg_N)
 base_v=6.5
 
 #### ILC parameters
-alpha=0.1
-total_iteration=3
+alpha=0.25
+total_iteration=9
 ##################
 
 #### data dir
 current_time = datetime.datetime.now()
 formatted_time = current_time.strftime('%Y_%m_%d_%H_%M_%S.%f')[:-7]
-data_dir='../data/wall_weld_test/weld_scan_'+formatted_time+'/'
+# data_dir='data/weld_scan_'+formatted_time+'/'
+data_dir='data/weld_scan_2023_11_01_17_44_58/'
 
 #### RR drivers and all other drivers
 robot_client=MotionProgramExecClient()
@@ -117,8 +121,10 @@ generate_mti_rr()
 ws=WeldSend(robot_client)
 # weld state logging
 weld_ser = RRN.SubscribeService('rr+tcp://192.168.55.10:60823?service=welder')
-cam_ser=RRN.ConnectService('rr+tcp://192.168.55.10:60827/?service=camera')
-mic_ser = RRN.ConnectService('rr+tcp://192.168.55.20:60828?service=microphone')
+# cam_ser=RRN.ConnectService('rr+tcp://192.168.55.10:60827/?service=camera')
+# mic_ser = RRN.ConnectService('rr+tcp://192.168.55.20:60828?service=microphone')
+cam_ser=None
+mic_ser=None
 ## RR sensor objects
 rr_sensors = WeldRRSensor(weld_service=weld_ser,cam_service=cam_ser,microphone_service=mic_ser)
 ### test sensor (camera, microphone)
@@ -136,31 +142,60 @@ Transz0_H=None
 #  [ 2.21825071e-03, -1.86365986e-03,  9.99995803e-01,  1.56294293e+00],
 #  [ 0.00000000e+00,  0.00000000e+00,  0.00000000e+00,  1.00000000e+00]])
 
-weld_arcon=False
-draw_dh = True
+weld_arcon=True
+draw_dh = False
+
+uk = np.ones(seg_N)*dh ## inputs
+uk_origin = deepcopy(uk)
+yk_d = deepcopy(uk)
+baselayer_u = deepcopy(uk)
+iter_start=0
+
+use_previous=True
+if use_previous:
+    iter_start=3
+    half_start=0
+
+    if half_start==0:
+        uk=np.loadtxt(data_dir+'iteration_'+str(iter_start-1)+'/half_0/input_uk.csv',delimiter=',')
+        yk=np.loadtxt(data_dir+'iteration_'+str(iter_start-1)+'/yk.csv',delimiter=',')
+        yk_prime=np.loadtxt(data_dir+'iteration_'+str(iter_start-1)+'/yk_prime.csv',delimiter=',')
+        ek_prime=yk_prime-yk
+        gradient_direction=np.flip(ek_prime)
+        print("gradient:",gradient_direction)
+        uk = uk-alpha*gradient_direction
+        print(uk)
+    elif half_start==1:
+        uk=np.loadtxt(data_dir+'iteration_'+str(iter_start)+'/half_0/input_uk.csv',delimiter=',')
+        yk=np.loadtxt(data_dir+'iteration_'+str(iter_start)+'/yk.csv',delimiter=',')
+        ek = yk-yk_d
+        ek_tilde = np.flip(ek)
+        print(uk)
+        print(ek_tilde)
+
+    skip_1=False
+    skip_2=False
+    
 
 input("Start?")
 # move robot to ready position
 ws.jog_dual(robot_scan,positioner,[r2_mid,r2_home],s1_weld,to_start_speed)
-
-uk = np.ones(seg_N)*dh ## inputs
-yk_d = deepcopy(uk)
-baselayer_u = deepcopy(uk)
-for iter_i in range(total_iteration):
+for iter_i in range(iter_start,total_iteration):
     
     ### first and second half in same loop
     print("Iteration",iter_i,"input u:",uk)
     input("Start?")
-    for half in range(2):
+    for half in range(half_start,2):
+        Transz0_H=None
         ### first/second half
         # very first layer (always have one base layer for aluminum, learning second layer here)
-        this_curve_start=[30*(iter_i*2+half)-45,curve_end[1],0,0,0,-1] # curve start
-        this_curve_end=[30*(iter_i*2+half)-45,curve_start[1],0,0,0,-1] # curve end
+        this_curve_start=[30*((iter_i%3)*2+half)-75,curve_end[1],0,0,0,-1] # curve start
+        this_curve_end=[30*((iter_i%3)*2+half)-75,curve_start[1],0,0,0,-1] # curve end
         curve_sliced_relative=np.linspace(this_curve_start,this_curve_end,seg_N+1) # split curve to seg_N segments
         profile_dh,weld_js_exe,weld_stamps,scan_js_exe,scan_stamps,mti_recording,pcd,Transz0_H\
-            =weldscan.robot_weld_scan(curve_sliced_relative,curve_sliced_relative[::-1],baselayer_u,ipm_weld,T_R1Base_S1TCP,\
+            =weldscan.robot_weld_scan(curve_sliced_relative,curve_sliced_relative,baselayer_u,ipm_weld,T_R1Base_S1TCP,\
                                 r1_mid,r1_home,s1_weld,r2_mid,r2_home,s1_scan,\
-                                arc_on=weld_arcon,ipm_calculation=ipm_for_calculation,Transz0_H=Transz0_H,draw_dh=draw_dh) # weld and scan
+                                arc_on=weld_arcon,ipm_calculation=ipm_for_calculation,Transz0_H=Transz0_H,draw_dh=draw_dh,skip_weld=skip_1) # weld and scan
         # save data
         Path(data_dir).mkdir(exist_ok=True)
         iter_data_dir=data_dir+'iteration_'+str(iter_i)+'/'
@@ -181,19 +216,21 @@ for iter_i in range(total_iteration):
         np.save(layer_data_dir+'height_profile.npy',profile_dh)
         
         # weld first/second half
-        this_curve_start=[30*(iter_i*2+half)-45,curve_start[1],dh,0,0,-1]
-        this_curve_end=[30*(iter_i*2+half)-45,curve_end[1],dh,0,0,-1]
+        this_curve_start=[30*((iter_i%3)*2+half)-75,curve_start[1],dh,0,0,-1]
+        this_curve_end=[30*((iter_i%3)*2+half)-75,curve_end[1],dh,0,0,-1]
         curve_sliced_relative=np.linspace(this_curve_start,this_curve_end,seg_N+1)
         ### ILC calculation
         if half==0: # first half
             uk_input = deepcopy(uk)
         else: # second half
             uk_input = deepcopy(uk)+ek_tilde
+        print("Input u:",np.round(uk_input,decimals=1))
+        # uk_input = deepcopy(uk_origin) # for testing
             
         profile_dh,weld_js_exe,weld_stamps,scan_js_exe,scan_stamps,mti_recording,pcd,Transz0_H\
-            =weldscan.robot_weld_scan(curve_sliced_relative,curve_sliced_relative[::-1],uk,ipm_weld,T_R1Base_S1TCP,\
+            =weldscan.robot_weld_scan(curve_sliced_relative,curve_sliced_relative[::-1],uk_input,ipm_weld,T_R1Base_S1TCP,\
                                 r1_mid,r1_home,s1_weld,r2_mid,r2_home,s1_scan,\
-                                arc_on=weld_arcon,ipm_calculation=ipm_for_calculation,Transz0_H=Transz0_H,draw_dh=draw_dh) # weld and scan
+                                arc_on=weld_arcon,ipm_calculation=ipm_for_calculation,Transz0_H=Transz0_H,draw_dh=draw_dh,skip_weld=skip_2) # weld and scan
         # save data
         layer_data_dir=half_data_dir+'layer_1/'
         Path(layer_data_dir).mkdir(exist_ok=True)
@@ -210,16 +247,33 @@ for iter_i in range(total_iteration):
         
         ### ILC calculation
         if half==0: # first half
-            yk = profile_dh[:,1]
+            yk = deepcopy(profile_dh[:,1])
+            yk = moving_average(yk,n=2)
             ek = yk-yk_d
             ek_tilde = np.flip(ek)
+            np.savetxt(iter_data_dir+'yk.csv',yk,delimiter=',')
         else: # second half
-            yk_prime = profile_dh[:,1]
+            yk_prime = deepcopy(profile_dh[:,1])
+            yk_prime = moving_average(yk_prime,n=2)
+            np.savetxt(iter_data_dir+'yk_prime.csv',yk_prime,delimiter=',')
             
         # save ILC data
         np.savetxt(half_data_dir+'input_uk.csv',uk_input,delimiter=',')
+
+        skip_1=False
+        skip_2=False
+    half_start=0
     
+    # save data
+    np.savetxt(iter_data_dir+'yk.csv',yk,delimiter=',')
+    np.savetxt(iter_data_dir+'yk_prime.csv',yk_prime,delimiter=',')
+    # plt.axhline(y = yk_d[0], color = 'r', linestyle = '-') 
+    # plt.scatter(np.arange(len(yk)),yk)
+    # plt.scatter(np.arange(len(yk_prime)),yk_prime)
+    # plt.show()
+
     ### find gradient and update
     ek_prime=yk_prime-yk
-    graduient_direction=np.flip(ek_prime)
-    uk = uk-alpha*graduient_direction
+    gradient_direction=np.flip(ek_prime)
+    print("gradient:",gradient_direction)
+    uk = uk-alpha*gradient_direction

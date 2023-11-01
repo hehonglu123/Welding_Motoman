@@ -42,8 +42,9 @@ class WeldScan(object):
         Rz_angle = np.radians(0) # point direction w.r.t welds
         Ry_angle = np.radians(0) # rotate in y a bit
         bounds_theta = np.radians(1) ## circular motion at start and end
+        extension = 10 ## extension before and after (mm)
         ### scanning path module
-        self.spg = ScanPathGen(self.robot_scan,self.positioner,scan_stand_off_d,Rz_angle,Ry_angle,bounds_theta)
+        self.spg = ScanPathGen(self.robot_scan,self.positioner,scan_stand_off_d,Rz_angle,Ry_angle,bounds_theta,extension)
         self.all_scan_angle = np.radians([0]) ## scan angle
         self.scan_table=np.radians([-15,200]) ## init table
         self.mti_Rpath = np.array([[ -1.,0.,0.],   
@@ -53,13 +54,14 @@ class WeldScan(object):
     def robot_weld_scan(self,curve,curve_scan,dh_input,ipm_mode,T_R1Base_S1TCP,\
                         robot_weld_mid,robot_weld_home,positioner_weld_q,\
                         robot_scan_mid,robot_scan_home,positioner_scan_q,\
-                        arc_on=False,ipm_calculation=None,Transz0_H=None,draw_dh=False):
+                        arc_on=False,ipm_calculation=None,Transz0_H=None,draw_dh=False,skip_weld=False):
         
         assert len(curve)-1==len(dh_input), "dh_input must have length equals len(curve)-1"
         
         ###################### welding ###########################
         if ipm_calculation is None:
             ipm_calculation==ipm_mode
+        ipm_job_num = int(ipm_mode/10+200)
         
         ## fix torch R because only the welding robot moves
         torch_Rz=[0,0,-1]
@@ -86,20 +88,29 @@ class WeldScan(object):
         rob_v=[]
         primitives=[]
         for dh in dh_input:
-            rob_v.append(min(20,max(2,dh2v_loglog(dh,ipm_mode))))
+            rob_v.append(min(20,max(2,dh2v_loglog(dh,ipm_calculation))))
             primitives.append('movel')
-        
+        print("rob speed",np.round(rob_v,decimals=1))
+        rob_v=np.append(rob_v[0],rob_v)
+        primitives=np.append(primitives[0],primitives)
+
         # to welding start position
         r1_start_path=[path_q[0],path_q[1]] if robot_weld_mid is None else [robot_weld_mid,path_q[0],path_q[1]]
         self.ws.jog_dual(self.robot_weld,self.positioner,r1_start_path,positioner_weld_q,self.to_start_s)
         
         # start welding and logging sensor information
-        self.wrr.start_all_sensors()
-        weld_stamps,weld_js_exe,_,_=self.ws.weld_segment_single(primitives,self.robot_weld,path_q[1:-1],np.append(rob_v[0],rob_v),cond_all=[ipm_mode],arc=arc_on)
-        self.wrr.stop_all_sensors()
+        if not skip_weld:
+            input("start weld")
+            self.wrr.start_all_sensors()
+            weld_stamps,weld_js_exe,_,_=self.ws.weld_segment_single(primitives,self.robot_weld,path_q[1:-1],rob_v,cond_all=[ipm_job_num],arc=arc_on)
+            self.wrr.stop_all_sensors()
+        else:
+            weld_stamps=np.zeros(10)
+            weld_js_exe=np.zeros((10,14))
         
         # robot to home
-        r1_home_path=[robot_weld_home] if robot_weld_mid is None else [robot_weld_mid,robot_weld_home]
+        input("weld home")
+        r1_home_path=[path_q[-1],robot_weld_home] if robot_weld_mid is None else [path_q[-1],robot_weld_mid,robot_weld_home]
         self.ws.jog_single(self.robot_weld,r1_home_path,self.to_home_s)
         #######################################################
         
@@ -115,6 +126,8 @@ class WeldScan(object):
             # to scanning start position
             r2_start_path=[q_bp1[0][0]] if robot_scan_mid is None else [robot_scan_mid,q_bp1[0][0]]
             self.ws.jog_dual(self.robot_scan,self.positioner,r2_start_path,q_bp2[0][0],self.to_start_s)
+
+            input("start scan")
             ## motion start
             mp = MotionProgram(ROBOT_CHOICE='RB2',ROBOT_CHOICE2='ST1',pulse2deg=self.robot_scan.pulse2deg,pulse2deg_2=self.positioner.pulse2deg)
             # routine motion
@@ -163,16 +176,15 @@ class WeldScan(object):
                 except:
                     pass
         mti_recording=np.array(mti_recording)
-        scan_js_exe=joint_recording
+        joint_recording=np.array(joint_recording)
+        scan_js_exe=joint_recording[:,6:]
         
         # scanning process: processing point cloud and get h
-        curve_x_start = deepcopy(curve_scan[0][0])
-        curve_x_end = deepcopy(curve_scan[-1][0])
         
         z_height_start=curve_scan[0][2]-3
         crop_extend=15
-        crop_min=tuple(np.min(curve_scan,axis=0)-crop_extend)
-        crop_max=np.max(curve_scan,axis=0)+crop_extend
+        crop_min=tuple(np.min(curve_scan[:,:3],axis=0)-crop_extend)
+        crop_max=np.max(curve_scan[:,:3],axis=0)+crop_extend
         crop_max[2]+=20
         crop_max=tuple(crop_max)
         
@@ -187,11 +199,12 @@ class WeldScan(object):
         # calibrate H
         pcd,Transz0_H = scan_process.pcd_calib_z(pcd,Transz0_H=Transz0_H)
         profile_dh = scan_process.pcd2dh(pcd,curve,drawing=draw_dh)
-        if draw_dh:
-            plt.scatter(profile_dh[:,0],profile_dh[:,1])
-            plt.show()
+        # if draw_dh:
+        #     plt.scatter(profile_dh[:,0],profile_dh[:,1])
+        #     plt.show()
         
         # robot to home
+        input("scan home")
         r2_home_path=[robot_scan_home] if robot_scan_mid is None else [robot_scan_mid,robot_scan_home]
         self.ws.jog_single(self.robot_scan,r2_home_path,self.to_home_s)
         ########################################
