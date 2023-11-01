@@ -61,7 +61,6 @@ material_param['316L'] = {
 def v2dh_loglog(v,mode=140,material='ER_4043'):
     
     mode=int(mode)
-    print(str(mode)+'ipm')
     param = material_param[material][str(mode)+'ipm']
     logdh = param[0]*np.log(v)+param[1]
     
@@ -117,9 +116,9 @@ def v2dh_quadratic(v,mode=140):
     return dh
 
 if __name__=='__main__':
-    dh=np.array([-2,-1,0,1,1.2,1.4,1.8,2])
-    loglog_v=dh2v_loglog(dh,160)
-    quad_v=dh2v_quadratic(dh,160)
+    # dh=np.array([-2,-1,0,1,1.2,1.4,1.8,2])
+    # loglog_v=dh2v_loglog(dh,160)
+    # quad_v=dh2v_quadratic(dh,160)
     # print(loglog_v)
     # print(quad_v)
 
@@ -128,9 +127,11 @@ if __name__=='__main__':
     # print(v2dh_loglog(75,220))
 
     # print(v2dh_loglog(5,100))
-    print(v2dh_loglog(16,160))
-    print(v2dh_loglog(10,180))
-    print(v2dh_loglog(9.411764,160))
+    # print(v2dh_loglog(16,160))
+    # print(v2dh_loglog(10,180))
+    # print(v2dh_loglog(9.411764,160))
+    print(v2dh_loglog(8,210))
+    print(dh2v_loglog(2.5,210))
     # print(v2dh_loglog(6,100))
     # print(v2dh_loglog(10,100))
     # print(dh2v_loglog(5,100))

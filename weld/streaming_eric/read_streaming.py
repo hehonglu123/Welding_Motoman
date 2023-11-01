@@ -257,6 +257,7 @@ for layer_count in range(0,total_layer):
             mti_pcd=np.delete(mti_pcd,mti_pcd[1]>100,axis=1)
             mti_pcd=np.delete(mti_pcd,mti_pcd[0]<-10,axis=1)
             mti_pcd=np.delete(mti_pcd,mti_pcd[0]>10,axis=1)
+            mti_pcd[0]=-1*mti_pcd[0]
             mti_pcd = mti_pcd.T
             
             # cluster based noise remove
@@ -290,8 +291,8 @@ for layer_count in range(0,total_layer):
             print("============")
             for cluster_i in range(n_clusters_-1):
                 cluster_id = dbscan.labels_==cluster_i
-                plt.scatter(-1*mti_pcd[cluster_id][:,0],mti_pcd[cluster_id][:,1])
-            plt.scatter(-1*mti_pcd[:,0],mti_pcd[:,1])
+                plt.scatter(mti_pcd[cluster_id][:,0],mti_pcd[cluster_id][:,1])
+            plt.scatter(mti_pcd[:,0],mti_pcd[:,1])
             # plt.axhline(y = target_z[2], color = 'r', linestyle = '-')
             plt.axhline(y = point_location_z_R2TCP-delta_h, color = 'r', linestyle = '-')
             plt.xlim((-30,30))
