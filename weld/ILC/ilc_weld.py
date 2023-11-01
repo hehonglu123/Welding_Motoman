@@ -14,6 +14,7 @@ from scanPathGen import *
 from scanProcess import *
 from weldRRSensor import *
 from WeldSend import *
+from WeldScan import *
 from dx200_motion_program_exec_client import *
 
 from general_robotics_toolbox import *
@@ -80,11 +81,14 @@ save_weld_record=True
 #### motion parameters
 to_start_speed=4
 to_home_speed=5
-# ir pose
-r2_ir_q = np.radians([43.3469,36.0996,-63.0900,142.5838,-83.0429,-96.0737])
+# r2 pose
+r1_home = np.zeros(6)
+r1_mid = None
+r2_home = np.radians([43.3469,36.0996,-63.0900,142.5838,-83.0429,-96.0737])
 r2_mid = np.radians([43.7851,20,-10,0,0,0])
 # positioner pose
-table_home = np.radians([-15,0])
+s1_weld = np.radians([-15,0])
+s1_scan = np.radians([-15,-20])
 
 #### weld and curve parameters
 ipm_weld=250
@@ -98,6 +102,7 @@ seg_N=int(np.linalg.norm(curve_end-curve_start)/seg_dist)+1
 base_v=6.5
 
 #### ILC parameters
+alpha=0.1
 total_iteration=3
 ##################
 
@@ -121,6 +126,8 @@ rr_sensors = WeldRRSensor(weld_service=weld_ser,cam_service=cam_ser,microphone_s
 # rr_sensors.test_all_sensors()
 # print(len(rr_sensors.ir_recording))
 # exit()
+weldscan=WeldScan(robot_weld,robot_scan,positioner,ws,rr_sensors,mti_client,\
+                to_start_s=to_start_speed,to_home_s=to_home_speed)
 ###############
 
 Transz0_H=None
@@ -130,36 +137,53 @@ Transz0_H=None
 #  [ 0.00000000e+00,  0.00000000e+00,  0.00000000e+00,  1.00000000e+00]])
 
 weld_arcon=False
+draw_dh = True
 
 input("Start?")
 # move robot to ready position
-ws.jog_dual(robot_scan,positioner,[r2_mid,r2_ir_q],table_home,to_start_speed)
+ws.jog_dual(robot_scan,positioner,[r2_mid,r2_home],s1_weld,to_start_speed)
 
 uk = np.ones(seg_N)*dh ## inputs
+yk_d = deepcopy(uk)
+baselayer_u = deepcopy(uk)
 for iter_i in range(total_iteration):
     
     ### first and second half in same loop
-    print("Iteration u:",uk)
-    yk=None
-    yk_prime=None
+    print("Iteration",iter_i,"input u:",uk)
+    input("Start?")
     for half in range(2):
         ### first/second half
         # very first layer (always have one base layer for aluminum, learning second layer here)
-        this_curve_start=[30*(iter_i*2+half)-45,curve_end[1],0,0,0,-1]
-        this_curve_end=[30*(iter_i*2+half)-45,curve_start[1],0,0,0,-1]
-        curve_sliced_relative=np.linspace(this_curve_start,this_curve_end,seg_N+1)
-        
+        this_curve_start=[30*(iter_i*2+half)-45,curve_end[1],0,0,0,-1] # curve start
+        this_curve_end=[30*(iter_i*2+half)-45,curve_start[1],0,0,0,-1] # curve end
+        curve_sliced_relative=np.linspace(this_curve_start,this_curve_end,seg_N+1) # split curve to seg_N segments
+        profile_dh,weld_js_exe,weld_stamps,scan_js_exe,scan_stamps,mti_recording,pcd,Transz0_H\
+            =weldscan.robot_weld_scan(curve_sliced_relative,curve_sliced_relative[::-1],baselayer_u,ipm_weld,T_R1Base_S1TCP,\
+                                r1_mid,r1_home,s1_weld,r2_mid,r2_home,s1_scan,\
+                                arc_on=weld_arcon,ipm_calculation=ipm_for_calculation,Transz0_H=Transz0_H,draw_dh=draw_dh) # weld and scan
         # weld first/second half
         this_curve_start=[30*(iter_i*2+half)-45,curve_start[1],dh,0,0,-1]
         this_curve_end=[30*(iter_i*2+half)-45,curve_end[1],dh,0,0,-1]
         curve_sliced_relative=np.linspace(this_curve_start,this_curve_end,seg_N+1)
         if half==0: # first half
-            pass # use 
+            uk_input = deepcopy(uk)
         else: # second half
-            pass # use augmented u 
+            uk_input = deepcopy(uk)+ek_tilde
+        profile_dh,weld_js_exe,weld_stamps,scan_js_exe,scan_stamps,mti_recording,pcd,Transz0_H\
+            =weldscan.robot_weld_scan(curve_sliced_relative,curve_sliced_relative[::-1],uk,ipm_weld,T_R1Base_S1TCP,\
+                                r1_mid,r1_home,s1_weld,r2_mid,r2_home,s1_scan,\
+                                arc_on=weld_arcon,ipm_calculation=ipm_for_calculation,Transz0_H=Transz0_H,draw_dh=draw_dh) # weld and scan
+        if half==0: # first half
+            yk = profile_dh[:,1]
+            ek = yk-yk_d
+            ek_tilde = np.flip(ek)
+        else: # second half
+            yk_prime = profile_dh[:,1]
     
     ### find gradient and update
     ek_prime=yk_prime-yk
     graduient_direction=np.flip(ek_prime)
+    uk = uk-alpha*graduient_direction
     
-    pass
+    ### save everything
+    

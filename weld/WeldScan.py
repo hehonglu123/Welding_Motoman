@@ -196,7 +196,7 @@ class WeldScan(object):
         self.ws.jog_single(self.robot_scan,r2_home_path,self.to_home_s)
         ########################################
         
-        return
+        return profile_dh,weld_js_exe,weld_stamps,scan_js_exe,scan_stamps,mti_recording,pcd,Transz0_H
 
     def regenerate_mti_rr(self):
         
