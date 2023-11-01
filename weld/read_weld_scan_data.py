@@ -141,7 +141,7 @@ for dataset in datasets:
     elif dataset=='repeat 2':
         data_dir = '../data/wall_weld_test/moveL_100_repeat_weld_scan_2023_08_02_17_07_02/'
     elif dataset =='test':
-        data_dir = '../data/wall_weld_test/316L_model_130ipm_2023_10_16_22_25_33/'
+        data_dir = '../data/wall_weld_test/ER4043_model_240ipm_2023_10_08_09_23_37/'
     forward_flag=False
     all_profile_height=[]
     all_correction_layer=[]
