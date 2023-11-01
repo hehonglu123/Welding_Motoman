@@ -16,11 +16,11 @@ Rx=np.array([1,0,0])
 Ry=np.array([0,1,0])
 Rz=np.array([0,0,1])
 
-ph_dataset_date='0804'
-test_dataset_date='0804'
+ph_dataset_date='0801'
+test_dataset_date='0801'
 config_dir='../config/'
 
-robot_type = 'R2'
+robot_type = 'R1'
 
 if robot_type == 'R1':
     robot_marker_dir=config_dir+'MA2010_marker_config/'
@@ -225,7 +225,9 @@ q_all=[]
 pos_all=[]
 for N in range(total_test_N):
     test_q = test_robot_q[N]
-    # print("Test q2q3:",np.round(np.degrees(test_q[1:3]),3))
+    # if N%10==0:
+    #     print("N:",N)
+    #     print("Test q2q3:",np.round(np.degrees(test_q[1:3]),3))
     # print("Using Train q2q3:",np.round(np.degrees(train_q[train_q_index]),3))
 
     T_marker_base = Transform(q2R(test_mocap_T[N][3:]),test_mocap_T[N][:3])
@@ -452,7 +454,7 @@ plt.title(robot_type+" Position Training Error using Optimized PH",fontsize=32)
 # plt.xticks(np.arange(0,total_test_N,50),pos_all[::50])
 plt.xticks(np.arange(0,split_index,100),fontsize=22)
 plt.yticks(fontsize=22)
-plt.xlabel("Testing pose index",fontsize=26)
+plt.xlabel("Training pose index",fontsize=26)
 plt.ylabel("Position Error (mm)",fontsize=26)
 plt.tight_layout()
 plt.show()
