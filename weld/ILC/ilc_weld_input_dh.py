@@ -192,6 +192,10 @@ for iter_i in range(iter_start,total_iteration):
         this_curve_start=[30*((iter_i%3)*2+half)-75,curve_end[1],0,0,0,-1] # curve start
         this_curve_end=[30*((iter_i%3)*2+half)-75,curve_start[1],0,0,0,-1] # curve end
         curve_sliced_relative=np.linspace(this_curve_start,this_curve_end,seg_N+1) # split curve to seg_N segments
+        rob_v=[]
+        for dh in baselayer_u:
+            rob_v.append(min(20,max(2,dh2v_loglog(dh,ipm_for_calculation))))
+        rob_v=np.append(rob_v[0],rob_v)
         profile_dh,weld_js_exe,weld_stamps,scan_js_exe,scan_stamps,mti_recording,pcd,Transz0_H\
             =weldscan.robot_weld_scan(curve_sliced_relative,curve_sliced_relative,baselayer_u,ipm_weld,T_R1Base_S1TCP,\
                                 r1_mid,r1_home,s1_weld,r2_mid,r2_home,s1_scan,\
@@ -226,11 +230,16 @@ for iter_i in range(iter_start,total_iteration):
             uk_input = deepcopy(uk)+ek_tilde
         print("Input u:",np.round(uk_input,decimals=1))
         # uk_input = deepcopy(uk_origin) # for testing
+        rob_v=[]
+        for dh in uk_input:
+            rob_v.append(min(20,max(2,dh2v_loglog(dh,ipm_for_calculation))))
+        print("rob speed",np.round(rob_v,decimals=1))
+        rob_v=np.append(rob_v[0],rob_v)
             
         profile_dh,weld_js_exe,weld_stamps,scan_js_exe,scan_stamps,mti_recording,pcd,Transz0_H\
-            =weldscan.robot_weld_scan(curve_sliced_relative,curve_sliced_relative[::-1],uk_input,ipm_weld,T_R1Base_S1TCP,\
+            =weldscan.robot_weld_scan(curve_sliced_relative,curve_sliced_relative[::-1],rob_v,ipm_weld,T_R1Base_S1TCP,\
                                 r1_mid,r1_home,s1_weld,r2_mid,r2_home,s1_scan,\
-                                arc_on=weld_arcon,ipm_calculation=ipm_for_calculation,Transz0_H=Transz0_H,draw_dh=draw_dh,skip_weld=skip_2) # weld and scan
+                                arc_on=weld_arcon,Transz0_H=Transz0_H,draw_dh=draw_dh,skip_weld=skip_2) # weld and scan
         # save data
         layer_data_dir=half_data_dir+'layer_1/'
         Path(layer_data_dir).mkdir(exist_ok=True)

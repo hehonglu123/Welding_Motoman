@@ -51,16 +51,14 @@ class WeldScan(object):
                     [ 0.,1.,0.],
                     [0.,0.,-1.]])
     
-    def robot_weld_scan(self,curve,curve_scan,dh_input,ipm_mode,T_R1Base_S1TCP,\
+    def robot_weld_scan(self,curve,curve_scan,rob_v,ipm_mode,T_R1Base_S1TCP,\
                         robot_weld_mid,robot_weld_home,positioner_weld_q,\
                         robot_scan_mid,robot_scan_home,positioner_scan_q,\
-                        arc_on=False,ipm_calculation=None,Transz0_H=None,draw_dh=False,skip_weld=False):
+                        arc_on=False,Transz0_H=None,draw_dh=False,skip_weld=False):
         
-        assert len(curve)-1==len(dh_input), "dh_input must have length equals len(curve)-1"
+        assert len(curve)==len(rob_v), "rob_v must have length equals len(curve)"
         
         ###################### welding ###########################
-        if ipm_calculation is None:
-            ipm_calculation==ipm_mode
         ipm_job_num = int(ipm_mode/10+200)
         
         ## fix torch R because only the welding robot moves
@@ -85,14 +83,7 @@ class WeldScan(object):
         for tcp_T in path_T:
             path_q.append(self.robot_weld.inv(tcp_T.p,tcp_T.R,zero_config)[0])
         # get path velocity and primitives
-        rob_v=[]
-        primitives=[]
-        for dh in dh_input:
-            rob_v.append(min(20,max(2,dh2v_loglog(dh,ipm_calculation))))
-            primitives.append('movel')
-        print("rob speed",np.round(rob_v,decimals=1))
-        rob_v=np.append(rob_v[0],rob_v)
-        primitives=np.append(primitives[0],primitives)
+        primitives=['movel']*len(rob_v)
 
         # to welding start position
         r1_start_path=[path_q[0],path_q[1]] if robot_weld_mid is None else [robot_weld_mid,path_q[0],path_q[1]]
