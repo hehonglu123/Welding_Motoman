@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.path import Path
 from mpl_toolkits.mplot3d import Axes3D
-import sys, copy, traceback
+import sys, copy, traceback, warnings
 from scipy.spatial import ConvexHull
 import open3d as o3d
 
@@ -12,6 +12,8 @@ from utils import *
 from lambda_calc import *
 from error_check import *
 from toolbox_circular_fit import *
+
+warnings.filterwarnings("ignore")
 
 def sort_points(xy: np.ndarray) -> np.ndarray:
     ###  sort points by polar angle https://stackoverflow.com/questions/20506712/sort-the-points-coordinates-of-a-circle-into-a-logical-sequence
@@ -134,12 +136,22 @@ def slicing_uniform(stl_pc,z,threshold = 1e-6):
 
     return bottom_edge_vertices
 
-def smooth_curve(curve):
+def smooth_curve(curve,point_distance):
     lam=calc_lam_cs(curve)
     polyfit=np.polyfit(lam,curve,deg=20)
+    lam=np.linspace(0,lam[-1],num=int(lam[-1]/point_distance))
+    curve_new=np.vstack((np.poly1d(polyfit[:,0])(lam), np.poly1d(polyfit[:,1])(lam), np.poly1d(polyfit[:,2])(lam))).T
+    
+    if len(curve_new)>10:
+        for i in range(1,len(curve_new)-9):
+            distance=np.linalg.norm(curve_new[i+1:]-curve_new[i],axis=1)
+            closest_indices=np.argsort(distance)+i+1
+            if closest_indices[0] not in [i+1,i+2,len(curve_new)-1]: ###knot detected
+                print('SOLVING KNOT',i,closest_indices[0],closest_indices[1])
+                curve_new=np.vstack((curve_new[:i],curve_new[closest_indices[0]:]))
+                break
 
-    return np.vstack((np.poly1d(polyfit[:,0])(lam), np.poly1d(polyfit[:,1])(lam), np.poly1d(polyfit[:,2])(lam))).T
-    # return curve
+    return curve_new
 
 def get_curve_normal(curve,stl_pc,direction):
     ###provide the curve and complete stl point cloud, a rough normal direction
@@ -217,8 +229,6 @@ def fit_to_length(curve,stl_pc,resolution=0.5,closed=False):
     start_shrinked=False
     start_extended=False
 
-    closed=closed_loop_check(curve)
-
     if closed:
     
         while (curve[start_idx+1]-curve[start_idx])@(curve[-1]-curve[start_idx])>0:
@@ -267,9 +277,11 @@ def fit_to_length(curve,stl_pc,resolution=0.5,closed=False):
     curve=curve[1:]
 
     ###shrink end firstly
+    print(start_shrinked,start_extended,closed)
+
     end_idx=len(curve)-1
     end_shrinked=False
-    print(start_shrinked,start_extended,closed)
+
     if not closed:
         while (not check_boundary(curve[end_idx],stl_pc)):
             end_shrinked=True
@@ -331,14 +343,37 @@ def split_slices(curve,stl_pc,closed=False):
     ###split curve
     sub_curves=np.split(curve, indices)
 
-    sub_curves=[sub_curve for sub_curve in sub_curves if len(sub_curve) > continuous_threshold2]
+    if closed and len(sub_curves)>1:    ##TODO, fix small sub_curve
+        print('SPLITTED CLOSED CURVE')
+        closed=False
+        print(len(sub_curves))
+        sorted_sub_curves = sorted(sub_curves, key=lambda trajectory: len(trajectory), reverse=True)
 
-    return sub_curves
+        # Select the two trajectories with the most points
+        sub_curves = sorted_sub_curves[:2]
+        print(len(sub_curves))
 
-def slice_stl(bottom_curve,stl_pc,direction,slice_height,closed=False):
+        sub_curves=[np.vstack((sub_curves[0][::-1],sub_curves[-1][::-1]))]
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+        vis_step=1
+        ax.plot3D(sub_curves[0][::vis_step,0],sub_curves[0][::vis_step,1],sub_curves[0][::vis_step,2],'g.-')
+
+        ax.set_xlabel('X')
+        ax.set_ylabel('Y')
+        ax.set_zlabel('Z')
+        plt.show()
+
+        # sub_curves=[]
+    else:
+        sub_curves=[sub_curve for sub_curve in sub_curves if len(sub_curve) > continuous_threshold2]
+
+    return sub_curves, closed
+
+def slice_stl(bottom_curve,stl_pc,direction,slice_height,point_distance=1,closed=False):
     slice_all=[[bottom_curve]]
     layer_num=0
-    while layer_num<50:
+    while layer_num<70:
         print(layer_num, 'th layer')
         if len(slice_all[-1])==0:
             slice_all=slice_all[:-1]
@@ -355,7 +390,7 @@ def slice_stl(bottom_curve,stl_pc,direction,slice_height,closed=False):
             curve_next=slice_next_layer(slice_all[-1][x],stl_pc,curve_normal,slice_height)
 
             if x==0 or x==len(slice_all[-1])-1: ###only extend or shrink if first or last section for now
-                curve_next=fit_to_length(curve_next,stl_pc,closed)
+                curve_next=fit_to_length(curve_next,stl_pc,closed=closed)
 
             if len(curve_next)==0:   
                 if len(slice_all[-1])<=1:   ###end condition
@@ -363,10 +398,12 @@ def slice_stl(bottom_curve,stl_pc,direction,slice_height,closed=False):
                 continue
 
             ###split the curve based on projection error
-            sub_curves_next=split_slices(curve_next,stl_pc)
+            sub_curves_next,closed=split_slices(curve_next,stl_pc,closed)
+            if len(sub_curves_next)==0:
+                return slice_all
 
             for j in range(len(sub_curves_next)):
-                sub_curves_next[j]=smooth_curve(sub_curves_next[j])
+                sub_curves_next[j]=smooth_curve(sub_curves_next[j],point_distance)
             
             slice_ith_layer.extend(sub_curves_next)
 
@@ -471,6 +508,7 @@ def main_tube():
     stl_pc = np.array(mesh.sample_points_uniformly(number_of_points=10000).points)  ###uniform sampling of mesh
 
     slice_height=1
+    point_distance=1
 
     # fig = plt.figure()
     # ax = fig.add_subplot(111, projection='3d')
@@ -492,8 +530,8 @@ def main_tube():
     # plt.title('STL %fmm Slicing'%slice_height)
     # plt.show()
 
-    slice_all=slice_stl(bottom_edge,stl_pc,np.array([0,0,1]),slice_height=slice_height,closed=True)
-    slice_all,curve_normal_all=post_process(slice_all,point_distance=1)
+    slice_all=slice_stl(bottom_edge,stl_pc,np.array([0,0,1]),slice_height=slice_height,point_distance=point_distance,closed=True)
+    slice_all,curve_normal_all=post_process(slice_all,point_distance=point_distance)
    
 
     # Plot the original points and the fitted curved plane
