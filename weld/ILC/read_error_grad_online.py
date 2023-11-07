@@ -45,7 +45,7 @@ positioner=positioner_obj('D500B',def_path=config_dir+'D500B_robot_default_confi
     base_transformation_file=config_dir+'D500B_pose.csv',pulse2deg_file_path=config_dir+'D500B_pulse2deg_real.csv',\
     base_marker_config_file=S1_marker_dir+'D500B_'+S1_ph_dataset_date+'_marker_config.yaml',tool_marker_config_file=S1_tcp_marker_dir+'positioner_tcp_marker_config.yaml')
 
-data_dir='data/weld_scan_2023_11_07_16_48_39/'
+data_dir='data/weld_scan_error_smooth_2023_11_07_16_48_39/'
 seg_dist=1.6
 dh=2.5
 yk_d=[dh]
@@ -88,6 +88,7 @@ if show_yk:
     for iter_read in range(total_iteration):
 
         yk=np.loadtxt(data_dir+'iteration_'+str(iter_read)+'/yk.csv',delimiter=',')
+        # yk=yk[7:-7]
         # try:
         #     yk_prime=np.loadtxt(data_dir+'iteration_'+str(iter_read)+'/yk_prime.csv',delimiter=',')
         # except:
@@ -155,6 +156,7 @@ if show_norm:
     norm_iter=[]
     for iter_read in range(total_iteration):
         yk=np.loadtxt(data_dir+'iteration_'+str(iter_read)+'/yk.csv',delimiter=',')
+        # yk=yk[7:-7]
         norm_iter.append(np.linalg.norm(yk-dh))
     plt.plot(norm_iter,'-o',markersize=6,linewidth=2)
     plt.xlabel("Iteration",fontsize=14)
