@@ -133,7 +133,7 @@ np.save(base_path + 'audio_clipped.npy', audio_clipped)
 np.save(base_path + 'height_interpolated.npy', height_interpolated)
 
 # Start and end times
-t_start = 4.3
+t_start = 5
 t_end = t_start + 0.3
 
 # Clip from the audio signal
