@@ -9,6 +9,7 @@ sys.path.append('../../scan/scan_plan/')
 sys.path.append('../../scan/scan_process/')
 from robot_def import *
 from utils import *
+from lambda_calc import *
 from scan_utils import *
 from scan_continuous import *
 from scanPathGen import *
@@ -22,19 +23,46 @@ import datetime
 import numpy as np
 import open3d as o3d
 
-data_dir='data/weld_scan_2023_11_01_17_44_58/'
+R1_ph_dataset_date='0926'
+R2_ph_dataset_date='0926'
+S1_ph_dataset_date='0926'
+# 0. robots"
+config_dir='../../config/'
+R1_marker_dir=config_dir+'MA2010_marker_config/'
+weldgun_marker_dir=config_dir+'weldgun_marker_config/'
+R2_marker_dir=config_dir+'MA1440_marker_config/'
+mti_marker_dir=config_dir+'mti_marker_config/'
+S1_marker_dir=config_dir+'D500B_marker_config/'
+S1_tcp_marker_dir=config_dir+'positioner_tcp_marker_config/'
+robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',d=15,tool_file_path=config_dir+'torch.csv',\
+	pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',\
+    base_marker_config_file=R1_marker_dir+'MA2010_'+R1_ph_dataset_date+'_marker_config.yaml',tool_marker_config_file=weldgun_marker_dir+'weldgun_'+R1_ph_dataset_date+'_marker_config.yaml')
+robot_scan=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.yml',tool_file_path=config_dir+'mti.csv',\
+	base_transformation_file=config_dir+'MA1440_pose.csv',pulse2deg_file_path=config_dir+'MA1440_A0_pulse2deg_real.csv',\
+    base_marker_config_file=R2_marker_dir+'MA1440_'+R2_ph_dataset_date+'_marker_config.yaml',tool_marker_config_file=mti_marker_dir+'mti_'+R2_ph_dataset_date+'_marker_config.yaml')
+
+positioner=positioner_obj('D500B',def_path=config_dir+'D500B_robot_default_config.yml',tool_file_path=config_dir+'positioner_tcp.csv',\
+    base_transformation_file=config_dir+'D500B_pose.csv',pulse2deg_file_path=config_dir+'D500B_pulse2deg_real.csv',\
+    base_marker_config_file=S1_marker_dir+'D500B_'+S1_ph_dataset_date+'_marker_config.yaml',tool_marker_config_file=S1_tcp_marker_dir+'positioner_tcp_marker_config.yaml')
+
+data_dir='data/weld_scan_2023_11_07_16_48_39/'
 seg_dist=1.6
 dh=2.5
 yk_d=[dh]
+smooth=False
+if 'smooth' in data_dir or smooth:
+    yk0=np.loadtxt(data_dir+'iteration_0/yk.csv',delimiter=',')
+    yk_d=[np.mean(yk0)]
 ipm_weld=250
 ipm_for_calculation=210
 uk_nom=dh2v_loglog(dh,mode=ipm_for_calculation)
 
-total_iteration=9
+total_iteration=6
 
 show_pcd=False
 show_yk=True
-show_uk=False
+show_uk=True
+show_actual_uk=False
 show_grad=False
 show_norm=True
 show_norm_parts=False
@@ -71,6 +99,22 @@ if show_yk:
     plt.legend()
     plt.title("Output height of iterations",fontsize=14)
     plt.show()
+
+if show_actual_uk:
+    for iter_read in range(total_iteration):
+        uk=np.loadtxt(data_dir+'iteration_'+str(iter_read)+'/input_uk.csv',delimiter=',')
+        uk=np.append(uk[0],uk)
+        profile_dh=np.load(data_dir+'iteration_'+str(iter_read)+'/layer_1/height_profile.npy')
+        weld_js_exe=np.loadtxt(data_dir + 'iteration_'+str(iter_read)+'/layer_1/weld_js_exe.csv',delimiter=',')
+        weld_stamps=np.loadtxt(data_dir + 'iteration_'+str(iter_read)+'/layer_1/weld_robot_stamps.csv',delimiter=',')
+        lam_exe = calc_lam_js(weld_js_exe[:,:6],robot_weld)
+        ldot=np.diff(lam_exe)/np.diff(weld_stamps)
+        ldot=np.append(ldot[0],ldot)
+        ldot=moving_average(ldot,padding=True)
+        plt.plot(profile_dh[:,0],uk,marker='o')
+        plt.plot(lam_exe,ldot,marker='o')
+        plt.title("Iteration "+str(iter_read))
+        plt.show()
 
 ## show input of iterations (uk)
 if show_uk:

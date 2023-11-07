@@ -54,7 +54,7 @@ class WeldScan(object):
     def robot_weld_scan(self,curve,curve_scan,rob_v,ipm_mode,T_R1Base_S1TCP,\
                         robot_weld_mid,robot_weld_home,positioner_weld_q,\
                         robot_scan_mid,robot_scan_home,positioner_scan_q,\
-                        arc_on=False,Transz0_H=None,draw_dh=False,skip_weld=False):
+                        arc_on=False,Transz0_H=None,draw_dh=False,skip_weld=False,wait_signal=True):
         
         assert len(curve)-1==len(rob_v), "rob_v must have length equals len(curve)-1"
         rob_v=np.append(rob_v[0],rob_v)
@@ -92,7 +92,8 @@ class WeldScan(object):
         
         # start welding and logging sensor information
         if not skip_weld:
-            input("start weld")
+            if wait_signal:
+                input("start weld")
             self.wrr.start_all_sensors()
             weld_stamps,weld_js_exe,_,_=self.ws.weld_segment_single(primitives,self.robot_weld,path_q[1:-1],rob_v,cond_all=[ipm_job_num],arc=arc_on)
             self.wrr.stop_all_sensors()
@@ -101,7 +102,8 @@ class WeldScan(object):
             weld_js_exe=np.zeros((10,14))
         
         # robot to home
-        input("weld home")
+        if wait_signal:
+            input("weld home")
         r1_home_path=[path_q[-1],robot_weld_home] if robot_weld_mid is None else [path_q[-1],robot_weld_mid,robot_weld_home]
         self.ws.jog_single(self.robot_weld,r1_home_path,self.to_home_s)
         #######################################################
@@ -119,7 +121,8 @@ class WeldScan(object):
             r2_start_path=[q_bp1[0][0]] if robot_scan_mid is None else [robot_scan_mid,q_bp1[0][0]]
             self.ws.jog_dual(self.robot_scan,self.positioner,r2_start_path,q_bp2[0][0],self.to_start_s)
 
-            input("start scan")
+            if wait_signal:
+                input("start scan")
             ## motion start
             mp = MotionProgram(ROBOT_CHOICE='RB2',ROBOT_CHOICE2='ST1',pulse2deg=self.robot_scan.pulse2deg,pulse2deg_2=self.positioner.pulse2deg)
             # routine motion
@@ -162,7 +165,8 @@ class WeldScan(object):
             print("MTI broke during robot move")
             while True:
                 try:
-                    input("MTI reconnect ready?")
+                    if wait_signal:
+                        input("MTI reconnect ready?")
                     self.regenerate_mti_rr()
                     break
                 except:
@@ -196,7 +200,8 @@ class WeldScan(object):
         #     plt.show()
         
         # robot to home
-        input("scan home")
+        if wait_signal:
+            input("scan home")
         r2_home_path=[robot_scan_home] if robot_scan_mid is None else [robot_scan_mid,robot_scan_home]
         self.ws.jog_single(self.robot_scan,r2_home_path,self.to_home_s)
         ########################################

@@ -146,7 +146,7 @@ Transz0_H=None
 #  [ 2.21825071e-03, -1.86365986e-03,  9.99995803e-01,  1.56294293e+00],
 #  [ 0.00000000e+00,  0.00000000e+00,  0.00000000e+00,  1.00000000e+00]])
 
-weld_arcon=False
+weld_arcon=True
 wait_signal=False
 draw_dh = False
 
@@ -154,13 +154,15 @@ uk = np.ones(seg_N)*dh2v_loglog(dh,ipm_for_calculation) ## inputs
 uk_init = deepcopy(uk)
 yk_d = np.ones(seg_N)*dh
 baselayer_u = deepcopy(uk)
-iter_start=5
+iter_start=0
 
 use_previous=False
 if use_previous:
     iter_start=3
     uk=np.loadtxt(data_dir+'iteration_'+str(iter_start-1)+'/input_uk.csv',delimiter=',')
     yk=np.loadtxt(data_dir+'iteration_'+str(iter_start-1)+'/yk.csv',delimiter=',')
+    yk0=np.loadtxt(data_dir+'iteration_0/yk.csv',delimiter=',')
+    yk_d=np.ones(seg_N)*np.mean(yk0)
     ek = yk-yk_d
     gradient_direction=deepcopy(ek)*-1 # negative direction
     print("gradient:",np.round(gradient_direction,decimals=2))
@@ -233,6 +235,10 @@ for iter_i in range(iter_start,total_iteration):
     ### output and error calculation
     yk = deepcopy(profile_dh[:,1])
     yk = moving_average(yk,n=2)
+    # set the desired output to the average height at iteration 0
+    if iter_i==0:
+        yk_d = np.ones(seg_N)*np.mean(yk)
+        print("Set yk_d to",np.mean(yk))
     ek = yk-yk_d
     
     # save data
