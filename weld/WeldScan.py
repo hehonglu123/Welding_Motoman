@@ -56,7 +56,8 @@ class WeldScan(object):
                         robot_scan_mid,robot_scan_home,positioner_scan_q,\
                         arc_on=False,Transz0_H=None,draw_dh=False,skip_weld=False):
         
-        assert len(curve)==len(rob_v), "rob_v must have length equals len(curve)"
+        assert len(curve)-1==len(rob_v), "rob_v must have length equals len(curve)-1"
+        rob_v=np.append(rob_v[0],rob_v)
         
         ###################### welding ###########################
         ipm_job_num = int(ipm_mode/10+200)

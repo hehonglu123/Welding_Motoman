@@ -163,9 +163,9 @@ if use_previous:
     yk=np.loadtxt(data_dir+'iteration_'+str(iter_start-1)+'/yk.csv',delimiter=',')
     ek = yk-yk_d
     gradient_direction=deepcopy(ek)*-1 # negative direction
-    print("gradient:",gradient_direction)
+    print("gradient:",np.round(gradient_direction,decimals=2))
     uk = uk-alpha*gradient_direction
-    print(uk)
+    print(np.round(uk,decimals=2))
     
 
 input("Start?")
@@ -174,7 +174,7 @@ ws.jog_dual(robot_scan,positioner,[r2_mid,r2_home],s1_weld,to_start_speed)
 for iter_i in range(iter_start,total_iteration):
     
     ### first and second half in same loop
-    print("Iteration",iter_i,"input u:",uk)
+    print("Iteration",iter_i,"input u:",np.round(uk,decimals=2))
     input("Start?")
     
     Transz0_H=None
@@ -186,7 +186,7 @@ for iter_i in range(iter_start,total_iteration):
     profile_dh,weld_js_exe,weld_stamps,scan_js_exe,scan_stamps,mti_recording,pcd,Transz0_H\
         =weldscan.robot_weld_scan(curve_sliced_relative,curve_sliced_relative,baselayer_u,ipm_weld,T_R1Base_S1TCP,\
                             r1_mid,r1_home,s1_weld,r2_mid,r2_home,s1_scan,\
-                            arc_on=weld_arcon,ipm_calculation=ipm_for_calculation,Transz0_H=Transz0_H,draw_dh=draw_dh,skip_weld=skip_1) # weld and scan
+                            arc_on=weld_arcon,Transz0_H=Transz0_H,draw_dh=draw_dh) # weld and scan
     # save data
     Path(data_dir).mkdir(exist_ok=True)
     iter_data_dir=data_dir+'iteration_'+str(iter_i)+'/'
@@ -209,13 +209,13 @@ for iter_i in range(iter_start,total_iteration):
     this_curve_end=[30*iter_i-75,curve_end[1],dh,0,0,-1]
     curve_sliced_relative=np.linspace(this_curve_start,this_curve_end,seg_N+1)
     uk_input = deepcopy(uk)
-    print("Input u:",np.round(uk_input,decimals=1))
+    print("Input u:",np.round(uk_input,decimals=2))
     # uk_input = deepcopy(uk_init) # for testing
         
     profile_dh,weld_js_exe,weld_stamps,scan_js_exe,scan_stamps,mti_recording,pcd,Transz0_H\
         =weldscan.robot_weld_scan(curve_sliced_relative,curve_sliced_relative[::-1],uk_input,ipm_weld,T_R1Base_S1TCP,\
                             r1_mid,r1_home,s1_weld,r2_mid,r2_home,s1_scan,\
-                            arc_on=weld_arcon,ipm_calculation=ipm_for_calculation,Transz0_H=Transz0_H,draw_dh=draw_dh,skip_weld=skip_2) # weld and scan
+                            arc_on=weld_arcon,Transz0_H=Transz0_H,draw_dh=draw_dh) # weld and scan
     # save data
     layer_data_dir=iter_data_dir+'layer_1/'
     Path(layer_data_dir).mkdir(exist_ok=True)
@@ -241,7 +241,7 @@ for iter_i in range(iter_start,total_iteration):
 
     ### find gradient and update
     gradient_direction=deepcopy(ek)*-1 # negative direction
-    print("gradient:",gradient_direction)
+    print("gradient:",np.round(gradient_direction,decimals=2))
     uk = uk-alpha*gradient_direction
     uk=np.clip(uk,min_v,max_v)
     
