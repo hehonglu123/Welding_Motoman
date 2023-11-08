@@ -45,7 +45,8 @@ positioner=positioner_obj('D500B',def_path=config_dir+'D500B_robot_default_confi
     base_transformation_file=config_dir+'D500B_pose.csv',pulse2deg_file_path=config_dir+'D500B_pulse2deg_real.csv',\
     base_marker_config_file=S1_marker_dir+'D500B_'+S1_ph_dataset_date+'_marker_config.yaml',tool_marker_config_file=S1_tcp_marker_dir+'positioner_tcp_marker_config.yaml')
 
-data_dir='data/weld_scan_error_smooth_2023_11_07_16_48_39/'
+data_dir='data/weld_scan_error_grad_2023_11_07_15_39_30/'
+# data_dir='data/weld_scan_error_smooth_2023_11_07_16_48_39/'
 seg_dist=1.6
 dh=2.5
 yk_d=[dh]
@@ -53,6 +54,7 @@ smooth=False
 if 'smooth' in data_dir or smooth:
     yk0=np.loadtxt(data_dir+'iteration_0/yk.csv',delimiter=',')
     yk_d=[np.mean(yk0)]
+    print(np.mean(yk0))
 ipm_weld=250
 ipm_for_calculation=210
 uk_nom=dh2v_loglog(dh,mode=ipm_for_calculation)
@@ -88,7 +90,7 @@ if show_yk:
     for iter_read in range(total_iteration):
 
         yk=np.loadtxt(data_dir+'iteration_'+str(iter_read)+'/yk.csv',delimiter=',')
-        # yk=yk[7:-7]
+        # yk=yk[4:-9]
         # try:
         #     yk_prime=np.loadtxt(data_dir+'iteration_'+str(iter_read)+'/yk_prime.csv',delimiter=',')
         # except:
@@ -156,8 +158,8 @@ if show_norm:
     norm_iter=[]
     for iter_read in range(total_iteration):
         yk=np.loadtxt(data_dir+'iteration_'+str(iter_read)+'/yk.csv',delimiter=',')
-        # yk=yk[7:-7]
-        norm_iter.append(np.linalg.norm(yk-dh))
+        # yk=yk[4:-9]
+        norm_iter.append(np.linalg.norm(yk-yk_d[0]))
     plt.plot(norm_iter,'-o',markersize=6,linewidth=2)
     plt.xlabel("Iteration",fontsize=14)
     plt.ylabel("Error Norm (mm)",fontsize=14)
@@ -171,7 +173,7 @@ if show_norm_parts:
     for iter_read in range(total_iteration):
         yk=np.loadtxt(data_dir+'iteration_'+str(iter_read)+'/yk.csv',delimiter=',')
         yk=np.reshape(yk,(9,5))
-        norm_iter.append(np.squeeze(np.linalg.norm(yk-dh,axis=1)))
+        norm_iter.append(np.squeeze(np.linalg.norm(yk-yk_d[0],axis=1)))
     norm_iter=np.array(norm_iter)
     draw_part=[0,1,4,7,8]
     for part_n in range(9):

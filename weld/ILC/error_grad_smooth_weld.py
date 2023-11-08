@@ -182,8 +182,8 @@ for iter_i in range(iter_start,total_iteration):
     Transz0_H=None
     ### first/second half
     # very first layer (always have one base layer for aluminum, learning second layer here)
-    this_curve_start=[30*iter_i-75,curve_end[1],0,0,0,-1] # curve start
-    this_curve_end=[30*iter_i-75,curve_start[1],0,0,0,-1] # curve end
+    this_curve_start=[30*(iter_i%6)-75,curve_end[1],0,0,0,-1] # curve start
+    this_curve_end=[30*(iter_i%6)-75,curve_start[1],0,0,0,-1] # curve end
     curve_sliced_relative=np.linspace(this_curve_start,this_curve_end,seg_N+1) # split curve to seg_N segments
     profile_dh,weld_js_exe,weld_stamps,scan_js_exe,scan_stamps,mti_recording,pcd,Transz0_H\
         =weldscan.robot_weld_scan(curve_sliced_relative,curve_sliced_relative,baselayer_u,ipm_weld,T_R1Base_S1TCP,\
@@ -207,8 +207,8 @@ for iter_i in range(iter_start,total_iteration):
     np.save(layer_data_dir+'height_profile.npy',profile_dh)
     
     # weld first/second half
-    this_curve_start=[30*iter_i-75,curve_start[1],dh,0,0,-1]
-    this_curve_end=[30*iter_i-75,curve_end[1],dh,0,0,-1]
+    this_curve_start=[30*(iter_i%6)-75,curve_start[1],dh,0,0,-1]
+    this_curve_end=[30*(iter_i%6)-75,curve_end[1],dh,0,0,-1]
     curve_sliced_relative=np.linspace(this_curve_start,this_curve_end,seg_N+1)
     uk_input = deepcopy(uk)
     print("Input u:",np.round(uk_input,decimals=2))

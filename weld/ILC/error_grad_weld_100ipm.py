@@ -96,13 +96,20 @@ s1_weld = np.radians([-15,0])
 s1_scan = np.radians([-15,-20])
 
 #### weld and curve parameters
+ipm_base=250
+ipm_base_calculation=210
 ipm_weld=100
 ipm_for_calculation=100
-dh=2.5
+base_dh=2.5
+base_ave_h=base_dh+3.257039925871609
+dh=2.2
 weld_z_height=[0,dh] # two base layer height to first top layer
-curve_start=np.array([0,-32,0])
-curve_end=np.array([0,40,0])
+base_curve_start=np.array([0,-32,0])
+base_curve_end=np.array([0,40,0])
+curve_start=np.array([0,-25,0])
+curve_end=np.array([0,25,0])
 seg_dist=1.6
+seg_base_N=int(np.linalg.norm(base_curve_end-base_curve_start)/seg_dist)
 seg_N=int(np.linalg.norm(curve_end-curve_start)/seg_dist)
 print("Total seg:",seg_N)
 
@@ -155,7 +162,7 @@ draw_dh = False
 uk = np.ones(seg_N)*dh2v_loglog(dh,ipm_for_calculation) ## inputs
 uk_init = deepcopy(uk)
 yk_d = np.ones(seg_N)*dh
-baselayer_u = deepcopy(uk)
+baselayer_u = np.ones(seg_N)*dh2v_loglog(base_dh,ipm_base_calculation)
 iter_start=5
 
 use_previous=False
@@ -180,11 +187,11 @@ for iter_i in range(iter_start,total_iteration):
     input("Start?")
     
     Transz0_H=None
+    # very first/second layer (always have one base layer for aluminum, learning second layer here)
     for layer in range(2):
-        # very first/second layer (always have one base layer for aluminum, learning second layer here)
-        this_curve_start=[30*iter_i-75,curve_end[1],dh*layer,0,0,-1] # curve start
-        this_curve_end=[30*iter_i-75,curve_start[1],dh*layer,0,0,-1] # curve end
-        curve_sliced_relative=np.linspace(this_curve_start,this_curve_end,seg_N+1) # split curve to seg_N segments
+        this_curve_start=[30*(iter_i%6)-75,base_curve_end[1],base_dh*layer,0,0,-1] # curve start
+        this_curve_end=[30*(iter_i%6)-75,base_curve_start[1],base_dh*layer,0,0,-1] # curve end
+        curve_sliced_relative=np.linspace(this_curve_start,this_curve_end,seg_base_N+1) # split curve to seg_base_N segments
         curve_scan_relative=deepcopy(curve_sliced_relative)
         if layer%2==0:
             curve_sliced_relative=curve_sliced_relative[::-1]
@@ -194,7 +201,7 @@ for iter_i in range(iter_start,total_iteration):
             uk_input = np.loadtxt(opt_baseu_datadir+'opt_baseu.csv',delimiter=',')
             print("Base u:",np.round(uk_input,decimals=2))
         profile_dh,weld_js_exe,weld_stamps,scan_js_exe,scan_stamps,mti_recording,pcd,Transz0_H\
-            =weldscan.robot_weld_scan(curve_sliced_relative,curve_scan_relative,baselayer_u,ipm_weld,T_R1Base_S1TCP,\
+            =weldscan.robot_weld_scan(curve_sliced_relative,curve_scan_relative,baselayer_u,ipm_base,T_R1Base_S1TCP,\
                                 r1_mid,r1_home,s1_weld,r2_mid,r2_home,s1_scan,\
                                 arc_on=weld_arcon,Transz0_H=Transz0_H,draw_dh=draw_dh,wait_signal=wait_signal) # weld and scan
         # save data
@@ -214,6 +221,29 @@ for iter_i in range(iter_start,total_iteration):
         o3d.io.write_point_cloud(layer_data_dir+'processed_pcd.pcd',pcd)
         np.save(layer_data_dir+'height_profile.npy',profile_dh)
     
+    ## learn 100 ipm
+    this_curve_start=[30*(iter_i%6)-75,curve_end[1],base_ave_h,0,0,-1] # curve start
+    this_curve_end=[30*(iter_i%6)-75,curve_start[1],base_ave_h,0,0,-1] # curve end
+    curve_sliced_relative=np.linspace(this_curve_start,this_curve_end,seg_N+1) # split curve to seg_N segments
+    curve_scan_relative=deepcopy(curve_sliced_relative)
+    uk_input = deepcopy(uk)
+    profile_dh,weld_js_exe,weld_stamps,scan_js_exe,scan_stamps,mti_recording,pcd,Transz0_H\
+        =weldscan.robot_weld_scan(curve_sliced_relative,curve_scan_relative,uk_input,ipm_weld,T_R1Base_S1TCP,\
+                            r1_mid,r1_home,s1_weld,r2_mid,r2_home,s1_scan,\
+                            arc_on=weld_arcon,Transz0_H=Transz0_H,draw_dh=draw_dh,wait_signal=wait_signal) # weld and scan
+    # save data
+    layer_data_dir=iter_data_dir+'layer_2/'
+    Path(layer_data_dir).mkdir(exist_ok=True)
+    # save weld record
+    np.savetxt(layer_data_dir + 'curve.csv',curve_sliced_relative,delimiter=',')
+    np.savetxt(layer_data_dir + 'weld_js_exe.csv',weld_js_exe,delimiter=',')
+    np.savetxt(layer_data_dir + 'weld_robot_stamps.csv',weld_stamps,delimiter=',')
+    np.savetxt(layer_data_dir + 'scan_js_exe.csv',scan_js_exe,delimiter=',')
+    np.savetxt(layer_data_dir + 'scan_robot_stamps.csv',scan_stamps,delimiter=',')
+    with open(layer_data_dir + 'mti_scans.pickle', 'wb') as file:
+        pickle.dump(mti_recording, file)
+    o3d.io.write_point_cloud(layer_data_dir+'processed_pcd.pcd',pcd)
+    np.save(layer_data_dir+'height_profile.npy',profile_dh)
     
     ### output and error calculation
     yk = deepcopy(profile_dh[:,1])

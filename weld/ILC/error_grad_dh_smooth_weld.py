@@ -154,7 +154,7 @@ uk = np.ones(seg_N)*dh ## inputs
 uk_init = deepcopy(uk)
 yk_d = np.ones(seg_N)*dh
 baselayer_u = deepcopy(uk)
-iter_start=5
+iter_start=0
 
 use_previous=False
 if use_previous:
@@ -181,8 +181,8 @@ for iter_i in range(iter_start,total_iteration):
     ### first/second half
     robv=dh2v_loglog(baselayer_u,mode=ipm_for_calculation)
     # very first layer (always have one base layer for aluminum, learning second layer here)
-    this_curve_start=[30*iter_i-75,curve_end[1],0,0,0,-1] # curve start
-    this_curve_end=[30*iter_i-75,curve_start[1],0,0,0,-1] # curve end
+    this_curve_start=[30*(iter_i%6)-75,curve_end[1],0,0,0,-1] # curve start
+    this_curve_end=[30*(iter_i%6)-75,curve_start[1],0,0,0,-1] # curve end
     curve_sliced_relative=np.linspace(this_curve_start,this_curve_end,seg_N+1) # split curve to seg_N segments
     profile_dh,weld_js_exe,weld_stamps,scan_js_exe,scan_stamps,mti_recording,pcd,Transz0_H\
         =weldscan.robot_weld_scan(curve_sliced_relative,curve_sliced_relative,robv,ipm_weld,T_R1Base_S1TCP,\
@@ -206,8 +206,8 @@ for iter_i in range(iter_start,total_iteration):
     np.save(layer_data_dir+'height_profile.npy',profile_dh)
     
     # weld first/second half
-    this_curve_start=[30*iter_i-75,curve_start[1],dh,0,0,-1]
-    this_curve_end=[30*iter_i-75,curve_end[1],dh,0,0,-1]
+    this_curve_start=[30*(iter_i%6)-75,curve_start[1],dh,0,0,-1]
+    this_curve_end=[30*(iter_i%6)-75,curve_end[1],dh,0,0,-1]
     curve_sliced_relative=np.linspace(this_curve_start,this_curve_end,seg_N+1)
     uk_input = deepcopy(uk)
     print("Input u:",np.round(uk_input,decimals=2))
@@ -235,6 +235,10 @@ for iter_i in range(iter_start,total_iteration):
     ### output and error calculation
     yk = deepcopy(profile_dh[:,1])
     yk = moving_average(yk,n=2)
+    # set the desired output to the average height at iteration 0
+    if iter_i==0:
+        yk_d = np.ones(seg_N)*np.mean(yk)
+        print("Set yk_d to",np.mean(yk))
     ek = yk-yk_d
     
     # save data
