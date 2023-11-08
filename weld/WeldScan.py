@@ -165,8 +165,7 @@ class WeldScan(object):
             print("MTI broke during robot move")
             while True:
                 try:
-                    if wait_signal:
-                        input("MTI reconnect ready?")
+                    input("MTI reconnect ready?")
                     self.regenerate_mti_rr()
                     break
                 except:

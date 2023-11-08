@@ -45,12 +45,15 @@ positioner=positioner_obj('D500B',def_path=config_dir+'D500B_robot_default_confi
     base_transformation_file=config_dir+'D500B_pose.csv',pulse2deg_file_path=config_dir+'D500B_pulse2deg_real.csv',\
     base_marker_config_file=S1_marker_dir+'D500B_'+S1_ph_dataset_date+'_marker_config.yaml',tool_marker_config_file=S1_tcp_marker_dir+'positioner_tcp_marker_config.yaml')
 
-data_dir='data/weld_scan_error_grad_2023_11_07_15_39_30/'
+# data_dir='data/weld_scan_error_grad_2023_11_07_15_39_30/'
 # data_dir='data/weld_scan_error_smooth_2023_11_07_16_48_39/'
+# data_dir='data/weld_scan_error_smooth_dh_2023_11_08_13_25_03/'
+data_dir='data/weld_scan_2023_11_08_14_34_15/'
+learn_layer=0
 seg_dist=1.6
 dh=2.5
 yk_d=[dh]
-smooth=False
+smooth=True
 if 'smooth' in data_dir or smooth:
     yk0=np.loadtxt(data_dir+'iteration_0/yk.csv',delimiter=',')
     yk_d=[np.mean(yk0)]
@@ -59,7 +62,7 @@ ipm_weld=250
 ipm_for_calculation=210
 uk_nom=dh2v_loglog(dh,mode=ipm_for_calculation)
 
-total_iteration=6
+total_iteration=12
 
 show_pcd=False
 show_yk=True
@@ -75,7 +78,7 @@ if show_pcd:
     for iter_read in range(total_iteration):
         if iter_read in show_pcd:
             pcd_all=o3d.geometry.PointCloud()
-            for layer in range(2):
+            for layer in range(learn_layer+1):
                 pcd=o3d.io.read_point_cloud(data_dir+'iteration_'+str(iter_read)+'/layer_'+str(layer)+'/processed_pcd.pcd')
                 if layer==0:
                     pcd=pcd.paint_uniform_color([0.1,0.1,0.1])
@@ -107,9 +110,9 @@ if show_actual_uk:
     for iter_read in range(total_iteration):
         uk=np.loadtxt(data_dir+'iteration_'+str(iter_read)+'/input_uk.csv',delimiter=',')
         uk=np.append(uk[0],uk)
-        profile_dh=np.load(data_dir+'iteration_'+str(iter_read)+'/layer_1/height_profile.npy')
-        weld_js_exe=np.loadtxt(data_dir + 'iteration_'+str(iter_read)+'/layer_1/weld_js_exe.csv',delimiter=',')
-        weld_stamps=np.loadtxt(data_dir + 'iteration_'+str(iter_read)+'/layer_1/weld_robot_stamps.csv',delimiter=',')
+        profile_dh=np.load(data_dir+'iteration_'+str(iter_read)+'/layer_'+str(learn_layer)+'/height_profile.npy')
+        weld_js_exe=np.loadtxt(data_dir + 'iteration_'+str(iter_read)+'/layer_'+str(learn_layer)+'/weld_js_exe.csv',delimiter=',')
+        weld_stamps=np.loadtxt(data_dir + 'iteration_'+str(iter_read)+'/layer_'+str(learn_layer)+'/weld_robot_stamps.csv',delimiter=',')
         lam_exe = calc_lam_js(weld_js_exe[:,:6],robot_weld)
         ldot=np.diff(lam_exe)/np.diff(weld_stamps)
         ldot=np.append(ldot[0],ldot)

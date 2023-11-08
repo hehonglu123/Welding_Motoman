@@ -96,30 +96,37 @@ s1_weld = np.radians([-15,0])
 s1_scan = np.radians([-15,-20])
 
 #### weld and curve parameters
-ipm_weld=250
-ipm_for_calculation=210
-dh=2.5
+ipm_base=250
+ipm_base_calculation=210
+ipm_weld=100
+ipm_for_calculation=100
+base_dh=2.5
+base_ave_h=base_dh+3.257039925871609
+dh=2.2
 weld_z_height=[0,dh] # two base layer height to first top layer
-curve_start=np.array([0,-32,0])
-curve_end=np.array([0,40,0])
+base_curve_start=np.array([0,-32,0])
+base_curve_end=np.array([0,40,0])
+curve_start=np.array([0,-25,0])
+curve_end=np.array([0,25,0])
 seg_dist=1.6
+seg_base_N=int(np.linalg.norm(base_curve_end-base_curve_start)/seg_dist)
 seg_N=int(np.linalg.norm(curve_end-curve_start)/seg_dist)
 print("Total seg:",seg_N)
 
 #### gradient descent parameters
-alpha=0.25
-max_v=40
+alpha=1
+max_v=20
 min_v=0.1
-max_h=20
-min_h=0.001
-total_iteration=11
+total_iteration=9
 ##################
 
 #### data dir
 current_time = datetime.datetime.now()
 formatted_time = current_time.strftime('%Y_%m_%d_%H_%M_%S.%f')[:-7]
 data_dir='data/weld_scan_'+formatted_time+'/'
+# data_dir='data/weld_scan_2023_11_01_17_44_58/'
 
+opt_baseu_datadir=''
 
 #### RR drivers and all other drivers
 robot_client=MotionProgramExecClient()
@@ -148,34 +155,29 @@ Transz0_H=None
 #  [ 2.21825071e-03, -1.86365986e-03,  9.99995803e-01,  1.56294293e+00],
 #  [ 0.00000000e+00,  0.00000000e+00,  0.00000000e+00,  1.00000000e+00]])
 
-weld_arcon=True
+weld_arcon=False
 wait_signal=False
 draw_dh = False
 
 uk = np.ones(seg_N)*dh ## inputs
 uk_init = deepcopy(uk)
 yk_d = np.ones(seg_N)*dh
-baselayer_u = deepcopy(uk)
+baselayer_u = np.ones(seg_N)*base_dh
 iter_start=0
 
 use_previous=False
 if use_previous:
-    data_dir='data/weld_scan_2023_11_08_13_25_03/'
-    iter_start=9
-    skip_1=False
-    skip_2_weld=False
-
+    iter_start=3
     uk=np.loadtxt(data_dir+'iteration_'+str(iter_start-1)+'/input_uk.csv',delimiter=',')
     yk=np.loadtxt(data_dir+'iteration_'+str(iter_start-1)+'/yk.csv',delimiter=',')
     yk0=np.loadtxt(data_dir+'iteration_0/yk.csv',delimiter=',')
     yk_d=np.ones(seg_N)*np.mean(yk0)
     ek = yk-yk_d
-    ### find gradient and update
-    gradient_direction=deepcopy(ek) # negative direction
+    gradient_direction=deepcopy(ek)*-1 # negative direction
     print("gradient:",np.round(gradient_direction,decimals=2))
     uk = uk-alpha*gradient_direction
-    uk=np.clip(uk,min_h,max_h)
-    print('uk:',np.round(uk,decimals=2))
+    print(np.round(uk,decimals=2))
+    
 
 input("Start?")
 # move robot to ready position
@@ -187,23 +189,28 @@ for iter_i in range(iter_start,total_iteration):
     input("Start?")
     
     Transz0_H=None
-
-    ### first/second half
-    if not skip_1:
-        robv=dh2v_loglog(baselayer_u,mode=ipm_for_calculation)
-        # very first layer (always have one base layer for aluminum, learning second layer here)
-        this_curve_start=[30*(iter_i%6)-75,curve_end[1],0,0,0,-1] # curve start
-        this_curve_end=[30*(iter_i%6)-75,curve_start[1],0,0,0,-1] # curve end
-        curve_sliced_relative=np.linspace(this_curve_start,this_curve_end,seg_N+1) # split curve to seg_N segments
+    # very first/second layer (always have one base layer for aluminum, learning second layer here)
+    for layer in range(2):
+        this_curve_start=[30*(iter_i%6)-75,base_curve_end[1],base_dh*layer,0,0,-1] # curve start
+        this_curve_end=[30*(iter_i%6)-75,base_curve_start[1],base_dh*layer,0,0,-1] # curve end
+        curve_sliced_relative=np.linspace(this_curve_start,this_curve_end,seg_base_N+1) # split curve to seg_base_N segments
+        curve_scan_relative=deepcopy(curve_sliced_relative)
+        if layer%2==0:
+            curve_sliced_relative=curve_sliced_relative[::-1]
+        if layer==0:
+            uk_input=deepcopy(baselayer_u)
+        elif layer==1:
+            uk_input = np.loadtxt(opt_baseu_datadir+'opt_baseu.csv',delimiter=',')
+            print("Base u:",np.round(uk_input,decimals=2))
         profile_dh,weld_js_exe,weld_stamps,scan_js_exe,scan_stamps,mti_recording,pcd,Transz0_H\
-            =weldscan.robot_weld_scan(curve_sliced_relative,curve_sliced_relative,robv,ipm_weld,T_R1Base_S1TCP,\
+            =weldscan.robot_weld_scan(curve_sliced_relative,curve_scan_relative,baselayer_u,ipm_base,T_R1Base_S1TCP,\
                                 r1_mid,r1_home,s1_weld,r2_mid,r2_home,s1_scan,\
                                 arc_on=weld_arcon,Transz0_H=Transz0_H,draw_dh=draw_dh,wait_signal=wait_signal) # weld and scan
         # save data
         Path(data_dir).mkdir(exist_ok=True)
         iter_data_dir=data_dir+'iteration_'+str(iter_i)+'/'
         Path(iter_data_dir).mkdir(exist_ok=True)
-        layer_data_dir=iter_data_dir+'layer_0/'
+        layer_data_dir=iter_data_dir+'layer_'+str(layer)+'/'
         Path(layer_data_dir).mkdir(exist_ok=True)
         # save weld record
         np.savetxt(layer_data_dir + 'curve.csv',curve_sliced_relative,delimiter=',')
@@ -216,24 +223,18 @@ for iter_i in range(iter_start,total_iteration):
         o3d.io.write_point_cloud(layer_data_dir+'processed_pcd.pcd',pcd)
         np.save(layer_data_dir+'height_profile.npy',profile_dh)
     
-    # weld first/second half
-    this_curve_start=[30*(iter_i%6)-75,curve_start[1],dh,0,0,-1]
-    this_curve_end=[30*(iter_i%6)-75,curve_end[1],dh,0,0,-1]
-    curve_sliced_relative=np.linspace(this_curve_start,this_curve_end,seg_N+1)
+    ## learn 100 ipm
+    this_curve_start=[30*(iter_i%6)-75,curve_end[1],base_ave_h,0,0,-1] # curve start
+    this_curve_end=[30*(iter_i%6)-75,curve_start[1],base_ave_h,0,0,-1] # curve end
+    curve_sliced_relative=np.linspace(this_curve_start,this_curve_end,seg_N+1) # split curve to seg_N segments
+    curve_scan_relative=deepcopy(curve_sliced_relative)
     uk_input = deepcopy(uk)
-    print("Input u:",np.round(uk_input,decimals=2))
-    # uk_input = deepcopy(uk_init) # for testing
-    
-    robv=dh2v_loglog(uk_input,mode=ipm_for_calculation)
-    robv=np.clip(robv,min_v,max_v)    
     profile_dh,weld_js_exe,weld_stamps,scan_js_exe,scan_stamps,mti_recording,pcd,Transz0_H\
-        =weldscan.robot_weld_scan(curve_sliced_relative,curve_sliced_relative[::-1],robv,ipm_weld,T_R1Base_S1TCP,\
+        =weldscan.robot_weld_scan(curve_sliced_relative,curve_scan_relative,uk_input,ipm_weld,T_R1Base_S1TCP,\
                             r1_mid,r1_home,s1_weld,r2_mid,r2_home,s1_scan,\
-                            arc_on=weld_arcon,Transz0_H=Transz0_H,draw_dh=draw_dh,wait_signal=wait_signal,skip_weld=skip_2_weld) # weld and scan
+                            arc_on=weld_arcon,Transz0_H=Transz0_H,draw_dh=draw_dh,wait_signal=wait_signal) # weld and scan
     # save data
-    iter_data_dir=data_dir+'iteration_'+str(iter_i)+'/'
-    Path(iter_data_dir).mkdir(exist_ok=True)
-    layer_data_dir=iter_data_dir+'layer_1/'
+    layer_data_dir=iter_data_dir+'layer_2/'
     Path(layer_data_dir).mkdir(exist_ok=True)
     # save weld record
     np.savetxt(layer_data_dir + 'curve.csv',curve_sliced_relative,delimiter=',')
@@ -260,11 +261,8 @@ for iter_i in range(iter_start,total_iteration):
     np.savetxt(iter_data_dir+'yk.csv',yk,delimiter=',')
 
     ### find gradient and update
-    gradient_direction=deepcopy(ek) # negative direction
+    gradient_direction=deepcopy(ek)*-1 # negative direction
     print("gradient:",np.round(gradient_direction,decimals=2))
     uk = uk-alpha*gradient_direction
-    uk=np.clip(uk,min_h,max_h)
-
-    skip_1=False
-    skip_2_weld=False
+    uk=np.clip(uk,min_v,max_v)
     
