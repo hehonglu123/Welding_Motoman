@@ -1,6 +1,6 @@
 from copy import deepcopy
 import sys
-sys.path.append('toolbox/')
+sys.path.append('../../toolbox/')
 from utils import *
 from robot_def import * 
 
@@ -22,7 +22,7 @@ class CalibRobotPH:
         self.robot = robot
         # self.calib_marker_ids = robot.calib_markers_id
         self.calib_marker_ids = robot.tool_markers_id
-        print('Calib ID:',self.calib_marker_ids)
+        
         self.base_markers_ids = robot.base_markers_id
         self.base_rigid_id = robot.base_rigid_id
 
@@ -33,6 +33,7 @@ class CalibRobotPH:
         all_ids.append(self.base_rigid_id)
         all_ids.append(robot.tool_rigid_id)
         all_ids.append("marker10_rigid0")
+        print('Calib ID:',all_ids)
         self.mpl_obj = MocapFrameListener(self.mocap_cli,all_ids,'world',use_quat=True)
     
     def run_datacollect_sync(self,rob_IP=None,paths=[],rob_speed=3,waittime=1,
@@ -48,9 +49,8 @@ class CalibRobotPH:
         for q in paths:
             jt = jointtarget(robot_group,uframe_num,utool_num,q,[0]*6)
             tp.moveJ(jt,rob_speed,'%',-1) # moveJ does not support coordinated motion
-            # tp.moveJ(jt,rob_speed,'%',-1) # moveJ does not support coordinated motion
-            # tp.setIO('DO',10,True)
-            # tp.waitIO('DO',10,False)
+            tp.setIO('DO',10,True)
+            tp.waitIO('DO',10,False)
         client.execute_motion_program(tp,record_joint=False,non_block=True)
         
         pose_cnt=0

@@ -1,6 +1,6 @@
 from copy import deepcopy
 import sys
-sys.path.append('toolbox/')
+sys.path.append('../../toolbox/')
 from utils import *
 from robot_def import * 
 
