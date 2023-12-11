@@ -49,6 +49,7 @@ def jacobian_param(param,robot,theta):
     robot.robot.H=H.T
     T_tool = robot.fwd(theta)
     p0T=T_tool.p
+    R0T=T_tool.R
     
     # get jacobian
     J=np.zeros((6,len(param))) # J=[JR;Jp]
@@ -57,6 +58,7 @@ def jacobian_param(param,robot,theta):
     for j in range(jN):
         Rj1j=rot(H[j],theta[j]) # R_{j-1,j}
         R0j=last_R0j@Rj1j # R_{0,j}
+        RjT = R0j.T@R0T
         p0j=p0j+last_R0j@P[j] # p0j_0
         pjT_j=(R0j.T)@(p0T-p0j)
         # gradient of P w.r.t p0T
@@ -64,13 +66,19 @@ def jacobian_param(param,robot,theta):
         # gradient of R0T,P0T w.r.t alpha  
         drot_alpha = last_R0j@rot_k2_beta[j]@hat(robot.param_k1[j])@rot_k1_alpha[j]@\
                      hat(Hn[j])*theta[j]@Rj1j
-        J[:3,total_p+2*j]=invhat(drot_alpha)
-        J[3:,total_p+2*j]=drot_alpha@pjT_j
+        J[:3,total_p+2*j]=invhat(drot_alpha@RjT)
+        J[3:,total_p+2*j]=drot_alpha@pjT_j/180
         # gradient of R0T,P0T w.r.t beta
         drot_beta = last_R0j@hat(robot.param_k2[j])@rot_k2_beta[j]@rot_k1_alpha[j]@\
                     hat(Hn[j])*theta[j]@Rj1j
-        J[:3,total_p+2*j+1]=invhat(drot_beta)
-        J[3:,total_p+2*j+1]=drot_beta@pjT_j
+        # if j==3:
+        #     print(hat(robot.param_k2[j]))
+        #     print(last_R0j)
+        #     print(last_R0j@hat(robot.param_k2[j]))
+        #     print(drot_beta@RjT)
+        #     exit
+        J[:3,total_p+2*j+1]=invhat(drot_beta@RjT)
+        J[3:,total_p+2*j+1]=drot_beta@pjT_j/180
         last_R0j=R0j
     J[3:,total_p-3:total_p] = last_R0j # p6T
     
@@ -117,13 +125,13 @@ def main():
     robot.param_k1=np.array(k1)
     robot.param_k2=np.array(k2)
     
-    test_theta = np.radians([[10,20,-10,20,-30,20]])
+    test_theta = np.radians([[10,10,10,10,10,10]])
     
     param = np.zeros(3*(jN+1)+2*jN)
     for test_th in test_theta:
         # analytical J
         J_ana = jacobian_param(param,robot,test_th)
-        print(J_ana)
+        # print(J_ana)
         fig, ax = plt.subplots()
         im = ax.matshow(J_ana,cmap='RdBu')
         fig.colorbar(im)
