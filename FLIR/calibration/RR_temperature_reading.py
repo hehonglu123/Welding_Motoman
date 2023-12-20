@@ -50,7 +50,10 @@ class temperature_reading(object):
 		while(self._streaming):
 			with self._capture_lock:
 				samples = np.array(self.dev.read(100, -1))   ###read 100 samples
-				self.temperature.OutValue=voltage_to_temperature(np.average(1e6*samples[:,0,0]))
+				sample=np.average(samples[:,0,0])
+				# print(sample)
+				# self.temperature.OutValue=voltage_to_temperature(1e6*sample)
+				self.temperature.OutValue=1e6*sample
 
 def main():
 	with RR.ServerNodeSetup("experimental.temperature_reading", 12182):

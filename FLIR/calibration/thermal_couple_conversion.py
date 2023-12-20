@@ -58,13 +58,13 @@ def voltage_to_temperature(voltage):
     temperature = 0.0
     # Calculate temperature using the polynomial equation for the given voltage range
     for i, coeff in enumerate(coeffs):
-        print(i,coeff)
+        # print(i,coeff)
         temperature += coeff * (voltage ** i)
     
     # temperature+=magnetic_coeff[0]*np.exp(magnetic_coeff[1]*(voltage-magnetic_coeff[2])**2)
     return temperature
 
-# Example voltage reading
-voltage_example = 40000.0  # Example in microvolt
-temperature = voltage_to_temperature(voltage_example)
-print(temperature)
+# # Example voltage reading
+# voltage_example = 40000.0  # Example in microvolt
+# temperature = voltage_to_temperature(voltage_example)
+# print(temperature)
