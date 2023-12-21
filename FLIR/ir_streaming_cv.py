@@ -11,14 +11,14 @@ def packet_received(self, pipe):
 image_consts = None
 
 def main():
-    cv2.namedWindow("IR Recording", cv2.WINDOW_NORMAL)
+    cv2.namedWindow("IR Recording", cv2.WINDOW_AUTOSIZE)
     cmap = cv2.COLORMAP_INFERNO
 
     now=time.time()
-    url='rr+tcp://192.168.55.10:60827/?service=camera'
+    url='rr+tcp://localhost:60827/?service=camera'
 
     c1=RRN.ConnectService(url)
-
+    c1.setf_param("current_case", RR.VarValue(2,"int32"))
     global image_consts, ts
     ts=0
     image_consts = RRN.GetConstants('com.robotraconteur.image', c1)
@@ -41,9 +41,10 @@ def main():
                 # print(c1.getf_param('focus_pos').data[0])
                 # print(1/(time.time()-now))
                 # now=time.time()
+                # current_mat[current_mat>10000]=10000
                 ir_normalized = ((current_mat - np.min(current_mat)) / (np.max(current_mat) - np.min(current_mat))) * 255
                 ir_bgr = cv2.applyColorMap(ir_normalized.astype(np.uint8), cv2.COLORMAP_INFERNO)
-                cv2.imshow("IR Recording", cv2.rotate(ir_bgr,cv2.ROTATE_90_CLOCKWISE))
+                cv2.imshow("IR Recording", cv2.resize(ir_bgr,(int(320*3),int(240*3))))
                 if cv2.waitKey(1) == 27: 
                     break  # esc to quit
     finally:

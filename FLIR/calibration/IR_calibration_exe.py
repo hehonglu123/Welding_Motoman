@@ -18,7 +18,7 @@ def main():
 
     c1=RRN.ConnectService(url)
     #pre adjust focus
-    c1.setf_param("focus_pos", RR.VarValue(int(1400),"int32"))
+    c1.setf_param("focus_pos", RR.VarValue(int(2200),"int32"))
     c1.setf_param("object_distance", RR.VarValue(0.3,"double"))
     c1.setf_param("reflected_temperature", RR.VarValue(291.15,"double"))
     c1.setf_param("atmospheric_temperature", RR.VarValue(293.15,"double"))
@@ -45,27 +45,30 @@ def main():
         c1.start_streaming()
     except: pass
 
+    time.sleep(10)
 
+    start_time=time.time()
     ir_images=[]
     temperature_reading=[]
     timestamp=[]
-    start_time=time.time()
     try:
         while True:
-            if current_mat is not None:
-                ir_images.append(current_mat)
-                temperature_reading.append(temperature_sub.InValue)
-                timestamp.append(time.time()-start_time)
-                time.sleep(0.1)
+            try:
+                if current_mat is not None:
+                    ir_images.append(current_mat)
+                    temperature_reading.append(temperature_sub.InValue)
+                    timestamp.append(time.time()-start_time)
+                    time.sleep(0.1)
+            except:
+                break
     finally:
         try:
             p.Close()
-            np.savetxt('recorded_data/temperature_reading.csv',temperature_reading,delimiter=',')
-            np.save('recorded_data/ir_images.npy',np.vstack((np.array(timestamp),np.array(ir_images))).T)
+            np.savetxt('recorded_data/temperature_reading.csv',np.vstack((timestamp,temperature_reading)).T,delimiter=',')
+            np.save('recorded_data/ir_images.npy',np.array(ir_images))
                 
         except: 
             traceback.print_exc()
-
 
 
 current_mat = None
