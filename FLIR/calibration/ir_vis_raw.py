@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pickle, sys
 
-ir_recording=np.load('ir_images.npy')
+ir_recording=np.load('recorded_data/ir_images.npy')
 freq=13
 
 fig = plt.figure(1)
