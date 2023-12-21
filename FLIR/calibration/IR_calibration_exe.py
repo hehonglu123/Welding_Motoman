@@ -3,18 +3,18 @@
 from RobotRaconteur.Client import *
 import numpy as np
 import matplotlib.pyplot as plt
-import time
+import time, traceback
 
 
 image_consts = None
 
 def main():
-    url='rr+tcp://192.168.55.21:12182/?service=Temperature'
+    url='rr+tcp://localhost:12182/?service=Temperature'
     sub=RRN.SubscribeService(url)
     temperature_sub=sub.SubscribeWire("temperature")
 
 
-    url='rr+tcp://192.168.55.10:60827/?service=camera'
+    url='rr+tcp://localhost:60827/?service=camera'
 
     c1=RRN.ConnectService(url)
     #pre adjust focus
@@ -48,18 +48,24 @@ def main():
 
     ir_images=[]
     temperature_reading=[]
+    timestamp=[]
+    start_time=time.time()
     try:
         while True:
             if current_mat is not None:
                 ir_images.append(current_mat)
                 temperature_reading.append(temperature_sub.InValue)
+                timestamp.append(time.time()-start_time)
+                time.sleep(0.1)
     finally:
         try:
             p.Close()
-            np.savetxt('temperature_reading.csv',temperature_reading,delimiter=',')
-            np.save('ir_images.npy',np.array(ir_images))
+            np.savetxt('recorded_data/temperature_reading.csv',temperature_reading,delimiter=',')
+            np.save('recorded_data/ir_images.npy',np.vstack((np.array(timestamp),np.array(ir_images))).T)
                 
-        except: pass
+        except: 
+            traceback.print_exc()
+
 
 
 current_mat = None
