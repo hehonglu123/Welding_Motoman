@@ -10,6 +10,9 @@ Rx=np.array([1,0,0])
 Ry=np.array([0,1,0])
 Rz=np.array([0,0,1])
 
+from numpy.random import default_rng
+rng = default_rng()
+
 def s_err(ER,mode=3):
     
     mode_choice=[3]
@@ -21,6 +24,90 @@ def s_err(ER,mode=3):
         derr=2*theta*k
     
     return derr
+
+def jacobian_param_numerical(param,robot,theta):
+    
+    jN=len(theta)
+    numerical_iteration=1000
+    dP_up_range = 0.05
+    dP_low_range = 0.01
+    dab_up_range = np.radians(0.1)
+    dab_low_range = np.radians(0.03)
+    Pn=deepcopy(robot.P_nominal)
+    Hn=deepcopy(robot.H_nominal)
+    
+    d_T_all = [] # difference in robot T
+    d_param_all = [] # difference in param
+    for iter_i in range(numerical_iteration):
+        print(iter_i)
+        param_init = deepcopy(param)
+        
+        dP=rng.uniform(low=-(dP_up_range-dP_low_range),high=(dP_up_range-dP_low_range),size=((jN+1)*3,))
+        dP=dP+dP/np.fabs(dP)*dP_low_range
+        dab=rng.uniform(low=-(dab_up_range-dab_low_range),high=(dab_up_range-dab_low_range),size=(jN*2,))
+        dab=dab+dab/np.fabs(dab)*dab_low_range
+        # dP[:] = np.zeros((jN+1)*3)
+        # dab[:-2] = np.zeros(jN*2-2)
+        # dab[-1] = 0
+        dparam = np.append(dP,dab)
+        param_pert = param_init+dparam
+        # dparam[(jN+1)*3:]=np.degrees(dparam[(jN+1)*3:])
+        # get P,H (given param)
+        P_init=param_init[:(jN+1)*3]
+        P_init=np.reshape(P_init,((jN+1),3))
+        P_pert=param_pert[:(jN+1)*3]
+        P_pert=np.reshape(P_pert,((jN+1),3))
+        
+        param_h_init=param_init[(jN+1)*3:]
+        param_h_pert=param_pert[(jN+1)*3:]
+        
+        H_init=[]
+        H_pert=[]
+        for j in range(jN):
+            k1=robot.param_k1[j]
+            k2=robot.param_k2[j]
+            H_init.append(rot(k2,param_h_init[2*j+1])@rot(k1,param_h_init[2*j])@Hn[j])
+            H_pert.append(rot(k2,param_h_pert[2*j+1])@rot(k1,param_h_pert[2*j])@Hn[j])
+        H_init=np.array(H_init)
+        H_pert=np.array(H_pert)
+        
+        # find dp dRR^T
+        robot.robot.P=P_init.T
+        robot.robot.H=H_init.T
+        T_init = robot.fwd(theta)
+        robot.robot.P=P_pert.T
+        robot.robot.H=H_pert.T
+        print(robot.robot.H)
+        T_pert = robot.fwd(theta)
+        dp = T_pert.p-T_init.p
+        print(dp)
+        # input()
+        # dR = T_init.R.T@T_pert.R
+        # k,th = R2rot(dR)
+        # if th == 0:
+        #     ktheta=np.zeros(3)
+        # else:
+        #     ktheta=k*th
+        dR = T_pert.R-T_init.R
+        dRRT = dR@T_init.R
+        ktheta = invhat(dRRT)
+        # print(ktheta)
+        dT = np.append(ktheta,dp)
+        
+        # append dT dparam
+        d_T_all.append(dT)
+        d_param_all.append(dparam)
+    
+    d_T_all=np.array(d_T_all)
+    d_param_all=np.array(d_param_all)
+    
+    num_J = np.linalg.pinv(d_param_all)@d_T_all
+    num_J = num_J.T
+    # num_J = (d_T_all.T)@np.linalg.pinv(d_param_all.T)
+    
+    num_J[3:,(jN+1)*3:] = num_J[3:,(jN+1)*3:]/180
+    
+    return num_J
 
 def jacobian_param(param,robot,theta):
     
@@ -38,7 +125,7 @@ def jacobian_param(param,robot,theta):
         rot_k1_alpha.append(rot(robot.param_k1[j],param_h[2*j]))
         rot_k2_beta.append(rot(robot.param_k2[j],param_h[2*j+1]))
         hi = rot_k2_beta[-1]@\
-           rot_k1_alpha[-1]@robot.robot.H[:,j]
+           rot_k1_alpha[-1]@robot.H_nominal[j]
         H.append(hi)
     H=np.array(H)
     Pn=deepcopy(robot.P_nominal)
@@ -64,36 +151,66 @@ def jacobian_param(param,robot,theta):
         # gradient of P w.r.t p0T
         J[3:,3*j:3*(j+1)]=last_R0j
         # gradient of R0T,P0T w.r.t alpha  
-        drot_alpha = last_R0j@rot_k2_beta[j]@hat(robot.param_k1[j])@rot_k1_alpha[j]@\
-                     hat(Hn[j])*theta[j]@Rj1j
-        J[:3,total_p+2*j]=invhat(drot_alpha@RjT)
-        J[3:,total_p+2*j]=drot_alpha@pjT_j/180
+        # drot_alpha = last_R0j@rot_k2_beta[j]@hat(robot.param_k1[j])@rot_k1_alpha[j]@\
+        #              hat(Hn[j])*theta[j]@Rj1j
+        drot_alpha = last_R0j@hat(rot_k2_beta[j]@hat(robot.param_k1[j])@rot_k1_alpha[j]@Hn[j])\
+                     *theta[j]@Rj1j
+        # drot_alpha = last_R0j@Rj1j@hat(rot_k2_beta[j]@rot_k1_alpha[j]@hat(robot.param_k1[j])@Hn[j])\
+        #              *theta[j]
+        J[:3,total_p+2*j]=invhat(drot_alpha@RjT@(R0T.T))
+        J[3:,total_p+2*j]=drot_alpha@pjT_j
+        print(j+1)
+        print(rot_k2_beta[j])
+        print(hat(robot.param_k1[j]))
+        print(rot_k1_alpha[j])
+        print(rot_k2_beta[j]@hat(robot.param_k1[j])@rot_k1_alpha[j]@Hn[j])
+        print(hat(rot_k2_beta[j]@hat(robot.param_k1[j])@rot_k1_alpha[j]@Hn[j]))
+        print(Rj1j)
+        print(drot_alpha)
+        print(pjT_j)
         # gradient of R0T,P0T w.r.t beta
-        drot_beta = last_R0j@hat(robot.param_k2[j])@rot_k2_beta[j]@rot_k1_alpha[j]@\
-                    hat(Hn[j])*theta[j]@Rj1j
+        # drot_beta = last_R0j@hat(robot.param_k2[j])@rot_k2_beta[j]@rot_k1_alpha[j]@\
+        #             hat(Hn[j])*theta[j]@Rj1j
+        drot_beta = last_R0j@hat(hat(robot.param_k2[j])@rot_k2_beta[j]@rot_k1_alpha[j]@Hn[j])\
+                    *theta[j]@Rj1j
         # if j==3:
         #     print(hat(robot.param_k2[j]))
         #     print(last_R0j)
         #     print(last_R0j@hat(robot.param_k2[j]))
         #     print(drot_beta@RjT)
         #     exit
-        J[:3,total_p+2*j+1]=invhat(drot_beta@RjT)
-        J[3:,total_p+2*j+1]=drot_beta@pjT_j/180
+        J[:3,total_p+2*j+1]=invhat(drot_beta@RjT@(R0T.T))
+        J[3:,total_p+2*j+1]=drot_beta@pjT_j
         last_R0j=R0j
     J[3:,total_p-3:total_p] = last_R0j # p6T
+    
+    
+    J[3:,(jN+1)*3:] = J[3:,(jN+1)*3:]/180
     
     return J
 
 def main():
     config_dir='../config/'
-    robot=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',\
-                        tool_file_path=config_dir+'torch.csv',d=15,\
-                        #  tool_file_path='',d=0,\
-                        pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv')
+    # robot=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',\
+    #                     tool_file_path=config_dir+'torch.csv',d=15,\
+    #                     #  tool_file_path='',d=0,\
+    #                     pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv')
+    
+    link_N=1
+    robot=robot_obj(str(link_N)+'Link_robot',def_path=config_dir+'Nlink_robots/'+str(link_N)+'Link_robot.yml')
+    
     robot.P_nominal=deepcopy(robot.robot.P)
     robot.H_nominal=deepcopy(robot.robot.H)
     robot.P_nominal=robot.P_nominal.T
     robot.H_nominal=robot.H_nominal.T
+    
+    robot.robot.R_tool=np.eye(3)
+    robot.robot.p_tool=np.zeros(3)
+    
+    # print(robot.fwd(np.zeros(6)))
+    # print(robot.fwd(np.zeros(link_N)))
+    # print(robot.fwd(np.ones(link_N)))
+    # exit()
     
     jN = len(robot.robot.H[0])
     k1=[]
@@ -125,21 +242,34 @@ def main():
     robot.param_k1=np.array(k1)
     robot.param_k2=np.array(k2)
     
-    test_theta = np.radians([[10,10,10,10,10,10]])
+    # test_theta = np.radians([[10,10,10,10,10,10]])*3
+    test_theta = np.radians([[10]*link_N])*3
+    # test_theta = np.radians([[0,0,0,0,0,10]])*3
     
     param = np.zeros(3*(jN+1)+2*jN)
+    param[:3*(jN+1)] = np.reshape(robot.P_nominal,(3*(jN+1),))
     for test_th in test_theta:
         # analytical J
         J_ana = jacobian_param(param,robot,test_th)
-        # print(J_ana)
         fig, ax = plt.subplots()
         im = ax.matshow(J_ana,cmap='RdBu')
         fig.colorbar(im)
         plt.show()
         
-        # numerical J
+        # # numerical J
+        J_num = jacobian_param_numerical(param,robot,test_th)
+        fig, ax = plt.subplots()
+        im = ax.matshow(J_num,cmap='RdBu')
+        fig.colorbar(im)
+        plt.show()
         
-
+        J_diff = J_num-J_ana
+        J_diff = np.fabs(J_diff)
+        fig, ax = plt.subplots()
+        im = ax.matshow(J_diff,cmap='RdBu')
+        fig.colorbar(im)
+        plt.show()
+    
 
 if __name__=='__main__':
     
