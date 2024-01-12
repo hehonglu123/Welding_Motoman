@@ -75,7 +75,9 @@ def dh2v_loglog(dh,mode=140,material='ER_4043'):
     logdh = np.log(dh)
     logv = (logdh-param[1])/param[0]
     
-    v = np.exp(logv)
+    # v = np.exp(logv)
+    v=np.float_power((dh/np.exp(param[1])),1/param[0])
+    
     return v
 
 def dh2v_quadratic(dh,mode=140):
