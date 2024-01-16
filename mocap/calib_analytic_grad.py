@@ -28,7 +28,7 @@ def s_err(ER,mode=3):
 def jacobian_param_numerical(param,robot,theta):
     
     jN=len(theta)
-    numerical_iteration=1000
+    numerical_iteration=5000
     dP_up_range = 0.05
     dP_low_range = 0.01
     dab_up_range = np.radians(0.1)
@@ -86,7 +86,7 @@ def jacobian_param_numerical(param,robot,theta):
         # else:
         #     ktheta=k*th
         dR = T_pert.R-T_init.R
-        dRRT = dR@T_init.R
+        dRRT = dR@T_init.R.T
         ktheta = invhat(dRRT)
         # print(ktheta)
         dT = np.append(ktheta,dp)
@@ -102,7 +102,7 @@ def jacobian_param_numerical(param,robot,theta):
     num_J = num_J.T
     # num_J = (d_T_all.T)@np.linalg.pinv(d_param_all.T)
     
-    num_J[3:,(jN+1)*3:] = num_J[3:,(jN+1)*3:]/180
+    # num_J[3:,(jN+1)*3:] = num_J[3:,(jN+1)*3:]/180
     
     return num_J
 
@@ -169,19 +169,19 @@ def jacobian_param(param,robot,theta):
     J[3:,total_p-3:total_p] = last_R0j # p6T
     
     
-    J[3:,(jN+1)*3:] = J[3:,(jN+1)*3:]/180
+    # J[3:,(jN+1)*3:] = J[3:,(jN+1)*3:]/180
     
     return J
 
 def main():
     config_dir='../config/'
-    # robot=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',\
-    #                     tool_file_path=config_dir+'torch.csv',d=15,\
-    #                     #  tool_file_path='',d=0,\
-    #                     pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv')
+    robot=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',\
+                        tool_file_path=config_dir+'torch.csv',d=15,\
+                        #  tool_file_path='',d=0,\
+                        pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv')
     
-    link_N=1
-    robot=robot_obj(str(link_N)+'Link_robot',def_path=config_dir+'Nlink_robots/'+str(link_N)+'Link_robot.yml')
+    # link_N=1
+    # robot=robot_obj(str(link_N)+'Link_robot',def_path=config_dir+'Nlink_robots/'+str(link_N)+'Link_robot.yml')
     
     robot.P_nominal=deepcopy(robot.robot.P)
     robot.H_nominal=deepcopy(robot.robot.H)
@@ -226,11 +226,12 @@ def main():
     robot.param_k1=np.array(k1)
     robot.param_k2=np.array(k2)
     
-    # test_theta = np.radians([[10,10,10,10,10,10]])*3
-    test_theta = np.radians([[10]*link_N])*3
+    test_theta = np.radians([[10,10,10,10,10,10]])*3
+    # test_theta = np.radians([[10]*link_N])*3
     # test_theta = np.radians([[0,0,0,0,0,10]])*3
     
-    param = np.zeros(3*(jN+1)+2*jN)
+    # param = np.zeros(3*(jN+1)+2*jN)
+    param = np.random.rand(3*(jN+1)+2*jN)*0.001
     param[:3*(jN+1)] = np.reshape(robot.P_nominal,(3*(jN+1),))
     for test_th in test_theta:
         # analytical J
