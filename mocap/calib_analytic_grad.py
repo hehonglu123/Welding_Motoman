@@ -39,7 +39,6 @@ def jacobian_param_numerical(param,robot,theta):
     d_T_all = [] # difference in robot T
     d_param_all = [] # difference in param
     for iter_i in range(numerical_iteration):
-        print(iter_i)
         param_init = deepcopy(param)
         
         dP=rng.uniform(low=-(dP_up_range-dP_low_range),high=(dP_up_range-dP_low_range),size=((jN+1)*3,))
@@ -77,10 +76,8 @@ def jacobian_param_numerical(param,robot,theta):
         T_init = robot.fwd(theta)
         robot.robot.P=P_pert.T
         robot.robot.H=H_pert.T
-        print(robot.robot.H)
         T_pert = robot.fwd(theta)
         dp = T_pert.p-T_init.p
-        print(dp)
         # input()
         # dR = T_init.R.T@T_pert.R
         # k,th = R2rot(dR)
@@ -151,36 +148,23 @@ def jacobian_param(param,robot,theta):
         # gradient of P w.r.t p0T
         J[3:,3*j:3*(j+1)]=last_R0j
         # gradient of R0T,P0T w.r.t alpha  
-        # drot_alpha = last_R0j@rot_k2_beta[j]@hat(robot.param_k1[j])@rot_k1_alpha[j]@\
-        #              hat(Hn[j])*theta[j]@Rj1j
-        drot_alpha = last_R0j@hat(rot_k2_beta[j]@hat(robot.param_k1[j])@rot_k1_alpha[j]@Hn[j])\
-                     *theta[j]@Rj1j
-        # drot_alpha = last_R0j@Rj1j@hat(rot_k2_beta[j]@rot_k1_alpha[j]@hat(robot.param_k1[j])@Hn[j])\
-        #              *theta[j]
-        J[:3,total_p+2*j]=invhat(drot_alpha@RjT@(R0T.T))
-        J[3:,total_p+2*j]=drot_alpha@pjT_j
-        print(j+1)
-        print(rot_k2_beta[j])
-        print(hat(robot.param_k1[j]))
-        print(rot_k1_alpha[j])
-        print(rot_k2_beta[j]@hat(robot.param_k1[j])@rot_k1_alpha[j]@Hn[j])
-        print(hat(rot_k2_beta[j]@hat(robot.param_k1[j])@rot_k1_alpha[j]@Hn[j]))
-        print(Rj1j)
-        print(drot_alpha)
-        print(pjT_j)
+        dhda = rot_k2_beta[j]@hat(robot.param_k1[j])@rot_k1_alpha[j]@Hn[j]
+        dRda = np.sin(theta[j])*hat(dhda)+(1-np.cos(theta[j]))*(hat(dhda)@hat(H[j])+hat(H[j])@hat(dhda))
+        dR0jda = last_R0j@dRda
+        J[:3,total_p+2*j]=invhat(dR0jda@RjT@(R0T.T))
+        J[3:,total_p+2*j]=dR0jda@pjT_j
         # gradient of R0T,P0T w.r.t beta
-        # drot_beta = last_R0j@hat(robot.param_k2[j])@rot_k2_beta[j]@rot_k1_alpha[j]@\
-        #             hat(Hn[j])*theta[j]@Rj1j
-        drot_beta = last_R0j@hat(hat(robot.param_k2[j])@rot_k2_beta[j]@rot_k1_alpha[j]@Hn[j])\
-                    *theta[j]@Rj1j
+        dhdb = hat(robot.param_k2[j])@rot_k2_beta[j]@rot_k1_alpha[j]@Hn[j]
+        dRdb = np.sin(theta[j])*hat(dhdb)+(1-np.cos(theta[j]))*(hat(dhdb)@hat(H[j])+hat(H[j])@hat(dhdb))
+        dR0jdb = last_R0j@dRdb
         # if j==3:
         #     print(hat(robot.param_k2[j]))
         #     print(last_R0j)
         #     print(last_R0j@hat(robot.param_k2[j]))
         #     print(drot_beta@RjT)
         #     exit
-        J[:3,total_p+2*j+1]=invhat(drot_beta@RjT@(R0T.T))
-        J[3:,total_p+2*j+1]=drot_beta@pjT_j
+        J[:3,total_p+2*j+1]=invhat(dR0jdb@RjT@(R0T.T))
+        J[3:,total_p+2*j+1]=dR0jdb@pjT_j
         last_R0j=R0j
     J[3:,total_p-3:total_p] = last_R0j # p6T
     
