@@ -10,9 +10,6 @@ Rx=np.array([1,0,0])
 Ry=np.array([0,1,0])
 Rz=np.array([0,0,1])
 
-from numpy.random import default_rng
-rng = default_rng()
-
 def s_err(ER,mode=3):
     
     mode_choice=[3]
@@ -25,10 +22,12 @@ def s_err(ER,mode=3):
     
     return derr
 
-def jacobian_param_numerical(param,robot,theta):
+def jacobian_param_numerical(param,robot,theta,unit='radians'):
+    from numpy.random import default_rng
+    rng = default_rng()
     
     jN=len(theta)
-    numerical_iteration=5000
+    numerical_iteration=1000
     dP_up_range = 0.05
     dP_low_range = 0.01
     dab_up_range = np.radians(0.1)
@@ -102,14 +101,14 @@ def jacobian_param_numerical(param,robot,theta):
     num_J = num_J.T
     # num_J = (d_T_all.T)@np.linalg.pinv(d_param_all.T)
     
-    # num_J[3:,(jN+1)*3:] = num_J[3:,(jN+1)*3:]/180
+    if unit!='radians':
+        num_J[3:,(jN+1)*3:] = num_J[3:,(jN+1)*3:]*(np.pi/180)
     
     return num_J
 
-def jacobian_param(param,robot,theta):
+def get_PH_from_param(param,robot):
     
-    jN=len(theta)
-    
+    jN=len(robot.robot.H[0])
     # get current P,H (given param)
     P=param[:(jN+1)*3]
     P=np.reshape(P,((jN+1),3))
@@ -125,12 +124,39 @@ def jacobian_param(param,robot,theta):
            rot_k1_alpha[-1]@robot.H_nominal[j]
         H.append(hi)
     H=np.array(H)
+    robot.robot.P=P.T
+    robot.robot.H=H.T
+    return robot
+
+def jacobian_param(param,robot,theta,unit='radians'):
+    
+    jN=len(theta)
+    
+    # get current P,H (given param)
+    # robot = get_PH_from_param(param,robot)
+    
+    P=param[:(jN+1)*3]
+    P=np.reshape(P,((jN+1),3))
+    total_p = (jN+1)*3
+    param_h=param[total_p:]
+    H=[]
+    rot_k1_alpha=[]
+    rot_k2_beta=[]
+    for j in range(jN):
+        rot_k1_alpha.append(rot(robot.param_k1[j],param_h[2*j]))
+        rot_k2_beta.append(rot(robot.param_k2[j],param_h[2*j+1]))
+        hi = rot_k2_beta[-1]@\
+           rot_k1_alpha[-1]@robot.H_nominal[j]
+        H.append(hi)
+    H=np.array(H)
+    
+    robot.robot.P=P.T
+    robot.robot.H=H.T
     Pn=deepcopy(robot.P_nominal)
     Hn=deepcopy(robot.H_nominal)
     
     # foward kinematics
-    robot.robot.P=P.T
-    robot.robot.H=H.T
+    
     T_tool = robot.fwd(theta)
     p0T=T_tool.p
     R0T=T_tool.R
@@ -168,12 +194,13 @@ def jacobian_param(param,robot,theta):
         last_R0j=R0j
     J[3:,total_p-3:total_p] = last_R0j # p6T
     
-    
-    # J[3:,(jN+1)*3:] = J[3:,(jN+1)*3:]/180
+    if unit!='radians':
+        J[3:,(jN+1)*3:] = J[3:,(jN+1)*3:]*(np.pi/180)
     
     return J
 
 def main():
+    
     config_dir='../config/'
     robot=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',\
                         tool_file_path=config_dir+'torch.csv',d=15,\
@@ -188,8 +215,8 @@ def main():
     robot.P_nominal=robot.P_nominal.T
     robot.H_nominal=robot.H_nominal.T
     
-    robot.robot.R_tool=np.eye(3)
-    robot.robot.p_tool=np.zeros(3)
+    # robot.robot.R_tool=np.eye(3)
+    # robot.robot.p_tool=np.zeros(3)
     
     # print(robot.fwd(np.zeros(6)))
     # print(robot.fwd(np.zeros(link_N)))
@@ -230,29 +257,35 @@ def main():
     # test_theta = np.radians([[10]*link_N])*3
     # test_theta = np.radians([[0,0,0,0,0,10]])*3
     
-    # param = np.zeros(3*(jN+1)+2*jN)
-    param = np.random.rand(3*(jN+1)+2*jN)*0.001
+    param = np.zeros(3*(jN+1)+2*jN)
+    # param = np.random.rand(3*(jN+1)+2*jN)*0.01
     param[:3*(jN+1)] = np.reshape(robot.P_nominal,(3*(jN+1),))
     for test_th in test_theta:
         # analytical J
-        J_ana = jacobian_param(param,robot,test_th)
+        J_ana = jacobian_param(param,robot,test_th,unit='degrees')
         fig, ax = plt.subplots()
         im = ax.matshow(J_ana,cmap='RdBu')
-        fig.colorbar(im)
+        ax.tick_params(axis='both', labelsize=24)
+        cbar = fig.colorbar(im)
+        cbar.ax.tick_params(labelsize=24)
         plt.show()
         
         # # numerical J
-        J_num = jacobian_param_numerical(param,robot,test_th)
+        J_num = jacobian_param_numerical(param,robot,test_th,unit='degrees')
         fig, ax = plt.subplots()
         im = ax.matshow(J_num,cmap='RdBu')
-        fig.colorbar(im)
+        ax.tick_params(axis='both', labelsize=24)
+        cbar = fig.colorbar(im)
+        cbar.ax.tick_params(labelsize=24)
         plt.show()
         
         J_diff = J_num-J_ana
         J_diff = np.fabs(J_diff)
         fig, ax = plt.subplots()
         im = ax.matshow(J_diff,cmap='RdBu')
-        fig.colorbar(im)
+        ax.tick_params(axis='both', labelsize=24)
+        cbar = fig.colorbar(im)
+        cbar.ax.tick_params(labelsize=24)
         plt.show()
     
 
