@@ -48,8 +48,8 @@ elif robot_type == 'R2':
     nom_H=np.array([[0,0,1],[0,1,0],[0,-1,0],\
                    [-1,0,0],[0,-1,0],[-1,0,0]]).T
 
-T_base_basemarker = robot.T_base_basemarker
-T_basemarker_base = T_base_basemarker.inv()
+# T_base_basemarker = robot.T_base_basemarker
+# T_basemarker_base = T_base_basemarker.inv()
 
 #### using rigid body
 use_toolmaker=True
@@ -133,7 +133,10 @@ if use_raw:
 print(len(test_mocap_T))
 assert len(test_robot_q)==len(test_mocap_T), f"Need to have the same amount of robot_q and mocap_T"
 
-with open(PH_data_dir+'calib_PH_q.pickle','rb') as file:
+use_analytical_calib = True
+
+calib_file_name = 'calib_PH_q_ana.pickle' if use_analytical_calib else 'calib_PH_q.pickle'
+with open(PH_data_dir+calib_file_name,'rb') as file:
     PH_q=pickle.load(file)
 #### all train data q
 train_q = []
@@ -161,7 +164,8 @@ qzero_H = PH_q[train_q_zero_key]['H']
 #############################
 
 try:
-    with open(PH_data_dir+'calib_one_PH.pickle','rb') as file:
+    calib_file_name = 'calib_one_PH_ana.pickle' if use_analytical_calib else 'calib_one_PH.pickle'
+    with open(PH_data_dir+calib_file_name,'rb') as file:
         PH_q_one=pickle.load(file)
 except:
     PH_q_one=PH_q[train_q_zero_key]

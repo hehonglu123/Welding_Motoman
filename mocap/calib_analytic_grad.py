@@ -106,6 +106,40 @@ def jacobian_param_numerical(param,robot,theta,unit='radians'):
     
     return num_J
 
+def get_H_param_axis(robot):
+    
+    jN = len(robot.robot.H[0])
+    
+    k1=[]
+    k2=[]
+    for j in range(jN):
+        if np.fabs(np.dot(Rx,robot.robot.H[:,j]))>0.999:
+            if np.dot(Rx,robot.robot.H[:,j])>0:
+                k1.append(Ry)
+                k2.append(Rz)
+            else:
+                k1.append(Rz)
+                k2.append(Ry)
+        elif np.fabs(np.dot(Ry,robot.robot.H[:,j]))>0.999:
+            if  np.dot(Ry,robot.robot.H[:,j])>0:
+                k1.append(Rz)
+                k2.append(Rx)
+            else:
+                k1.append(Rx)
+                k2.append(Rz)
+        elif np.fabs(np.dot(Rz,robot.robot.H[:,j]))>0.999:
+            if np.dot(Rz,robot.robot.H[:,j])>0:
+                k1.append(Rx)
+                k2.append(Ry)
+            else:
+                k1.append(Ry)
+                k2.append(Rx)
+        else:
+            assert AssertionError,'Assume h is aligned well with x or y or z axis.'
+    robot.param_k1=np.array(k1)
+    robot.param_k2=np.array(k2)
+    return robot
+
 def get_PH_from_param(param,robot):
     
     jN=len(robot.robot.H[0])
