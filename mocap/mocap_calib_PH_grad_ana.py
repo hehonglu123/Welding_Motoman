@@ -91,13 +91,17 @@ P_size = 7
 H_size = 6
 alpha=0.1
 # weight_ori = 0.1
-weight_ori = 57
-weight_pos = 0.5
+# weight_ori = 57
+# weight_pos = 0.5
+weight_ori = 1
+weight_pos = 1
 
 # lambda_H = 57
 # lambda_P = 0.1
-lambda_H = 114
-lambda_P = 0.1
+# lambda_H = 114
+# lambda_P = 0.1
+lambda_H = 5
+lambda_P = 0.5
 start_t = time.time()
 
 ## get initial param from CPA
@@ -108,8 +112,10 @@ for j in range(jN):
     sol_id = np.argmin(np.linalg.norm(sol,axis=1))
     sol_b = sol[sol_id][0]
     sol_a = sol[sol_id][1]
-    param_init[3*(jN+1)+2*j] = sol_a
-    param_init[3*(jN+1)+2*j+1] = sol_b
+    # param_init[3*(jN+1)+2*j] = sol_a
+    # param_init[3*(jN+1)+2*j+1] = sol_b
+    param_init[3*(jN+1)+2*j] = np.degrees(sol_a)
+    param_init[3*(jN+1)+2*j+1] = np.degrees(sol_b)
 
 ### start calibration. Iterate all collected configurations/clusters
 PH_q = {}
@@ -129,7 +135,7 @@ for N in train_set:
     ori_error_norm_progress = []
     for iter_N in range(max_iteration):
         # update robot PH
-        robot = get_PH_from_param(param,robot)
+        robot = get_PH_from_param(param,robot,unit='degrees')
         
         J_ana=[]
         error_pos_ori = []
@@ -137,7 +143,7 @@ for N in train_set:
         error_ori = []
         for testing_pose in all_testing_pose:
             pose_ind=N*N_per_pose+testing_pose
-            J_ana_part = jacobian_param(param,robot,robot_q[pose_ind])
+            J_ana_part = jacobian_param(param,robot,robot_q[pose_ind],unit='degrees')
             J_ana.extend(J_ana_part)
             # get error
             robot_init_T = robot.fwd(robot_q[pose_ind])
@@ -145,7 +151,8 @@ for N in train_set:
             T_tool_base = T_marker_base*robot.T_tool_toolmarker
             k,theta = R2rot(T_tool_base.R@robot_init_T.R.T)
             k=np.array(k)
-            error_pos_ori = np.append(error_pos_ori,np.append((k*theta)*weight_ori,(T_tool_base.p-robot_init_T.p)*weight_pos))
+            # error_pos_ori = np.append(error_pos_ori,np.append((k*theta)*weight_ori,(T_tool_base.p-robot_init_T.p)*weight_pos))
+            error_pos_ori = np.append(error_pos_ori,np.append((k*np.degrees(theta))*weight_ori,(T_tool_base.p-robot_init_T.p)*weight_pos))
             error_pos.append(T_tool_base.p-robot_init_T.p)
             error_ori.append(k*np.degrees(theta))  # for plotting purpose only (unit: degrees)          
         J_ana = np.array(J_ana)
@@ -153,6 +160,7 @@ for N in train_set:
         pos_error_norm_progress.append(np.linalg.norm(error_pos,ord=2,axis=1))
         ori_error_progress.append(error_ori[0])
         ori_error_norm_progress.append(np.linalg.norm(error_ori,ord=2,axis=1))
+        
         if iter_N>0 and np.linalg.norm(pos_error_norm_progress[-1]-pos_error_norm_progress[-2])<terminate_eps and np.mean(ori_error_norm_progress[-1])<terminate_ori_error:
             break
         
@@ -217,7 +225,7 @@ for N in train_set:
         plt.title("Mean/Std of Orientation Error Norm of Poses",fontsize=18)
         plt.show()
     # update robot PH
-    robot = get_PH_from_param(param,robot)
+    robot = get_PH_from_param(param,robot,unit='degrees')
     print(robot.robot.P.T)
     if save_PH:
         q_key = tuple(robot_q_sample[N,1:3])
@@ -231,6 +239,7 @@ for N in train_set:
 
     print("================")
     
+# exit()
 ###### get just one optimal pose
 plot_grad=False
 plot_error=False

@@ -136,6 +136,7 @@ assert len(test_robot_q)==len(test_mocap_T), f"Need to have the same amount of r
 use_analytical_calib = True
 
 calib_file_name = 'calib_PH_q_ana.pickle' if use_analytical_calib else 'calib_PH_q.pickle'
+print(calib_file_name)
 with open(PH_data_dir+calib_file_name,'rb') as file:
     PH_q=pickle.load(file)
 #### all train data q

@@ -140,7 +140,7 @@ def get_H_param_axis(robot):
     robot.param_k2=np.array(k2)
     return robot
 
-def get_PH_from_param(param,robot):
+def get_PH_from_param(param,robot,unit='radians'):
     
     jN=len(robot.robot.H[0])
     # get current P,H (given param)
@@ -148,6 +148,8 @@ def get_PH_from_param(param,robot):
     P=np.reshape(P,((jN+1),3))
     total_p = (jN+1)*3
     param_h=param[total_p:]
+    if unit!='radians':
+        param_h = np.radians(param_h)
     H=[]
     rot_k1_alpha=[]
     rot_k2_beta=[]
@@ -173,6 +175,8 @@ def jacobian_param(param,robot,theta,unit='radians'):
     P=np.reshape(P,((jN+1),3))
     total_p = (jN+1)*3
     param_h=param[total_p:]
+    if unit!='radians':
+        param_h = np.radians(param_h)
     H=[]
     rot_k1_alpha=[]
     rot_k2_beta=[]
@@ -230,6 +234,7 @@ def jacobian_param(param,robot,theta,unit='radians'):
     
     if unit!='radians':
         J[3:,(jN+1)*3:] = J[3:,(jN+1)*3:]*(np.pi/180)
+        # J[3:,:] = J[3:,:]*(np.pi/180)
     
     return J
 
