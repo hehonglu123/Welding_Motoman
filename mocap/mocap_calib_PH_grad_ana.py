@@ -18,11 +18,11 @@ Rx=np.array([1,0,0])
 Ry=np.array([0,1,0])
 Rz=np.array([0,0,1])
 
-dataset_date='0801'
+dataset_date='0804'
 
 config_dir='../config/'
 
-robot_type = 'R1'
+robot_type = 'R2'
 
 if robot_type == 'R1':
     robot_marker_dir=config_dir+'MA2010_marker_config/'
@@ -90,17 +90,14 @@ terminate_ori_error=999
 P_size = 7
 H_size = 6
 alpha=0.1
-# weight_ori = 0.1
-# weight_ori = 57
-# weight_pos = 0.5
-weight_ori = 1
+# weight_ori = 1
+# weight_pos = 1
+weight_ori = 0.1
 weight_pos = 1
 
-# lambda_H = 57
-# lambda_P = 0.1
-# lambda_H = 114
-# lambda_P = 0.1
-lambda_H = 5
+# lambda_H = 5
+# lambda_P = 0.5
+lambda_H = 0.5
 lambda_P = 0.5
 start_t = time.time()
 

@@ -16,11 +16,11 @@ Rx=np.array([1,0,0])
 Ry=np.array([0,1,0])
 Rz=np.array([0,0,1])
 
-ph_dataset_date='0801'
-test_dataset_date='0801'
+ph_dataset_date='0804'
+test_dataset_date='0804'
 config_dir='../config/'
 
-robot_type = 'R1'
+robot_type = 'R2'
 
 if robot_type == 'R1':
     robot_marker_dir=config_dir+'MA2010_marker_config/'
