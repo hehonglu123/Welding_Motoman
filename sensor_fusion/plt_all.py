@@ -6,10 +6,10 @@ sys.path.append('../toolbox/')
 from flir_toolbox import *
 import matplotlib.pyplot as plt
 
-data_dir='../data/wall_weld_test/moveL_100_repeat_weld_scan_2023_08_02_17_07_02/layer_10/'
+data_dir="../data/wall_weld_test/moveL_100_repeat_weld_scan_2023_08_02_17_07_02/layer_10/"
 
 fig, ax1 = plt.subplots()
-ax1.set_title(f'{data_dir}')
+ax1.set_title('Welding All Data')
 ax2 = ax1.twinx()
 ax3 = ax2.twiny()
 # Load the IR recording data from the pickle file
@@ -18,7 +18,7 @@ with open(data_dir+'ir_recording.pickle', 'rb') as file:
 ir_ts=np.loadtxt(data_dir+'ir_stamps.csv', delimiter=',')
 ir_ts=ir_ts-ir_ts[0]
 center_brightness=np.average(ir_recording[:,100:140,140:180],axis=(1,2))
-# ax1.plot(ir_ts, center_brightness, c='red', label='ir center counts')
+ax1.plot(ir_ts, center_brightness, c='red', label='ir center counts')
 ax1.set_ylabel('Center Brightness (counts)')
 ax1.set_xlabel('Time (s)')
 
@@ -96,4 +96,4 @@ plt.xlabel('Distance (mm)')
 plt.ylabel('Height')
 plt.title('Height Profile with Segments')
 plt.legend()
-# plt.show()
+plt.show()
