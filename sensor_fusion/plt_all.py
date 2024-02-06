@@ -74,26 +74,26 @@ plt.show()
 profile_height = np.load(data_dir + 'scans/height_profile.npy')
 
 # 计算每段的长度
-num_segments = 20
-segment_length = len(profile_height) // num_segments
+# num_segments = 20
+# segment_length = len(profile_height) // num_segments
 
-color_cycle = ["#e41a1c", "#377eb8", "#4daf4a", "#984ea3", "#ff7f00", "#ffff33", "#a65628", "#f781bf", "#999999"]
-colors = [color_cycle[i % len(color_cycle)] for i in range(num_segments)]
+# color_cycle = ["#e41a1c", "#377eb8", "#4daf4a", "#984ea3", "#ff7f00", "#ffff33", "#a65628", "#f781bf", "#999999"]
+# colors = [color_cycle[i % len(color_cycle)] for i in range(num_segments)]
 
-plt.figure(figsize=(10, 6))
+# plt.figure(figsize=(10, 6))
 
-# 循环遍历每段并绘制
-for i in range(num_segments):
-    start_index = i * segment_length
-    end_index = (i + 1) * segment_length if i != num_segments - 1 else None  # 如果是最后一段，取到末尾
+# # 循环遍历每段并绘制
+# for i in range(num_segments):
+#     start_index = i * segment_length
+#     end_index = (i + 1) * segment_length if i != num_segments - 1 else None  # 如果是最后一段，取到末尾
     
-    segment_data = profile_height[start_index:end_index]
-    plt.plot(segment_data[:, 0], segment_data[:, 1], color=colors[i], label='Height Profile' if i == 0 else "")
+#     segment_data = profile_height[start_index:end_index]
+#     plt.plot(segment_data[:, 0], segment_data[:, 1], color=colors[i], label='Height Profile' if i == 0 else "")
 
-# 如果您只想为一个段加上legend，您可以在上述循环中只为一个段添加label。如上例中，只为第一个segment设置了label。
+# # 如果您只想为一个段加上legend，您可以在上述循环中只为一个段添加label。如上例中，只为第一个segment设置了label。
 
-plt.xlabel('Distance (mm)')
-plt.ylabel('Height')
-plt.title('Height Profile with Segments')
-plt.legend()
-plt.show()
+# plt.xlabel('Distance (mm)')
+# plt.ylabel('Height')
+# plt.title('Height Profile with Segments')
+# plt.legend()
+# plt.show()

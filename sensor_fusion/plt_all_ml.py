@@ -53,7 +53,7 @@ for n in range(0,23):
         welding_duration_mic = end_welding_mic - start_welding_mic
         welding_duration_mic_ext=mic_ts[-1]-mic_ts[0]
         welding_audio_data = audio_data[start_sample_index:end_sample_index]
-        print(welding_audio_data)
+        # print(welding_audio_data)
     else:
         # 如果没有找到合适的频率，可能需要其他逻辑来处理
         print("No signal captured")
@@ -62,21 +62,22 @@ for n in range(0,23):
     print('welding started:', start_welding_mic)
     print('welding ended:', end_welding_mic)
     print('welding duration time:', welding_duration_mic)
+    freq_welding, mic_ts_welding, Sxx_welding = signal.spectrogram(welding_audio_data, samplerate)
+    selected_mic_ts_welding = mic_ts_welding[start_index:end_index]
 
-    ax2.plot(welding_audio_data, mean_freq, label='microphone frequency')
+    mean_freq_welding = np.sum(Sxx_welding * np.arange(Sxx_welding.shape[0])[:, np.newaxis], axis=0) / np.sum(Sxx_welding, axis=0)
+    ax2.plot(mic_ts_welding, mean_freq_welding, label='microphone frequency')
     ax2.set_xlabel('Time Frame')
-    ax2.set_ylabel('Frequency, Height')
-    plt.show()
+    ax2.set_ylabel('Frequency, Height Difference')
+    # plt.show()
 
     # ##welding data
-    # welding_data=np.loadtxt(data_dir+'welding.csv',skiprows=1, delimiter=',')
-    # welding_data[:,0]-=welding_data[0,0]
-    # welding_data[:,0]/=1e6
-    # ax2.plot(welding_data[:,0],welding_data[:,1],label='voltage')
-    # ax2.plot(welding_data[:,0],welding_data[:,2],label='current')
-    # ax2.plot(welding_data[:,0],welding_data[:,3],c='gray',label='feedrate')
-
-
+    welding_data=np.loadtxt(data_dir+'welding.csv',skiprows=1, delimiter=',')
+    welding_data[:,0]-=welding_data[0,0]
+    welding_data[:,0]/=1e6
+    ax2.plot(welding_data[:,0],welding_data[:,1],label='voltage')
+    ax2.plot(welding_data[:,0],welding_data[:,2],label='current')
+    ax2.plot(welding_data[:,0],welding_data[:,3],c='gray',label='feedrate')
     # plt.show() 
 
     ##height profile
@@ -110,19 +111,21 @@ for n in range(0,23):
     # h3, l3 = ax3.get_legend_handles_labels()
     # ax1.legend(h1 + h2 + h3, l1 + l2 + l3, loc=1)
     # plt.show()
-    # 计算焊接音频数据的样本索引范围
-    start_sample_index = int(start_welding_mic * samplerate)
-    end_sample_index = int(end_welding_mic * samplerate)
-
-    # 提取焊接期间的音频数据
-    welding_audio_data = audio_data[start_sample_index:end_sample_index]
 
     # 绘制层高差异数据
-    plt.scatter(profile_height_current[:, 0], height_difference, c='silver', label='Height Difference During Welding')
-    plt.xlabel('Distance (mm)')
-    plt.ylabel('Height Difference (mm)')
-    plt.xlim(welding_ext_start, welding_ext_start + welding_length_ext)
-    plt.legend()
+    print(mic_ts_welding)
+    print(profile_height_current[:, 0])
+    ax3.set_xlim(mic_ts_welding[0], mic_ts_welding[-1])
+    ax1.set_xlim(mic_ts_welding[0], mic_ts_welding[-1])
+    ax3.scatter(profile_height_current[:, 0], height_difference, c='silver', label='Height Difference During Welding')
+    ax3.set_xlabel('Length (mm)')
+    
+    # ax1.xlim(welding_ext_start, welding_ext_start + welding_length_ext)
+    h1, l1 = ax1.get_legend_handles_labels()
+    h2, l2 = ax2.get_legend_handles_labels()
+    h3, l3 = ax3.get_legend_handles_labels()
+    ax1.legend(h1 + h2 + h3, l1 + l2 + l3, loc=1)
+    ax1.legend()
     plt.show()
 
     # profile_height = np.load(data_dir + 'scans/height_profile.npy')
