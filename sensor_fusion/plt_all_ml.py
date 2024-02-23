@@ -22,7 +22,7 @@ for n in range(0,23):
     center_brightness=np.average(ir_recording[:,100:140,140:180],axis=(1,2))
     # ax1.plot(ir_ts, center_brightness, c='red', label='ir center counts')
     ax1.set_ylabel('Center Brightness (counts)')
-    ax1.set_xlabel('Time (s)')
+    ax1.set_xlabel('length (mm)')
 
     ##microphone data
     wavfile = wave.open(f'../data/wall_weld_test/ER4043_model_150ipm_2023_10_08_08_23_41/layer_{n}/mic_recording.wav', 'rb')
@@ -72,12 +72,12 @@ for n in range(0,23):
     # plt.show()
 
     # ##welding data
-    welding_data=np.loadtxt(data_dir+'welding.csv',skiprows=1, delimiter=',')
-    welding_data[:,0]-=welding_data[0,0]
-    welding_data[:,0]/=1e6
-    ax2.plot(welding_data[:,0],welding_data[:,1],label='voltage')
-    ax2.plot(welding_data[:,0],welding_data[:,2],label='current')
-    ax2.plot(welding_data[:,0],welding_data[:,3],c='gray',label='feedrate')
+    # welding_data=np.loadtxt(data_dir+'welding.csv',skiprows=1, delimiter=',')
+    # welding_data[:,0]-=welding_data[0,0]
+    # welding_data[:,0]/=1e6
+    # ax2.plot(welding_data[:,0],welding_data[:,1],label='voltage')
+    # ax2.plot(welding_data[:,0],welding_data[:,2],label='current')
+    # ax2.plot(welding_data[:,0],welding_data[:,3],c='gray',label='feedrate')
     # plt.show() 
 
     ##height profile
@@ -113,9 +113,7 @@ for n in range(0,23):
     # plt.show()
 
     # 绘制层高差异数据
-    print(mic_ts_welding)
-    print(profile_height_current[:, 0])
-    ax3.set_xlim(mic_ts_welding[0], mic_ts_welding[-1])
+    ax3.set_xlim(profile_height_current[0, 0], profile_height_current[-1, 0])
     ax1.set_xlim(mic_ts_welding[0], mic_ts_welding[-1])
     ax3.scatter(profile_height_current[:, 0], height_difference, c='silver', label='Height Difference During Welding')
     ax3.set_xlabel('Length (mm)')

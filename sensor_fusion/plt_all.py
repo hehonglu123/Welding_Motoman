@@ -60,6 +60,15 @@ welding_length=profile_height[-1,0]-profile_height[0,0]
 welding_length_ext=welding_length*welding_duration_mic_ext/welding_duration_mic
 welding_ext_start=profile_height[0,0]-welding_length_ext*start_welding_mic/welding_duration_mic_ext
 
+print('welding_length_ext',welding_length_ext)
+print('welding_length',welding_length)
+print('welding_duration_mic_ext',welding_duration_mic_ext)
+print('welding_duration_mic',welding_duration_mic)
+print('welding_ext_start',welding_ext_start)
+print('profile_height[0,0]',profile_height[0,0])
+print('profile_height[-1,0]',profile_height[-1,0])
+print('profile_height[:,0]',profile_height[:,0])
+print('start_welding_mic',start_welding_mic)
 ax3.set_xlim(welding_ext_start,welding_ext_start+welding_length_ext)
 ax1.set_xlim(mic_ts[0],mic_ts[-1])
 ax3.scatter(profile_height[:,0],profile_height[:,1], c='silver', label='height profile')
