@@ -12,7 +12,7 @@ from qpsolvers import solve_qp
 from calib_analytic_grad import *
 
 from numpy.random import default_rng
-rng = default_rng()
+rng = default_rng(seed=0)
 
 Rx=np.array([1,0,0])
 Ry=np.array([0,1,0])
@@ -102,7 +102,7 @@ for robot, param_nom in zip(robots, param_noms):
 #######################################
 
 ##### collect data #####
-collected_data_N = 10
+collected_data_N = 3
 joint_data = [[] for i in range(len(robots))]
 pose_data = []
 
@@ -159,7 +159,7 @@ def get_dPt1t2dparam(joints, params, robots, TR2R1):
     r2T_r1 = robots[1].fwd(q2,world=True)
     r2T = robots[1].fwd(q2)
     r1T = robots[0].fwd(q1)
-    t2_t1 = r2T_r1.inv()*r1T
+    t1_t2 = r2T_r1.inv()*r1T
     J1_ana = jacobian_param(params[0],robots[0],q1,unit='degrees')
     J2_ana = jacobian_param(params[1],robots[1],q2,unit='degrees')
     # [p_i / PR1 p_i / HR1]
@@ -171,7 +171,7 @@ def get_dPt1t2dparam(joints, params, robots, TR2R1):
     for ab in range((jN+1)*3,(jN+1)*3+jN*2):
         dRdab[:,ab]=hat(J2_ana[3:,ab])@r2T.R@dpt_r2
     dpdparamR2=dpdparamR2+dRdab
-    return dpdparamR1, dpdparamR2, t2_t1
+    return dpdparamR1, dpdparamR2, t1_t2
 
 ##### calibration, using relative distance #####
 iter_N = 100
@@ -188,14 +188,22 @@ for it in range(iter_N):
             robots[1] = get_PH_from_param(param_calib[1], robots[1])
             
             ## get p_i, and all gradients
-            dpidparamR1,dpidparamR2, t2_t1_i = get_dPt1t2dparam([joint_data[0][data_i],joint_data[1][data_i]], param_calib, robots, TR2R1)
+            dpidparamR1,dpidparamR2, t1_t2_i = get_dPt1t2dparam([joint_data[0][data_i],joint_data[1][data_i]], param_calib, robots, TR2R1)
             ## get p_j, and all gradients
-            dpjdparamR1,dpjdparamR2, t2_t1_j = get_dPt1t2dparam([joint_data[0][data_j],joint_data[1][data_j]], param_calib, robots, TR2R1)
+            dpjdparamR1,dpjdparamR2, t1_t2_j = get_dPt1t2dparam([joint_data[0][data_j],joint_data[1][data_j]], param_calib, robots, TR2R1)
             ## add to gradient
             G1.extend(dpidparamR1-dpjdparamR1)
             G2.extend(dpidparamR2-dpjdparamR2)
             ## add error vec
-            error_vec.extend(t2_t1_i.p-t2_t1_j.p)
+            error_vec.extend(t1_t2_i.p-t1_t2_j.p)
+            
+            print(robots[0].fwd(joint_data[0][data_i]))
+            print(robots[0].fwd(joint_data[0][data_j]))
+            print(t1_t2_i)
+            print(t1_t2_j)
+            print(np.round(error_vec,3))
+            input(np.round(G1,3).T)
+    
     G1 = np.array(G1)
     G2 = np.array(G2)
     error_vec = np.array(error_vec)
@@ -203,6 +211,11 @@ for it in range(iter_N):
     G2_m = deepcopy(G2)
     G1_m[:,-12:] = 0
     G2_m[:,-12:] = 0
+    
+    plt.matshow(G1_m)
+    plt.colorbar()
+    plt.show()
+    
     param_calib[0] = param_calib[0] - alpha*np.dot(error_vec,G1_m)
     param_calib[1] = param_calib[1] - alpha*np.dot(error_vec,G2_m)
     print("error norm:", np.linalg.norm(np.array(error_vec)))
