@@ -102,7 +102,7 @@ for robot, param_nom in zip(robots, param_noms):
 #######################################
 
 ##### collect data #####
-collected_data_N = 3
+collected_data_N = 10
 joint_data = [[] for i in range(len(robots))]
 pose_data = []
 
@@ -163,15 +163,22 @@ def get_dPt1t2dparam(joints, params, robots, TR2R1):
     J1_ana = jacobian_param(params[0],robots[0],q1,unit='degrees')
     J2_ana = jacobian_param(params[1],robots[1],q2,unit='degrees')
     # [p_i / PR1 p_i / HR1]
-    dpdparamR1 = r2T_r1.R@J1_ana[3:,:]
+    dpdparamR1 = r2T_r1.R.T@J1_ana[3:,:]
     # [p_i / PR2 p_i / HR2]
-    dpdparamR2 = -r2T_r1.R@J2_ana[3:,:]
-    dpt_r2 = TR2R1.R.T@(r1T.p-r2T.p)
-    dRdab = np.zeros_like(dpdparamR1)
+    dpdparamR2 = -r2T.R.T@J2_ana[3:,:]
+    dpt_r2 = (TR2R1.R.T)@(r1T.p-r2T_r1.p)
+    dRdab = np.zeros_like(dpdparamR2)
     for ab in range((jN+1)*3,(jN+1)*3+jN*2):
-        dRdab[:,ab]=hat(J2_ana[3:,ab])@r2T.R@dpt_r2
+        dRdab[:,ab]=(-r2T.R.T@hat(J2_ana[3:,ab]))@dpt_r2
     dpdparamR2=dpdparamR2+dRdab
     return dpdparamR1, dpdparamR2, t1_t2
+
+##### calibration, using relative pose #####
+iter_N = 100
+alpha = 0.001
+param_calib = deepcopy(param_noms)
+for it in range(iter_N):
+    pass
 
 ##### calibration, using relative distance #####
 iter_N = 100
@@ -197,25 +204,30 @@ for it in range(iter_N):
             ## add error vec
             error_vec.extend(t1_t2_i.p-t1_t2_j.p)
             
-            print(robots[0].fwd(joint_data[0][data_i]))
-            print(robots[0].fwd(joint_data[0][data_j]))
-            print(t1_t2_i)
-            print(t1_t2_j)
-            print(np.round(error_vec,3))
-            input(np.round(G1,3).T)
+            # print(robots[0].fwd(joint_data[0][data_i]))
+            # print(robots[1].fwd(joint_data[1][data_i], world=True))
+            # print(t1_t2_i)
+            # print("==")
+            # print(robots[0].fwd(joint_data[0][data_j]))
+            # print(t1_t2_j)
+            # print(np.round(error_vec,3))
+            # print(np.round(dpidparamR1,3).T)
+            # print(np.round(dpjdparamR1,3).T)
+            # # print(np.round(G1,3).T)
+            # input('====================')
     
     G1 = np.array(G1)
     G2 = np.array(G2)
     error_vec = np.array(error_vec)
     G1_m = deepcopy(G1)
     G2_m = deepcopy(G2)
-    G1_m[:,-12:] = 0
-    G2_m[:,-12:] = 0
+    G1_m[:,-12:] *= 0.001
+    G2_m[:,-12:] *= 0.001
     
-    plt.matshow(G1_m)
-    plt.colorbar()
-    plt.show()
+    # plt.matshow(G1_m)
+    # plt.colorbar()
+    # plt.show()
     
     param_calib[0] = param_calib[0] - alpha*np.dot(error_vec,G1_m)
-    param_calib[1] = param_calib[1] - alpha*np.dot(error_vec,G2_m)
+    # param_calib[1] = param_calib[1] - alpha*np.dot(error_vec,G2_m)
     print("error norm:", np.linalg.norm(np.array(error_vec)))
