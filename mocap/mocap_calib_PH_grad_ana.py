@@ -163,7 +163,7 @@ for N in train_set:
         
         # update PH
         G = J_ana
-        Kq = np.diag(np.append(np.ones(P_size*3)*lambda_P,np.ones(H_size*2))*lambda_H)
+        Kq = np.diag(np.append(np.ones(P_size*3)*lambda_P,np.ones(H_size*2)*lambda_H)) ## TODO: tune lambda!!
         H=np.matmul(G.T,G)+Kq
         H=(H+np.transpose(H))/2
         f=-np.matmul(G.T,error_pos_ori)

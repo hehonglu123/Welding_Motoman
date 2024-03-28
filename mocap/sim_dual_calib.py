@@ -12,7 +12,7 @@ from qpsolvers import solve_qp
 from calib_analytic_grad import *
 
 from numpy.random import default_rng
-rng = default_rng(seed=0)
+rng = default_rng()
 
 Rx=np.array([1,0,0])
 Ry=np.array([0,1,0])
@@ -85,10 +85,10 @@ for robot in robots:
 ##############################
 
 ##### simulated actual parameters #####
-dP_up_range = 0.3
-dP_low_range = 0.1
-dab_up_range = np.radians(0.1)
-dab_low_range = np.radians(0.03)
+dP_up_range = 1.1
+dP_low_range = 0.05
+dab_up_range = np.radians(0.2)
+dab_low_range = np.radians(0.02)
 
 param_gts = []
 for robot, param_nom in zip(robots, param_noms):
@@ -102,7 +102,7 @@ for robot, param_nom in zip(robots, param_noms):
 #######################################
 
 ##### collect data #####
-collected_data_N = 10
+collected_data_N = 200
 joint_data = [[] for i in range(len(robots))]
 pose_data = []
 
@@ -173,13 +173,108 @@ def get_dPt1t2dparam(joints, params, robots, TR2R1):
     dpdparamR2=dpdparamR2+dRdab
     return dpdparamR1, dpdparamR2, t1_t2
 
-##### calibration, using relative pose #####
-iter_N = 100
-alpha = 0.001
-param_calib = deepcopy(param_noms)
-for it in range(iter_N):
-    pass
+def get_dPRt1t2dparam(joints, params, robots, TR2R1):
+    
+    q1 = joints[0]
+    q2 = joints[1]
+    jN = len(q1)
+    r2T_r1 = robots[1].fwd(q2,world=True)
+    r1_t2 = r2T_r1.inv()
+    r2T = robots[1].fwd(q2)
+    r2_t2 = r2T.inv()
+    r1T = robots[0].fwd(q1)
+    t1_t2 = r1_t2*r1T
+    J1_ana = jacobian_param(params[0],robots[0],q1,unit='radians')
+    J2_ana = jacobian_param(params[1],robots[1],q2,unit='radians')
+    
+    dpt1t2_t2=r1_t2.R@(r1T.p-r2T_r1.p) # note: dpt1t2_t2 and t1_t2.p is the same
+    
+    J1p=np.matmul(r1_t2.R,J1_ana[3:,:])
+    J1R=np.matmul(r1_t2.R,J1_ana[:3,:])
+    
+    J2p=np.matmul(r2_t2.R,J2_ana[3:,:])
+    J2R=np.matmul(r2_t2.R,J2_ana[:3,:])
+    
+    dpRdparamR1 = np.vstack((J1R,J1p))
+    dpRdparamR2 = np.vstack((-J2R,-J2p+hat(dpt1t2_t2)@J2R))
+    
+    return dpRdparamR1, dpRdparamR2, t1_t2
 
+##### calibration, using relative pose #####
+iter_N = 200
+alpha = 0.03
+lambda_P=1
+lambda_H=1
+P_size=7
+H_size=6
+param_calib = deepcopy(param_noms)
+ave_error_iter=[]
+param1_norm_iter=[np.linalg.norm(param_gts[0]-param_calib[0])]
+param2_norm_iter=[np.linalg.norm(param_gts[1]-param_calib[1])]
+for it in range(iter_N):
+    try:
+        print("iter: ", it)
+        error_nu = []
+        J_all = []
+        ave_error = []
+        for data_i in range(collected_data_N):
+            robots[0] = get_PH_from_param(param_calib[0], robots[0])
+            robots[1] = get_PH_from_param(param_calib[1], robots[1])
+            dpRdparamR1, dpRdparamR2, t1_t2 = get_dPRt1t2dparam([joint_data[0][data_i],joint_data[1][data_i]], param_calib, robots, TR2R1)
+            
+            # ground truth relative pose
+            gt_p = pose_data[data_i][:3]
+            gt_R = q2R(pose_data[data_i][3:])
+            
+            vd = gt_p-t1_t2.p
+            omega_d=s_err_func(t1_t2.R@gt_R.T)
+            ave_error.append(np.linalg.norm(np.append(omega_d,vd)))
+            error_nu.extend(np.append(omega_d,vd))
+            if data_i==0:
+                J_all = np.hstack((dpRdparamR1,dpRdparamR2))
+            else:
+                J_all = np.vstack((J_all,np.hstack((dpRdparamR1,dpRdparamR2))))
+        
+        r1_param_weight = np.append(np.ones(P_size*3)*lambda_P,np.ones(H_size*2))*lambda_H
+        r2_param_weight = np.append(np.ones(P_size*3)*lambda_P,np.ones(H_size*2))*lambda_H
+        Kq = np.diag(np.append(r1_param_weight,r2_param_weight))
+        H=np.matmul(J_all.T,J_all)+Kq
+        H=(H+np.transpose(H))/2
+        f=-np.matmul(J_all.T,error_nu)
+        dph=solve_qp(H,f,solver='quadprog')
+        
+        # eps=0.1
+        # dph = np.linalg.pinv(J_all)@error_nu
+        # dph = -J_all.T@(J_all@J_all.T+eps*np.eye(J_all.shape[0]))@error_nu
+        
+        d_pH_update = alpha*dph
+        param_calib[0] = param_calib[0]+d_pH_update[:len(param_calib[0])]
+        param_calib[1] = param_calib[1]+d_pH_update[len(param_calib[0]):]
+        print("Ave error: ", np.mean(ave_error))
+        print("Actual param vs calib param: ", np.linalg.norm(param_gts[0]-param_calib[0]), np.linalg.norm(param_gts[1]-param_calib[1]))
+        u,s,v=np.linalg.svd(J_all)
+        print("J rank (numpy) / Total singular values: %d/%d"%(np.linalg.matrix_rank(J_all),len(s)))
+        print("J condition number: ", s[0]/s[-1])
+        print("============")
+        ave_error_iter.append(np.mean(ave_error))
+        param1_norm_iter.append(np.linalg.norm(param_gts[0]-param_calib[0]))
+        param2_norm_iter.append(np.linalg.norm(param_gts[1]-param_calib[1]))
+    except KeyboardInterrupt:
+        break
+
+plt.plot(ave_error_iter)
+plt.title("Ave error")
+plt.xlabel("iter")
+plt.ylabel("nu error norm")
+plt.show()
+
+plt.plot(param1_norm_iter, label='robot 1 params')
+plt.plot(param2_norm_iter, label='robot 2 params')
+plt.xlabel("iter")
+plt.legend()
+plt.title("Param Error norm")
+plt.show()
+exit()
 ##### calibration, using relative distance #####
 iter_N = 100
 alpha = 0.001
