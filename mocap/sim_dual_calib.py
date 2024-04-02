@@ -12,7 +12,7 @@ from qpsolvers import solve_qp
 from calib_analytic_grad import *
 
 from numpy.random import default_rng
-rng = default_rng()
+rng = default_rng(seed=0)
 
 Rx=np.array([1,0,0])
 Ry=np.array([0,1,0])
@@ -91,6 +91,8 @@ dab_up_range = np.radians(0.2)
 dab_low_range = np.radians(0.02)
 
 param_gts = []
+param_upper_bounds = []
+param_lower_bounds = []
 for robot, param_nom in zip(robots, param_noms):
     jN = len(robot.robot.H[0])
     dP=rng.uniform(low=-(dP_up_range-dP_low_range),high=(dP_up_range-dP_low_range),size=((jN+1)*3,))
@@ -99,6 +101,8 @@ for robot, param_nom in zip(robots, param_noms):
     dab=dab+dab/np.fabs(dab)*dab_low_range
     param_gt = param_nom + np.concatenate((dP, dab))
     param_gts.append(param_gt)
+    param_upper_bounds.extend(np.append(np.ones((jN+1)*3)*dP_up_range,np.ones(jN*2)*dab_up_range)+param_nom)
+    param_lower_bounds.extend(np.append(np.ones((jN+1)*3)*-dP_up_range,np.ones(jN*2)*-dab_up_range)+param_nom)
 #######################################
 
 ##### collect data #####
@@ -203,10 +207,13 @@ def get_dPRt1t2dparam(joints, params, robots, TR2R1):
 ##### calibration, using relative pose #####
 iter_N = 200
 alpha = 0.03
-lambda_P=1
-lambda_H=1
+lambda_P=0.1
+lambda_H=10
 P_size=7
 H_size=6
+r1_param_weight = np.append(np.ones(P_size*3)*lambda_P,np.ones(H_size*2)*lambda_H)
+r2_param_weight = np.append(np.ones(P_size*3)*lambda_P,np.ones(H_size*2)*lambda_H)
+
 param_calib = deepcopy(param_noms)
 ave_error_iter=[]
 param1_norm_iter=[np.linalg.norm(param_gts[0]-param_calib[0])]
@@ -217,6 +224,7 @@ for it in range(iter_N):
         error_nu = []
         J_all = []
         ave_error = []
+        this_param = np.resize(param_calib,(len(param_calib)*len(param_calib[0]),))
         for data_i in range(collected_data_N):
             robots[0] = get_PH_from_param(param_calib[0], robots[0])
             robots[1] = get_PH_from_param(param_calib[1], robots[1])
@@ -235,12 +243,12 @@ for it in range(iter_N):
             else:
                 J_all = np.vstack((J_all,np.hstack((dpRdparamR1,dpRdparamR2))))
         
-        r1_param_weight = np.append(np.ones(P_size*3)*lambda_P,np.ones(H_size*2))*lambda_H
-        r2_param_weight = np.append(np.ones(P_size*3)*lambda_P,np.ones(H_size*2))*lambda_H
+        
         Kq = np.diag(np.append(r1_param_weight,r2_param_weight))
         H=np.matmul(J_all.T,J_all)+Kq
         H=(H+np.transpose(H))/2
         f=-np.matmul(J_all.T,error_nu)
+        # dph=solve_qp(H,f,solver='quadprog',lb=np.array(param_lower_bounds)-this_param,ub=np.array(param_upper_bounds)-this_param)
         dph=solve_qp(H,f,solver='quadprog')
         
         # eps=0.1
@@ -259,6 +267,17 @@ for it in range(iter_N):
         ave_error_iter.append(np.mean(ave_error))
         param1_norm_iter.append(np.linalg.norm(param_gts[0]-param_calib[0]))
         param2_norm_iter.append(np.linalg.norm(param_gts[1]-param_calib[1]))
+        
+        # visualize jacobian matrix
+        # plt.scatter(np.arange(len(s)),s)
+        # plt.title("Singular values")
+        # plt.show()
+        
+        # plt.matshow(v.T)
+        # plt.title("Right singular vectors")
+        # plt.colorbar()
+        # plt.show()
+        
     except KeyboardInterrupt:
         break
 
