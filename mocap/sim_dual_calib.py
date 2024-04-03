@@ -207,10 +207,12 @@ def get_dPRt1t2dparam(joints, params, robots, TR2R1):
 ##### calibration, using relative pose #####
 iter_N = 200
 alpha = 0.03
-lambda_P=0.1
-lambda_H=10
+lambda_P=1
+lambda_H=1000
 P_size=7
 H_size=6
+weight_H = 0.1
+weight_P = 1
 r1_param_weight = np.append(np.ones(P_size*3)*lambda_P,np.ones(H_size*2)*lambda_H)
 r2_param_weight = np.append(np.ones(P_size*3)*lambda_P,np.ones(H_size*2)*lambda_H)
 
@@ -229,6 +231,12 @@ for it in range(iter_N):
             robots[0] = get_PH_from_param(param_calib[0], robots[0])
             robots[1] = get_PH_from_param(param_calib[1], robots[1])
             dpRdparamR1, dpRdparamR2, t1_t2 = get_dPRt1t2dparam([joint_data[0][data_i],joint_data[1][data_i]], param_calib, robots, TR2R1)
+            
+            # weighting
+            dpRdparamR1[:,:P_size*3] *= weight_P
+            dpRdparamR1[:,P_size*3:] *= weight_H
+            dpRdparamR2[:,:P_size*3] *= weight_P
+            dpRdparamR2[:,P_size*3:] *= weight_H
             
             # ground truth relative pose
             gt_p = pose_data[data_i][:3]
