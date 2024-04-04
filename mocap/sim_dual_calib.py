@@ -106,7 +106,7 @@ for robot, param_nom in zip(robots, param_noms):
 #######################################
 
 ##### collect data #####
-collected_data_N = 200
+collected_data_N = 100
 joint_data = [[] for i in range(len(robots))]
 pose_data = []
 
@@ -125,6 +125,7 @@ while data_cnt < collected_data_N:
     ## get robot 1 tool pose
     r1T = deepcopy(r2T_r1)
     r1T.R = r2T_r1.R@toolR2R1
+    r1T.p = r2T_r1.p+rng.uniform(low=[-1,-1,-1], high=[1,1,1]) # random translation
     ## get robot 1 tool pose in robot 2 tool frame
     r1T_r2 = r2T_r1.inv()*r1T
     ## solve for robot1 joint angles
@@ -205,14 +206,16 @@ def get_dPRt1t2dparam(joints, params, robots, TR2R1):
     return dpRdparamR1, dpRdparamR2, t1_t2
 
 ##### calibration, using relative pose #####
-iter_N = 200
-alpha = 0.03
+iter_N = 400
+alpha = 0.05
 lambda_P=1
-lambda_H=1000
+lambda_H=10
 P_size=7
 H_size=6
-weight_H = 0.1
+weight_H = 0.03
 weight_P = 1
+# weight_H = 1
+# weight_P = 1
 r1_param_weight = np.append(np.ones(P_size*3)*lambda_P,np.ones(H_size*2)*lambda_H)
 r2_param_weight = np.append(np.ones(P_size*3)*lambda_P,np.ones(H_size*2)*lambda_H)
 
@@ -256,8 +259,8 @@ for it in range(iter_N):
         H=np.matmul(J_all.T,J_all)+Kq
         H=(H+np.transpose(H))/2
         f=-np.matmul(J_all.T,error_nu)
-        # dph=solve_qp(H,f,solver='quadprog',lb=np.array(param_lower_bounds)-this_param,ub=np.array(param_upper_bounds)-this_param)
-        dph=solve_qp(H,f,solver='quadprog')
+        dph=solve_qp(H,f,solver='quadprog',lb=np.array(param_lower_bounds)-this_param,ub=np.array(param_upper_bounds)-this_param)
+        # dph=solve_qp(H,f,solver='quadprog')
         
         # eps=0.1
         # dph = np.linalg.pinv(J_all)@error_nu
@@ -277,14 +280,15 @@ for it in range(iter_N):
         param2_norm_iter.append(np.linalg.norm(param_gts[1]-param_calib[1]))
         
         # visualize jacobian matrix
-        # plt.scatter(np.arange(len(s)),s)
-        # plt.title("Singular values")
-        # plt.show()
-        
-        # plt.matshow(v.T)
-        # plt.title("Right singular vectors")
-        # plt.colorbar()
-        # plt.show()
+        if iter==iter_N-1:
+            plt.scatter(np.arange(len(s)),np.log10(s))
+            plt.title("Singular values (log10)")
+            plt.show()
+            
+            plt.matshow(v.T)
+            plt.title("Right singular vectors")
+            plt.colorbar()
+            plt.show()
         
     except KeyboardInterrupt:
         break
