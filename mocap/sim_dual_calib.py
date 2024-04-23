@@ -43,6 +43,9 @@ robot=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.
                     tool_marker_config_file=tool_marker_dir+'mti_'+r2dataset_date+'_marker_config.yaml')
 robots.append(robot)
 TR2R1 = Transform(robots[1].base_H[:3,:3],robots[1].base_H[:3,3])
+tool1_makers = [Transform(np.eye(3),np.array([0,0,0])),\
+                Transform(np.eye(3),np.array([0.1,0,0])),\
+                Transform(np.eye(3),np.array([0,0.1,0]))] # transformation from robot tool 1 to markers
 
 print("robot 1 zero config: ", robots[0].fwd(np.zeros(6)))
 print("robot 2 zero config: ", robots[1].fwd(np.zeros(6)))
@@ -105,10 +108,18 @@ for robot, param_nom in zip(robots, param_noms):
     param_lower_bounds.extend(np.append(np.ones((jN+1)*3)*-dP_up_range,np.ones(jN*2)*-dab_up_range)+param_nom)
 #######################################
 
+def objective_J():
+    
+    pass
+
 ##### collect data #####
+# Assuming the robot2 is holding a camera
+# robot1 is holding three markers, m1 m2 m3
+# collect joint angles of robot1 and robot2
+# collect pose of m1, m2 and m3 in robot2 tool (camera) frame
 collected_data_N = 100
 joint_data = [[] for i in range(len(robots))]
-pose_data = []
+pose_data = [[] for i in range(len(tool1_makers))]
 
 limit_factor = np.radians(2)
 toolR2R1 = rot(Rx,np.pi)@rot(Rz,np.pi/2)
@@ -119,12 +130,16 @@ while data_cnt < collected_data_N:
     joint_angles = []
     q2 = rng.uniform(low=robots[1].lower_limit+limit_factor, high=robots[1].upper_limit-limit_factor) \
             if data_cnt!=0 else np.array([0,0,0,0,np.radians(10),0])
+    ## check singularity for robot 1
+    if min(np.linalg.svd(robots[1].jacobian(q2))[1]) < 1e-3:
+        print("near singular")
+        continue
     ## robot2 forward kinematics using simulated actual parameters
     robots[1] = get_PH_from_param(param_gts[1], robots[1])
-    r2T_r1 = robots[1].fwd(q2,world=True)
+    r2T_r1 = robots[1].fwd(q2,world=True) # robot 2 tool in robot 1 base frame
     ## get robot 1 tool pose
     r1T = deepcopy(r2T_r1)
-    r1T.R = r2T_r1.R@toolR2R1
+    r1T.R = r2T_r1.R@toolR2R1@rpy2R(rng.uniform(low=np.radians(-5), high=np.radians(5),size=3))
     r1T.p = r2T_r1.p+rng.uniform(low=[-1,-1,-1], high=[1,1,1]) # random translation
     ## get robot 1 tool pose in robot 2 tool frame
     r1T_r2 = r2T_r1.inv()*r1T
@@ -134,6 +149,7 @@ while data_cnt < collected_data_N:
         q1_nom = robots[0].inv(r1T.p, r1T.R, last_joints=np.zeros(6))[0]
     except ValueError:
         continue
+    ## check singularity for robot 1
     if min(np.linalg.svd(robots[0].jacobian(q1_nom))[1]) < 1e-3:
         print("near singular")
         continue
@@ -143,7 +159,10 @@ while data_cnt < collected_data_N:
     ## record data
     joint_data[0].append(q1)
     joint_data[1].append(q2)
-    pose_data.append(np.append(r1T_r2.p,R2q(r1T_r2.R)))
+    for mpi,mp in enumerate(tool1_makers): # marker pose in robot 2 tool frame
+        mp_r2 = r1T_r2*mp
+        pose_data[mpi].append(np.append(mp_r2.p,R2q(mp_r2.R)))
+    # pose_data.append(np.append(r1T_r2.p,R2q(r1T_r2.R)))
     data_cnt+=1
     
     # print(robots[0].fwd(q1_nom))
@@ -233,27 +252,40 @@ for it in range(iter_N):
         for data_i in range(collected_data_N):
             robots[0] = get_PH_from_param(param_calib[0], robots[0])
             robots[1] = get_PH_from_param(param_calib[1], robots[1])
-            dpRdparamR1, dpRdparamR2, t1_t2 = get_dPRt1t2dparam([joint_data[0][data_i],joint_data[1][data_i]], param_calib, robots, TR2R1)
-            
-            # weighting
-            dpRdparamR1[:,:P_size*3] *= weight_P
-            dpRdparamR1[:,P_size*3:] *= weight_H
-            dpRdparamR2[:,:P_size*3] *= weight_P
-            dpRdparamR2[:,P_size*3:] *= weight_H
-            
-            # ground truth relative pose
-            gt_p = pose_data[data_i][:3]
-            gt_R = q2R(pose_data[data_i][3:])
-            
-            vd = gt_p-t1_t2.p
-            omega_d=s_err_func(t1_t2.R@gt_R.T)
-            ave_error.append(np.linalg.norm(np.append(omega_d,vd)))
-            error_nu.extend(np.append(omega_d,vd))
-            if data_i==0:
-                J_all = np.hstack((dpRdparamR1,dpRdparamR2))
-            else:
-                J_all = np.vstack((J_all,np.hstack((dpRdparamR1,dpRdparamR2))))
-        
+            # loop through all collected marker data
+            origin_Rtool = deepcopy(robots[0].robot.R_tool)
+            origin_Ptool = deepcopy(robots[0].robot.p_tool)
+            for mpi,mp in enumerate(tool1_makers):
+                # change the tool pose to the marker pose
+                robots[0].robot.p_tool = robots[0].robot.R_tool@mp.p + robots[0].robot.p_tool
+                robots[0].robot.R_tool = robots[0].robot.R_tool@mp.R
+                robots[0].p_tool = robots[0].robot.p_tool
+                robots[0].R_tool = robots[0].robot.R_tool
+                # get the analytical jacobian and relative pose
+                dpRdparamR1, dpRdparamR2, t1_t2 = get_dPRt1t2dparam([joint_data[0][data_i],joint_data[1][data_i]], param_calib, robots, TR2R1)
+                
+                # weighting
+                dpRdparamR1[:,:P_size*3] *= weight_P
+                dpRdparamR1[:,P_size*3:] *= weight_H
+                dpRdparamR2[:,:P_size*3] *= weight_P
+                dpRdparamR2[:,P_size*3:] *= weight_H
+                
+                # ground truth/recorded relative pose
+                gt_p = pose_data[mpi][data_i][:3]
+                gt_R = q2R(pose_data[mpi][data_i][3:])
+                
+                vd = gt_p-t1_t2.p
+                omega_d=s_err_func(t1_t2.R@gt_R.T)
+                ave_error.append(np.linalg.norm(np.append(omega_d,vd)))
+                error_nu.extend(np.append(omega_d,vd))
+                if len(J_all)==0:
+                    J_all = np.hstack((dpRdparamR1,dpRdparamR2))
+                else:
+                    J_all = np.vstack((J_all,np.hstack((dpRdparamR1,dpRdparamR2))))
+            robots[0].robot.R_tool = origin_Rtool
+            robots[0].robot.p_tool = origin_Ptool
+            robots[0].p_tool = origin_Ptool
+            robots[0].R_tool = origin_Rtool
         
         Kq = np.diag(np.append(r1_param_weight,r2_param_weight))
         H=np.matmul(J_all.T,J_all)+Kq
