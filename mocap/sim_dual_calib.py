@@ -43,9 +43,10 @@ robot=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.
                     tool_marker_config_file=tool_marker_dir+'mti_'+r2dataset_date+'_marker_config.yaml')
 robots.append(robot)
 TR2R1 = Transform(robots[1].base_H[:3,:3],robots[1].base_H[:3,3])
-tool1_makers = [Transform(np.eye(3),np.array([0,0,0])),\
-                Transform(np.eye(3),np.array([0.1,0,0])),\
-                Transform(np.eye(3),np.array([0,0.1,0]))] # transformation from robot tool 1 to markers
+# tool1_makers = [Transform(np.eye(3),np.array([0,0,0])),\
+#                 Transform(np.eye(3),np.array([0.1,0,0])),\
+#                 Transform(np.eye(3),np.array([0,0.1,0]))] # transformation from robot tool 1 to markers
+tool1_makers = [Transform(np.eye(3),np.array([0,0,0]))] # transformation from robot tool 1 to markers
 
 print("robot 1 zero config: ", robots[0].fwd(np.zeros(6)))
 print("robot 2 zero config: ", robots[1].fwd(np.zeros(6)))
@@ -117,7 +118,7 @@ def objective_J():
 # robot1 is holding three markers, m1 m2 m3
 # collect joint angles of robot1 and robot2
 # collect pose of m1, m2 and m3 in robot2 tool (camera) frame
-collected_data_N = 100
+collected_data_N = 200
 joint_data = [[] for i in range(len(robots))]
 pose_data = [[] for i in range(len(tool1_makers))]
 
@@ -130,6 +131,7 @@ while data_cnt < collected_data_N:
     joint_angles = []
     q2 = rng.uniform(low=robots[1].lower_limit+limit_factor, high=robots[1].upper_limit-limit_factor) \
             if data_cnt!=0 else np.array([0,0,0,0,np.radians(10),0])
+    
     ## check singularity for robot 1
     if min(np.linalg.svd(robots[1].jacobian(q2))[1]) < 1e-3:
         print("near singular")
@@ -147,6 +149,7 @@ while data_cnt < collected_data_N:
     robots[0] = get_PH_from_param(param_noms[0], robots[0])
     try:
         q1_nom = robots[0].inv(r1T.p, r1T.R, last_joints=np.zeros(6))[0]
+        # q1_nom = rng.choice(robots[0].inv(r1T.p, r1T.R))
     except ValueError:
         continue
     ## check singularity for robot 1
@@ -226,22 +229,35 @@ def get_dPRt1t2dparam(joints, params, robots, TR2R1):
 
 ##### calibration, using relative pose #####
 iter_N = 400
-alpha = 0.05
+alpha = 0.01
+# lambda_P=0.01
+# lambda_H=0.01
 lambda_P=1
 lambda_H=10
 P_size=7
 H_size=6
-weight_H = 0.03
+weight_ori = 1
+weight_pos = 1
+# weight_H = 0
+# weight_P = 1
+weight_H = 0.3
 weight_P = 1
 # weight_H = 1
 # weight_P = 1
 r1_param_weight = np.append(np.ones(P_size*3)*lambda_P,np.ones(H_size*2)*lambda_H)
 r2_param_weight = np.append(np.ones(P_size*3)*lambda_P,np.ones(H_size*2)*lambda_H)
+####
+train_dataset_ratio = 0.5
 
 param_calib = deepcopy(param_noms)
 ave_error_iter=[]
+ave_test_error_iter=[]
 param1_norm_iter=[np.linalg.norm(param_gts[0]-param_calib[0])]
 param2_norm_iter=[np.linalg.norm(param_gts[1]-param_calib[1])]
+datasets_part = np.arange(collected_data_N)
+rng.shuffle(datasets_part)
+train_dataset = datasets_part[:int(collected_data_N*train_dataset_ratio)]
+test_dataset = datasets_part[int(collected_data_N*(1-train_dataset_ratio)):]
 for it in range(iter_N):
     try:
         print("iter: ", it)
@@ -249,7 +265,8 @@ for it in range(iter_N):
         J_all = []
         ave_error = []
         this_param = np.resize(param_calib,(len(param_calib)*len(param_calib[0]),))
-        for data_i in range(collected_data_N):
+        ## training dataset
+        for data_i in train_dataset:
             robots[0] = get_PH_from_param(param_calib[0], robots[0])
             robots[1] = get_PH_from_param(param_calib[1], robots[1])
             # loop through all collected marker data
@@ -274,14 +291,50 @@ for it in range(iter_N):
                 gt_p = pose_data[mpi][data_i][:3]
                 gt_R = q2R(pose_data[mpi][data_i][3:])
                 
-                vd = gt_p-t1_t2.p
+                vd = t1_t2.p-gt_p
                 omega_d=s_err_func(t1_t2.R@gt_R.T)
-                ave_error.append(np.linalg.norm(np.append(omega_d,vd)))
-                error_nu.extend(np.append(omega_d,vd))
+                ave_error.append(np.linalg.norm(np.append(omega_d*weight_ori,vd*weight_pos)))
+                error_nu.extend(np.append(omega_d*weight_ori,vd*weight_pos))
                 if len(J_all)==0:
-                    J_all = np.hstack((dpRdparamR1,dpRdparamR2))
+                    J_all = np.diag([weight_ori,weight_ori,weight_ori,\
+                        weight_pos,weight_pos,weight_pos])@np.hstack((dpRdparamR1,dpRdparamR2))
                 else:
-                    J_all = np.vstack((J_all,np.hstack((dpRdparamR1,dpRdparamR2))))
+                    J_all = np.vstack((J_all,np.diag([weight_ori,weight_ori,weight_ori,\
+                        weight_pos,weight_pos,weight_pos])@np.hstack((dpRdparamR1,dpRdparamR2))))
+            robots[0].robot.R_tool = origin_Rtool
+            robots[0].robot.p_tool = origin_Ptool
+            robots[0].p_tool = origin_Ptool
+            robots[0].R_tool = origin_Rtool
+        ## testing dataset, get error only
+        ave_test_error=[]
+        for data_i in test_dataset:
+            robots[0] = get_PH_from_param(param_calib[0], robots[0])
+            robots[1] = get_PH_from_param(param_calib[1], robots[1])
+            # loop through all collected marker data
+            origin_Rtool = deepcopy(robots[0].robot.R_tool)
+            origin_Ptool = deepcopy(robots[0].robot.p_tool)
+            for mpi,mp in enumerate(tool1_makers):
+                # change the tool pose to the marker pose
+                robots[0].robot.p_tool = robots[0].robot.R_tool@mp.p + robots[0].robot.p_tool
+                robots[0].robot.R_tool = robots[0].robot.R_tool@mp.R
+                robots[0].p_tool = robots[0].robot.p_tool
+                robots[0].R_tool = robots[0].robot.R_tool
+                # get tool pose in robot 2 tool frame
+                q1 = joint_data[0][data_i]
+                q2 = joint_data[1][data_i]
+                jN = len(q1)
+                r2T_r1 = robots[1].fwd(q2,world=True)
+                r1_t2 = r2T_r1.inv()
+                r2T = robots[1].fwd(q2)
+                r2_t2 = r2T.inv()
+                r1T = robots[0].fwd(q1)
+                t1_t2 = r1_t2*r1T
+                # ground truth/recorded relative pose
+                gt_p = pose_data[mpi][data_i][:3]
+                gt_R = q2R(pose_data[mpi][data_i][3:])
+                vd = t1_t2.p-gt_p
+                omega_d=s_err_func(t1_t2.R@gt_R.T)
+                ave_test_error.append(np.linalg.norm(np.append(omega_d*weight_ori,vd*weight_pos)))
             robots[0].robot.R_tool = origin_Rtool
             robots[0].robot.p_tool = origin_Ptool
             robots[0].p_tool = origin_Ptool
@@ -293,26 +346,36 @@ for it in range(iter_N):
         f=-np.matmul(J_all.T,error_nu)
         dph=solve_qp(H,f,solver='quadprog',lb=np.array(param_lower_bounds)-this_param,ub=np.array(param_upper_bounds)-this_param)
         # dph=solve_qp(H,f,solver='quadprog')
-        
+        # dph[P_size*6+H_size*2:]*=-1
         # eps=0.1
         # dph = np.linalg.pinv(J_all)@error_nu
         # dph = -J_all.T@(J_all@J_all.T+eps*np.eye(J_all.shape[0]))@error_nu
         
-        d_pH_update = alpha*dph
+        d_pH_update = -1*alpha*dph
         param_calib[0] = param_calib[0]+d_pH_update[:len(param_calib[0])]
         param_calib[1] = param_calib[1]+d_pH_update[len(param_calib[0]):]
         print("Ave error: ", np.mean(ave_error))
+        print("Ave testing error",np.mean(ave_test_error))
         print("Actual param vs calib param: ", np.linalg.norm(param_gts[0]-param_calib[0]), np.linalg.norm(param_gts[1]-param_calib[1]))
         u,s,v=np.linalg.svd(J_all)
         print("J rank (numpy) / Total singular values: %d/%d"%(np.linalg.matrix_rank(J_all),len(s)))
         print("J condition number: ", s[0]/s[-1])
+        
+        # check H, jacobian
+        J_all_H = np.hstack((J_all[:,P_size*3:P_size*3+H_size*2],J_all[:,P_size*6+H_size*2:]))
+        print("J_all_H shape: ", J_all_H.shape)
+        u,s,v=np.linalg.svd(J_all_H)
+        print("J_H rank (numpy) / Total singular values: %d/%d"%(np.linalg.matrix_rank(J_all_H),len(s)))
+        print("Actual H param vs calib H param: ", np.linalg.norm(param_gts[0][P_size*3:]-param_calib[0][P_size*3:]), np.linalg.norm(param_gts[1][P_size*3:]-param_calib[1][P_size*3:]))
+        
         print("============")
         ave_error_iter.append(np.mean(ave_error))
+        ave_test_error_iter.append(np.mean(ave_test_error))
         param1_norm_iter.append(np.linalg.norm(param_gts[0]-param_calib[0]))
         param2_norm_iter.append(np.linalg.norm(param_gts[1]-param_calib[1]))
         
         # visualize jacobian matrix
-        if iter==iter_N-1:
+        if it==999999:
             plt.scatter(np.arange(len(s)),np.log10(s))
             plt.title("Singular values (log10)")
             plt.show()
@@ -321,11 +384,17 @@ for it in range(iter_N):
             plt.title("Right singular vectors")
             plt.colorbar()
             plt.show()
+            
+            plt.matshow(u)
+            plt.title("Left singular vectors")
+            plt.colorbar()
+            plt.show()
         
     except KeyboardInterrupt:
         break
 
-plt.plot(ave_error_iter)
+plt.plot(ave_error_iter, label='train error')
+plt.plot(ave_test_error_iter, label='test error')
 plt.title("Ave error")
 plt.xlabel("iter")
 plt.ylabel("nu error norm")
