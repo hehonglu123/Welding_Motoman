@@ -118,7 +118,7 @@ def objective_J():
 # robot1 is holding three markers, m1 m2 m3
 # collect joint angles of robot1 and robot2
 # collect pose of m1, m2 and m3 in robot2 tool (camera) frame
-collected_data_N = 200
+collected_data_N = 400
 joint_data = [[] for i in range(len(robots))]
 pose_data = [[] for i in range(len(tool1_makers))]
 
@@ -143,6 +143,8 @@ while data_cnt < collected_data_N:
     r1T = deepcopy(r2T_r1)
     r1T.R = r2T_r1.R@toolR2R1@rpy2R(rng.uniform(low=np.radians(-5), high=np.radians(5),size=3))
     r1T.p = r2T_r1.p+rng.uniform(low=[-1,-1,-1], high=[1,1,1]) # random translation
+    # r1T.R = r2T_r1.R@toolR2R1@rpy2R(rng.uniform(low=np.radians(-180), high=np.radians(180),size=3))
+    # r1T.p = r2T_r1.p+rng.uniform(low=[-3000,-3000,-3000], high=[3000,3000,3000]) # random translation
     ## get robot 1 tool pose in robot 2 tool frame
     r1T_r2 = r2T_r1.inv()*r1T
     ## solve for robot1 joint angles
@@ -222,8 +224,15 @@ def get_dPRt1t2dparam(joints, params, robots, TR2R1):
     J2p=np.matmul(r2_t2.R,J2_ana[3:,:])
     J2R=np.matmul(r2_t2.R,J2_ana[:3,:])
     
+    # jrpr1t2 = []
+    # for jrinvhat in J2_ana[:3,:].T:
+    #     this_col = -r2_t2.R@hat(jrinvhat)@r2T.R@dpt1t2_t2
+    #     jrpr1t2.append(this_col)
+    # jrpr1t2 = np.array(jrpr1t2).T
+    
     dpRdparamR1 = np.vstack((J1R,J1p))
     dpRdparamR2 = np.vstack((-J2R,-J2p+hat(dpt1t2_t2)@J2R))
+    # dpRdparamR2 = np.vstack((-J2R,-J2p+jrpr1t2))
     
     return dpRdparamR1, dpRdparamR2, t1_t2
 
