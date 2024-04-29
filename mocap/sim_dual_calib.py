@@ -43,10 +43,10 @@ robot=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.
                     tool_marker_config_file=tool_marker_dir+'mti_'+r2dataset_date+'_marker_config.yaml')
 robots.append(robot)
 TR2R1 = Transform(robots[1].base_H[:3,:3],robots[1].base_H[:3,3])
-# tool1_makers = [Transform(np.eye(3),np.array([0,0,0])),\
-#                 Transform(np.eye(3),np.array([0.1,0,0])),\
-#                 Transform(np.eye(3),np.array([0,0.1,0]))] # transformation from robot tool 1 to markers
-tool1_makers = [Transform(np.eye(3),np.array([0,0,0]))] # transformation from robot tool 1 to markers
+tool1_makers = [Transform(np.eye(3),np.array([0,0,0])),\
+                Transform(np.eye(3),np.array([0.1,0,0])),\
+                Transform(np.eye(3),np.array([0,0.1,0]))] # transformation from robot tool 1 to markers
+# tool1_makers = [Transform(np.eye(3),np.array([0,0,0]))] # transformation from robot tool 1 to markers
 
 print("robot 1 zero config: ", robots[0].fwd(np.zeros(6)))
 print("robot 2 zero config: ", robots[1].fwd(np.zeros(6)))
@@ -118,7 +118,7 @@ def objective_J():
 # robot1 is holding three markers, m1 m2 m3
 # collect joint angles of robot1 and robot2
 # collect pose of m1, m2 and m3 in robot2 tool (camera) frame
-collected_data_N = 400
+collected_data_N = 200
 joint_data = [[] for i in range(len(robots))]
 pose_data = [[] for i in range(len(tool1_makers))]
 
@@ -132,7 +132,7 @@ while data_cnt < collected_data_N:
     q2 = rng.uniform(low=robots[1].lower_limit+limit_factor, high=robots[1].upper_limit-limit_factor) \
             if data_cnt!=0 else np.array([0,0,0,0,np.radians(10),0])
     
-    ## check singularity for robot 1
+    ## check singularity for robot 2
     if min(np.linalg.svd(robots[1].jacobian(q2))[1]) < 1e-3:
         print("near singular")
         continue
@@ -147,19 +147,32 @@ while data_cnt < collected_data_N:
     # r1T.p = r2T_r1.p+rng.uniform(low=[-3000,-3000,-3000], high=[3000,3000,3000]) # random translation
     ## get robot 1 tool pose in robot 2 tool frame
     r1T_r2 = r2T_r1.inv()*r1T
-    ## solve for robot1 joint angles
-    robots[0] = get_PH_from_param(param_noms[0], robots[0])
-    try:
-        q1_nom = robots[0].inv(r1T.p, r1T.R, last_joints=np.zeros(6))[0]
-        # q1_nom = rng.choice(robots[0].inv(r1T.p, r1T.R))
-    except ValueError:
-        continue
+    
+    ##### get robot1 joint angles, robot1 tool closed to robot2 ##### 
+    # solve for robot1 joint angles
+    # robots[0] = get_PH_from_param(param_noms[0], robots[0])
+    # try:
+    #     q1_nom = robots[0].inv(r1T.p, r1T.R, last_joints=np.zeros(6))[0]
+    #     # q1_nom = rng.choice(robots[0].inv(r1T.p, r1T.R))
+    # except ValueError:
+    #     continue
+    # ## check singularity for robot 1
+    # if min(np.linalg.svd(robots[0].jacobian(q1_nom))[1]) < 1e-3:
+    #     print("near singular")
+    #     continue
+    # robots[0] = get_PH_from_param(param_gts[0], robots[0])
+    # q1 = robots[0].inv_iter(r1T.p, r1T.R, q_seed=q1_nom, lim_factor=limit_factor/2)
+    #########################
+    
+    #### random generate robot 1 joint angles ####
+    q1 = rng.uniform(low=robots[0].lower_limit+limit_factor, high=robots[0].upper_limit-limit_factor)
     ## check singularity for robot 1
-    if min(np.linalg.svd(robots[0].jacobian(q1_nom))[1]) < 1e-3:
+    if min(np.linalg.svd(robots[0].jacobian(q1))[1]) < 1e-3:
         print("near singular")
         continue
     robots[0] = get_PH_from_param(param_gts[0], robots[0])
-    q1 = robots[0].inv_iter(r1T.p, r1T.R, q_seed=q1_nom, lim_factor=limit_factor/2)
+    r1T_r2 = r2T_r1.inv()*robots[0].fwd(q1,world=True)
+    ##################################
     
     ## record data
     joint_data[0].append(q1)
@@ -235,6 +248,37 @@ def get_dPRt1t2dparam(joints, params, robots, TR2R1):
     # dpRdparamR2 = np.vstack((-J2R,-J2p+jrpr1t2))
     
     return dpRdparamR1, dpRdparamR2, t1_t2
+
+## single arm rank test
+J1=[]
+for data_i in range(collected_data_N):
+    robots[0] = get_PH_from_param(param_gts[0], robots[0])
+    robots[1] = get_PH_from_param(param_gts[1], robots[1])
+    # loop through all collected marker data
+    origin_Rtool = deepcopy(robots[0].robot.R_tool)
+    origin_Ptool = deepcopy(robots[0].robot.p_tool)
+    for mpi,mp in enumerate(tool1_makers):
+        # change the tool pose to the marker pose
+        robots[0].robot.p_tool = robots[0].robot.R_tool@mp.p + robots[0].robot.p_tool
+        robots[0].robot.R_tool = robots[0].robot.R_tool@mp.R
+        robots[0].p_tool = robots[0].robot.p_tool
+        robots[0].R_tool = robots[0].robot.R_tool
+        # get the analytical jacobian and relative pose
+        J1_ana = jacobian_param(param_noms[0],robots[0],joint_data[0][data_i],unit='radians')
+        J1.extend(J1_ana)
+    robots[0].robot.R_tool = origin_Rtool
+    robots[0].robot.p_tool = origin_Ptool
+    robots[0].p_tool = origin_Ptool
+    robots[0].R_tool = origin_Rtool
+u,s,v = np.linalg.svd(J1)
+
+print("J rank (numpy) / Total singular values: %d/%d"%(np.linalg.matrix_rank(J1),len(s)))
+print("============")
+plt.scatter(np.arange(len(s)),np.log10(s))
+plt.title("Singular values (log10)")
+plt.show()
+exit()
+##############
 
 ##### calibration, using relative pose #####
 iter_N = 400
@@ -373,8 +417,8 @@ for it in range(iter_N):
         # check H, jacobian
         J_all_H = np.hstack((J_all[:,P_size*3:P_size*3+H_size*2],J_all[:,P_size*6+H_size*2:]))
         print("J_all_H shape: ", J_all_H.shape)
-        u,s,v=np.linalg.svd(J_all_H)
-        print("J_H rank (numpy) / Total singular values: %d/%d"%(np.linalg.matrix_rank(J_all_H),len(s)))
+        u_h,s_h,v_h=np.linalg.svd(J_all_H)
+        print("J_H rank (numpy) / Total singular values: %d/%d"%(np.linalg.matrix_rank(J_all_H),len(s_h)))
         print("Actual H param vs calib H param: ", np.linalg.norm(param_gts[0][P_size*3:]-param_calib[0][P_size*3:]), np.linalg.norm(param_gts[1][P_size*3:]-param_calib[1][P_size*3:]))
         
         print("============")
@@ -384,7 +428,7 @@ for it in range(iter_N):
         param2_norm_iter.append(np.linalg.norm(param_gts[1]-param_calib[1]))
         
         # visualize jacobian matrix
-        if it==999999:
+        if it==0:
             plt.scatter(np.arange(len(s)),np.log10(s))
             plt.title("Singular values (log10)")
             plt.show()
@@ -399,12 +443,14 @@ for it in range(iter_N):
             plt.colorbar()
             plt.show()
         
+        
     except KeyboardInterrupt:
         break
 
 plt.plot(ave_error_iter, label='train error')
 plt.plot(ave_test_error_iter, label='test error')
 plt.title("Ave error")
+plt.legend()
 plt.xlabel("iter")
 plt.ylabel("nu error norm")
 plt.show()
