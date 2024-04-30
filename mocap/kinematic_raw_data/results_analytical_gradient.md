@@ -33,6 +33,41 @@
 |RBF Interp PH|0.0613|0.0343|0.1830|
 |FBF Interp PH|0.0626|0.0339|0.1764|
 
+## Dataset 0801 R1 (minimal)
+Testing Data (Position)
+||Mean (mm)|Std (mm)|Max (mm)|
+|-|-|-|-|
+|Origin PH|1.2898|0.2067|1.7211|
+|CPA PH|0.4429|0.2017|0.9927|
+|Zero PH|0.4381|0.1968|1.0876|
+|One PH|1.7680|1.6906|6.0710|
+|Nearest PH|0.4552|0.2336|1.4311|
+|Linear Interp PH|0.4423|0.2181|1.3025|
+|Cubic Interp PH|0.4478|0.2310|1.3339|
+|RBF Interp PH|0.4493|0.2272|1.3224|
+|FBF Interp PH|0.3958|0.1416|0.9884|
+
+Testing Data (Orientation)
+||Mean (deg)|Std (deg)|Max (deg)|
+|-|-|-|-|
+|Origin PH|0.0691|0.0374|0.2010|
+|CPA PH|0.0663|0.0317|0.1733|
+|Zero PH|0.0736|0.0401|0.2024|
+|One PH|0.4960|0.5982|2.0743|
+|Nearest PH|0.0694|0.0403|0.2742|
+|Linear Interp PH|0.0700|0.0400|0.2488|
+|Cubic Interp PH|0.0694|0.0398|0.2579|
+|RBF Interp PH|0.0695|0.0397|0.2564|
+|FBF Interp PH|0.0710|0.0405|0.2111|
+
+Training Data
+||Mean (mm)|Std (mm)|Max (mm)|
+|-|-|-|-|
+|Nominal PH|1.3188|0.2347|1.8143|
+|CPA|0.4871|0.2525|1.2043|
+|One PH|0.2433|0.1360|0.8328|
+|Optimize PH|0.0333|0.0272|0.1913|
+
 ## Dataset 0804 R2
 
 ### Training Data

@@ -134,11 +134,14 @@ print(len(test_mocap_T))
 assert len(test_robot_q)==len(test_mocap_T), f"Need to have the same amount of robot_q and mocap_T"
 
 use_analytical_calib = True
+use_minimal_calib = True
 
 calib_file_name = 'calib_PH_q_ana.pickle' if use_analytical_calib else 'calib_PH_q.pickle'
+calib_file_name = calib_file_name[:-7]+'_minimal.pickle' if use_minimal_calib else calib_file_name
 print(calib_file_name)
 with open(PH_data_dir+calib_file_name,'rb') as file:
     PH_q=pickle.load(file)
+
 #### all train data q
 train_q = []
 training_error=[]
@@ -166,9 +169,12 @@ qzero_H = PH_q[train_q_zero_key]['H']
 
 try:
     calib_file_name = 'calib_one_PH_ana.pickle' if use_analytical_calib else 'calib_one_PH.pickle'
+    calib_file_name = calib_file_name[:-7]+'_minimal.pickle' if use_minimal_calib else calib_file_name
+    print(calib_file_name)
     with open(PH_data_dir+calib_file_name,'rb') as file:
         PH_q_one=pickle.load(file)
 except:
+    print("One PH not found")
     PH_q_one=PH_q[train_q_zero_key]
 #### one PH for all ####
 universal_P = PH_q_one['P']
