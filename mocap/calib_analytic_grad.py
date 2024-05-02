@@ -144,10 +144,10 @@ def get_PH_from_param(param,robot,unit='radians'):
     
     jN=len(robot.robot.H[0])
     # get current P,H (given param)
-    P=param[:(jN+1)*3]
+    P=deepcopy(param[:(jN+1)*3])
     P=np.reshape(P,((jN+1),3))
     total_p = (jN+1)*3
-    param_h=param[total_p:]
+    param_h=deepcopy(param[total_p:])
     if unit!='radians':
         param_h = np.radians(param_h)
     H=[]
@@ -164,7 +164,7 @@ def get_PH_from_param(param,robot,unit='radians'):
     robot.robot.H=H.T
     return robot
 
-def jacobian_param(param,robot,theta,unit='radians'):
+def jacobian_param(param,robot,theta,unit='radians',minimal=True):
     
     jN=len(theta)
     
@@ -212,116 +212,15 @@ def jacobian_param(param,robot,theta,unit='radians'):
         # gradient of P w.r.t p0T
         # Hn_base = last_R0j@Hn[j]
         projection_P = np.eye(3)-np.outer(Hn[j],Hn[j])/np.dot(Hn[j],Hn[j])
-        J[3:,3*j:3*(j+1)]=last_R0j@projection_P # move only in the direction orthogonal to Hn (a plane)
+        if minimal:
+            J[3:,3*j:3*(j+1)]=last_R0j@projection_P # move only in the direction orthogonal to Hn (a plane)
+        else:
+            J[3:,3*j:3*(j+1)]=last_R0j
         # print(j)
         # print(last_R0j)
         # print(projection_P@last_R0j)
         # input("=")
         # J[3:,3*j:3*(j+1)]=last_R0j
-        # gradient of R0T,P0T w.r.t alpha  
-        dhda = rot_k2_beta[j]@hat(robot.param_k1[j])@rot_k1_alpha[j]@Hn[j]
-        dRda = np.sin(theta[j])*hat(dhda)+(1-np.cos(theta[j]))*(hat(dhda)@hat(H[j])+hat(H[j])@hat(dhda))
-        dR0jda = last_R0j@dRda
-        J[:3,total_p+2*j]=invhat(dR0jda@RjT@(R0T.T))
-        J[3:,total_p+2*j]=dR0jda@pjT_j
-        # gradient of R0T,P0T w.r.t beta
-        dhdb = hat(robot.param_k2[j])@rot_k2_beta[j]@rot_k1_alpha[j]@Hn[j]
-        dRdb = np.sin(theta[j])*hat(dhdb)+(1-np.cos(theta[j]))*(hat(dhdb)@hat(H[j])+hat(H[j])@hat(dhdb))
-        dR0jdb = last_R0j@dRdb
-        # if j==3:
-        #     print(hat(robot.param_k2[j]))
-        #     print(last_R0j)
-        #     print(last_R0j@hat(robot.param_k2[j]))
-        #     print(drot_beta@RjT)
-        #     exit
-        J[:3,total_p+2*j+1]=invhat(dR0jdb@RjT@(R0T.T))
-        J[3:,total_p+2*j+1]=dR0jdb@pjT_j
-        last_R0j=R0j
-    J[3:,total_p-3:total_p] = last_R0j # p6T
-    
-    if unit!='radians':
-        J[3:,(jN+1)*3:] = J[3:,(jN+1)*3:]*(np.pi/180)
-        # J[3:,:] = J[3:,:]*(np.pi/180)
-    
-    return J
-
-def get_PH_from_param_redundant(param,robot,unit='radians'):
-    
-    jN=len(robot.robot.H[0])
-    # get current P,H (given param)
-    P=param[:(jN+1)*3]
-    P=np.reshape(P,((jN+1),3))
-    total_p = (jN+1)*3
-    param_h=param[total_p:]
-    if unit!='radians':
-        param_h = np.radians(param_h)
-    H=[]
-    rot_k1_alpha=[]
-    rot_k2_beta=[]
-    for j in range(jN):
-        rot_k1_alpha.append(rot(robot.param_k1[j],param_h[2*j]))
-        rot_k2_beta.append(rot(robot.param_k2[j],param_h[2*j+1]))
-        hi = rot_k2_beta[-1]@\
-           rot_k1_alpha[-1]@robot.H_nominal[j]
-        H.append(hi)
-    H=np.array(H)
-    robot.robot.P=P.T
-    robot.robot.H=H.T
-    return robot
-
-def jacobian_param_redundant(param,robot,theta,unit='radians'):
-    
-    jN=len(theta)
-    
-    # get current P,H (given param)
-    # robot = get_PH_from_param(param,robot)
-    
-    P=param[:(jN+1)*3]
-    P=np.reshape(P,((jN+1),3))
-    total_p = (jN+1)*3
-    param_h=param[total_p:]
-    if unit!='radians':
-        param_h = np.radians(param_h)
-    H=[]
-    rot_k1_alpha=[]
-    rot_k2_beta=[]
-    for j in range(jN):
-        rot_k1_alpha.append(rot(robot.param_k1[j],param_h[2*j]))
-        rot_k2_beta.append(rot(robot.param_k2[j],param_h[2*j+1]))
-        hi = rot_k2_beta[-1]@\
-           rot_k1_alpha[-1]@robot.H_nominal[j]
-        H.append(hi)
-    H=np.array(H)
-    
-    robot.robot.P=P.T
-    robot.robot.H=H.T
-    Pn=deepcopy(robot.P_nominal)
-    Hn=deepcopy(robot.H_nominal)
-    
-    # foward kinematics
-    
-    T_tool = robot.fwd(theta)
-    p0T=T_tool.p
-    R0T=T_tool.R
-    
-    # get jacobian
-    J=np.zeros((6,len(param))) # J=[JR;Jp]
-    last_R0j=np.eye(3)
-    p0j=np.zeros(3)
-    for j in range(jN):
-        Rj1j=rot(H[j],theta[j]) # R_{j-1,j}
-        R0j=last_R0j@Rj1j # R_{0,j}
-        RjT = R0j.T@R0T
-        p0j=p0j+last_R0j@P[j] # p0j_0
-        pjT_j=(R0j.T)@(p0T-p0j)
-        # gradient of P w.r.t p0T
-        projection_P = np.eye(3)-np.outer(Hn[j],Hn[j])/np.dot(Hn[j],Hn[j])
-        # J[3:,3*j:3*(j+1)]=projection_P@last_R0j # move only in the direction orthogonal to Hn (a plane)
-        # print(j)
-        # print(last_R0j)
-        # print(projection_P@last_R0j)
-        # input("=")
-        J[3:,3*j:3*(j+1)]=last_R0j
         # gradient of R0T,P0T w.r.t alpha  
         dhda = rot_k2_beta[j]@hat(robot.param_k1[j])@rot_k1_alpha[j]@Hn[j]
         dRda = np.sin(theta[j])*hat(dhda)+(1-np.cos(theta[j]))*(hat(dhda)@hat(H[j])+hat(H[j])@hat(dhda))

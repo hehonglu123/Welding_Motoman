@@ -113,7 +113,6 @@ for i in range(jN):
     h_act = robot.robot.H[:,i]
     p_i_i1 = param_gt_remove[i*3:(i+1)*3]
     alpha_i = -np.dot(p_i_i1,h_nom)/np.dot(h_act,h_nom)
-    print("alpha_i: ", alpha_i)
     p_i_i1_remove = p_i_i1+alpha_i*h_act
     param_gt_remove[i*3:(i+1)*3] = p_i_i1_remove
     param_gt_remove[(i+1)*3:(i+2)*3] = param_gt_remove[(i+1)*3:(i+2)*3]-alpha_i*h_act
@@ -206,7 +205,7 @@ plt.show()
 ##############
 
 ##### calibration, using relative pose #####
-iter_N = 400
+iter_N = 50
 alpha_init = 0.01
 # lambda_P=0.01
 # lambda_H=0.01
@@ -252,7 +251,7 @@ for it in range(iter_N):
                 robot.R_tool = robot.robot.R_tool
                 # get the analytical jacobian and relative pose
                 t1_r1 = robot.fwd(joint_data[data_i])
-                J1_ana = jacobian_param(param_nom,robot,joint_data[data_i],unit='radians')
+                J1_ana = jacobian_param(param_nom,robot,joint_data[data_i],unit='radians',minimal=False)
                 # weighting
                 J1_ana[:,:P_size*3] *= weight_P
                 J1_ana[:,P_size*3:] *= weight_H
@@ -311,7 +310,6 @@ for it in range(iter_N):
         f=-np.matmul(J_all.T,error_nu)
         # dph=solve_qp(H,f,solver='quadprog',lb=np.array(param_lower_bounds)-param_calib,ub=np.array(param_upper_bounds)-param_calib)
         dph=solve_qp(H,f,solver='quadprog')
-        print("dph: ", dph)
         # dph=solve_qp(H,f,solver='quadprog')
         # dph[P_size*6+H_size*2:]*=-1
         # eps=0.1

@@ -85,6 +85,32 @@ for robot in robots:
     param_nom = deepcopy(robot.P_nominal)
     param_nom = np.reshape(param_nom, (param_nom.size, ))
     param_nom = np.append(param_nom,np.zeros(jN*2))
+    # remove redundancy
+    param_nom_remove = deepcopy(param_nom)
+    robot = get_PH_from_param(param_nom, robot)
+    for i in range(jN):
+        h_nom = robot.H_nominal[i]
+        h_act = robot.robot.H[:,i]
+        p_i_i1 = param_nom_remove[i*3:(i+1)*3]
+        alpha_i = -np.dot(p_i_i1,h_nom)/np.dot(h_act,h_nom)
+        p_i_i1_remove = p_i_i1+alpha_i*h_act
+        param_nom_remove[i*3:(i+1)*3] = p_i_i1_remove
+        param_nom_remove[(i+1)*3:(i+2)*3] = param_nom_remove[(i+1)*3:(i+2)*3]-alpha_i*h_act
+    # test remove redundancy
+    for i in range(100):
+        q1 = rng.uniform(low=robot.lower_limit, high=robot.upper_limit)
+        # q1=np.radians([0,0,0,40,0,0])
+        # if i==0:
+        #     q1 = np.zeros(6)
+        robot = get_PH_from_param(param_nom, robot)
+        T_redundant = robot.fwd(q1)
+        robot = get_PH_from_param(param_nom_remove, robot)
+        T_remove = robot.fwd(q1)
+        TT_inv = T_redundant*(T_remove.inv())
+        if np.linalg.norm(H_from_RT(TT_inv.R,TT_inv.p)-np.eye(4),'fro')>1e-3:
+            print("redundancy removal failed")
+            exit()
+    param_nom=param_nom_remove
     param_noms.append(param_nom)
 ##############################
 
@@ -104,21 +130,44 @@ for robot, param_nom in zip(robots, param_noms):
     dab=rng.uniform(low=-(dab_up_range-dab_low_range),high=(dab_up_range-dab_low_range),size=(jN*2,))
     dab=dab+dab/np.fabs(dab)*dab_low_range
     param_gt = param_nom + np.concatenate((dP, dab))
+    
+    ## remove redundancy, all link vectors are perpendicular to the nominal rotation axis
+    param_gt_remove = deepcopy(param_gt)
+    robot = get_PH_from_param(param_gt, robot)
+    for i in range(jN):
+        h_nom = robot.H_nominal[i]
+        h_act = robot.robot.H[:,i]
+        p_i_i1 = param_gt_remove[i*3:(i+1)*3]
+        alpha_i = -np.dot(p_i_i1,h_nom)/np.dot(h_act,h_nom)
+        p_i_i1_remove = p_i_i1+alpha_i*h_act
+        param_gt_remove[i*3:(i+1)*3] = p_i_i1_remove
+        param_gt_remove[(i+1)*3:(i+2)*3] = param_gt_remove[(i+1)*3:(i+2)*3]-alpha_i*h_act
+    # test remove redundancy
+    for i in range(100):
+        q1 = rng.uniform(low=robot.lower_limit, high=robot.upper_limit)
+        # q1=np.radians([0,0,0,40,0,0])
+        # if i==0:
+        #     q1 = np.zeros(6)
+        robot = get_PH_from_param(param_gt, robot)
+        T_redundant = robot.fwd(q1)
+        robot = get_PH_from_param(param_gt_remove, robot)
+        T_remove = robot.fwd(q1)
+        TT_inv = T_redundant*(T_remove.inv())
+        if np.linalg.norm(H_from_RT(TT_inv.R,TT_inv.p)-np.eye(4),'fro')>1e-3:
+            print("redundancy removal failed")
+            exit()
+    param_gt = param_gt_remove
     param_gts.append(param_gt)
     param_upper_bounds.extend(np.append(np.ones((jN+1)*3)*dP_up_range,np.ones(jN*2)*dab_up_range)+param_nom)
     param_lower_bounds.extend(np.append(np.ones((jN+1)*3)*-dP_up_range,np.ones(jN*2)*-dab_up_range)+param_nom)
 #######################################
-
-def objective_J():
-    
-    pass
 
 ##### collect data #####
 # Assuming the robot2 is holding a camera
 # robot1 is holding three markers, m1 m2 m3
 # collect joint angles of robot1 and robot2
 # collect pose of m1, m2 and m3 in robot2 tool (camera) frame
-collected_data_N = 200
+collected_data_N = 800
 joint_data = [[] for i in range(len(robots))]
 pose_data = [[] for i in range(len(tool1_makers))]
 
@@ -150,28 +199,28 @@ while data_cnt < collected_data_N:
     
     ##### get robot1 joint angles, robot1 tool closed to robot2 ##### 
     # solve for robot1 joint angles
-    # robots[0] = get_PH_from_param(param_noms[0], robots[0])
-    # try:
-    #     q1_nom = robots[0].inv(r1T.p, r1T.R, last_joints=np.zeros(6))[0]
-    #     # q1_nom = rng.choice(robots[0].inv(r1T.p, r1T.R))
-    # except ValueError:
-    #     continue
-    # ## check singularity for robot 1
-    # if min(np.linalg.svd(robots[0].jacobian(q1_nom))[1]) < 1e-3:
-    #     print("near singular")
-    #     continue
-    # robots[0] = get_PH_from_param(param_gts[0], robots[0])
-    # q1 = robots[0].inv_iter(r1T.p, r1T.R, q_seed=q1_nom, lim_factor=limit_factor/2)
-    #########################
-    
-    #### random generate robot 1 joint angles ####
-    q1 = rng.uniform(low=robots[0].lower_limit+limit_factor, high=robots[0].upper_limit-limit_factor)
+    robots[0] = get_PH_from_param(param_noms[0], robots[0])
+    try:
+        q1_nom = robots[0].inv(r1T.p, r1T.R, last_joints=np.zeros(6))[0]
+        # q1_nom = rng.choice(robots[0].inv(r1T.p, r1T.R))
+    except ValueError:
+        continue
     ## check singularity for robot 1
-    if min(np.linalg.svd(robots[0].jacobian(q1))[1]) < 1e-3:
+    if min(np.linalg.svd(robots[0].jacobian(q1_nom))[1]) < 1e-3:
         print("near singular")
         continue
     robots[0] = get_PH_from_param(param_gts[0], robots[0])
-    r1T_r2 = r2T_r1.inv()*robots[0].fwd(q1,world=True)
+    q1 = robots[0].inv_iter(r1T.p, r1T.R, q_seed=q1_nom, lim_factor=limit_factor/2)
+    #########################
+    
+    #### random generate robot 1 joint angles ####
+    # q1 = rng.uniform(low=robots[0].lower_limit+limit_factor, high=robots[0].upper_limit-limit_factor)
+    # ## check singularity for robot 1
+    # if min(np.linalg.svd(robots[0].jacobian(q1))[1]) < 1e-3:
+    #     print("near singular")
+    #     continue
+    # robots[0] = get_PH_from_param(param_gts[0], robots[0])
+    # r1T_r2 = r2T_r1.inv()*robots[0].fwd(q1,world=True)
     ##################################
     
     ## record data
@@ -191,6 +240,7 @@ while data_cnt < collected_data_N:
     # print("q1: ", np.degrees(q1))
     # input("=====================")
 ########################
+print(param_noms[0])
 print("simulated data collected")
 
 
@@ -250,53 +300,51 @@ def get_dPRt1t2dparam(joints, params, robots, TR2R1):
     return dpRdparamR1, dpRdparamR2, t1_t2
 
 ## single arm rank test
-J1=[]
-for data_i in range(collected_data_N):
-    robots[0] = get_PH_from_param(param_gts[0], robots[0])
-    robots[1] = get_PH_from_param(param_gts[1], robots[1])
-    # loop through all collected marker data
-    origin_Rtool = deepcopy(robots[0].robot.R_tool)
-    origin_Ptool = deepcopy(robots[0].robot.p_tool)
-    for mpi,mp in enumerate(tool1_makers):
-        # change the tool pose to the marker pose
-        robots[0].robot.p_tool = robots[0].robot.R_tool@mp.p + robots[0].robot.p_tool
-        robots[0].robot.R_tool = robots[0].robot.R_tool@mp.R
-        robots[0].p_tool = robots[0].robot.p_tool
-        robots[0].R_tool = robots[0].robot.R_tool
-        # get the analytical jacobian and relative pose
-        J1_ana = jacobian_param(param_noms[0],robots[0],joint_data[0][data_i],unit='radians')
-        J1.extend(J1_ana)
-    robots[0].robot.R_tool = origin_Rtool
-    robots[0].robot.p_tool = origin_Ptool
-    robots[0].p_tool = origin_Ptool
-    robots[0].R_tool = origin_Rtool
-u,s,v = np.linalg.svd(J1)
-
-print("J rank (numpy) / Total singular values: %d/%d"%(np.linalg.matrix_rank(J1),len(s)))
-print("============")
-plt.scatter(np.arange(len(s)),np.log10(s))
-plt.title("Singular values (log10)")
-plt.show()
-exit()
+# J1=[]
+# for data_i in range(collected_data_N):
+#     robots[0] = get_PH_from_param(param_gts[0], robots[0])
+#     robots[1] = get_PH_from_param(param_gts[1], robots[1])
+#     # loop through all collected marker data
+#     origin_Rtool = deepcopy(robots[0].robot.R_tool)
+#     origin_Ptool = deepcopy(robots[0].robot.p_tool)
+#     for mpi,mp in enumerate(tool1_makers):
+#         # change the tool pose to the marker pose
+#         robots[0].robot.p_tool = robots[0].robot.R_tool@mp.p + robots[0].robot.p_tool
+#         robots[0].robot.R_tool = robots[0].robot.R_tool@mp.R
+#         robots[0].p_tool = robots[0].robot.p_tool
+#         robots[0].R_tool = robots[0].robot.R_tool
+#         # get the analytical jacobian and relative pose
+#         J1_ana = jacobian_param(param_noms[0],robots[0],joint_data[0][data_i],unit='radians')
+#         J1.extend(J1_ana)
+#     robots[0].robot.R_tool = origin_Rtool
+#     robots[0].robot.p_tool = origin_Ptool
+#     robots[0].p_tool = origin_Ptool
+#     robots[0].R_tool = origin_Rtool
+# u,s,v = np.linalg.svd(J1)
+# print("J rank (numpy) / Total singular values: %d/%d"%(np.linalg.matrix_rank(J1),len(s)))
+# print("============")
+# plt.scatter(np.arange(len(s)),np.log10(s))
+# plt.title("Singular values (log10)")
+# plt.show()
 ##############
 
 ##### calibration, using relative pose #####
-iter_N = 400
-alpha = 0.01
+iter_N = 50
+alpha = 0.3
 # lambda_P=0.01
 # lambda_H=0.01
 lambda_P=1
-lambda_H=10
+lambda_H=1
 P_size=7
 H_size=6
 weight_ori = 1
 weight_pos = 1
 # weight_H = 0
 # weight_P = 1
-weight_H = 0.3
-weight_P = 1
-# weight_H = 1
+# weight_H = 0.3
 # weight_P = 1
+weight_H = 1
+weight_P = 1
 r1_param_weight = np.append(np.ones(P_size*3)*lambda_P,np.ones(H_size*2)*lambda_H)
 r2_param_weight = np.append(np.ones(P_size*3)*lambda_P,np.ones(H_size*2)*lambda_H)
 ####
@@ -311,6 +359,8 @@ datasets_part = np.arange(collected_data_N)
 rng.shuffle(datasets_part)
 train_dataset = datasets_part[:int(collected_data_N*train_dataset_ratio)]
 test_dataset = datasets_part[int(collected_data_N*(1-train_dataset_ratio)):]
+print("Actual param vs calib param: ", np.linalg.norm(param_gts[0]-param_calib[0]), np.linalg.norm(param_gts[1]-param_calib[1]))
+print("============")
 for it in range(iter_N):
     try:
         print("iter: ", it)
@@ -397,8 +447,8 @@ for it in range(iter_N):
         H=np.matmul(J_all.T,J_all)+Kq
         H=(H+np.transpose(H))/2
         f=-np.matmul(J_all.T,error_nu)
-        dph=solve_qp(H,f,solver='quadprog',lb=np.array(param_lower_bounds)-this_param,ub=np.array(param_upper_bounds)-this_param)
-        # dph=solve_qp(H,f,solver='quadprog')
+        # dph=solve_qp(H,f,solver='quadprog',lb=np.array(param_lower_bounds)-this_param,ub=np.array(param_upper_bounds)-this_param)
+        dph=solve_qp(H,f,solver='quadprog')
         # dph[P_size*6+H_size*2:]*=-1
         # eps=0.1
         # dph = np.linalg.pinv(J_all)@error_nu
@@ -446,6 +496,9 @@ for it in range(iter_N):
         
     except KeyboardInterrupt:
         break
+
+print("Param estimation differences largest order:\n", np.vstack((np.argsort(np.abs(param_gts[0]-param_calib[0]))[::-1], np.argsort(np.abs(param_gts[1]-param_calib[1]))[::-1])))
+print("Param estimation differences largest order:\n", np.vstack((np.sort(np.abs(param_gts[0]-param_calib[0]))[::-1], np.sort(np.abs(param_gts[1]-param_calib[1]))[::-1])))
 
 plt.plot(ave_error_iter, label='train error')
 plt.plot(ave_test_error_iter, label='test error')
