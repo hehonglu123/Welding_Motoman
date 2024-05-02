@@ -251,7 +251,7 @@ for it in range(iter_N):
                 robot.R_tool = robot.robot.R_tool
                 # get the analytical jacobian and relative pose
                 t1_r1 = robot.fwd(joint_data[data_i])
-                J1_ana = jacobian_param(param_nom,robot,joint_data[data_i],unit='radians',minimal=False)
+                J1_ana = jacobian_param(param_nom,robot,joint_data[data_i],unit='radians',minimal=True)
                 # weighting
                 J1_ana[:,:P_size*3] *= weight_P
                 J1_ana[:,P_size*3:] *= weight_H
