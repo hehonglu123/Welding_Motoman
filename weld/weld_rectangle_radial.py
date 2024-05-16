@@ -21,15 +21,15 @@ feedrate = int(470)
 base_layer_height=6.5
 layer_height=8
 weld_v = 4
-z_int = -250
+z_int = -244
 q_all=[]
 v_all=[]
 cond_all=[]
 primitives=[]
 p_all=[]
 # quit
-x_int = 1620#1630#
-x_end = 1720#1690#
+x_int = 1630#1630#
+x_end = 1710#1690#
 y_int = -924.5
 y_end = -702.5
 for i in range(2,3):

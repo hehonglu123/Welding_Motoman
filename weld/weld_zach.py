@@ -27,52 +27,9 @@ R=np.array([[-0.7071, 0.7071, -0.    ],
 
 # p_end=np.array([1653,-755,-255]) # 789
 # p_start=np.array([1653,-870,-255]) # 789
-n=9 #13
-p_start=np.array([1678-(5*n),-815+40,-258])
-p_end=np.array([1678-(5*n),-815-93+50,-258])
 
-# p_start=np.array([1725,-920,-245])
-# p_end=np.array([1725,-704.236,-245])
-
-# p_start=np.array([1700,-880,-258])
-# p_end=np.array([1700,-780,-258])
-#####################################################################
-## Long wall parameters:
-# Base Layers
-# p_start=np.array([1688,-920,-258])
-# p_end=np.array([1688,-710,-258])
-
-# Top layers
-# p_start=np.array([1688,-915,-258])
-# p_end=np.array([1688,-715,-258])
-######################################################################
-## Thick wall parameters:
-########## First trail ###########
-# Base layers
-# p_start=np.array([1683,-870,-258])
-# p_end=np.array([1683,-750,-258])
-
-# Top layers
-# p_start=np.array([1683,-860,-258])
-# p_end=np.array([1683,-760,-258])
-
-########## Second trail ##########
-# Base layers
-# p_start=np.array([1691,-870,-258])
-# p_end=np.array([1691,-750,-258])
-
-# Top layers
-# p_start=np.array([1691,-860,-258])
-# p_end=np.array([1691,-760,-258])
-
-########## Mid Trails ##########
-# Base layers
-# p_start=np.array([1687,-870,-258])
-# p_end=np.array([1687,-750,-258])
-
-# # Top layers
-# p_start=np.array([1687,-860,-258])
-# p_end=np.array([1687,-760,-258])
+p_topleft = np.array([1625,-860,-260])
+p_topright =np.array([1625,-800,-260])
 
 q_seed=np.radians([-35.4291,56.6333,40.5194,4.5177,-52.2505,-11.6546])
 
@@ -83,7 +40,7 @@ ws=WeldSend(client)
 # rr_sensors = WeldRRSensor(weld_service=weld_ser)
 
 feedrate = int(470)
-base_layer_height=6.5
+base_layer_height=2.5
 layer_height=1.5
 q_all=[]
 v_all=[]
@@ -91,28 +48,35 @@ cond_all=[]
 primitives=[]
 
 # Base layer
-for i in range(1,2):
-	if i%2==0:
-		p1=p_start+np.array([0,0,i*base_layer_height])
-		p2=p_end+np.array([0,0,i*base_layer_height])
-	else:
-		p1=p_end+np.array([0,0,i*base_layer_height])
-		p2=p_start+np.array([0,0,i*base_layer_height])
+for i in range(2,3):
+    if i%2==0:
+        p1 = p_topleft+np.array([0,0,i*base_layer_height])
+        p2 = p_topright+np.array([0,0,i*base_layer_height])
+        p3 = p_topleft+np.array([60,0,i*base_layer_height])
+        p4 = p_topright+np.array([60,0,i*base_layer_height])
 
-	
-	q_init=robot.inv(p1,R,q_seed)[0]
-	q_end=robot.inv(p2,R,q_seed)[0]
+    else:
+        p1 = p_topright+np.array([60,0,i*base_layer_height])
+        p2 = p_topleft+np.array([60,0,i*base_layer_height])
+        p3 = p_topright+np.array([0,0,i*base_layer_height])
+        p4 = p_topleft+np.array([0,0,i*base_layer_height])
+
+
+    q_1=robot.inv(p1,R,q_seed)[0]
+    q_2=robot.inv(p2,R,q_seed)[0]
+    q_3=robot.inv(p3,R,q_seed)[0]
+    q_4=robot.inv(p4,R,q_seed)[0]
 
 	# p_mid1=p1+5*(p2-p1)/np.linalg.norm(p2-p1)
 	# p_mid2=p2-5*(p2-p1)/np.linalg.norm(p2-p1)
 	# q_mid1=robot.inv(p_mid1,R,q_seed)[0]
 	# q_mid2=robot.inv(p_mid2,R,q_seed)[0]
 
-	q_all.extend([q_init,q_end])
-	v_all.extend([1,5])
-	primitives.extend(['movej','movel'])
-	cond_all.extend([0,feedrate])
-	print(cond_all)
+    q_all.extend([q_1,q_2,q_3,q_4])
+    v_all.extend([5,10,10,10])
+    primitives.extend(['movej','movel','movel','movel'])
+    cond_all.extend([0,feedrate,feedrate,feedrate])
+    print(cond_all)
 
 # Top Layers
 	
@@ -131,6 +95,11 @@ for i in range(1,2):
 # 	v_all.extend([1,15])
 # 	primitives.extend(['movej','movel'])
 # 	cond_all.extend([0,210])
+
+print("p1",p1)
+print('p2',p2)
+print('p3',p3)
+print('p4',p4)
 
 print('primitives',primitives)
 print('q_all',q_all)

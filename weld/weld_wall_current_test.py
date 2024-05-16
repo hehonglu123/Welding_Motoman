@@ -17,7 +17,7 @@ fronius_client = fronius_sub.GetDefaultClientWait(1)      #connect, timeout=30s
 ##########################################SENSORS LOGGIGN########################################################
 rr_sensors = WeldRRSensor(weld_service=fronius_sub,cam_service=None,microphone_service=microphone,current_service=current_sub)
 
-
+ 
 
 robot=robot_obj('MA2010_A0',def_path='../config/MA2010_A0_robot_default_config.yml',tool_file_path='../config/torch.csv',\
 	pulse2deg_file_path='../config/MA2010_A0_pulse2deg_real.csv',d=15)

@@ -1,3 +1,4 @@
+
 import sys
 sys.path.append('../toolbox/')
 from robot_def import *
@@ -17,51 +18,52 @@ q_seed=np.radians([-35.4291,56.6333,40.5194,4.5177,-52.2505,-11.6546])
 client=MotionProgramExecClient()
 ws=WeldSend(client)
 
-feedrate = int(470)
+feedrate = int(465)
 base_layer_height=6.5
 layer_height=8
-weld_v = 4
-z_int = -250
+weld_v = 5
+z_int = -255
 q_all=[]
 v_all=[]
 cond_all=[]
 primitives=[]
 p_all=[]
 # quit
-x_int = 1620#1630#
-x_end = 1720#1690#
-y_int = -924.5
-y_end = -702.5
-for i in range(2,3):
+n = 5
+x_int = 1686#1630#
+x_end = 1736#1690#
+y_int = -940
+y_end = -845
+for i in range(1,2):
     if i%2==0:
         p_start=np.array([x_int,y_int,z_int])
         p_end=np.array([x_end,y_int,z_int])
     else:
         p_start=np.array([x_int,y_end,z_int])
         p_end=np.array([x_end,y_end,z_int])
-    for n in range(18,19):#19
+    for n in range(5,6):#25
         if i%2==0:
-            p_start=np.array([x_int,y_int+(12*(n)),z_int])
-            p_end=np.array([x_end,y_int+(12*(n)),z_int])
+            p_start=np.array([x_int,y_int+(10*(n)),z_int])
+            p_end=np.array([x_end,y_int+(10*(n)),z_int])
             p1=p_start+np.array([0,0,i*layer_height])
             p2=p_end+np.array([0,0,i*layer_height])
-            p3=p_end+np.array([0,6,i*layer_height])
-            p4=p_start+np.array([0,6,i*layer_height])
-            p5=p_start+np.array([0,12,i*layer_height])
+            p3=p_end+np.array([0,5,i*layer_height])
+            p4=p_start+np.array([0,5,i*layer_height])
+            p5=p_start+np.array([0,10,i*layer_height])
             print('p1,p2,p3,p4,p5:',p1,p2,p3,p4,p5)
-            p_start=np.array([x_int,y_int+(12*(n+1)),z_int])
-            p_end=np.array([x_end,y_int+(12*(n+1)),z_int])
+            p_start=np.array([x_int,y_int+(10*(n+1)),z_int])
+            p_end=np.array([x_end,y_int+(10*(n+1)),z_int])
         else:
-            p_start=np.array([x_int,y_end+(-12*(n)),z_int])
-            p_end=np.array([x_end,y_end+(-12*(n)),z_int])
+            p_start=np.array([x_int,y_end+(-10*(n)),z_int])
+            p_end=np.array([x_end,y_end+(-10*(n)),z_int])
             p1=p_start+np.array([0,0,i*layer_height])
             p2=p_end+np.array([0,0,i*layer_height])
-            p3=p_end+np.array([0,-6,i*layer_height])
-            p4=p_start+np.array([0,-6,i*layer_height])
-            p5=p_start+np.array([0,-12,i*layer_height])
+            p3=p_end+np.array([0,-5,i*layer_height])
+            p4=p_start+np.array([0,-5,i*layer_height])
+            p5=p_start+np.array([0,-10,i*layer_height])
             print('p1,p2,p3,p4,p5:',p1,p2,p3,p4,p5)
-            p_start=np.array([x_int,y_end+(-12*(n+1)),z_int])
-            p_end=np.array([x_end,y_end+(-12*(n+1)),z_int])
+            p_start=np.array([x_int,y_end+(-10*(n+1)),z_int])
+            p_end=np.array([x_end,y_end+(-10*(n+1)),z_int])
         q_1=robot.inv(p1,R,q_seed)[0]
         q_2=robot.inv(p2,R,q_seed)[0]
         q_3=robot.inv(p3,R,q_seed)[0]
