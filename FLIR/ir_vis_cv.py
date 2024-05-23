@@ -6,10 +6,11 @@ from flir_toolbox import *
 
 
 # Load the IR recording data from the pickle file
-with open('../../recorded_data/ER316L_wall_streaming_bf/layer_394/ir_recording.pickle', 'rb') as file:
+data_dir='../../recorded_data/blade_recording/layer_330/'
+with open(data_dir+'ir_recording.pickle', 'rb') as file:
     ir_recording = pickle.load(file)
 
-ir_ts=np.loadtxt('../../recorded_data/ER316L_wall_streaming_bf/layer_394/ir_stamps.csv', delimiter=',')
+ir_ts=np.loadtxt(data_dir+'ir_stamps.csv', delimiter=',')
 
 print(len(ir_recording), len(ir_ts))
 

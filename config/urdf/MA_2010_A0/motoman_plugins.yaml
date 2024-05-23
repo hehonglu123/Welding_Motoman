@@ -1,0 +1,50 @@
+kinematic_plugins:
+  search_libraries:
+    - tesseract_kinematics_opw_factories
+  fwd_kin_plugins:
+    MA2010:
+      default: KDLFwdKinChain
+      plugins:
+        KDLFwdKinChain:
+          class: KDLFwdKinChainFactory
+          config:
+            base_link: MA2010_base_link
+            tip_link: MA2010_tool0
+    MA1440:
+      default: KDLFwdKinChain
+      plugins:
+        KDLFwdKinChain:
+          class: KDLFwdKinChainFactory
+          config:
+            base_link: MA1440_base_link
+            tip_link: MA1440_tool0
+
+
+  inv_kin_plugins:
+    MA2010:
+      default: KDLInvKinChainLMA
+      plugins:
+        KDLInvKinChainLMA:
+          class: KDLInvKinChainLMAFactory
+          config:
+            base_link: MA2010_base_link
+            tip_link: MA2010_tool0
+        KDLInvKinChainNR:
+          class: KDLInvKinChainNRFactory
+          config:
+            base_link: MA2010_base_link
+            tip_link: MA2010_tool0
+
+    MA1440:
+      default: KDLInvKinChainLMA
+      plugins:
+        KDLInvKinChainLMA:
+          class: KDLInvKinChainLMAFactory
+          config:
+            base_link: MA1440_base_link
+            tip_link: MA1440_tool0
+        KDLInvKinChainNR:
+          class: KDLInvKinChainNRFactory
+          config:
+            base_link: MA1440_base_link
+            tip_link: MA1440_tool0
