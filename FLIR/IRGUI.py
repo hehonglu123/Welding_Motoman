@@ -16,11 +16,11 @@ counts_all_frames = []
 temp_all_frames = []
 all_frames = []
 data_mode = 0
-main_folder_path = '../data/wall_weld_test/moveL_100_repeat_weld_scan_2023_08_02_17_07_02'
+main_folder_path = '../FLIR/recorded_data/DAPRA/'
 for folder_name in os.listdir(main_folder_path):
     if folder_name.startswith('layer_'):
         folder_path = os.path.join(main_folder_path, folder_name)
-        file_path = os.path.join(folder_path, 'ir_recording.pickle')
+        file_path = os.path.join(folder_path, 'ir_recording_raw.pickle')
         
         file_size_kb = os.path.getsize(file_path) / 1024
         if file_size_kb > 1000:
