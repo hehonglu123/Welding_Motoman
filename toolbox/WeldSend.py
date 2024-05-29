@@ -26,7 +26,7 @@ class WeldSend(object):
 		self.client.execute_motion_program(mp)
 
 
-	def weld_segment_single(self,primitives,robot,q_all,v_all,cond_all,arc=False,wait=0):
+	def weld_segment_single(self,primitives,robot,q_all,v_all,cond_all,arc=False,wait=0,blocking=True):
 		###single arm weld segment 
 		#q_all: list of joint angles (N x 6)
 		#v_all: list of segment speed (N x 1)
@@ -67,9 +67,13 @@ class WeldSend(object):
 			
 		if arc and not arcof:
 			mp.setArc(False)
-		return self.client.execute_motion_program(mp)
+		
+		if blocking:
+			return self.client.execute_motion_program(mp)
+		else:
+			self.client.execute_motion_program_nonblocking(mp)
 
-	def weld_segment_dual(self,primitives,robot1,robot2,q1_all,q2_all,v1_all,v2_all,cond_all,arc=False):
+	def weld_segment_dual(self,primitives,robot1,robot2,q1_all,q2_all,v1_all,v2_all,cond_all,arc=False,blocking=True):
 		###robot+positioner weld segment, MOVEJ + MOVEL x (N-1)
 		#q1_all: list of robot joint angles (N x 6)
 		#q2_all: list of positioenr joint angles (N x 2)
@@ -110,9 +114,13 @@ class WeldSend(object):
 			
 		if arc and not arcof:
 			mp.setArc(False)
-		return self.client.execute_motion_program(mp)
 
-	def weld_segment_tri(self,primitives,robot1,positioner,robot2,q1_all,positioner_all,q2_all,v1_all,v2_all,cond_all,arc=False):
+		if blocking:
+			return self.client.execute_motion_program(mp)
+		else:
+			self.client.execute_motion_program_nonblocking(mp)
+
+	def weld_segment_tri(self,primitives,robot1,positioner,robot2,q1_all,positioner_all,q2_all,v1_all,v2_all,cond_all,arc=False,blocking=True):
 		###robot+positioner weld segment, MOVEJ + MOVEL x (N-1)
 		#q1_all: list of robot joint angles (N x 6)
 		#positioner_all: list of positioner joint angles (N x 2)
@@ -158,7 +166,11 @@ class WeldSend(object):
 			
 		if arc and not arcof:
 			mp.setArc(False)
-		return self.client.execute_motion_program(mp)
+		
+		if blocking:
+			return self.client.execute_motion_program(mp)
+		else:
+			self.client.execute_motion_program_nonblocking(mp)
 	
 	def wire_cut(self,robot,speed=5,q_safe=np.radians([-23.88,37.9,40.66,7.42,-72,-20])):
 		###cut wire, length given in robot standoff d
