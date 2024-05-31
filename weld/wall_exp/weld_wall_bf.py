@@ -69,6 +69,8 @@ def new_frame(pipe_ep):
         ir_image_all.append(display_mat)
 
 def main():
+	global ir_image_all, ir_ts_all
+
 	##############################################################FLIR####################################################################
 	flir_rr_init()
 
@@ -106,11 +108,11 @@ def main():
 	R=np.array([[-0.7071, 0.7071, -0.    ],
 				[ 0.7071, 0.7071,  0.    ],
 				[0.,      0.,     -1.    ]])
-	#ystart -850, yend -780
-	p_start_base=np.array([1710,-820,-260])
-	p_end_base=np.array([1590,-820,-260])
-	p_start=np.array([1700,-820,-260])
-	p_end=np.array([1600,-820,-260])
+	#ystart -850, yend -775
+	p_start_base=np.array([1710,-780,-260])
+	p_end_base=np.array([1590,-780,-260])
+	p_start=np.array([1700,-780,-260])
+	p_end=np.array([1600,-780,-260])
 	q_seed=np.radians([-35.4291,56.6333,40.5194,4.5177,-52.2505,-11.6546])
 
 
@@ -118,14 +120,14 @@ def main():
 	feedrate=100
 	base_layer_height=3
 	v_base=5
-	layer_height=1.3
+	layer_height=1.1
 	v_layer=10
 	#edge params, 1cm left and right
-	feedrate_edge=100
-	v_edge=10
+	feedrate_edge=120
+	v_edge=12
 	q_all=[]
 	v_all=[]
-	job_offset=200
+	job_offset=100
 	cond_all=[]
 	primitives=[]
 
@@ -147,10 +149,14 @@ def main():
 		primitives.extend(['movej','movel'])
 		cond_all.extend([0,int(base_feedrate/10+job_offset)])
 
+	ws.jog_single(robot,robot.inv(p1+np.array([0,0,100]),R,q_seed)[0])
 	ws.weld_segment_single(primitives,robot,q_all,v_all,cond_all,arc=True,wait=0.,blocking=True)
-
+	q_all=[]
+	v_all=[]
+	cond_all=[]
+	primitives=[]
 	####################################Normal Layer ####################################
-	for i in range(2,32):
+	for i in range(2,62):
 		if i%2==0:
 			p1=p_start+np.array([0,0,2*base_layer_height+i*layer_height])
 			p2=p_end+np.array([0,0,2*base_layer_height+i*layer_height])
@@ -175,9 +181,13 @@ def main():
 			primitives.extend(['movel','movel','movel'])
 			cond_all.extend([int(feedrate_edge/10+job_offset),int(feedrate/10+job_offset),int(feedrate_edge/10+job_offset)])
 
+	if len(ir_image_all)==0:	#check if IR is correctly received
+		raise Exception('No IR image received')
 	ws.weld_segment_single(primitives,robot,q_all,v_all,cond_all,arc=True,wait=0.,blocking=False)
 	##############################################################Log Joint Data####################################################################
 	js_recording=[]
+	ir_image_all=[]
+	ir_ts_all=[]
 	start_time=time.time()
 	while not(client.state_flag & 0x08 == 0 and time.time()-start_time>1.):
 		res, fb_data = client.fb.try_receive_state_sync(client.controller_info, 0.001)
@@ -189,10 +199,10 @@ def main():
 	client.servoMH(False) #stop the motor
 
 	os.makedirs('../../../recorded_data/wallbf_%iipm_v%i_%iipm_v%i'%(feedrate,v_layer,feedrate_edge,v_edge),exist_ok=True)
-	np.savetxt('weld_js_exe.csv',np.array(js_recording),delimiter=',')
-	np.savetxt('ir_stamps.csv',np.array(ir_ts_all),delimiter=',')
+	np.savetxt('../../../recorded_data/wallbf_%iipm_v%i_%iipm_v%i'%(feedrate,v_layer,feedrate_edge,v_edge)+'/weld_js_exe.csv',np.array(js_recording),delimiter=',')
+	np.savetxt('../../../recorded_data/wallbf_%iipm_v%i_%iipm_v%i'%(feedrate,v_layer,feedrate_edge,v_edge)+'/ir_stamps.csv',np.array(ir_ts_all),delimiter=',')
 	#save as pickle
-	with open('ir_recording.pickle', 'wb') as file:
+	with open('../../../recorded_data/wallbf_%iipm_v%i_%iipm_v%i'%(feedrate,v_layer,feedrate_edge,v_edge)+'/ir_recording.pickle', 'wb') as file:
 		pickle.dump(ir_image_all, file)
 
 if __name__ == '__main__':
