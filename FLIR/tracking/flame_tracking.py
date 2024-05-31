@@ -7,11 +7,13 @@ from flir_toolbox import *
 
 # Load the IR recording data from the pickle file
 # with open('../../../recorded_data/cup_streaming_recording/slice_108_0_flir.pickle', 'rb') as file:
-with open('../../../recorded_data/weld_scan_job205_v152023_07_27_13_23_06/layer_225/ir_recording.pickle', 'rb') as file:
+# with open('../../../recorded_data/weld_scan_job205_v152023_07_27_13_23_06/layer_225/ir_recording.pickle', 'rb') as file:
+with open('../../../recorded_data/wall_bf_100ipm_v10/ir_recording.pickle', 'rb') as file:
     ir_recording = pickle.load(file)
 
 # ir_ts=np.loadtxt('../../../recorded_data/cup_streaming_recording/slice_108_0_flir_ts.csv', delimiter=',')
-ir_ts=np.loadtxt('../../../recorded_data/weld_scan_job205_v152023_07_27_13_23_06/layer_225/ir_stamps.csv', delimiter=',')
+# ir_ts=np.loadtxt('../../../recorded_data/weld_scan_job205_v152023_07_27_13_23_06/layer_225/ir_stamps.csv', delimiter=',')
+ir_ts=np.loadtxt('../../../recorded_data/wall_bf_100ipm_v10/ir_stamps.csv', delimiter=',')
 
 
 result = cv2.VideoWriter('output.avi', 

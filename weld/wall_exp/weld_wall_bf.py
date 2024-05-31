@@ -1,4 +1,4 @@
-import sys, time, pickle
+import sys, time, pickle, os
 sys.path.append('../../toolbox/')
 from robot_def import *
 from WeldSend import *
@@ -7,9 +7,7 @@ from RobotRaconteur.Client import *
 
 image_consts = None
 
-def main():
-	##############################################################FLIR####################################################################
-	
+def flir_rr_init():
 	url='rr+tcp://localhost:60827/?service=camera'
 
 	c1=RRN.ConnectService(url)
@@ -42,6 +40,38 @@ def main():
 		c1.start_streaming()
 	except: pass
 
+##############################################################FLIR Callback####################################################################
+def new_frame(pipe_ep):
+    global ir_image_all, ir_ts_all
+
+    #Loop to get the newest frame
+    while (pipe_ep.Available > 0):
+        #Receive the packet
+        rr_img=pipe_ep.ReceivePacket()
+        if rr_img.image_info.encoding == image_consts["ImageEncoding"]["mono8"]:
+            # Simple uint8 image
+            mat = rr_img.data.reshape([rr_img.image_info.height, rr_img.image_info.width], order='C')
+        elif rr_img.image_info.encoding == image_consts["ImageEncoding"]["mono16"]:
+            data_u16 = np.array(rr_img.data.view(np.uint16))
+            mat = data_u16.reshape([rr_img.image_info.height, rr_img.image_info.width], order='C')
+        
+        ir_format = rr_img.image_info.extended["ir_format"].data
+
+        if ir_format == "temperature_linear_10mK":
+            display_mat = (mat * 0.01) - 273.15    
+        elif ir_format == "temperature_linear_100mK":
+            display_mat = (mat * 0.1) - 273.15    
+        else:
+            display_mat = mat
+
+        #Convert the packet to an image and set the global variable
+        ir_ts_all.append(time.time())
+        ir_image_all.append(display_mat)
+
+def main():
+	##############################################################FLIR####################################################################
+	flir_rr_init()
+
 	##############################################################Robot####################################################################
 	###robot kinematics def
 	config_dir='../../config/'
@@ -72,7 +102,7 @@ def main():
 	ws.jog_dual(robot2,positioner,q2,q_positioner_home,v=1)
 
 
-	#################################################################robot 1 welding####################################################################
+	#################################################################robot 1 welding params####################################################################
 	R=np.array([[-0.7071, 0.7071, -0.    ],
 				[ 0.7071, 0.7071,  0.    ],
 				[0.,      0.,     -1.    ]])
@@ -90,6 +120,9 @@ def main():
 	v_base=5
 	layer_height=1.3
 	v_layer=10
+	#edge params, 1cm left and right
+	feedrate_edge=100
+	v_edge=10
 	q_all=[]
 	v_all=[]
 	job_offset=200
@@ -114,9 +147,9 @@ def main():
 		primitives.extend(['movej','movel'])
 		cond_all.extend([0,int(base_feedrate/10+job_offset)])
 
+	ws.weld_segment_single(primitives,robot,q_all,v_all,cond_all,arc=True,wait=0.,blocking=True)
 
 	####################################Normal Layer ####################################
-
 	for i in range(2,32):
 		if i%2==0:
 			p1=p_start+np.array([0,0,2*base_layer_height+i*layer_height])
@@ -125,19 +158,22 @@ def main():
 			p1=p_end+np.array([0,0,2*base_layer_height+i*layer_height])
 			p2=p_start+np.array([0,0,2*base_layer_height+i*layer_height])
 
+		p_edge1=p1+(p2-p1)/np.linalg.norm(p2-p1)*10
+		p_edge2=p2-(p2-p1)/np.linalg.norm(p2-p1)*10
 		q_init=robot.inv(p1,R,q_seed)[0]
 		q_end=robot.inv(p2,R,q_seed)[0]
+		q_edge1=robot.inv(p_edge1,R,q_seed)[0]
+		q_edge2=robot.inv(p_edge2,R,q_seed)[0]
 		if i==2:	#if start of first normal layer
-			
-			q_all.extend([q_init,q_end])
-			v_all.extend([1,v_layer])
-			primitives.extend(['movej','movel'])
-			cond_all.extend([0,int(feedrate/10+job_offset)])
+			q_all.extend([q_init,q_edge1,q_edge2,q_end])
+			v_all.extend([1,v_edge,v_layer,v_edge])
+			primitives.extend(['movej','movel','movel','movel'])
+			cond_all.extend([0,int(feedrate_edge/10+job_offset),int(feedrate/10+job_offset),int(feedrate_edge/10+job_offset)])
 		else:
-			q_all.extend([q_end])
-			v_all.extend([v_layer])
-			primitives.extend(['movel'])
-			cond_all.extend([int(feedrate/10+job_offset)])
+			q_all.extend([q_edge1,q_edge2,q_end])
+			v_all.extend([v_edge,v_layer,v_edge])
+			primitives.extend(['movel','movel','movel'])
+			cond_all.extend([int(feedrate_edge/10+job_offset),int(feedrate/10+job_offset),int(feedrate_edge/10+job_offset)])
 
 	ws.weld_segment_single(primitives,robot,q_all,v_all,cond_all,arc=True,wait=0.,blocking=False)
 	##############################################################Log Joint Data####################################################################
@@ -149,45 +185,15 @@ def main():
 			with client._lock:
 				client.joint_angle=np.hstack((fb_data.group_state[0].feedback_position,fb_data.group_state[1].feedback_position,fb_data.group_state[2].feedback_position))
 				client.state_flag=fb_data.controller_flags
-				js_recording.append(np.array([time.time()]+client.joint_angle.tolist()+[fb_data.job_state[0][1],fb_data.job_state[0][2]]))
+				js_recording.append(np.array([time.time()]+[fb_data.job_state[0][1]]+client.joint_angle.tolist()))
+	client.servoMH(False) #stop the motor
 
+	os.makedirs('../../../recorded_data/wallbf_%iipm_v%i_%iipm_v%i'%(feedrate,v_layer,feedrate_edge,v_edge),exist_ok=True)
 	np.savetxt('weld_js_exe.csv',np.array(js_recording),delimiter=',')
 	np.savetxt('ir_stamps.csv',np.array(ir_ts_all),delimiter=',')
 	#save as pickle
 	with open('ir_recording.pickle', 'wb') as file:
 		pickle.dump(ir_image_all, file)
-
-current_mat=None
-
-# ##############################################################FLIR Callback####################################################################
-def new_frame(pipe_ep):
-    global ir_image_all, ir_ts_all
-
-    #Loop to get the newest frame
-    while (pipe_ep.Available > 0):
-        #Receive the packet
-        rr_img=pipe_ep.ReceivePacket()
-        if rr_img.image_info.encoding == image_consts["ImageEncoding"]["mono8"]:
-            # Simple uint8 image
-            mat = rr_img.data.reshape([rr_img.image_info.height, rr_img.image_info.width], order='C')
-        elif rr_img.image_info.encoding == image_consts["ImageEncoding"]["mono16"]:
-            data_u16 = np.array(rr_img.data.view(np.uint16))
-            mat = data_u16.reshape([rr_img.image_info.height, rr_img.image_info.width], order='C')
-        
-        ir_format = rr_img.image_info.extended["ir_format"].data
-
-        if ir_format == "temperature_linear_10mK":
-            display_mat = (mat * 0.01) - 273.15    
-        elif ir_format == "temperature_linear_100mK":
-            display_mat = (mat * 0.1) - 273.15    
-        else:
-            display_mat = mat
-
-        #Convert the packet to an image and set the global variable
-        ir_ts_all.append(time.time())
-        ir_image_all.append(display_mat)
-    
-
 
 if __name__ == '__main__':
 	main()
