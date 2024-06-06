@@ -152,7 +152,8 @@ class WeldRRSensor(object):
 	def weld_cb(self, sub, value, ts):
 
 		if self.start_weld_cb:
-			self.weld_timestamp.append(value.ts['microseconds'][0])
+			# self.weld_timestamp.append(value.ts['microseconds'][0])
+			self.weld_timestamp.append(time.time())
 			self.weld_voltage.append(value.welding_voltage)
 			self.weld_current.append(value.welding_current)
 			self.weld_feedrate.append(value.wire_speed)
@@ -161,18 +162,19 @@ class WeldRRSensor(object):
 	def current_cb(self, sub, value, ts):
 
 		if self.start_current_cb:
-			self.current_timestamp.append(ts.seconds+ts.nanoseconds*1e-9)
+			# self.current_timestamp.append(ts.seconds+ts.nanoseconds*1e-9)
+			self.current_timestamp.append(time.time())
 			self.current.append(value)
 
 	
 	def save_weld_file(self,filedir):
 		np.savetxt(filedir + 'welding.csv',
-				np.array([(np.array(self.weld_timestamp)-self.weld_timestamp[0])/1e6, self.weld_voltage, self.weld_current, self.weld_feedrate, self.weld_energy]).T, delimiter=',',
+				np.array([(np.array(self.weld_timestamp)), self.weld_voltage, self.weld_current, self.weld_feedrate, self.weld_energy]).T, delimiter=',',
 				header='timestamp,voltage,current,feedrate,energy', comments='')
 		
 	def save_current_file(self,filedir):
 		np.savetxt(filedir + 'current.csv',
-				np.array([(np.array(self.current_timestamp)-self.current_timestamp[0]), self.current]).T, delimiter=',',
+				np.array([(np.array(self.current_timestamp)), self.current]).T, delimiter=',',
 				header='timestamp,current', comments='')
 	
 	def clean_ir_record(self):
@@ -204,13 +206,14 @@ class WeldRRSensor(object):
 
 				# Convert the packet to an image and set the global variable
 				self.ir_recording.append(copy.deepcopy(display_mat))
-				self.ir_timestamp.append(rr_img.image_info.data_header.ts['seconds']+rr_img.image_info.data_header.ts['nanoseconds']*1e-9)
-	
+				# self.ir_timestamp.append(rr_img.image_info.data_header.ts['seconds']+rr_img.image_info.data_header.ts['nanoseconds']*1e-9)
+				self.ir_timestamp.append(time.time())
+
 	def save_ir_file(self,filedir):
 
 		with open(filedir+'ir_recording.pickle','wb') as file:
 				pickle.dump(np.array(self.ir_recording),file)
-		np.savetxt(filedir + "ir_stamps.csv",self.ir_timestamp-self.ir_timestamp[0],delimiter=',')
+		np.savetxt(filedir + "ir_stamps.csv",self.ir_timestamp,delimiter=',')
 	
 	def clean_mic_record(self):
 
@@ -274,6 +277,6 @@ class WeldRRSensor(object):
 		flir_ts=np.array(flir_ts)
 		with open(layer_data_dir+'ir_recording.pickle','wb') as file:
 				pickle.dump(np.array(flir_logging),file)
-		np.savetxt(layer_data_dir + "ir_stamps.csv",flir_ts-flir_ts[0],delimiter=',')
+		np.savetxt(layer_data_dir + "ir_stamps.csv",flir_ts,delimiter=',')
 		
 		return
