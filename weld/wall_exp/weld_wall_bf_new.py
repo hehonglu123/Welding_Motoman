@@ -11,11 +11,11 @@ def main():
 
 	##############################################################SENSORS####################################################################
 	# weld state logging
-	weld_ser = RRN.SubscribeService('rr+tcp://192.168.55.10:60823?service=welder')
+	# weld_ser = RRN.SubscribeService('rr+tcp://192.168.55.10:60823?service=welder')
 	cam_ser=RRN.ConnectService('rr+tcp://localhost:60827/?service=camera')
-	mic_ser = RRN.ConnectService('rr+tcp://192.168.55.20:60828?service=microphone')
+	# mic_ser = RRN.ConnectService('rr+tcp://192.168.55.20:60828?service=microphone')
 	## RR sensor objects
-	rr_sensors = WeldRRSensor(weld_service=weld_ser,cam_service=cam_ser,microphone_service=mic_ser)
+	rr_sensors = WeldRRSensor(weld_service=None,cam_service=cam_ser,microphone_service=None)
 
 	##############################################################Robot####################################################################
 	###robot kinematics def
@@ -52,10 +52,10 @@ def main():
 				[ 0.7071, 0.7071,  0.    ],
 				[0.,      0.,     -1.    ]])
 	#ystart -850, yend -775
-	p_start_base=np.array([1710,-780,-260])
-	p_end_base=np.array([1590,-780,-260])
-	p_start=np.array([1700,-780,-260])
-	p_end=np.array([1600,-780,-260])
+	p_start_base=np.array([1710,-825,-260])
+	p_end_base=np.array([1590,-825,-260])
+	p_start=np.array([1700,-825,-260])
+	p_end=np.array([1600,-825,-260])
 	q_seed=np.radians([-35.4291,56.6333,40.5194,4.5177,-52.2505,-11.6546])
 
 
@@ -66,11 +66,11 @@ def main():
 	layer_height=1.1
 	v_layer=10
 	#edge params, 1cm left and right
-	feedrate_edge=120
-	v_edge=12
+	feedrate_edge=70
+	v_edge=7
 	q_all=[]
 	v_all=[]
-	job_offset=100
+	job_offset=200
 	cond_all=[]
 	primitives=[]
 
@@ -141,9 +141,9 @@ def main():
 	client.servoMH(False) #stop the motor
 
 
-	recorded_dir='../../../recorded_data/wallbf_%iipm_v%i_%iipm_v%i'%(feedrate,v_layer,feedrate_edge,v_edge)
+	recorded_dir='../../../recorded_data/wallbf_%iipm_v%i_%iipm_v%i/'%(feedrate,v_layer,feedrate_edge,v_edge)
 	os.makedirs(recorded_dir,exist_ok=True)
-	np.savetxt(recorded_dir+'/weld_js_exe.csv',np.array(js_recording),delimiter=',')
+	np.savetxt(recorded_dir+'weld_js_exe.csv',np.array(js_recording),delimiter=',')
 	rr_sensors.save_all_sensors(recorded_dir)
 
 if __name__ == '__main__':

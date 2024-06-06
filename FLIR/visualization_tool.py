@@ -5,7 +5,7 @@ sys.path.append('../toolbox/')
 from flir_toolbox import *
 
 # Load the IR recording data from the pickle file
-data_dir='../../recorded_data/wallbf_100ipm_v10_80ipm_v8/'
+data_dir='../../recorded_data/wallbf_100ipm_v10_70ipm_v7/'
 with open(data_dir+'/ir_recording.pickle', 'rb') as file:
     ir_recording = pickle.load(file)
 ir_ts=np.loadtxt(data_dir+'/ir_stamps.csv', delimiter=',')
