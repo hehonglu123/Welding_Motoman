@@ -56,19 +56,19 @@ def main():
 	p_end_base=np.array([1590,-825,-260])
 	p_start=np.array([1700,-825,-260])
 	p_end=np.array([1600,-825,-260])
-	bead_width=3
 	q_seed=np.radians([-35.4291,56.6333,40.5194,4.5177,-52.2505,-11.6546])
 
 
 	base_feedrate=300
-	feedrate=100
+	feedrate=120
 	base_layer_height=3
 	v_base=5
-	layer_height=1.2
+	layer_height=1.5
 	v_layer=10
+	bead_width=3.3
 	#edge params, 1cm left and right
-	feedrate_edge=70
-	v_edge=7
+	feedrate_side=120
+	v_side=10
 	q_all=[]
 	v_all=[]
 	job_offset=200
@@ -94,36 +94,36 @@ def main():
 		cond_all.extend([0,int(base_feedrate/10+job_offset)])
 
 	ws.jog_single(robot,robot.inv(p1+np.array([0,0,100]),R,q_seed)[0])
-	ws.weld_segment_single(primitives,robot,q_all,v_all,cond_all,arc=False,wait=0.,blocking=True)
+	ws.weld_segment_single(primitives,robot,q_all,v_all,cond_all,arc=True,wait=0.,blocking=True)
 	q_all=[]
 	v_all=[]
 	cond_all=[]
 	primitives=[]
 	####################################Normal Layer ####################################
-	for i in range(2,4):
+	for i in range(2,62):
 		p1=p_start+np.array([0,-bead_width/2,2*base_layer_height+i*layer_height])
 		p2=p_end+np.array([0,-bead_width/2,2*base_layer_height+i*layer_height])
 		p3=p_end+np.array([0,bead_width/2,2*base_layer_height+i*layer_height])
 		p4=p_start+np.array([0,bead_width/2,2*base_layer_height+i*layer_height])
 		
-		q1=robot.inv(q1,R,q_seed)[0]
-		q2=robot.inv(q2,R,q_seed)[0]
-		q3=robot.inv(q3,R,q_seed)[0]
-		q4=robot.inv(q4,R,q_seed)[0]
+		q1=robot.inv(p1,R,q_seed)[0]
+		q2=robot.inv(p2,R,q_seed)[0]
+		q3=robot.inv(p3,R,q_seed)[0]
+		q4=robot.inv(p4,R,q_seed)[0]
 		
 		if i==2:	#if start of first normal layer
 			q_all.extend([q1,q2,q3,q4])
-			v_all.extend([1,v_layer,v_layer,v_layer])
+			v_all.extend([1,v_layer,v_side,v_layer])
 			primitives.extend(['movej','movel','movel','movel'])
 			cond_all.extend([0,int(feedrate/10+job_offset),int(feedrate/10+job_offset),int(feedrate/10+job_offset)])
 		else:
 			q_all.extend([q1,q2,q3,q4])
-			v_all.extend([v_layer,v_layer,v_layer,v_layer])
+			v_all.extend([v_side,v_layer,v_side,v_layer])
 			primitives.extend(['movel','movel','movel','movel'])
 			cond_all.extend([int(feedrate/10+job_offset),int(feedrate/10+job_offset),int(feedrate/10+job_offset),int(feedrate/10+job_offset)])
 
 
-	ws.weld_segment_single(primitives,robot,q_all,v_all,cond_all,arc=False,wait=0.,blocking=False)
+	ws.weld_segment_single(primitives,robot,q_all,v_all,cond_all,arc=True,wait=0.,blocking=False)
 	##############################################################Log Joint Data####################################################################
 	js_recording=[]
 	rr_sensors.start_all_sensors()
@@ -139,7 +139,7 @@ def main():
 	client.servoMH(False) #stop the motor
 
 
-	recorded_dir='../../../recorded_data/wall_2bead_%iipm_v%i/'%(feedrate,v_layer)
+	recorded_dir='../../../recorded_data/wall2bead_w%.1f_%iipm_v%i_%iipm_v%i/'%(bead_width,feedrate,v_layer,feedrate_side,v_side)
 	os.makedirs(recorded_dir,exist_ok=True)
 	np.savetxt(recorded_dir+'weld_js_exe.csv',np.array(js_recording),delimiter=',')
 	rr_sensors.save_all_sensors(recorded_dir)
