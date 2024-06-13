@@ -5,8 +5,11 @@ sys.path.append('../toolbox/')
 sys.path.append('../scan/scan_tools/')
 sys.path.append('../scan/scan_plan/')
 sys.path.append('../scan/scan_process/')
+sys.path.append('../sensor_fusion/')
+
 from robot_def import *
 from scan_utils import *
+# from scan_continuous import *
 from scanPathGen import *
 from scanProcess import *
 from weldCorrectionStrategy import *
@@ -51,9 +54,6 @@ def robot_weld_path_gen(all_layer_z,forward_flag,base_layer):
     
     return all_path_T
 
-R1_ph_dataset_date='0926'
-R2_ph_dataset_date='0926'
-S1_ph_dataset_date='0926'
 
 zero_config=np.zeros(6)
 # 0. robots.
@@ -65,25 +65,22 @@ mti_marker_dir=config_dir+'mti_marker_config/'
 S1_marker_dir=config_dir+'D500B_marker_config/'
 S1_tcp_marker_dir=config_dir+'positioner_tcp_marker_config/'
 robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',d=15,tool_file_path=config_dir+'torch.csv',\
-	pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',\
-    base_marker_config_file=R1_marker_dir+'MA2010_'+R1_ph_dataset_date+'_marker_config.yaml',tool_marker_config_file=weldgun_marker_dir+'weldgun_'+R1_ph_dataset_date+'_marker_config.yaml')
+	pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv')
 robot_scan=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.yml',tool_file_path=config_dir+'mti.csv',\
-	base_transformation_file=config_dir+'MA1440_pose.csv',pulse2deg_file_path=config_dir+'MA1440_A0_pulse2deg_real.csv',\
-    base_marker_config_file=R2_marker_dir+'MA1440_'+R2_ph_dataset_date+'_marker_config.yaml',tool_marker_config_file=mti_marker_dir+'mti_'+R2_ph_dataset_date+'_marker_config.yaml')
+	base_transformation_file=config_dir+'MA1440_pose_new.csv',pulse2deg_file_path=config_dir+'MA1440_A0_pulse2deg_real.csv')
 
 positioner=positioner_obj('D500B',def_path=config_dir+'D500B_robot_default_config.yml',tool_file_path=config_dir+'positioner_tcp.csv',\
-    base_transformation_file=config_dir+'D500B_pose.csv',pulse2deg_file_path=config_dir+'D500B_pulse2deg_real.csv',\
-    base_marker_config_file=S1_marker_dir+'D500B_'+S1_ph_dataset_date+'_marker_config.yaml',tool_marker_config_file=S1_tcp_marker_dir+'positioner_tcp_marker_config.yaml')
+    base_transformation_file=config_dir+'D500B_pose.csv',pulse2deg_file_path=config_dir+'D500B_pulse2deg_real.csv')
 
 
 Table_home_T = positioner.fwd(np.radians([-15,180]))
 T_S1TCP_R1Base = np.linalg.inv(np.matmul(positioner.base_H,H_from_RT(Table_home_T.R,Table_home_T.p)))
 T_R1Base_S1TCP = np.linalg.inv(T_S1TCP_R1Base)
 #### change base H to calibrated ones ####
-robot_scan.base_H = H_from_RT(robot_scan.T_base_basemarker.R,robot_scan.T_base_basemarker.p)
-positioner.base_H = H_from_RT(positioner.T_base_basemarker.R,positioner.T_base_basemarker.p)
-T_to_base = Transform(np.eye(3),[0,0,-380])
-positioner.base_H = np.matmul(positioner.base_H,H_from_RT(T_to_base.R,T_to_base.p))
+# robot_scan.base_H = H_from_RT(robot_scan.T_base_basemarker.R,robot_scan.T_base_basemarker.p)
+# positioner.base_H = H_from_RT(positioner.T_base_basemarker.R,positioner.T_base_basemarker.p)
+# T_to_base = Transform(np.eye(3),[0,0,-380])
+# positioner.base_H = np.matmul(positioner.base_H,H_from_RT(T_to_base.R,T_to_base.p))
 
 final_height=50
 # final_h_std_thres=0.48
@@ -91,11 +88,14 @@ final_h_std_thres=999999999
 weld_z_height=[0,6,7] # two base layer height to first top layer
 weld_z_height=np.append(weld_z_height,np.arange(weld_z_height[-1],final_height,1)+1)
 # job_number=[115,115]
-job_number=[430,430]
+job_number=[120,120]
 model_job_nuber = 130
+
+job_number=np.append(job_number,np.ones(len(weld_z_height)-2)*(int(model_job_nuber)/10 + 100)) # 5356
 # job_number=np.append(job_number,np.ones(len(weld_z_height)-2)*(int(model_job_nuber)/10 + 200)) # ER4043
 # job_number=np.append(job_number,np.ones(len(weld_z_height)-2)*(int(model_job_nuber)/10 + 300)) # ER70S-6
-job_number=np.append(job_number,np.ones(len(weld_z_height)-2)*(int(model_job_nuber)/10 + 400)) # 316L
+# job_number=np.append(job_number,np.ones(len(weld_z_height)-2)*(int(model_job_nuber)/10 + 400)) # 316L
+
 print(weld_z_height)
 print(job_number)
 
@@ -121,29 +121,23 @@ start_correction_layer=3
 
 current_time = datetime.datetime.now()
 formatted_time = current_time.strftime('%Y_%m_%d_%H_%M_%S.%f')[:-7]
-data_dir=f'../data/wall_weld_test/316_correction_{model_job_nuber}ipm_'  +formatted_time+'/'
+data_dir=f'../../recorded_data/wall_weld_test/5356_{model_job_nuber}ipm_'  +formatted_time+'/'
 
-### read cmd
-use_previous_cmd=False
-cmd_dir = '../data/wall_weld_test/'+'moveL_100_weld_scan_2023_08_02_15_17_25/'
 
 ## rr drivers and all other drivers
 robot_client=MotionProgramExecClient()
 ws=WeldSend(robot_client)
 # weld state logging
-current_ser=RRN.SubscribeService('rr+tcp://192.168.55.21:12182?service=Current')
-weld_ser = RRN.SubscribeService('rr+tcp://192.168.55.10:60823?service=welder')
+# current_ser=RRN.SubscribeService('rr+tcp://192.168.55.21:12182?service=Current')
+# weld_ser = RRN.SubscribeService('rr+tcp://192.168.55.10:60823?service=welder')
 cam_ser= RRN.ConnectService('rr+tcp://localhost:60827/?service=camera')
-mic_ser = RRN.ConnectService('rr+tcp://localhost:60828?service=microphone')
+# mic_ser = RRN.ConnectService('rr+tcp://localhost:60828?service=microphone')
 ## RR sensor objects
-rr_sensors = WeldRRSensor(weld_service=weld_ser,cam_service=cam_ser,microphone_service=mic_ser,current_service=current_ser)
+# rr_sensors = WeldRRSensor(weld_service=weld_ser,cam_service=cam_ser,microphone_service=mic_ser,current_service=current_ser)
 
-# rr_sensors = WeldRRSensor(cam_service=cam_ser)
+rr_sensors = WeldRRSensor(cam_service=cam_ser)
 
 # ## test sensor (camera, microphone)
-print("Test 3 Sec.")
-rr_sensors.test_all_sensors()
-print(len(rr_sensors.ir_recording))
 # exit()
 ###############
 
@@ -166,15 +160,14 @@ r2_ir_q = np.radians([38.1523,35.3321,-67.5745,145.4767,-87.9081,-96.3553])
 r2_mid = np.radians([43.7851,20,-10,0,0,0])
 # r2_ir_q = np.zeros(6)
 
-weld_arcon=True
+weld_arcon=False
 
 end_layer = len(weld_z_height)
-if use_previous_cmd:
-    end_layer = len(glob.glob(cmd_dir+'layer_*'))
 
 input("Start?")
 # move robot to ready position
-ws.jog_dual(robot_scan,positioner,[r2_mid,r2_ir_q],np.radians([-15,180]),to_start_speed)
+ws.jog_dual(robot_scan,positioner,r2_mid,np.radians([-15,180]),to_start_speed)
+ws.jog_dual(robot_scan,positioner,r2_ir_q,np.radians([-15,180]),to_start_speed)
 
 for i in range(0,end_layer):
     cycle_st = time.time()
@@ -217,13 +210,7 @@ for i in range(0,end_layer):
         if (i<start_correction_layer):
             if (last_mean_h == 0) and (profile_height is not None):
                 last_mean_h=np.mean(profile_height[:,1])
-            if profile_height is None:
-                if i!=0:
-                    data_dir='../data/wall_weld_test/weld_scan_2023_07_05_16_58_36/'
-                    print("Using data:",data_dir)
-                    last_profile_height=np.load(data_dir+'layer_2/scans/height_profile.npy')
-                    last_mean_h=np.mean(last_profile_height[:,1])
-                    profile_height=np.load(data_dir+'layer_3/scans/height_profile.npy')
+            
 
             if (profile_height is not None) and (i>2):
                 mean_h = np.mean(profile_height[:,1])
@@ -242,13 +229,7 @@ for i in range(0,end_layer):
                 last_mean_h=mean_h
 
         else: # start correction from 2nd top layer
-            
-            if profile_height is None:
-                data_dir='../data/wall_weld_test/weld_scan_2023_08_02_15_17_25/'
-                print("Using data:",data_dir)
-                last_profile_height=np.load(data_dir+'layer_21/scans/height_profile.npy')
-                last_mean_h=np.mean(last_profile_height[:,1])
-                profile_height=np.load(data_dir+'layer_22/scans/height_profile.npy')
+        
                 
 
             ## parameters
@@ -303,20 +284,6 @@ for i in range(0,end_layer):
         for tcp_T in path_T:
             path_q.append(robot_weld.inv(tcp_T.p,tcp_T.R,zero_config)[0])
 
-        if use_previous_cmd:
-            cmd_layer_data_dir=cmd_dir+'layer_'+str(i)+'/'
-            breakpoints,primitives,q_bp,this_weld_v = ws.load_weld_cmd(cmd_layer_data_dir+'command1.csv')
-            this_weld_v=this_weld_v[1:]
-            path_q = []
-            for q in q_bp:
-                path_q.append(q[0])
-            start_T = robot_weld.fwd(path_q[0])
-            start_T.p = start_T.p+np.array([0,0,10])
-            path_q.insert(0,robot_weld.inv(start_T.p,start_T.R,path_q[0])[0])
-            end_T = robot_weld.fwd(path_q[-1])
-            end_T.p = end_T.p+np.array([0,0,10])
-            path_q.append(robot_weld.inv(end_T.p,end_T.R,path_q[-1])[0])
-            print("Use cmd:",cmd_layer_data_dir)
         
         ####################
         print("dh:",all_dh)
@@ -361,14 +328,14 @@ for i in range(0,end_layer):
         rr_sensors.stop_all_sensors()
 
         if save_weld_record:
-            Path(data_dir).mkdir(exist_ok=True)
+            os.makedirs(data_dir, exist_ok=True)
             layer_data_dir=data_dir+'layer_'+str(i)+'/'
             Path(layer_data_dir).mkdir(exist_ok=True)
             # save cmd
             q_bp=[]
             for q in path_q[1:-1]:
                 q_bp.append([np.array(q)])
-            ws.save_weld_cmd(layer_data_dir+'command1.csv',np.arange(len(primitives)),primitives,q_bp,np.append(10,this_weld_v))
+            # ws.save_weld_cmd(layer_data_dir+'command1.csv',np.arange(len(primitives)),primitives,q_bp,np.append(10,this_weld_v))
             # save weld record
             np.savetxt(layer_data_dir + 'weld_js_exe.csv',rob_js_exe,delimiter=',')
             np.savetxt(layer_data_dir + 'weld_robot_stamps.csv',rob_stamps,delimiter=',')
@@ -397,17 +364,6 @@ for i in range(0,end_layer):
     #### scanning
     if True:
         scan_st = time.time()
-        if curve_sliced_relative is None:
-            data_dir='../data/wall_weld_test/weld_scan_2023_08_02_17_07_02/'
-            last_profile_height=np.load('../data/wall_weld_test/weld_scan_2023_08_02_17_07_02/layer_17/scans/height_profile.npy')
-            last_mean_h=np.mean(last_profile_height[:,1])
-            h_largest=np.max(last_profile_height[:,1])
-            layer_data_dir=data_dir+'layer_'+str(i)+'/'
-            curve_sliced_relative=[np.array([ 3.30446707e+01,  1.72700000e+00,  4.36704154e+01,  1.55554573e-04,
-       -6.31394918e-20, -9.99881509e-01]), np.array([-3.19476273e+01,  1.72700000e+00,  4.36704154e+01,  1.55554573e-04,
-       -6.31394918e-20, -9.99881509e-01])]
-            input("Start Scanning")
-
         scan_plan_st = time.time()
         # 2. Scanning parameters
         ### scan parameters
@@ -444,7 +400,8 @@ for i in range(0,end_layer):
         # input("Press Enter and move to scanning startint point")
 
         ## move to start
-        ws.jog_dual(robot_scan,positioner,[r2_mid,q_bp1[0][0]],q_bp2[0][0],to_start_speed)
+        ws.jog_dual(robot_scan,positioner,r2_mid,q_bp2[0][0],to_start_speed)
+        ws.jog_dual(robot_scan,positioner,q_bp1[0][0],q_bp2[0][0],to_start_speed)
 
         # input("Press Enter to start moving and scanning")
         scan_motion_scan_st = time.time()
@@ -494,7 +451,8 @@ for i in range(0,end_layer):
         # q2[0]=90
         q2=deepcopy(r2_ir_q)
         q3=np.radians([-15,180])
-        ws.jog_dual(robot_scan,positioner,[r2_mid,r2_ir_q],q3,to_home_speed)
+        ws.jog_dual(robot_scan,positioner,r2_mid,q3,to_home_speed)
+        ws.jog_dual(robot_scan,positioner,r2_ir_q,q3,to_home_speed)
         #####################
         # exit()
 
@@ -568,7 +526,7 @@ for i in range(0,end_layer):
     # plt.close()
     # exit()
 
-    if np.mean(profile_height[:,1])>final_height and np.std(profile_height[:,1])<final_h_std_thres and (not use_previous_cmd):
+    if np.mean(profile_height[:,1])>final_height and np.std(profile_height[:,1])<final_h_std_thres:
         break
 
     forward_flag=not forward_flag

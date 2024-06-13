@@ -1,0 +1,30 @@
+base_markers:
+- marker1_rigid2
+- marker2_rigid2
+- marker3_rigid2
+calib_base_basemarker_pose:
+  orientation:
+    w: -0.4854991844177272
+    x: 0.48902723605379933
+    y: 0.5072541879062734
+    z: 0.5175288331860156
+  position:
+    x: -144.3641008179227
+    y: -11.62981502227808
+    z: 49.278001025304775
+calib_base_mocap_pose:
+  orientation:
+    w: -0.4863242998561268
+    x: 0.48938067872599234
+    y: 0.5066316181491902
+    z: 0.5170296221210814
+  position:
+    x: 317.90633235303574
+    y: 1268.5445556739683
+    z: -1567.790043744993
+calibration_markers:
+- marker1_rigid3
+- marker2_rigid3
+- marker3_rigid3
+- marker4_rigid3
+- marker5_rigid3
