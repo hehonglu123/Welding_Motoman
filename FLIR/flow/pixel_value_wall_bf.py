@@ -8,24 +8,12 @@ from flir_toolbox import *
 from robot_def import *
 
 
-def center_of_window_below_bbox(bbox,ir_pixel_window_size):
+def center_of_window_below_bbox(bbox,ir_pixel_window_size, num_pixel_below_centroid=8):
     # Calculate the bottom center point of the bbox
     x, y, w, h = bbox
-    center_bottom = (x + w // 2, y + h)
-
-    # # Define the 3x3 region below the bbox
-    # start_x = center_bottom[0] - 1
-    # start_y = center_bottom[1]
-    # end_x = start_x + 3
-    # end_y = start_y + 3
-
-    # # Calculate the center of the 3x3 window
-    # center_x = (start_x + end_x) // 2
-    # center_y = (start_y + end_y) // 2
 
     center_x = int(x + w/2) 
-    center_y = y + max(h+ir_pixel_window_size//2, h//2+8)
-    # center_y = y+h+ir_pixel_window_size//2
+    center_y = y + max(h+ir_pixel_window_size//2, h//2+num_pixel_below_centroid)
 
     return center_x, center_y
 
@@ -80,7 +68,7 @@ for layer_num in range(20,len(layer_indices_ir)-1):
             #find 3x3 average pixel value below centroid
             pixel_coord=center_of_window_below_bbox(bbox,ir_pixel_window_size)
             pixel_coord_layer.append(pixel_coord)
-            #DISPLAY THE IMAGE WITH BBOX
+            ###DISPLAY THE IMAGE WITH BBOX
             ir_normalized = ((ir_image - np.min(ir_image)) / (np.max(ir_image) - np.min(ir_image))) * 255
             ir_normalized=np.clip(ir_normalized, 0, 255)
             ir_bgr = cv2.applyColorMap(ir_normalized.astype(np.uint8), cv2.COLORMAP_INFERNO)
