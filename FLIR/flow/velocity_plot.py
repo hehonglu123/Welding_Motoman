@@ -21,12 +21,10 @@ robot2=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config
 positioner=positioner_obj('D500B',def_path=config_dir+'D500B_robot_default_config.yml',tool_file_path=config_dir+'positioner_tcp.csv',\
 	pulse2deg_file_path=config_dir+'D500B_pulse2deg_real.csv',base_transformation_file=config_dir+'D500B_pose_mocap.csv')
 
-p_all=[]
-for i in range(0,len(joint_angle)):
-    p_all.append(robot.fwd(joint_angle[i,2:8]).p)
+
 
 #calculate the velocity
-p_all=np.array(p_all)
+p_all=robot.fwd(joint_angle[:,2:8]).p_all
 v_all=np.linalg.norm(np.diff(p_all,axis=0),axis=1)/np.diff(joint_angle[:,0])
 plt.plot(joint_angle[1:,0],v_all)
 plt.xlabel('Time (s)')
