@@ -32,6 +32,8 @@ class current_reading(object):
 
 			# Start a continuous session.
 			self.session.start(0)
+		else:
+			raise Exception("No device found")
 	
 	def start_streaming(self):
 		if (self._streaming):

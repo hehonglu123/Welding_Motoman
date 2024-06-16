@@ -58,29 +58,18 @@ def robot_weld_path_gen(all_layer_z,forward_flag,base_layer):
 zero_config=np.zeros(6)
 # 0. robots.
 config_dir='../config/'
-R1_marker_dir=config_dir+'MA2010_marker_config/'
-weldgun_marker_dir=config_dir+'weldgun_marker_config/'
-R2_marker_dir=config_dir+'MA1440_marker_config/'
-mti_marker_dir=config_dir+'mti_marker_config/'
-S1_marker_dir=config_dir+'D500B_marker_config/'
-S1_tcp_marker_dir=config_dir+'positioner_tcp_marker_config/'
-robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',d=15,tool_file_path=config_dir+'torch.csv',\
-	pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv')
-robot_scan=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.yml',tool_file_path=config_dir+'mti.csv',\
-	base_transformation_file=config_dir+'MA1440_pose_new.csv',pulse2deg_file_path=config_dir+'MA1440_A0_pulse2deg_real.csv')
 
-positioner=positioner_obj('D500B',def_path=config_dir+'D500B_robot_default_config.yml',tool_file_path=config_dir+'positioner_tcp.csv',\
-    base_transformation_file=config_dir+'D500B_pose.csv',pulse2deg_file_path=config_dir+'D500B_pulse2deg_real.csv')
+robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',d=15,tool_file_path=config_dir+'torch.csv', pulse2deg_file_path='../config/MA2010_A0_pulse2deg_real.csv')
+robot_scan=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.yml',tool_file_path=config_dir+'mti.csv',base_transformation_file='../config/MA1440_pose.csv',pulse2deg_file_path='../config/MA1440_A0_pulse2deg_real.csv')
+robot_ir=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.yml',tool_file_path=config_dir+'flir.csv',base_transformation_file='../config/MA1440_pose.csv',pulse2deg_file_path='../config/MA1440_A0_pulse2deg_real.csv')
+
+positioner=positioner_obj('D500B',def_path=config_dir+'D500B_robot_default_config.yml',tool_file_path=config_dir+'positioner_tcp.csv',base_transformation_file='../config/D500B_pose.csv',pulse2deg_file_path='../config/D500B_pulse2deg_real.csv')
 
 
 Table_home_T = positioner.fwd(np.radians([-15,180]))
 T_S1TCP_R1Base = np.linalg.inv(np.matmul(positioner.base_H,H_from_RT(Table_home_T.R,Table_home_T.p)))
 T_R1Base_S1TCP = np.linalg.inv(T_S1TCP_R1Base)
-#### change base H to calibrated ones ####
-# robot_scan.base_H = H_from_RT(robot_scan.T_base_basemarker.R,robot_scan.T_base_basemarker.p)
-# positioner.base_H = H_from_RT(positioner.T_base_basemarker.R,positioner.T_base_basemarker.p)
-# T_to_base = Transform(np.eye(3),[0,0,-380])
-# positioner.base_H = np.matmul(positioner.base_H,H_from_RT(T_to_base.R,T_to_base.p))
+
 
 final_height=50
 # final_h_std_thres=0.48
@@ -156,11 +145,12 @@ curve_sliced_relative=None
 last_mean_h = 0
 
 # ir pose
-r2_ir_q = np.radians([38.1523,35.3321,-67.5745,145.4767,-87.9081,-96.3553])
+# r2_ir_q = np.radians([38.1523,35.3321,-67.5745,145.4767,-87.9081,-96.3553])
+r2_ir_q = np.radians([44.544,   36.087,  -63.436,134.42,-83.946, -95.874])
 r2_mid = np.radians([43.7851,20,-10,0,0,0])
 # r2_ir_q = np.zeros(6)
 
-weld_arcon=False
+weld_arcon=True
 
 end_layer = len(weld_z_height)
 
