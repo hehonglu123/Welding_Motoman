@@ -60,17 +60,17 @@ def main():
 
 
 	base_feedrate=300
-	feedrate=100
+	feedrate=150
+	v_layer=15
 	base_layer_height=3
 	v_base=5
 	layer_height=1.1
-	v_layer=10
 	#edge params, 1cm left and right
-	feedrate_edge=70
-	v_edge=7
+	feedrate_edge=150
+	v_edge=15
 	q_all=[]
 	v_all=[]
-	job_offset=200
+	job_offset=450
 	cond_all=[]
 	primitives=[]
 

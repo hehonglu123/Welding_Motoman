@@ -36,12 +36,12 @@ positioner=positioner_obj('D500B',def_path=config_dir+'D500B_robot_default_confi
 flir_intrinsic=yaml.load(open(config_dir+'FLIR_A320.yaml'), Loader=yaml.FullLoader)
 
 
-data_dir='../../../recorded_data/316L_model_120ipm_2023_09_25_19_56_43/'
+data_dir='../../../recorded_data/wall_weld_test/5356_150ipm_2024_06_17_14_36_16/'
 #get all folder names
-folders = [f for f in os.listdir(data_dir) if os.isdir(os.join(data_dir, f))]
+folders = [f for f in os.listdir(data_dir) if os.path.isdir(os.path.join(data_dir, f))]
 
 flame_3d=[]
-for folder in folders:
+for folder in folders[2:]:
     with open(data_dir+folder+'/ir_recording.pickle', 'rb') as file:
         ir_recording = pickle.load(file)
     ir_ts=np.loadtxt(data_dir+folder+'/ir_stamps.csv', delimiter=',')
@@ -88,6 +88,14 @@ for folder in folders:
             # plt.show()
 
 ##############################################GROUND TRUTH FROM MTI SCANNING################################################
+flame_3d=np.array(flame_3d)
+#plot the flame 3d
+fig = plt.figure()
+ax = fig.add_subplot(111, projection='3d')
+ax.scatter(flame_3d[:,0],flame_3d[:,1],flame_3d[:,2])
+#set equal aspect ratio
+ax.set_box_aspect([np.ptp(flame_3d[:,0]),np.ptp(flame_3d[:,1]),np.ptp(flame_3d[:,2])])
+plt.show()
 
 
 for folder in folders[:-1]:

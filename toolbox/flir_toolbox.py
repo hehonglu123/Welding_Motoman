@@ -88,6 +88,36 @@ def flame_detection(raw_img,threshold=1.2e4,area_threshold=10):
 
     return centroid, bbox
 
+def flame_detection_no_arc(raw_img,threshold=2.0e4,area_threshold=10):
+    ###flame detection by raw counts thresholding and connected components labeling
+    #centroids: x,y
+    if np.max(raw_img)<threshold:
+        return None
+    #find the highest 10 pixel values and their x,y coordinates
+    flat = raw_img.flatten()
+    indices = np.argpartition(flat, -area_threshold)[-area_threshold:]
+    
+    # Convert the indices to x,y coordinates
+    y, x = np.unravel_index(indices, raw_img.shape)
+    
+    # Get the corresponding values
+    values = raw_img[y, x]
+    
+    # Combine the coordinates and values into a single list of tuples
+    result = list(zip(values, zip(y, x)))
+    
+    # Sort the result by the values in descending order
+    result.sort(key=lambda x: x[0], reverse=True)
+
+    # Extract the coordinates from the result
+    coordinates = np.array([coord for _, coord in result])
+
+    # Calculate the mean of the coordinates
+    centroid = np.mean(coordinates, axis=0)
+    bbox = np.array([np.min(x),np.min(y),np.max(x)-np.min(x),np.max(y)-np.min(y)])
+
+    return centroid, bbox
+
 
 def weld_detection(raw_img,threshold=1.2e4,area_threshold=10):
     ###flame detection by raw counts thresholding and connected components labeling

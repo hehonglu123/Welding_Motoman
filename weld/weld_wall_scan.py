@@ -12,7 +12,6 @@ from scan_utils import *
 from utils import *
 from scanPathGen import *
 from scanProcess import *
-from weldCorrectionStrategy import *
 from weldRRSensor import *
 from WeldSend import *
 from dx200_motion_program_exec_client import *
@@ -73,9 +72,10 @@ T_R1Base_S1TCP = np.linalg.inv(T_S1TCP_R1Base)
 
 final_height=50
 final_h_std_thres=999999999
-weld_z_height=[0,6,7] # two base layer height to first top layer
-weld_z_height=np.append(weld_z_height,np.arange(weld_z_height[-1],final_height,1)+1)
-feedrate = 130
+weld_z_height=[0,2,4] # two base layer height to first top layer
+layer_height=0.5
+weld_z_height=np.append(weld_z_height,np.linspace(weld_z_height[-1],final_height,(final_height-weld_z_height[-1])//layer_height+1))
+feedrate = 150
 baselayer_feedrate = 200
 job_offset=100
 
@@ -88,8 +88,7 @@ print(job_number)
 ipm_mode=300
 
 weld_velocity=[5,5]
-weld_v=8
-print("input dh:",v2dh_loglog(weld_v,ipm_mode))
+weld_v=10
 
 weld_velocity=[5,5]+[weld_v]*len(weld_z_height[2:])
 
@@ -106,8 +105,8 @@ data_dir=f'../../recorded_data/wall_weld_test/5356_{feedrate}ipm_'  +formatted_t
 
 
 ## rr drivers and all other drivers
-robot_client=MotionProgramExecClient()
-ws=WeldSend(robot_client)
+client=MotionProgramExecClient()
+ws=WeldSend(client)
 # weld state logging
 # current_ser=RRN.SubscribeService('rr+tcp://192.168.55.21:12182?service=Current')
 # weld_ser = RRN.SubscribeService('rr+tcp://192.168.55.10:60823?service=welder')
@@ -150,13 +149,10 @@ v_x=np.cross(v_y,v_z)
 p2_in_base_frame=p2_in_base_frame-measure_distance*v_z			###back project measure_distance-mm away from torch
 R2=np.vstack((v_x,v_y,v_z)).T
 r2_ir_q=robot_ir.inv(p2_in_base_frame,R2,last_joints=np.zeros(6))[0]
-print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!r2_ir_q:",r2_ir_q)
-# r2_ir_q = np.radians([44.544,   36.087,  -63.436,134.42,-83.946, -95.874])
 r2_mid = np.radians([43.7851,20,-10,0,0,0])
 
-weld_arcon=False
+weld_arcon=True
 
-input("Start?")
 # move robot to ready position
 ws.jog_dual(robot_scan,positioner,r2_mid,np.radians([-15,180]),to_start_speed)
 ws.jog_dual(robot_scan,positioner,r2_ir_q,np.radians([-15,180]),to_start_speed)
@@ -197,33 +193,27 @@ for i in range(0,len(weld_z_height)):
         R_S1TCP = np.matmul(T_S1TCP_R1Base[:3,:3],path_p.R)
 
         h_largest=this_z_height
-
-        ## parameters
-        noise_h_thres = 3
-        num_l=40
-        input_dh=v2dh_loglog(weld_v,ipm_mode)
-
-        min_v=3
-        max_v=10
-        h_std_thres=-1
-
-
-        nominal_v=weld_v
-        curve_sliced_relative,path_T_S1,this_weld_v,all_dh,last_mean_h,scan_flag=\
-            strategy_3(profile_height,input_dh,curve_sliced_relative,R_S1TCP,num_l,noise_h_thres=noise_h_thres,\
-                        min_v=min_v,max_v=max_v,h_std_thres=h_std_thres,nominal_v=nominal_v,ipm_mode=ipm_mode)
+        if (last_mean_h == 0) and (profile_height is not None):
+            last_mean_h=np.mean(profile_height[:,1])
         
-        h_largest = np.max(profile_height[:,1])
 
-        # find curve in R1 frame
-        path_T=[]
-        for tcp_T in path_T_S1:
-            this_p = T_R1Base_S1TCP[:3,:3]@tcp_T.p+T_R1Base_S1TCP[:3,-1]
-            this_R = T_R1Base_S1TCP[:3,:3]@tcp_T.R
-            path_T.append(Transform(this_R,this_p))
-        # add path collision avoidance
-        path_T.insert(0,Transform(path_T[0].R,path_T[0].p+np.array([0,0,10])))
-        path_T.append(Transform(path_T[-1].R,path_T[-1].p+np.array([0,0,10])))
+        if (profile_height is not None) and (i>2):
+            mean_h = np.mean(profile_height[:,1])
+            dh_last_layer = mean_h-last_mean_h
+            h_target = mean_h+dh_last_layer
+
+            dh_direction = np.array([0,0,h_target-curve_sliced_relative[0][2]])
+            dh_direction_R1 = T_R1Base_S1TCP[:3,:3]@dh_direction
+
+            for curve_i in range(len(curve_sliced_relative)):
+                curve_sliced_relative[curve_i][2]=h_target
+            
+            for path_i in range(len(path_T)):
+                path_T[path_i].p=path_T[path_i].p+dh_direction_R1
+
+            last_mean_h=mean_h
+                
+
         
         path_q = []
         for tcp_T in path_T:
@@ -256,9 +246,22 @@ for i in range(0,len(weld_z_height)):
         rr_sensors.start_all_sensors()
 
 
-        rob_stamps,rob_js_exe,_,_=ws.weld_segment_single(primitives,robot_weld,path_q[1:-1],np.append(10,this_weld_v),cond_all=[int(this_job_number)],arc=weld_arcon)
+        ws.weld_segment_single(primitives,robot_weld,path_q[1:-1],np.append(10,this_weld_v),cond_all=[int(this_job_number)],arc=weld_arcon,blocking=False)
+        ##############################################################Log Joint Data####################################################################
+        js_recording=[]
+        rr_sensors.start_all_sensors()
+        start_time=time.time()
+        while not(client.state_flag & 0x08 == 0 and time.time()-start_time>1.):
+            res, fb_data = client.fb.try_receive_state_sync(client.controller_info, 0.001)
+            if res:
+                with client._lock:
+                    client.joint_angle=np.hstack((fb_data.group_state[0].feedback_position,fb_data.group_state[1].feedback_position,fb_data.group_state[2].feedback_position))
+                    client.state_flag=fb_data.controller_flags
+                    js_recording.append(np.array([time.time()]+[fb_data.job_state[0][1]]+client.joint_angle.tolist()))
+        rr_sensors.stop_all_sensors()
+        client.servoMH(False) #stop the motor
 
-
+        ##############################################################Log Sensor Data####################################################################
         rr_sensors.stop_all_sensors()
 
         if save_weld_record:
@@ -270,8 +273,7 @@ for i in range(0,len(weld_z_height)):
             for q in path_q[1:-1]:
                 q_bp.append([np.array(q)])
             # save weld record
-            np.savetxt(layer_data_dir + 'weld_js_exe.csv',rob_js_exe,delimiter=',')
-            np.savetxt(layer_data_dir + 'weld_robot_stamps.csv',rob_stamps,delimiter=',')
+            np.savetxt(layer_data_dir + 'weld_js_exe.csv',np.array(js_recording),delimiter=',')
             np.save(layer_data_dir+'primitives.npy',primitives)
             np.save(layer_data_dir+'path_q.npy',path_q)
             np.save(layer_data_dir+'this_weld_v.npy',np.append(10,this_weld_v))
@@ -435,7 +437,7 @@ for i in range(0,len(weld_z_height)):
         np.save(out_scan_dir+'height_profile.npy',profile_height)
     # visualize_pcd([pcd])
     plt.scatter(profile_height[:,0],profile_height[:,1])
-    plt.show()
+    # plt.show()
     # plt.close()
     # exit()
 
