@@ -9,7 +9,7 @@ sys.path.append('../sensor_fusion/')
 
 from robot_def import *
 from scan_utils import *
-# from scan_continuous import *
+from utils import *
 from scanPathGen import *
 from scanProcess import *
 from weldCorrectionStrategy import *
@@ -72,18 +72,15 @@ T_R1Base_S1TCP = np.linalg.inv(T_S1TCP_R1Base)
 
 
 final_height=50
-# final_h_std_thres=0.48
 final_h_std_thres=999999999
 weld_z_height=[0,6,7] # two base layer height to first top layer
 weld_z_height=np.append(weld_z_height,np.arange(weld_z_height[-1],final_height,1)+1)
-# job_number=[115,115]
-job_number=[120,120]
-model_job_nuber = 130
+feedrate = 130
+baselayer_feedrate = 200
+job_offset=100
 
-job_number=np.append(job_number,np.ones(len(weld_z_height)-2)*(int(model_job_nuber)/10 + 100)) # 5356
-# job_number=np.append(job_number,np.ones(len(weld_z_height)-2)*(int(model_job_nuber)/10 + 200)) # ER4043
-# job_number=np.append(job_number,np.ones(len(weld_z_height)-2)*(int(model_job_nuber)/10 + 300)) # ER70S-6
-# job_number=np.append(job_number,np.ones(len(weld_z_height)-2)*(int(model_job_nuber)/10 + 400)) # 316L
+job_number=np.append(2*[int(baselayer_feedrate/10)+job_offset],np.ones(len(weld_z_height)-2)*(int(feedrate/10) + job_offset)) # 5356
+
 
 print(weld_z_height)
 print(job_number)
@@ -93,24 +90,19 @@ ipm_mode=300
 weld_velocity=[5,5]
 weld_v=8
 print("input dh:",v2dh_loglog(weld_v,ipm_mode))
-for i in range(len(weld_z_height)-2):
-    weld_velocity.append(weld_v)
-    # if weld_v==weld_velocity[-2]:
-    #     weld_v+=2
-# print(weld_velocity)
-# exit()
+
+weld_velocity=[5,5]+[weld_v]*len(weld_z_height[2:])
+
 
 to_start_speed=5
 to_home_speed=6
 
 save_weld_record=True
 
-start_correction_layer=3
-# start_correction_layer=99999999
 
 current_time = datetime.datetime.now()
 formatted_time = current_time.strftime('%Y_%m_%d_%H_%M_%S.%f')[:-7]
-data_dir=f'../../recorded_data/wall_weld_test/5356_{model_job_nuber}ipm_'  +formatted_time+'/'
+data_dir=f'../../recorded_data/wall_weld_test/5356_{feedrate}ipm_'  +formatted_time+'/'
 
 
 ## rr drivers and all other drivers
@@ -145,21 +137,31 @@ curve_sliced_relative=None
 last_mean_h = 0
 
 # ir pose
-# r2_ir_q = np.radians([38.1523,35.3321,-67.5745,145.4767,-87.9081,-96.3553])
-r2_ir_q = np.radians([44.544,   36.087,  -63.436,134.42,-83.946, -95.874])
+###define start pose for 3 robtos
+measure_distance=500
+H2010_1440=H_inv(robot_ir.base_H)
+q_positioner_home=np.array([-15.*np.pi/180.,np.pi])
+p_positioner_home=positioner.fwd(q_positioner_home,world=True).p
+p_robot2_proj=p_positioner_home+np.array([0,0,50])
+p2_in_base_frame=np.dot(H2010_1440[:3,:3],p_robot2_proj)+H2010_1440[:3,3]
+v_z=H2010_1440[:3,:3]@np.array([-0.9659258262,0,-0.2588190451]) #R(15)deg down
+v_y=VectorPlaneProjection(np.array([0,1,0]),v_z)	###FLIR's Y pointing toward 1440's +Y in 1440's base frame, projected on v_z's plane
+v_x=np.cross(v_y,v_z)
+p2_in_base_frame=p2_in_base_frame-measure_distance*v_z			###back project measure_distance-mm away from torch
+R2=np.vstack((v_x,v_y,v_z)).T
+r2_ir_q=robot_ir.inv(p2_in_base_frame,R2,last_joints=np.zeros(6))[0]
+print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!r2_ir_q:",r2_ir_q)
+# r2_ir_q = np.radians([44.544,   36.087,  -63.436,134.42,-83.946, -95.874])
 r2_mid = np.radians([43.7851,20,-10,0,0,0])
-# r2_ir_q = np.zeros(6)
 
-weld_arcon=True
-
-end_layer = len(weld_z_height)
+weld_arcon=False
 
 input("Start?")
 # move robot to ready position
 ws.jog_dual(robot_scan,positioner,r2_mid,np.radians([-15,180]),to_start_speed)
 ws.jog_dual(robot_scan,positioner,r2_ir_q,np.radians([-15,180]),to_start_speed)
 
-for i in range(0,end_layer):
+for i in range(0,len(weld_z_height)):
     cycle_st = time.time()
     print("==================================")
     print("Layer:",i)
@@ -194,81 +196,34 @@ for i in range(0,end_layer):
         print(curve_sliced_relative)
         R_S1TCP = np.matmul(T_S1TCP_R1Base[:3,:3],path_p.R)
 
-        #### Correction ####
-        # TODO: Add fitering if near threshold
         h_largest=this_z_height
-        if (i<start_correction_layer):
-            if (last_mean_h == 0) and (profile_height is not None):
-                last_mean_h=np.mean(profile_height[:,1])
-            
 
-            if (profile_height is not None) and (i>2):
-                mean_h = np.mean(profile_height[:,1])
-                dh_last_layer = mean_h-last_mean_h
-                h_target = mean_h+dh_last_layer
+        ## parameters
+        noise_h_thres = 3
+        num_l=40
+        input_dh=v2dh_loglog(weld_v,ipm_mode)
 
-                dh_direction = np.array([0,0,h_target-curve_sliced_relative[0][2]])
-                dh_direction_R1 = T_R1Base_S1TCP[:3,:3]@dh_direction
+        min_v=3
+        max_v=10
+        h_std_thres=-1
 
-                for curve_i in range(len(curve_sliced_relative)):
-                    curve_sliced_relative[curve_i][2]=h_target
-                
-                for path_i in range(len(path_T)):
-                    path_T[path_i].p=path_T[path_i].p+dh_direction_R1
 
-                last_mean_h=mean_h
-
-        else: # start correction from 2nd top layer
+        nominal_v=weld_v
+        curve_sliced_relative,path_T_S1,this_weld_v,all_dh,last_mean_h,scan_flag=\
+            strategy_3(profile_height,input_dh,curve_sliced_relative,R_S1TCP,num_l,noise_h_thres=noise_h_thres,\
+                        min_v=min_v,max_v=max_v,h_std_thres=h_std_thres,nominal_v=nominal_v,ipm_mode=ipm_mode)
         
-                
+        h_largest = np.max(profile_height[:,1])
 
-            ## parameters
-            # noise_h_thres = 3
-            # peak_threshold=0.25
-            # flat_threshold=2.5
-            # correct_thres = 1.4 # mm
-            # patch_nb = 2 # 2*0.1
-            # start_ramp_ratio = 0.67
-            # end_ramp_ratio = 0.33
-            #############
-            # curve_sliced_relative,path_T_S1,this_weld_v,all_dh,last_mean_h=\
-            #     strategy_2(profile_height,last_mean_h,forward_flag,curve_sliced_relative,R_S1TCP,this_weld_v[0],\
-            #             noise_h_thres=noise_h_thres,peak_threshold=peak_threshold,flat_threshold=flat_threshold,\
-            #             correct_thres=correct_thres,patch_nb=patch_nb,\
-            #             start_ramp_ratio=start_ramp_ratio,end_ramp_ratio=end_ramp_ratio)
-
-            ## parameters
-            noise_h_thres = 3
-            num_l=40
-            # input_dh=1.1624881529394444
-            # input_dh=1.4018280504260527
-            input_dh=v2dh_loglog(weld_v,ipm_mode)
-            
-            # min_v=10
-            # max_v=75
-            # h_std_thres=0.5
-
-            min_v=3
-            max_v=10
-            h_std_thres=-1
-
-
-            nominal_v=weld_v
-            curve_sliced_relative,path_T_S1,this_weld_v,all_dh,last_mean_h,scan_flag=\
-                strategy_3(profile_height,input_dh,curve_sliced_relative,R_S1TCP,num_l,noise_h_thres=noise_h_thres,\
-                           min_v=min_v,max_v=max_v,h_std_thres=h_std_thres,nominal_v=nominal_v,ipm_mode=ipm_mode)
-            
-            h_largest = np.max(profile_height[:,1])
-
-            # find curve in R1 frame
-            path_T=[]
-            for tcp_T in path_T_S1:
-                this_p = T_R1Base_S1TCP[:3,:3]@tcp_T.p+T_R1Base_S1TCP[:3,-1]
-                this_R = T_R1Base_S1TCP[:3,:3]@tcp_T.R
-                path_T.append(Transform(this_R,this_p))
-            # add path collision avoidance
-            path_T.insert(0,Transform(path_T[0].R,path_T[0].p+np.array([0,0,10])))
-            path_T.append(Transform(path_T[-1].R,path_T[-1].p+np.array([0,0,10])))
+        # find curve in R1 frame
+        path_T=[]
+        for tcp_T in path_T_S1:
+            this_p = T_R1Base_S1TCP[:3,:3]@tcp_T.p+T_R1Base_S1TCP[:3,-1]
+            this_R = T_R1Base_S1TCP[:3,:3]@tcp_T.R
+            path_T.append(Transform(this_R,this_p))
+        # add path collision avoidance
+        path_T.insert(0,Transform(path_T[0].R,path_T[0].p+np.array([0,0,10])))
+        path_T.append(Transform(path_T[-1].R,path_T[-1].p+np.array([0,0,10])))
         
         path_q = []
         for tcp_T in path_T:
@@ -293,17 +248,6 @@ for i in range(0,end_layer):
         ws.jog_single(robot_weld,path_q[0],to_start_speed)
         
         weld_motion_weld_st = time.time()
-        # input("Press Enter and start welding.")
-        # mp=MotionProgram(ROBOT_CHOICE='RB1',pulse2deg=robot_weld.pulse2deg)
-        # mp.MoveL(np.degrees(path_q[1]), 10, 0)
-        # mp.setArc(select, int(this_job_number))
-        # for bpi in range(len(this_weld_v)):
-        #     if bpi!=len(this_weld_v)-1:
-        #         mp.MoveL(np.degrees(path_q[bpi+2]), this_weld_v[bpi])
-        #     else:
-        #         mp.MoveL(np.degrees(path_q[bpi+2]), this_weld_v[bpi],0)
-        # mp.setArc(False)
-        # mp.MoveL(np.degrees(path_q[-1]), 10, 0)
 
         primitives=[]
         for bpi in range(len(this_weld_v)+1):
@@ -325,7 +269,6 @@ for i in range(0,end_layer):
             q_bp=[]
             for q in path_q[1:-1]:
                 q_bp.append([np.array(q)])
-            # ws.save_weld_cmd(layer_data_dir+'command1.csv',np.arange(len(primitives)),primitives,q_bp,np.append(10,this_weld_v))
             # save weld record
             np.savetxt(layer_data_dir + 'weld_js_exe.csv',rob_js_exe,delimiter=',')
             np.savetxt(layer_data_dir + 'weld_robot_stamps.csv',rob_stamps,delimiter=',')
@@ -346,130 +289,113 @@ for i in range(0,end_layer):
         ######################################################
 
         print("Weld Time:",time.time()-weld_st)
-    # exit()
-    if True:
-        ws.jog_single(robot_weld,np.zeros(6),to_home_speed)
+
+    ws.jog_single(robot_weld,np.zeros(6),to_home_speed)
 
 
     #### scanning
-    if True:
-        scan_st = time.time()
-        scan_plan_st = time.time()
-        # 2. Scanning parameters
-        ### scan parameters
-        scan_speed=10 # scanning speed (mm/sec)
-        scan_stand_off_d = 95 ## mm
-        Rz_angle = np.radians(0) # point direction w.r.t welds
-        Ry_angle = np.radians(0) # rotate in y a bit
-        bounds_theta = np.radians(1) ## circular motion at start and end
-        all_scan_angle = np.radians([0]) ## scan angle
-        q_init_table=np.radians([-15,200]) ## init table
-        save_output_points = True
-        ### scanning path module
-        spg = ScanPathGen(robot_scan,positioner,scan_stand_off_d,Rz_angle,Ry_angle,bounds_theta)
-        mti_Rpath = np.array([[ -1.,0.,0.],   
-                    [ 0.,1.,0.],
-                    [0.,0.,-1.]])
-        # generate scan path
-        if forward_flag:
-            scan_p,scan_R,q_out1,q_out2=spg.gen_scan_path([curve_sliced_relative],[0],all_scan_angle,\
-                            solve_js_method=0,q_init_table=q_init_table,R_path=mti_Rpath,scan_path_dir=None)
-        else:
-            scan_p,scan_R,q_out1,q_out2=spg.gen_scan_path([curve_sliced_relative[::-1]],[0],all_scan_angle,\
-                            solve_js_method=0,q_init_table=q_init_table,R_path=mti_Rpath,scan_path_dir=None)
-        # generate motion program
-        q_bp1,q_bp2,s1_all,s2_all=spg.gen_motion_program(q_out1,q_out2,scan_p,scan_speed,init_sync_move=0)
-        #######################################
+    scan_st = time.time()
+    scan_plan_st = time.time()
+    # 2. Scanning parameters
+    ### scan parameters
+    scan_speed=10 # scanning speed (mm/sec)
+    scan_stand_off_d = 95 ## mm
+    Rz_angle = np.radians(0) # point direction w.r.t welds
+    Ry_angle = np.radians(0) # rotate in y a bit
+    bounds_theta = np.radians(1) ## circular motion at start and end
+    all_scan_angle = np.radians([0]) ## scan angle
+    q_init_table=np.radians([-15,200]) ## init table
+    save_output_points = True
+    ### scanning path module
+    spg = ScanPathGen(robot_scan,positioner,scan_stand_off_d,Rz_angle,Ry_angle,bounds_theta)
+    mti_Rpath = np.array([[ -1.,0.,0.],   
+                [ 0.,1.,0.],
+                [0.,0.,-1.]])
+    # generate scan path
+    if forward_flag:
+        scan_p,scan_R,q_out1,q_out2=spg.gen_scan_path([curve_sliced_relative],[0],all_scan_angle,\
+                        solve_js_method=0,q_init_table=q_init_table,R_path=mti_Rpath,scan_path_dir=None)
+    else:
+        scan_p,scan_R,q_out1,q_out2=spg.gen_scan_path([curve_sliced_relative[::-1]],[0],all_scan_angle,\
+                        solve_js_method=0,q_init_table=q_init_table,R_path=mti_Rpath,scan_path_dir=None)
+    # generate motion program
+    q_bp1,q_bp2,s1_all,s2_all=spg.gen_motion_program(q_out1,q_out2,scan_p,scan_speed,init_sync_move=0)
+    #######################################
 
-        print("Scan plan time:",time.time()-scan_plan_st)
+    print("Scan plan time:",time.time()-scan_plan_st)
 
-        scan_motion_st = time.time()
-        ######## scanning motion #########
-        ### execute motion ###
-        # robot_client=MotionProgramExecClient()
-        # input("Press Enter and move to scanning startint point")
+    scan_motion_st = time.time()
+    ######## scanning motion #########
 
-        ## move to start
-        ws.jog_dual(robot_scan,positioner,r2_mid,q_bp2[0][0],to_start_speed)
-        ws.jog_dual(robot_scan,positioner,q_bp1[0][0],q_bp2[0][0],to_start_speed)
+    ## move to start
+    ws.jog_dual(robot_scan,positioner,r2_mid,q_bp2[0][0],to_start_speed)
+    ws.jog_dual(robot_scan,positioner,q_bp1[0][0],q_bp2[0][0],to_start_speed)
 
-        # input("Press Enter to start moving and scanning")
-        scan_motion_scan_st = time.time()
+    # input("Press Enter to start moving and scanning")
+    scan_motion_scan_st = time.time()
 
-        ## motion start
-        mp = MotionProgram(ROBOT_CHOICE='RB2',ROBOT_CHOICE2='ST1',pulse2deg=robot_scan.pulse2deg,pulse2deg_2=positioner.pulse2deg)
-        # calibration motion
-        target2=['MOVJ',np.degrees(q_bp2[1][0]),s2_all[0]]
-        mp.MoveL(np.degrees(q_bp1[1][0]), scan_speed, 0, target2=target2)
-        # routine motion
-        for path_i in range(2,len(q_bp1)-1):
-            target2=['MOVJ',np.degrees(q_bp2[path_i][0]),s2_all[path_i]]
-            mp.MoveL(np.degrees(q_bp1[path_i][0]), s1_all[path_i], target2=target2)
-        target2=['MOVJ',np.degrees(q_bp2[-1][0]),s2_all[-1]]
-        mp.MoveL(np.degrees(q_bp1[-1][0]), s1_all[-1], 0, target2=target2)
+    ## motion start
+    mp = MotionProgram(ROBOT_CHOICE='RB2',ROBOT_CHOICE2='ST1',pulse2deg=robot_scan.pulse2deg,pulse2deg_2=positioner.pulse2deg)
+    # calibration motion
+    target2=['MOVJ',np.degrees(q_bp2[1][0]),s2_all[0]]
+    mp.MoveL(np.degrees(q_bp1[1][0]), scan_speed, 0, target2=target2)
+    # routine motion
+    for path_i in range(2,len(q_bp1)-1):
+        target2=['MOVJ',np.degrees(q_bp2[path_i][0]),s2_all[path_i]]
+        mp.MoveL(np.degrees(q_bp1[path_i][0]), s1_all[path_i], target2=target2)
+    target2=['MOVJ',np.degrees(q_bp2[-1][0]),s2_all[-1]]
+    mp.MoveL(np.degrees(q_bp1[-1][0]), s1_all[-1], 0, target2=target2)
 
-        ws.client.execute_motion_program_nonblocking(mp)
-        ###streaming
-        ws.client.StartStreaming()
-        start_time=time.time()
-        state_flag=0
-        joint_recording=[]
-        robot_stamps=[]
-        mti_recording=[]
-        r_pulse2deg = np.append(robot_scan.pulse2deg,positioner.pulse2deg)
-        while True:
-            if state_flag & STATUS_RUNNING == 0 and time.time()-start_time>1.:
-                break 
-            res, fb_data = ws.client.fb.try_receive_state_sync(ws.client.controller_info, 0.001)
-            if res:
-                joint_angle=np.hstack((fb_data.group_state[0].feedback_position,fb_data.group_state[1].feedback_position,fb_data.group_state[2].feedback_position))
-                state_flag=fb_data.controller_flags
-                joint_recording.append(joint_angle)
-                timestamp=fb_data.time
-                robot_stamps.append(timestamp)
-                ###MTI scans YZ point from tool frame
-                mti_recording.append(deepcopy(np.array([mti_client.lineProfile.X_data,mti_client.lineProfile.Z_data])))
-        ws.client.servoMH(False)
-        
-        mti_recording=np.array(mti_recording)
-        joint_recording=np.array(joint_recording)
-        q_out_exe=joint_recording[:,6:]
-        print(np.degrees(q_out_exe[:10]))
-        # input("Press Enter to Move Home")
-        # move robot to home
-        # q2=np.zeros(6)
-        # q2[0]=90
-        q2=deepcopy(r2_ir_q)
-        q3=np.radians([-15,180])
-        ws.jog_dual(robot_scan,positioner,r2_mid,q3,to_home_speed)
-        ws.jog_dual(robot_scan,positioner,r2_ir_q,q3,to_home_speed)
-        #####################
-        # exit()
+    ws.client.execute_motion_program_nonblocking(mp)
+    ###streaming
+    ws.client.StartStreaming()
+    start_time=time.time()
+    state_flag=0
+    joint_recording=[]
+    robot_stamps=[]
+    mti_recording=[]
+    r_pulse2deg = np.append(robot_scan.pulse2deg,positioner.pulse2deg)
+    while True:
+        if state_flag & STATUS_RUNNING == 0 and time.time()-start_time>1.:
+            break 
+        res, fb_data = ws.client.fb.try_receive_state_sync(ws.client.controller_info, 0.001)
+        if res:
+            joint_angle=np.hstack((fb_data.group_state[0].feedback_position,fb_data.group_state[1].feedback_position,fb_data.group_state[2].feedback_position))
+            state_flag=fb_data.controller_flags
+            joint_recording.append(joint_angle)
+            timestamp=fb_data.time
+            robot_stamps.append(timestamp)
+            ###MTI scans YZ point from tool frame
+            mti_recording.append(deepcopy(np.array([mti_client.lineProfile.X_data,mti_client.lineProfile.Z_data])))
+    ws.client.servoMH(False)
+    
+    mti_recording=np.array(mti_recording)
+    joint_recording=np.array(joint_recording)
+    q_out_exe=joint_recording[:,6:]
 
-        print("Total exe len:",len(q_out_exe))
-        if save_output_points:
-            out_scan_dir = layer_data_dir+'scans/'
-            ## save traj
-            Path(out_scan_dir).mkdir(exist_ok=True)
-            # save poses
-            np.savetxt(out_scan_dir + 'scan_js_exe.csv',q_out_exe,delimiter=',')
-            np.savetxt(out_scan_dir + 'scan_robot_stamps.csv',robot_stamps,delimiter=',')
-            with open(out_scan_dir + 'mti_scans.pickle', 'wb') as file:
-                pickle.dump(mti_recording, file)
-            print('Total scans:',len(mti_recording))
-        
-        print("Scan motion time:",time.time()-scan_motion_st)
-        
-        print("Scan Time:",time.time()-scan_st)
+    q2=deepcopy(r2_ir_q)
+    q3=np.radians([-15,180])
+    ws.jog_dual(robot_scan,positioner,r2_mid,q3,to_home_speed)
+    ws.jog_dual(robot_scan,positioner,r2_ir_q,q3,to_home_speed)
+    #####################
 
-    ### for scan testing
-    # out_scan_dir=data_dir='../data/wall_weld_test/weld_scan_2023_06_06_12_43_57/layer_15/scans/'
-    # q_init_table=np.radians([-15,200])
-    # h_largest=20
-    # q_out_exe=np.loadtxt(out_scan_dir + 'scan_js_exe.csv',delimiter=',')
-    # robot_stamps=np.loadtxt(out_scan_dir + 'scan_robot_stamps.csv',delimiter=',')
-    # with open(out_scan_dir + 'mti_scans.pickle', 'rb') as file:
-    #     mti_recording=pickle.load(file)
+    print("Total exe len:",len(q_out_exe))
+    if save_output_points:
+        out_scan_dir = layer_data_dir+'scans/'
+        ## save traj
+        Path(out_scan_dir).mkdir(exist_ok=True)
+        # save poses
+        np.savetxt(out_scan_dir + 'scan_js_exe.csv',q_out_exe,delimiter=',')
+        np.savetxt(out_scan_dir + 'scan_robot_stamps.csv',robot_stamps,delimiter=',')
+        with open(out_scan_dir + 'mti_scans.pickle', 'wb') as file:
+            pickle.dump(mti_recording, file)
+        print('Total scans:',len(mti_recording))
+    
+    print("Scan motion time:",time.time()-scan_motion_st)
+    
+    print("Scan Time:",time.time()-scan_st)
+
+
     ########################
 
     recon_3d_st = time.time()
@@ -484,10 +410,7 @@ for i in range(0,end_layer):
     except:
         curve_x_start=43
         curve_x_end=-41
-    # Transz0_H=np.array([[ 9.99974559e-01, -7.29664987e-06, -7.13309345e-03, -1.06461758e-02],
-    #                     [-7.29664987e-06,  9.99997907e-01, -2.04583032e-03, -3.05341146e-03],
-    #                     [ 7.13309345e-03,  2.04583032e-03,  9.99972466e-01,  1.49246365e+00],
-    #                     [ 0.00000000e+00,  0.00000000e+00,  0.00000000e+00,  1.00000000e+00]])
+
     z_height_start=h_largest-3
     crop_extend=10
     crop_min=(curve_x_end-crop_extend,-30,-10)
@@ -512,7 +435,7 @@ for i in range(0,end_layer):
         np.save(out_scan_dir+'height_profile.npy',profile_height)
     # visualize_pcd([pcd])
     plt.scatter(profile_height[:,0],profile_height[:,1])
-    # plt.show()
+    plt.show()
     # plt.close()
     # exit()
 
