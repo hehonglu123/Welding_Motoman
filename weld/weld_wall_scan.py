@@ -72,9 +72,9 @@ T_R1Base_S1TCP = np.linalg.inv(T_S1TCP_R1Base)
 
 final_height=50
 final_h_std_thres=999999999
-weld_z_height=[0,2,4] # two base layer height to first top layer
-layer_height=0.5
-weld_z_height=np.append(weld_z_height,np.linspace(weld_z_height[-1],final_height,(final_height-weld_z_height[-1])//layer_height+1))
+weld_z_height=[0,1,2] # two base layer height to first top layer
+layer_height=0.8
+weld_z_height=np.append(weld_z_height,np.linspace(weld_z_height[-1]+layer_height,final_height,int((final_height-weld_z_height[-1])/layer_height)))
 feedrate = 150
 baselayer_feedrate = 300
 job_offset=200

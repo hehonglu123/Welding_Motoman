@@ -6,7 +6,7 @@ from flir_toolbox import *
 
 # Load the IR recording data from the pickle file
 # data_dir='../../../recorded_data/ER4043/wallbf_100ipm_v10_100ipm_v10/'
-data_dir='../../../recorded_data/5356_150ipm_2024_06_17_14_36_16/layer_2/'
+data_dir='../../../recorded_data/wall_weld_test/4043_150ipm_2024_06_18_11_16_32/layer_4/'
 
 with open(data_dir+'/ir_recording.pickle', 'rb') as file:
     ir_recording = pickle.load(file)
@@ -26,7 +26,7 @@ cmap = cv2.COLORMAP_INFERNO
 def update_frame(val):
     i = cv2.getTrackbarPos('Frame', 'IR Recording')
     ir_image = np.rot90(ir_recording[i], k=-1)
-    centroid, bbox=flame_detection(ir_image,threshold=1.0e4,area_threshold=10)
+    centroid, bbox=flame_detection(ir_image,threshold=1.1e4,area_threshold=10)
     # centroid, bbox=flame_detection_no_arc(ir_image,torch_template=template,threshold=2.0e4,area_threshold=10)
 
     ir_normalized = ((ir_image - np.min(ir_image)) / (np.max(ir_image) - np.min(ir_image))) * 255

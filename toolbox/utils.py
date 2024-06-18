@@ -44,6 +44,30 @@ def vector_to_plane(point, centroid, normal):		###find the vector from point to 
 def point2plane_distance(p,centroid,normal):
 	return np.abs(np.dot(p - centroid, normal) / np.linalg.norm(normal))
 
+def rodrigues_rot(curve, n0, n1):
+
+    if np.all(n0==n1):
+        return curve
+    
+    # If curve is only 1d array (coords of single point), fix it to be matrix
+    if curve.ndim == 1:
+        curve = curve[np.newaxis,:]
+    
+    # Get vector of rotation k and angle theta
+    n0 = n0/np.linalg.norm(n0)
+    n1 = n1/np.linalg.norm(n1)
+    k = np.cross(n0,n1)
+    k = k/np.linalg.norm(k)
+    theta = np.arccos(np.dot(n0,n1))
+    
+    # Compute rotated points
+    curve_rot = np.zeros((len(curve),3))
+    for i in range(len(curve)):
+        curve_rot[i] = curve[i]*np.cos(theta) + np.cross(k,curve[i])*np.sin(theta) + k*np.dot(k,curve[i])*(1-np.cos(theta))
+
+    return curve_rot
+
+
 def fit_plane(points):
 	# Calculate the centroid of the points
 	centroid = np.mean(points, axis=0)
@@ -58,6 +82,12 @@ def fit_plane(points):
 	normal = vh[-1]
 
 	return normal, centroid
+
+def project_onto_plane(points, normal):
+	points2d = rodrigues_rot(points, normal, [0,0,1])
+
+	return points2d[:,:2]
+
 
 def pose_regression(A,B):
 	###find transformation between ordered point lists A and B with regression
