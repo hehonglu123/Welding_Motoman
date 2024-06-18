@@ -76,10 +76,10 @@ weld_z_height=[0,2,4] # two base layer height to first top layer
 layer_height=0.5
 weld_z_height=np.append(weld_z_height,np.linspace(weld_z_height[-1],final_height,(final_height-weld_z_height[-1])//layer_height+1))
 feedrate = 150
-baselayer_feedrate = 200
-job_offset=100
+baselayer_feedrate = 300
+job_offset=200
 
-job_number=np.append(2*[int(baselayer_feedrate/10)+job_offset],np.ones(len(weld_z_height)-2)*(int(feedrate/10) + job_offset)) # 5356
+job_number=np.append(2*[int(baselayer_feedrate/10)+job_offset],np.ones(len(weld_z_height)-2)*(int(feedrate/10) + job_offset))
 
 
 print(weld_z_height)
@@ -87,10 +87,10 @@ print(job_number)
 
 ipm_mode=300
 
-weld_velocity=[5,5]
+v_baselayer=5
 weld_v=10
 
-weld_velocity=[5,5]+[weld_v]*len(weld_z_height[2:])
+weld_velocity=[v_baselayer]*2+[weld_v]*len(weld_z_height[2:])
 
 
 to_start_speed=5
@@ -101,7 +101,7 @@ save_weld_record=True
 
 current_time = datetime.datetime.now()
 formatted_time = current_time.strftime('%Y_%m_%d_%H_%M_%S.%f')[:-7]
-data_dir=f'../../recorded_data/wall_weld_test/5356_{feedrate}ipm_'  +formatted_time+'/'
+data_dir=f'../../recorded_data/wall_weld_test/4043_{feedrate}ipm_'  +formatted_time+'/'
 
 
 ## rr drivers and all other drivers
@@ -437,9 +437,7 @@ for i in range(0,len(weld_z_height)):
         np.save(out_scan_dir+'height_profile.npy',profile_height)
     # visualize_pcd([pcd])
     plt.scatter(profile_height[:,0],profile_height[:,1])
-    # plt.show()
-    # plt.close()
-    # exit()
+
 
     if np.mean(profile_height[:,1])>final_height and np.std(profile_height[:,1])<final_h_std_thres:
         break

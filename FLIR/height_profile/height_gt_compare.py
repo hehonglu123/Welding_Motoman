@@ -36,12 +36,13 @@ positioner=positioner_obj('D500B',def_path=config_dir+'D500B_robot_default_confi
 flir_intrinsic=yaml.load(open(config_dir+'FLIR_A320.yaml'), Loader=yaml.FullLoader)
 
 
-data_dir='../../../recorded_data/wall_weld_test/5356_150ipm_2024_06_17_14_36_16/'
+data_dir='../../../recorded_data/5356_150ipm_2024_06_17_14_36_16/'
 #get all folder names
 folders = [f for f in os.listdir(data_dir) if os.path.isdir(os.path.join(data_dir, f))]
 
-flame_3d=[]
+flame_3d_all_layers=[]
 for folder in folders[2:]:
+    flame_3d_layer=[]
     with open(data_dir+folder+'/ir_recording.pickle', 'rb') as file:
         ir_recording = pickle.load(file)
     ir_ts=np.loadtxt(data_dir+folder+'/ir_stamps.csv', delimiter=',')
@@ -69,7 +70,7 @@ for folder in folders[2:]:
             v1=robot1_pose.R[:,2]
             #find intersection point
             intersection=line_intersect(p1,v1,p2,v2)
-            flame_3d.append(intersection)
+            flame_3d_layer.append(intersection)
 
             ##########################################################DEBUGGING & VISUALIZATION: plot out p1,v1,p2,v2,intersection##########################################################
             # fig = plt.figure()
@@ -86,20 +87,33 @@ for folder in folders[2:]:
             # ax.set_ylabel('Y')
             # ax.set_zlabel('Z')
             # plt.show()
+    ##################################################################Layer Height Plot############################################################################################################
+    #plot the flame 3d
+    flame_3d_layer=np.array(flame_3d_layer)
+    print(flame_3d_layer.shape)
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.scatter(flame_3d_layer[:,0],flame_3d_layer[:,1],flame_3d_layer[:,2])
+    #set equal aspect ratio
+    ax.set_box_aspect([np.ptp(flame_3d_layer[:,0]),np.ptp(flame_3d_layer[:,1]),np.ptp(flame_3d_layer[:,2])])
+    plt.show()
+
+
+    flame_3d_all_layers.append(flame_3d_layer)
 
 ##############################################GROUND TRUTH FROM MTI SCANNING################################################
-flame_3d=np.array(flame_3d)
-#plot the flame 3d
-fig = plt.figure()
-ax = fig.add_subplot(111, projection='3d')
-ax.scatter(flame_3d[:,0],flame_3d[:,1],flame_3d[:,2])
-#set equal aspect ratio
-ax.set_box_aspect([np.ptp(flame_3d[:,0]),np.ptp(flame_3d[:,1]),np.ptp(flame_3d[:,2])])
-plt.show()
+# flame_3d_all_layers=np.array(flame_3d_all_layers)
+# #plot the flame 3d
+# fig = plt.figure()
+# ax = fig.add_subplot(111, projection='3d')
+# ax.scatter(flame_3d_all_layers[:,0],flame_3d_all_layers[:,1],flame_3d_all_layers[:,2])
+# #set equal aspect ratio
+# ax.set_box_aspect([np.ptp(flame_3d_all_layers[:,0]),np.ptp(flame_3d_all_layers[:,1]),np.ptp(flame_3d_all_layers[:,2])])
+# plt.show()
 
 
 for folder in folders[:-1]:
     height_profile=np.load(data_dir+folder+'/scans/height_profile.npy')
-    plt.plot(height_profile,c='b',alpha=0.5)
+    plt.plot(height_profile[:,0],height_profile[:,1])
 
 plt.show()

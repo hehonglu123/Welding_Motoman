@@ -8,7 +8,7 @@ image = np.load('torch_template.npy')
 image = cv2.normalize(image, None, 0, 255, cv2.NORM_MINMAX, cv2.CV_8U)
 
 
-# Apply Canny edge detection
+# Apply Canny edge detection, more aggressive
 edges = cv2.Canny(image, threshold1=50, threshold2=200)
 
 # save template as binary image
