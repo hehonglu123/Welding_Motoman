@@ -17,10 +17,10 @@ def main():
 	##############################################################SENSORS####################################################################
 	# weld state logging
 	# weld_ser = RRN.SubscribeService('rr+tcp://192.168.55.10:60823?service=welder')
-	cam_ser=RRN.ConnectService('rr+tcp://localhost:60827/?service=camera')
+	# cam_ser=RRN.ConnectService('rr+tcp://localhost:60827/?service=camera')
 	# mic_ser = RRN.ConnectService('rr+tcp://192.168.55.20:60828?service=microphone')
 	## RR sensor objects
-	rr_sensors = WeldRRSensor(weld_service=None,cam_service=cam_ser,microphone_service=None)
+	rr_sensors = WeldRRSensor(weld_service=None,cam_service=None,microphone_service=None)
 
 	##############################################################Robot####################################################################
 	###robot kinematics def
@@ -47,11 +47,13 @@ def main():
 	q2=robot2.inv(p2_in_base_frame,R2,last_joints=np.zeros(6))[0]
 
 	########################################################RR FRONIUS########################################################
-	fronius_sub=RRN.SubscribeService('rr+tcp://192.168.55.21:60823?service=welder')
-	fronius_client = fronius_sub.GetDefaultClientWait(1)      #connect, timeout=30s
-	hflags_const = RRN.GetConstants("experimental.fronius", fronius_client)["WelderStateHighFlags"]
-	fronius_client.prepare_welder()
 	weld_arcon=False
+	if weld_arcon:
+		fronius_sub=RRN.SubscribeService('rr+tcp://192.168.55.21:60823?service=welder')
+		fronius_client = fronius_sub.GetDefaultClientWait(1)      #connect, timeout=30s
+		hflags_const = RRN.GetConstants("experimental.fronius", fronius_client)["WelderStateHighFlags"]
+		fronius_client.prepare_welder()
+	
 	########################################################RR STREAMING########################################################
 	RR_robot_sub = RRN.SubscribeService('rr+tcp://192.168.55.15:59945?service=robot')
 	RR_robot_state = RR_robot_sub.SubscribeWire('robot_state')
@@ -114,14 +116,15 @@ def main():
 	###jog to start point
 	SS.jog2q(np.hstack((q_all[0],q2,q_positioner_home)))
 	##############################################################Base Layers ####################################################################
-	fronius_client.job_number = int(base_feedrate/10+job_offset)
 	if weld_arcon:
+		fronius_client.job_number = int(base_feedrate/10+job_offset)
 		fronius_client.start_weld()
 
 	for i in range(len(q_all)):
 		SS.position_cmd(np.hstack((q_all[i],q2,q_positioner_home)),time.time())
 	
-	fronius_client.stop_weld()
+	if weld_arcon:
+		fronius_client.stop_weld()
 	
 
 	####################################Normal Layer ####################################
@@ -159,19 +162,22 @@ def main():
 	SS.jog2q(np.hstack((q_all[0],q2,q_positioner_home)))
 
 	##############################################################Welding Layers ####################################################################
-	fronius_client.job_number = cond_all[0]
-	cond_all.pop(0)
-	cond_indices.pop(0)
+	
 
 	rr_sensors.start_all_sensors()
 	SS.joint_logging_flag=True
 	if weld_arcon:
+		fronius_client.job_number = cond_all[0]
+		cond_all.pop(0)
+		cond_indices.pop(0)
 		fronius_client.start_weld()
 	for i in range(len(q_all)):
 		SS.position_cmd(np.hstack((q_all[i],q2,q_positioner_home)),time.time())
-		if i in cond_indices:
+		if i in cond_indices and weld_arcon:
 			fronius_client.job_number = cond_all[cond_indices.index(i)]
-	fronius_client.stop_weld()
+		
+	if weld_arcon:
+		fronius_client.stop_weld()
 	rr_sensors.stop_all_sensors()
 	js_recording = SS.stop_recording()
 
