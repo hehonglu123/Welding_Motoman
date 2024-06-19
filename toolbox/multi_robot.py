@@ -3,7 +3,6 @@ import copy
 from general_robotics_toolbox import *
 # from utils import *
 # from lambda_calc import *
-from pandas import read_csv
 
 def form_relative_path_mocap(curve_exe1,curve_exe1_R,curve_exe2,curve_exe2_R,robot1,robot2):
 	relative_path_exe=[]
@@ -55,24 +54,6 @@ def calc_individual_speed(vd_relative,lam1,lam2,lam_relative,breakpoints):
 		s2_all.append(s2)
 
 	return s1_all,s2_all
-
-def initialize_data(dataset,data_dir,solution_dir,robot1,robot2):
-	relative_path = read_csv(data_dir+"Curve_dense.csv", header=None).values
-
-	###calculate desired TCP speed for both arm
-	curve_js1=read_csv(solution_dir+'arm1.csv', header=None).values
-	curve_js2=read_csv(solution_dir+'arm2.csv', header=None).values
-
-	
-
-	lam_relative_path=calc_lam_cs(relative_path)
-
-
-	lam1=calc_lam_js(curve_js1,robot1)
-	lam2=calc_lam_js(curve_js2,robot2)
-
-
-	return relative_path,lam_relative_path,lam1,lam2,curve_js1,curve_js2
 
 
 def cmd_speed_profile(breakpoints,s1_all,s2_all):

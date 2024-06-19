@@ -2,17 +2,25 @@ import sys, glob, pickle, os, traceback, wave, time
 from RobotRaconteur.Client import *
 from scipy.interpolate import interp1d
 from pathlib import Path
+import matplotlib.pyplot as plt
 import numpy as np
 sys.path.append('../../toolbox/')
 from robot_def import *
+# from multi_robot import *
 from lambda_calc import *
-from multi_robot import *
 from flir_toolbox import *
 from StreamingSend import *
 sys.path.append('../../sensor_fusion/')
 from weldRRSensor import *
 
 def main():
+
+	dataset='wall/'
+	sliced_alg='dense_slice/'
+	data_dir='../../data/'+dataset+sliced_alg
+	with open(data_dir+'slicing.yml', 'r') as file:
+		slicing_meta = yaml.safe_load(file)
+	
 
 	##############################################################SENSORS####################################################################
 	# weld state logging
@@ -55,7 +63,7 @@ def main():
 		fronius_client.prepare_welder()
 	
 	########################################################RR STREAMING########################################################
-	RR_robot_sub = RRN.SubscribeService('rr+tcp://192.168.55.15:59945?service=robot')
+	RR_robot_sub = RRN.SubscribeService('rr+tcp://localhost:59945?service=robot')
 	RR_robot_state = RR_robot_sub.SubscribeWire('robot_state')
 	RR_robot = RR_robot_sub.GetDefaultClientWait(1)
 	robot_const = RRN.GetConstants("com.robotraconteur.robotics.robot", RR_robot)
@@ -78,13 +86,6 @@ def main():
 	R=np.array([[-0.7071, 0.7071, -0.    ],
 				[ 0.7071, 0.7071,  0.    ],
 				[0.,      0.,     -1.    ]])
-	#ystart -850, yend -775
-	p_start_base=np.array([1710,-825,-260])
-	p_end_base=np.array([1590,-825,-260])
-	p_start=np.array([1700,-825,-260])
-	p_end=np.array([1600,-825,-260])
-	q_seed=np.radians([-35.4291,56.6333,40.5194,4.5177,-52.2505,-11.6546])
-
 
 	base_feedrate=300
 	feedrate=150
@@ -92,30 +93,58 @@ def main():
 	base_layer_height=3
 	v_base=5
 	layer_height=1.1
+	base_layer_height=2.
 	#edge params, 1cm left and right
+	edge_length=10
 	feedrate_edge=150
 	v_edge=15
-	p_all=[]
+	q_all=[]
 	job_offset=450
 	cond_all=[]
 
-	####################################Base Layer ####################################
-	for i in range(0,2):
-		if i%2==0:
-			p1=p_start_base+np.array([0,0,i*base_layer_height])
-			p2=p_end_base+np.array([0,0,i*base_layer_height])
-		else:
-			p1=p_end_base+np.array([0,0,i*base_layer_height])
-			p2=p_start_base+np.array([0,0,i*base_layer_height])
+	nominal_slice_increment=int(layer_height/slicing_meta['line_resolution'])
+	base_slice_increment=int(base_layer_height/slicing_meta['line_resolution'])
 
-		#interpolate between p1 and p2
-		p_all.extend(np.linspace(p1,p2,int(streaming_rate*np.linalg.norm(p2-p1)/v_base)),endpoint=False)
+
 	
-	q_all = robot.find_curve_js(np.array(p_all),[R]*len(p_all),q_seed)
-	
+	#########################################################BASELAYER find joint angles#########################################################
+	slice_num=0
+	for layer_num in range(2):
+		x=0
+		rob1_js=np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(slice_num)+'_'+str(x)+'.csv',delimiter=',')
+		rob2_js=np.loadtxt(data_dir+'curve_sliced_js/MA1440_js'+str(slice_num)+'_'+str(x)+'.csv',delimiter=',')
+		positioner_js=np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(slice_num)+'_'+str(x)+'.csv',delimiter=',')
+		curve_sliced_relative=np.loadtxt(data_dir+'curve_sliced_relative/slice'+str(slice_num)+'_'+str(x)+'.csv',delimiter=',')
+		if layer_num%2==0:
+			rob1_js=np.flip(rob1_js,axis=0)
+			rob2_js=np.flip(rob2_js,axis=0)
+			positioner_js=np.flip(positioner_js,axis=0)
+			curve_sliced_relative=np.flip(curve_sliced_relative,axis=0)
+
+
+		lam_relative=calc_lam_cs(curve_sliced_relative)
+
+		lam_relative_dense=np.linspace(0,lam_relative[-1],num=int(lam_relative[-1]/point_distance))
+		rob1_js_dense=interp1d(lam_relative,rob1_js,kind='cubic',axis=0)(lam_relative_dense)
+		rob2_js_dense=interp1d(lam_relative,rob2_js,kind='cubic',axis=0)(lam_relative_dense)
+		positioner_js_dense=interp1d(lam_relative,positioner_js,kind='cubic',axis=0)(lam_relative_dense)
+
+		breakpoints=SS.get_breakpoints(lam_relative_dense,v_base)
+
+
+		
+		###formulate streaming joint angles
+		q_all.extend(np.hstack((rob1_js_dense[breakpoints],rob2_js_dense[breakpoints],positioner_js_dense[breakpoints])))
+
+		###adjust slice_num
+		slice_num+=int(base_slice_increment)
+
+	q_all=np.array(q_all)[:,:6]
+
 	###jog to start point
+	print("BASELAYER CALCULATION FINISHED")
 	SS.jog2q(np.hstack((q_all[0],q2,q_positioner_home)))
-	##############################################################Base Layers ####################################################################
+	##############################################################Base Layers Welding####################################################################
 	if weld_arcon:
 		fronius_client.job_number = int(base_feedrate/10+job_offset)
 		fronius_client.start_weld()
@@ -126,46 +155,72 @@ def main():
 	if weld_arcon:
 		fronius_client.stop_weld()
 	
-
-	####################################Normal Layer ####################################
+	print("BASELAYER WELDING FINISHED")
+	####################################Normal Layer Joint Angles ####################################
 	q_all=[]
 	cond_all=[]
 	cond_indices=[]
 	
-	for i in range(2,12):
-		if i%2==0:
-			p1=p_start+np.array([0,0,2*base_layer_height+i*layer_height])
-			p2=p_end+np.array([0,0,2*base_layer_height+i*layer_height])
-		else:
-			p1=p_end+np.array([0,0,2*base_layer_height+i*layer_height])
-			p2=p_start+np.array([0,0,2*base_layer_height+i*layer_height])
+	slice_num=30
+	layer_num=2
+	while slice_num<100:#slicing_meta['num_layers']:
 
-		p_edge1=p1+(p2-p1)/np.linalg.norm(p2-p1)*10
-		p_edge2=p2-(p2-p1)/np.linalg.norm(p2-p1)*10
+		###############DETERMINE SECTION ORDER###########################
+		sections=[0]
+		####################DETERMINE CURVE ORDER##############################################
+		for x in sections:
+			rob1_js=np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(slice_num)+'_'+str(x)+'.csv',delimiter=',')
+			rob2_js=np.loadtxt(data_dir+'curve_sliced_js/MA1440_js'+str(slice_num)+'_'+str(x)+'.csv',delimiter=',')
+			positioner_js=np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(slice_num)+'_'+str(x)+'.csv',delimiter=',')
+			curve_sliced_relative=np.loadtxt(data_dir+'curve_sliced_relative/slice'+str(slice_num)+'_'+str(x)+'.csv',delimiter=',')
+			if layer_num%2==0:
+				rob1_js=np.flip(rob1_js,axis=0)
+				rob2_js=np.flip(rob2_js,axis=0)
+				positioner_js=np.flip(positioner_js,axis=0)
+				curve_sliced_relative=np.flip(curve_sliced_relative,axis=0)
+			
+			lam_relative=calc_lam_cs(curve_sliced_relative)
 
+			lam_relative_dense=np.linspace(0,lam_relative[-1],num=int(lam_relative[-1]/point_distance))
+			#find index of edge at edge_length
+			edge1_index=np.argmin(np.abs(lam_relative_dense-edge_length))
+			edge2_index=np.argmin(np.abs(lam_relative_dense-(lam_relative[-1]-edge_length)))
 
-		#interpolate between p1 and p2
-		cond_indices.append(len(p_all))
-		cond_all.extend([int(feedrate_edge/10+job_offset)]*len(p_all))
-		p_all.extend(np.linspace(p1,p_edge1,int(streaming_rate*np.linalg.norm(p_edge1-p1)/v_edge)),endpoint=False)
-		cond_indices.append(len(p_all))
-		cond_all.extend([int(feedrate/10+job_offset)]*len(p_all))
-		p_all.extend(np.linspace(p_edge1,p_edge2,int(streaming_rate*np.linalg.norm(p_edge2-p_edge1)/v_layer)),endpoint=False)
-		cond_indices.append(len(p_all))
-		cond_all.extend([int(feedrate_edge/10+job_offset)]*len(p_all))
-		p_all.extend(np.linspace(p_edge2,p2,int(streaming_rate*np.linalg.norm(p2-p_edge2)/v_edge)),endpoint=False)
+			rob1_js_dense=interp1d(lam_relative,rob1_js,kind='cubic',axis=0)(lam_relative_dense)
+			rob2_js_dense=interp1d(lam_relative,rob2_js,kind='cubic',axis=0)(lam_relative_dense)
+			positioner_js_dense=interp1d(lam_relative,positioner_js,kind='cubic',axis=0)(lam_relative_dense)
+
+			breakpoints_edge1=SS.get_breakpoints(lam_relative_dense[:edge1_index],v_edge)
+			breakpoints_edge2=SS.get_breakpoints(lam_relative_dense[edge2_index:],v_edge)
+			breakpoints_layer=SS.get_breakpoints(lam_relative_dense[edge1_index:edge2_index],v_layer)
+			breakpoints=np.hstack((breakpoints_edge1,breakpoints_layer+edge1_index,breakpoints_edge2+edge2_index))
+
+		
+		
+		#welding job adjustment in the middle of the layer
+		cond_indices.extend([len(q_all)+len(breakpoints_edge1),len(q_all)+len(breakpoints_edge1)+len(breakpoints_layer),len(q_all)+len(breakpoints)])
+		cond_all.extend([int(feedrate_edge/10+job_offset)]*len(breakpoints_edge1))
+		cond_all.extend([int(feedrate/10+job_offset)]*len(breakpoints_layer))
+		cond_all.extend([int(feedrate_edge/10+job_offset)]*len(breakpoints_edge2))
 		
 
+		###formulate streaming joint angles
+		q_all.extend(np.hstack((rob1_js_dense[breakpoints],rob2_js_dense[breakpoints],positioner_js_dense[breakpoints])))
+
+		slice_num+=int(nominal_slice_increment)
+		layer_num+=1
 	
+
+	q_all=np.array(q_all)[:,:6]
+	print("Layer CALCULATION FINISHED")
 
 	###jog to start point
 	SS.jog2q(np.hstack((q_all[0],q2,q_positioner_home)))
 
-	##############################################################Welding Layers ####################################################################
-	
+	##############################################################Welding Normal Layers ####################################################################
 
 	rr_sensors.start_all_sensors()
-	SS.joint_logging_flag=True
+	SS.start_recording()
 	if weld_arcon:
 		fronius_client.job_number = cond_all[0]
 		cond_all.pop(0)
@@ -183,10 +238,10 @@ def main():
 
 
 
-	recorded_dir='../../../recorded_data/wallbf_%iipm_v%i_%iipm_v%i/'%(feedrate,v_layer,feedrate_edge,v_edge)
-	os.makedirs(recorded_dir,exist_ok=True)
-	np.savetxt(recorded_dir+'weld_js_exe.csv',np.array(js_recording),delimiter=',')
-	rr_sensors.save_all_sensors(recorded_dir)
+	# recorded_dir='../../../recorded_data/wallbf_%iipm_v%i_%iipm_v%i/'%(feedrate,v_layer,feedrate_edge,v_edge)
+	# os.makedirs(recorded_dir,exist_ok=True)
+	# np.savetxt(recorded_dir+'weld_js_exe.csv',np.array(js_recording),delimiter=',')
+	# rr_sensors.save_all_sensors(recorded_dir)
 
 if __name__ == '__main__':
 	main()
