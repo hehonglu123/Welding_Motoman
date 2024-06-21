@@ -17,8 +17,11 @@ def center_of_window_below_bbox(bbox,ir_pixel_window_size, num_pixel_below_centr
 
     return center_x, center_y
 
+#load template
+template = cv2.imread('../tracking/torch_template.png',0)
+
 # Load the IR recording data from the pickle file
-data_dir='../../../recorded_data/wall_bf_100ipm_v10/'
+data_dir='../../../recorded_data/ER316L/wallbf_100ipm_v10_100ipm_v10/'
 # data_dir='../../../recorded_data/wallbf_100ipm_v10_80ipm_v8/'
 # data_dir='../../../recorded_data/wallbf_100ipm_v10_120ipm_v12/'
 config_dir='../../config/'
@@ -63,7 +66,8 @@ for layer_num in range(20,len(layer_indices_ir)-1):
     #find all pixel regions to record from flame detection
     for i in range(layer_indices_ir[layer_num],layer_indices_ir[layer_num+1]):
         ir_image = np.rot90(ir_recording[i], k=-1)
-        centroid, bbox=flame_detection(ir_image,threshold=1.0e4,area_threshold=10)
+        # centroid, bbox=flame_detection(ir_image,threshold=1.0e4,area_threshold=10)
+        centroid, bbox=flame_detection_no_arc(ir_image,template)
         if centroid is not None:
             #find 3x3 average pixel value below centroid
             pixel_coord=center_of_window_below_bbox(bbox,ir_pixel_window_size)
@@ -77,6 +81,10 @@ for layer_num in range(20,len(layer_indices_ir)-1):
             cv2.waitKey(10)
 
     pixel_coord_layer=np.array(pixel_coord_layer)
+    #remove duplicate pixel regions
+    pixel_coord_layer=np.unique(pixel_coord_layer,axis=0)
+    #smoothout the pixel regions with running average
+    pixel_coord_layer[:,1]=moving_average(pixel_coord_layer[:,1],3,padding=True)
 
     #go over again for the identified pixel regions value
     ts_all=[]
@@ -90,7 +98,8 @@ for layer_num in range(20,len(layer_indices_ir)-1):
             #find the NxN ir_pixel_window_size average pixel value below centroid
             window = ir_image[coord[1]-ir_pixel_window_size//2:coord[1]+ir_pixel_window_size//2+1,coord[0]-ir_pixel_window_size//2:coord[0]+ir_pixel_window_size//2+1]
             pixel_avg = np.mean(window)
-            mask = (window > 2*pixel_avg/3) & (window < 4*pixel_avg/3)  # filter out background or flame
+            mask = (window > 1*pixel_avg/3) # filter out background 
+            # mask = (window > 2*pixel_avg/3) & (window < 4*pixel_avg/3)  # filter out background or flame
             pixel_avg = np.mean(window[mask])
             counts_all.append(pixel_avg)
 

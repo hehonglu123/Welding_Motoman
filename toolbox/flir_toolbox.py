@@ -1,5 +1,8 @@
 import numpy as np
 import cv2
+from shapely.geometry import Point, Polygon
+from shapely.ops import nearest_points
+
 ##############################################FLIR COUNTS TO TEMPERATURE CONVERSION##############################################
 ####FROM https://flir.custhelp.com/app/answers/detail/a_id/3321/~/the-measurement-formula
 def counts2temp(data_counts,R,B,F,J1,J0,Emiss):
@@ -88,114 +91,51 @@ def flame_detection(raw_img,threshold=1.2e4,area_threshold=10):
 
     return centroid, bbox
 
-# def flame_detection_no_arc(raw_img,threshold=2.0e4,area_threshold=10):
-#     ###welding point detection without flame
-#     #centroids: x,y
-#     if np.max(raw_img)<threshold:
-#         return None
-#     #find the highest 10 pixel values and their x,y coordinates
-#     flat = raw_img.flatten()
-#     indices = np.argpartition(flat, -area_threshold)[-area_threshold:]
-    
-#     # Convert the indices to x,y coordinates
-#     y, x = np.unravel_index(indices, raw_img.shape)
-    
-#     # Get the corresponding values
-#     values = raw_img[y, x]
-    
-#     # Combine the coordinates and values into a single list of tuples
-#     result = list(zip(values, zip(y, x)))
-    
-#     # Sort the result by the values in descending order
-#     result.sort(key=lambda x: x[0], reverse=True)
 
-#     # Extract the coordinates from the result
-#     coordinates = np.array([coord for _, coord in result])
-
-#     # Calculate the mean of the coordinates
-#     centroid = np.mean(coordinates, axis=0)
-#     bbox = np.array([np.min(x),np.min(y),np.max(x)-np.min(x),np.max(y)-np.min(y)])
-
-#     return centroid, bbox
-
-# def flame_detection_no_arc(raw_img,threshold=2.0e4,area_threshold=10):
-#     ###welding point detection without flame
-#     #centroids: x,y
-#     #bbox: x,y,w,h
-
-#     ###adaptively increase the threshold to 90% of the maximum pixel value
-#     if np.max(raw_img)*0.9>threshold:
-#         threshold=np.max(raw_img)*0.9
-
-#     thresholded_img=(raw_img>threshold).astype(np.uint8)
-#     if np.max(thresholded_img)==0:
-#         return None, None
-
-
-#     nb_components, labels, stats, centroids = cv2.connectedComponentsWithStats(thresholded_img, connectivity=4)
-
-#     valid_indices=np.where(stats[:, cv2.CC_STAT_AREA] > area_threshold)[0][1:]  ###threshold connected area
-#     if len(valid_indices)==0:
-#         return None, None
-    
-#     average_pixel_values = [np.mean(raw_img[labels == label]) for label in valid_indices]   ###sorting
-
-#     valid_index=valid_indices[np.argmax(average_pixel_values)]      ###get the area with largest average brightness value
-
-#     # Extract the centroid and bounding box of the largest component
-#     centroid = centroids[valid_index]
-#     bbox = stats[valid_index, :-1]
-
-#     #find the lowest value index within the bbox
-#     x1,y1,w,h=bbox
-#     sub_img=raw_img[y1:y1+h,x1:x1+w]
-#     min_index=np.unravel_index(np.argmin(sub_img, axis=None), sub_img.shape)+np.array([y1,x1])
-#     direction=min_index[1]-centroid[0]
-#     print("direction: ",direction)
-#     if direction>0: #upper right corner of bbox
-#         centroid = bbox[:2]+np.array([bbox[2],0])
-#     else: #upper left corner of bbox
-#         centroid = bbox[:2]
-    
-#     #create a bbox around the centroid
-#     bbox=np.array([centroid[0]-1,centroid[1]-1,3,3])
-
-#     return centroid, bbox
-
-def flame_detection_no_arc(raw_img,torch_template,threshold=2.0e4,area_threshold=10):
+def flame_detection_no_arc(raw_img,torch_template,threshold=1.5e4,area_threshold=10,template_center_offset=2):
     ###welding point detection without flame
     #centroids: x,y
     #bbox: x,y,w,h
 
-    ###adaptively increase the threshold to 90% of the maximum pixel value
-    if np.max(raw_img)*0.9>threshold:
-        threshold=np.max(raw_img)*0.9
+    ###adaptively increase the threshold to 50% of the maximum pixel value
+    threshold=max(threshold,0.5*np.max(raw_img))
+
 
     thresholded_img=(raw_img>threshold).astype(np.uint8)
-    if np.max(thresholded_img)==0:
+    if np.max(thresholded_img)==0:      #if no pixel above threshold, means not welding 
+        print('no hotspot detected')
         return None, None
 
 
     nb_components, labels, stats, centroids = cv2.connectedComponentsWithStats(thresholded_img, connectivity=4)
+    #find the largest connected area
+    areas = stats[:, 4]
+    areas[0] = 0    # Exclude the background component (label 0) from the search
 
-    valid_indices=np.where(stats[:, cv2.CC_STAT_AREA] > area_threshold)[0][1:]  ###threshold connected area
-    if len(valid_indices)==0:
+    if np.max(areas)<area_threshold:    #if no hot spot larger than area_threshold, return None
+        print('hotspot too small')
         return None, None
     
-    average_pixel_values = [np.mean(raw_img[labels == label]) for label in valid_indices]   ###sorting
+    # Find the index of the component with the largest area
+    largest_component_index = np.argmax(areas)
+    pixel_coordinates = np.flip(np.array(np.where(labels == largest_component_index)).T,axis=1)
 
-    valid_index=valid_indices[np.argmax(average_pixel_values)]      ###get the area with largest average brightness value
+    ## Torch template detection
+    template_upper_corner=torch_detect(raw_img,torch_template)
+    if template_upper_corner is None:   #if no torch detected, return None
+        print('torch not found')
+        return None, None
+    template_bottom_center=template_upper_corner+np.array([torch_template.shape[1]//2+template_center_offset,torch_template.shape[0]])
+    hull = cv2.convexHull(pixel_coordinates)
 
-    # Extract the centroid and bounding box of the largest component
-    centroid = centroids[valid_index]
-    bbox = stats[valid_index, :-1]
+    poly = Polygon([tuple(point[0]) for point in hull])
+    point = Point(template_bottom_center[0],template_bottom_center[1])
+    # The points are returned in the same order as the input geometries:
+    p1, p2 = nearest_points(poly, point)
+    centroid=np.array([p1.x,p1.y]).astype(int)
 
-    max_loc=torch_detect(raw_img,torch_template)
-    if max_loc is None:
-        return centroid, bbox
-    centroid=max_loc
-    #create bbox around the max_loc
-    bbox=np.array([max_loc[0],max_loc[1],torch_template.shape[1],torch_template.shape[0]])
+    #create 5x5 bbox around the centroid
+    bbox=np.array([centroid[0]-2,centroid[1]-2,5,5])
 
 
     return centroid, bbox
@@ -232,6 +172,7 @@ def weld_detection(raw_img,threshold=1.2e4,area_threshold=10):
     return centroid, bbox, pixels
 
 def torch_detect(ir_image,template):
+    ###template matching for torch, return the upper left corner of the matched region
     #threshold and normalize ir image
     ir_torch_tracking=ir_image.copy()
     ir_torch_tracking[ir_torch_tracking>1e4]=1e4

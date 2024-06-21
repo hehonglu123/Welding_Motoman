@@ -8,62 +8,8 @@ from flir_toolbox import *
 from robot_def import *
 from sklearn.neighbors import NearestNeighbors
 from scipy.spatial.transform import Rotation as R
+import open3d as o3d
 
-
-
-def best_fit_transform(A, B):
-    '''
-    Calculates the least-squares best-fit transform between corresponding 2D points A and B.
-    '''
-    centroid_A = np.mean(A, axis=0)
-    centroid_B = np.mean(B, axis=0)
-
-    # centre the points
-    AA = A - centroid_A
-    BB = B - centroid_B
-
-    # dot is matrix multiplication for array
-    H = np.dot(AA.T, BB)
-
-    U, S, Vt = np.linalg.svd(H)
-
-    R = np.dot(Vt.T, U.T)
-
-    if np.linalg.det(R) < 0:
-       Vt[1,:] *= -1
-       R = np.dot(Vt.T, U.T)
-
-    t = centroid_B.T - np.dot(R,centroid_A.T)
-
-    return R, t.T
-
-def icp(A, B):
-    '''
-    The Iterative Closest Point method: finds best-fit transform that maps points A on to points B
-    '''
-    prev_error = 0
-
-    for i in range(100):
-        # find the nearest neighbors between the current source and destination points
-        neighbors = NearestNeighbors(n_neighbors=1, algorithm='auto').fit(B)
-        distances, indices = neighbors.kneighbors(A)
-
-        # compute the transformation between the current source and nearest destination points
-        R, t = best_fit_transform(A, B[indices].reshape(-1, 2))
-
-        # update the current source
-        A = np.dot(A, R.T) + t
-
-        # check error
-        mean_error = np.mean(distances)
-        if np.abs(prev_error - mean_error) < 0.000001:
-            break
-        prev_error = mean_error
-
-    # calculate final transformation
-    R, t = best_fit_transform(A, B)
-
-    return R, t
 
 
 def line_intersect(p1,v1,p2,v2):
@@ -162,7 +108,6 @@ for i in range(2,num_layers):
     ####################################################################################################################################
     flame_3d_all_layers.append(flame_3d_layer)
 
-##############################################GROUND TRUTH FROM MTI SCANNING################################################
 flame_3d_all_layers_concat = np.concatenate(flame_3d_all_layers, axis=0)
 ##########################################################plot the flame 3d####################################################################################################################################
 # fig = plt.figure()
@@ -181,29 +126,45 @@ flame2d_all_layers_projected = project_onto_plane(flame_3d_all_layers_concat, no
 plt.scatter(flame2d_all_layers_projected[:,0],flame2d_all_layers_projected[:,1])
 plt.show()
 
-R=Rz(np.radians(92))[:2,:2]
-flame2d_centroid=np.mean(flame2d_all_layers_projected,axis=0)
-T=np.array([-.5,30])
 
+##############################################GROUND TRUTH FROM MTI SCANNING################################################
+height_profile_all_layers=[]
 for i in range(2,num_layers):
     folder='layer_'+str(i)    
-
-    flame_profile = project_onto_plane(flame_3d_all_layers[i-2], normal)
-
-    #find the best transformation to align both
-    
-    flame_profile_transformed = (flame_profile-flame2d_centroid)@R.T+T
-
-    
-    plt.plot(flame_profile_transformed[:,0],flame_profile_transformed[:,1],c='r')#,label='IR Flame Detection')
-
-
     # ###load ground truth height profile
-    height_profile=np.load(data_dir+folder+'/scans/height_profile.npy')
-    plt.plot(height_profile[:,0],height_profile[:,1],c='b')#,label='MTI Scanning')
+    height_profile_all_layers.append(np.load(data_dir+folder+'/scans/height_profile.npy'))
+height_profile_all_layers_concat = np.concatenate(height_profile_all_layers, axis=0) 
+height_profile_centroid=np.mean(height_profile_all_layers_concat,axis=0)
+height_profile_all_layers_concat=height_profile_all_layers_concat-height_profile_centroid
 
-plt.title('Height Profile Comparison')
-plt.xlabel('X')
-plt.ylabel('Z')
-plt.legend(['IR Flame Detection','MTI Scanning'])
-plt.show()
+
+##############################################use ICP to align two groups##############################################
+flame2d_centroid=np.mean(flame2d_all_layers_projected,axis=0)
+flame2d_all_layers_projected=flame2d_all_layers_projected-flame2d_centroid
+source = o3d.geometry.PointCloud()
+source.points = o3d.utility.Vector3dVector(np.hstack((flame2d_all_layers_projected, np.zeros((flame2d_all_layers_projected.shape[0], 1)))))
+print(np.asarray(source.points))
+target = o3d.geometry.PointCloud()
+target.points = o3d.utility.Vector3dVector(np.hstack((height_profile_all_layers_concat, np.zeros((height_profile_all_layers_concat.shape[0], 1)))))
+threshold=9999
+H_guess=np.eye(4)
+H_guess[:-1,:-1]=Rz(np.pi/2)
+reg_p2p = o3d.pipelines.registration.registration_icp(source, target, threshold, H_guess,
+        o3d.pipelines.registration.TransformationEstimationPointToPoint(),
+        o3d.pipelines.registration.ICPConvergenceCriteria(max_iteration=999999999))
+H = reg_p2p.transformation
+print("Residual error after ICP: ", reg_p2p.inlier_rmse)
+#visualize the result
+source.transform(H)
+source.paint_uniform_color([1, 0, 0])  # Red color for source
+target.paint_uniform_color([0, 0, 1])  # Green color for target
+o3d.visualization.draw_geometries([target,source])
+
+
+# plt.plot(np.asarray(source.points)[:,0],np.asarray(source.points)[:,1],c='r',label='IR Flame Detection')
+# plt.plot(np.asarray(target.points)[:,0],np.asarray(target.points)[:,1],c='b',label='MTI Scanning')
+# plt.title('Height Profile Comparison')
+# plt.xlabel('X')
+# plt.ylabel('Z')
+# plt.legend()
+# plt.show()
