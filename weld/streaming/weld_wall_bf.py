@@ -25,10 +25,10 @@ def main():
 	##############################################################SENSORS####################################################################
 	# weld state logging
 	# weld_ser = RRN.SubscribeService('rr+tcp://192.168.55.10:60823?service=welder')
-	# cam_ser=RRN.ConnectService('rr+tcp://localhost:60827/?service=camera')
+	cam_ser=RRN.ConnectService('rr+tcp://localhost:60827/?service=camera')
 	# mic_ser = RRN.ConnectService('rr+tcp://192.168.55.20:60828?service=microphone')
 	## RR sensor objects
-	rr_sensors = WeldRRSensor(weld_service=None,cam_service=None,microphone_service=None)
+	rr_sensors = WeldRRSensor(weld_service=None,cam_service=cam_ser,microphone_service=None)
 
 	##############################################################Robot####################################################################
 	###robot kinematics def
@@ -55,7 +55,7 @@ def main():
 	q2=robot2.inv(p2_in_base_frame,R2,last_joints=np.zeros(6))[0]
 
 	########################################################RR FRONIUS########################################################
-	weld_arcon=False
+	weld_arcon=True
 	if weld_arcon:
 		fronius_sub=RRN.SubscribeService('rr+tcp://192.168.55.21:60823?service=welder')
 		fronius_client = fronius_sub.GetDefaultClientWait(1)      #connect, timeout=30s
@@ -63,7 +63,7 @@ def main():
 		fronius_client.prepare_welder()
 	
 	########################################################RR STREAMING########################################################
-	RR_robot_sub = RRN.SubscribeService('rr+tcp://localhost:59945?service=robot')
+	RR_robot_sub = RRN.SubscribeService('rr+tcp://192.168.1.114:59945?service=robot')
 	RR_robot_state = RR_robot_sub.SubscribeWire('robot_state')
 	RR_robot = RR_robot_sub.GetDefaultClientWait(1)
 	robot_const = RRN.GetConstants("com.robotraconteur.robotics.robot", RR_robot)
@@ -88,18 +88,18 @@ def main():
 				[0.,      0.,     -1.    ]])
 
 	base_feedrate=300
-	feedrate=150
-	v_layer=15
+	feedrate=100
+	v_layer=10
 	base_layer_height=3
 	v_base=5
 	layer_height=1.1
 	base_layer_height=2.
 	#edge params, 1cm left and right
 	edge_length=10
-	feedrate_edge=150
-	v_edge=15
+	feedrate_edge=100
+	v_edge=10
 	q_all=[]
-	job_offset=450
+	job_offset=100
 	cond_all=[]
 
 	nominal_slice_increment=int(layer_height/slicing_meta['line_resolution'])
@@ -163,7 +163,7 @@ def main():
 	
 	slice_num=30
 	layer_num=2
-	while slice_num<100:#slicing_meta['num_layers']:
+	while slice_num<slicing_meta['num_layers'] and layer_num<4:
 
 		###############DETERMINE SECTION ORDER###########################
 		sections=[0]
@@ -238,10 +238,10 @@ def main():
 
 
 
-	# recorded_dir='../../../recorded_data/wallbf_%iipm_v%i_%iipm_v%i/'%(feedrate,v_layer,feedrate_edge,v_edge)
-	# os.makedirs(recorded_dir,exist_ok=True)
-	# np.savetxt(recorded_dir+'weld_js_exe.csv',np.array(js_recording),delimiter=',')
-	# rr_sensors.save_all_sensors(recorded_dir)
+	recorded_dir='../../../recorded_data/streaming/wallbf_%iipm_v%i_%iipm_v%i/'%(feedrate,v_layer,feedrate_edge,v_edge)
+	os.makedirs(recorded_dir,exist_ok=True)
+	np.savetxt(recorded_dir+'weld_js_exe.csv',np.array(js_recording),delimiter=',')
+	rr_sensors.save_all_sensors(recorded_dir)
 
 if __name__ == '__main__':
 	main()
