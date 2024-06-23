@@ -479,3 +479,25 @@ def unwrapped_angle_check(q_init,q_all):
 	order=np.argsort(np.linalg.norm(temp_q,axis=1))
 	# return q_all[order[0]]
 	return temp_q[order[0]]+q_init
+
+def set_axes_equal(ax: plt.Axes):
+    """Set 3D plot axes to equal scale.
+
+    Make axes of 3D plot have equal scale so that spheres appear as
+    spheres and cubes as cubes.  Required since `ax.axis('equal')`
+    and `ax.set_aspect('equal')` don't work on 3D.
+    """
+    ax.set_box_aspect([1,1,1])
+    limits = np.array([
+        ax.get_xlim3d(),
+        ax.get_ylim3d(),
+        ax.get_zlim3d(),
+    ])
+    origin = np.mean(limits, axis=1)
+    radius = 0.5 * np.max(np.abs(limits[:, 1] - limits[:, 0]))
+    x, y, z = origin
+    ax.set_xlim3d([x - radius, x + radius])
+    ax.set_ylim3d([y - radius, y + radius])
+    ax.set_zlim3d([z - radius, z + radius])
+	
+    

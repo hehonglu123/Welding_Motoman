@@ -153,7 +153,7 @@ def smooth_curve(curve,point_distance):
 
     return curve_new
 
-def get_curve_normal(curve,stl_pc,direction):
+def get_curve_normal(curve,stl_pc,direction, smooth=False):
     ###provide the curve and complete stl point cloud, a rough normal direction
     curve_normal=[] 
     for i in range(len(curve)):
@@ -164,6 +164,9 @@ def get_curve_normal(curve,stl_pc,direction):
         if true_norm@direction<0:
             true_norm=-true_norm
         curve_normal.append(true_norm/np.linalg.norm(true_norm))
+    
+    if smooth:
+        curve_normal=moving_averageNd(np.array(curve_normal),5,padding=True)
     
     return np.array(curve_normal)
 
@@ -177,7 +180,7 @@ def linear_regression(data):
     data_fit=np.dot(np.arange(0,len(data)).reshape(-1,1),slope)+start_point
     return data_fit
 
-def get_curve_normal_from_curves(curve,curve_prev):
+def get_curve_normal_from_curves(curve,curve_prev,smooth=False):
     ###generate curve normal from point to previous curve
     curve_normal=[]
     for i in range(len(curve)):
@@ -277,7 +280,6 @@ def fit_to_length(curve,stl_pc,resolution=0.5,closed=False):
     curve=curve[1:]
 
     ###shrink end firstly
-    print(start_shrinked,start_extended,closed)
 
     end_idx=len(curve)-1
     end_shrinked=False
@@ -373,7 +375,7 @@ def split_slices(curve,stl_pc,closed=False):
 def slice_stl(bottom_curve,stl_pc,direction,slice_height,point_distance=1,closed=False):
     slice_all=[[bottom_curve]]
     layer_num=0
-    while layer_num<70:
+    while layer_num<1:
         print(layer_num, 'th layer')
         if len(slice_all[-1])==0:
             slice_all=slice_all[:-1]
@@ -385,12 +387,13 @@ def slice_stl(bottom_curve,stl_pc,direction,slice_height,point_distance=1,closed
                 curve_normal=get_curve_normal_from_curves(slice_all[-1][x],np.concatenate(slice_all[-2],axis=0))
             except:
                 print('USING SURF NORM @ %ith layer'%layer_num)
-                curve_normal=get_curve_normal(slice_all[-1][x],stl_pc,direction)
+                curve_normal=get_curve_normal(slice_all[-1][x],stl_pc,direction,smooth=True)
+                print(curve_normal)
 
             curve_next=slice_next_layer(slice_all[-1][x],stl_pc,curve_normal,slice_height)
 
-            if x==0 or x==len(slice_all[-1])-1: ###only extend or shrink if first or last section for now
-                curve_next=fit_to_length(curve_next,stl_pc,closed=closed)
+            # if x==0 or x==len(slice_all[-1])-1: ###only extend or shrink if first or last section for now
+            #     curve_next=fit_to_length(curve_next,stl_pc,closed=closed)
 
             if len(curve_next)==0:   
                 if len(slice_all[-1])<=1:   ###end condition
@@ -428,7 +431,7 @@ def post_process(slice_all,point_distance=0.5):       ###postprocess the sliced 
     polyfit=np.polyfit(lam,slice_all[0][0],deg=47)
     lam=np.linspace(0,lam[-1],num=int(lam[-1]/point_distance))
     slice_all_new.append([np.vstack((np.poly1d(polyfit[:,0])(lam), np.poly1d(polyfit[:,1])(lam), np.poly1d(polyfit[:,2])(lam))).T])
-    curve_normal_all.append([np.array([[0,0,1]]*len(slice_all_new[0][0]))])
+    curve_normal_all.append([np.array([[0,0,-1]]*len(slice_all_new[0][0]))])
 
     slice_prev=slice_all_new[0][0]
     for i in range(1,len(slice_all)):
@@ -449,6 +452,7 @@ def post_process(slice_all,point_distance=0.5):       ###postprocess the sliced 
         curve_normal_all.append(normal_ith_layer)
         if len(slice_prev)==1:
             break       ###if previous layer only contains 1 point given point_distance, then quit
+
 
     return slice_all_new, curve_normal_all
 
@@ -555,5 +559,105 @@ def main_tube():
     plt.show()
 
 
+def main_face():
+    sys.path.append('../../face_cad')
+    from ellipsoid_fit import find_intersection_point2ellipsoid
+    # Load the STL file
+    filename = '../data/face/ellipsoid_face_flat_chin.stl'
+    ellipsoid_center=[83.94262106, 65.80109433, 98.19574824]
+    ellipsoid_axes = [76.7293939,   91.8637148,  161.05431563]
+    your_mesh = mesh.Mesh.from_file(filename)
+    # Get the number of facets in the STL file
+    num_facets = len(your_mesh)
+
+    slice_height=1.0
+
+    # Extract all vertices
+    vertices = np.zeros((num_facets, 3, 3))
+    for i, facet in enumerate(your_mesh.vectors):
+        vertices[i] = facet
+    # Flatten the vertices array and remove duplicates
+    stl_pc = np.unique(vertices.reshape(-1, 3), axis=0)
+
+    bottom_edge = slicing_uniform(stl_pc,z = np.min(stl_pc[:,2]),threshold=1)
+    #smoothout the z due to crude chop
+    bottom_edge[:,2]=np.min(bottom_edge[:,2])
+
+    for m in range(10):
+        for i in range(len(bottom_edge)):
+            bottom_edge[i]=find_intersection_point2ellipsoid(ellipsoid_center,ellipsoid_axes,bottom_edge[i])
+        bottom_edge[:,2]=np.min(bottom_edge[:,2])
+
+    slice_all=[[bottom_edge]]
+    direction=np.array([0,0,1])
+    point_distance=1
+    layer_num=0
+
+    while layer_num<1000:
+        print(layer_num, 'th layer')
+        if len(slice_all[-1])==0:
+            slice_all=slice_all[:-1]
+            print('END')
+            break
+        slice_ith_layer=[]
+        for x in range(len(slice_all[-1])):
+            ###push curve 1 layer up
+            curve_normal=get_curve_normal(slice_all[-1][x],stl_pc,direction,smooth=True)
+
+            curve_next=[]
+
+            for i in range(len(slice_all[-1][x])):
+                p_plus=find_intersection_point2ellipsoid(ellipsoid_center,ellipsoid_axes,slice_all[-1][x][i]+slice_height*curve_normal[i])
+                curve_next.append(p_plus)
+
+            curve_next=np.array(curve_next)
+            
+                
+
+            if x==0 or x==len(slice_all[-1])-1: ###only extend or shrink if first or last section for now
+                curve_next=fit_to_length(curve_next,stl_pc,closed=False)
+
+            if len(curve_next)==0:   
+                if len(slice_all[-1])<=1:   ###end condition
+                    return slice_all
+                continue
+
+            ###split the curve based on projection error
+            sub_curves_next,closed=split_slices(curve_next,stl_pc,False)
+            if len(sub_curves_next)==0:
+                return slice_all
+
+            for j in range(len(sub_curves_next)):
+                sub_curves_next[j]=smooth_curve(sub_curves_next[j],point_distance)
+            
+            slice_ith_layer.extend(sub_curves_next)
+
+        layer_num+=1
+        slice_all.append(slice_ith_layer)
+
+    slice_all,curve_normal_all=post_process(slice_all,point_distance=1)
+   
+
+    # Plot the original points and the fitted curved plane
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    vis_step=1
+
+    for i in range(len(slice_all)):
+        for x in range(len(slice_all[i])):
+            if len(slice_all[i][x])==0:
+                break
+
+            ax.plot3D(slice_all[i][x][::vis_step,0],slice_all[i][x][::vis_step,1],slice_all[i][x][::vis_step,2],'r.-')
+            # np.savetxt('slicing_result/slice%i_%i.csv'%(i,x),slice_all[i][x],delimiter=',')
+            np.savetxt('slicing_result/slice%i_%i.csv'%(i,x),np.hstack((slice_all[i][x],curve_normal_all[i][x])),delimiter=',')
+
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
+    set_axes_equal(ax)
+    plt.title('STL %fmm Slicing'%slice_height)
+    plt.show()
+
 if __name__ == "__main__":
-    main_tube()
+    main_face()

@@ -216,7 +216,7 @@ def fit_to_length(curve,stl_pc,resolution=0.5,closed=False):
     start_idx=0
     start_shrinked=False
     start_extended=False
-
+    
     closed=closed_loop_check(curve)
 
     if closed:
@@ -235,7 +235,7 @@ def fit_to_length(curve,stl_pc,resolution=0.5,closed=False):
             start_idx+=1
             if start_idx>=len(curve)-1:
                 return []
-
+    
     if start_shrinked:
         boundary_distance=np.linalg.norm(curve[start_idx-1]-curve[start_idx])
     else:
@@ -249,7 +249,7 @@ def fit_to_length(curve,stl_pc,resolution=0.5,closed=False):
     vec=(curve[0]-curve[1])/np.linalg.norm(curve[0]-curve[1])
     distance_added=0
     if closed:
-
+        
         while distance_added < boundary_distance and (curve[1]-curve[0])@(curve[-1]-curve[0])<0:
             start_extended=True
             next_p=project_point_on_stl(curve[0]+resolution*vec,stl_pc)
@@ -263,7 +263,7 @@ def fit_to_length(curve,stl_pc,resolution=0.5,closed=False):
             next_p=project_point_on_stl(curve[0]+resolution*vec,stl_pc)
             curve=np.insert(curve,0,copy.deepcopy(next_p),axis=0)
             distance_added+=resolution
-
+    
     curve=curve[1:]
 
     ###shrink end firstly
@@ -338,7 +338,7 @@ def split_slices(curve,stl_pc,closed=False):
 def slice_stl(bottom_curve,stl_pc,direction,slice_height,closed=False):
     slice_all=[[bottom_curve]]
     layer_num=0
-    while layer_num<50:
+    while layer_num<2:
         print(layer_num, 'th layer')
         if len(slice_all[-1])==0:
             slice_all=slice_all[:-1]
@@ -353,15 +353,12 @@ def slice_stl(bottom_curve,stl_pc,direction,slice_height,closed=False):
                 curve_normal=get_curve_normal(slice_all[-1][x],stl_pc,direction)
 
             curve_next=slice_next_layer(slice_all[-1][x],stl_pc,curve_normal,slice_height)
-
             if x==0 or x==len(slice_all[-1])-1: ###only extend or shrink if first or last section for now
-                curve_next=fit_to_length(curve_next,stl_pc,closed)
-
+                curve_next=fit_to_length(curve_next,stl_pc,closed=closed)
             if len(curve_next)==0:   
                 if len(slice_all[-1])<=1:   ###end condition
                     return slice_all
                 continue
-
             ###split the curve based on projection error
             sub_curves_next=split_slices(curve_next,stl_pc)
 
@@ -517,5 +514,57 @@ def main_tube():
     plt.show()
 
 
+
+def main_face():
+    # Load the STL file
+    filename = '../data/face/ellipsoid_face_flat_chin.stl'
+    your_mesh = mesh.Mesh.from_file(filename)
+    # Get the number of facets in the STL file
+    num_facets = len(your_mesh)
+
+    slice_height=0.1
+
+    # Extract all vertices
+    vertices = np.zeros((num_facets, 3, 3))
+    for i, facet in enumerate(your_mesh.vectors):
+        vertices[i] = facet
+    # Flatten the vertices array and remove duplicates
+    stl_pc = np.unique(vertices.reshape(-1, 3), axis=0)
+
+    bottom_edge = slicing_uniform(stl_pc,z = np.min(stl_pc[:,2]),threshold=1)
+    #smoothout the z due to crude chop
+    bottom_edge[:,2]=np.min(stl_pc[:,2])
+    bottom_edge=smooth_curve(bottom_edge)
+
+
+    # fig = plt.figure()
+    # ax = fig.add_subplot(111, projection='3d')
+    # ax.scatter(bottom_edge[:,0],bottom_edge[:,1],bottom_edge[:,2],s=1)
+    # set_axes_equal(ax)
+    # plt.show()
+    slice_all=slice_stl(bottom_edge,stl_pc,np.array([0,0,1]),slice_height=slice_height)
+    slice_all,curve_normal_all=post_process(slice_all,point_distance=1)
+   
+
+    # Plot the original points and the fitted curved plane
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    vis_step=1
+
+    for i in range(len(slice_all)):
+        for x in range(len(slice_all[i])):
+            if len(slice_all[i][x])==0:
+                break
+
+            ax.plot3D(slice_all[i][x][::vis_step,0],slice_all[i][x][::vis_step,1],slice_all[i][x][::vis_step,2],'r.-')
+            # np.savetxt('slicing_result/slice%i_%i.csv'%(i,x),slice_all[i][x],delimiter=',')
+            np.savetxt('slicing_result/slice%i_%i.csv'%(i,x),np.hstack((slice_all[i][x],curve_normal_all[i][x])),delimiter=',')
+
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
+    plt.title('STL %fmm Slicing'%slice_height)
+    plt.show()
+
 if __name__ == "__main__":
-    main_tube()
+    main_face()

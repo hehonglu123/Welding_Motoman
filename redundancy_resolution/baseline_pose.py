@@ -7,8 +7,8 @@ from robot_def import *
 
 
 def main():
-	dataset='bell/'
-	sliced_alg='circular_slice/'
+	dataset='face/'
+	sliced_alg='auto_slice/'
 	data_dir='../data/'+dataset+sliced_alg
 	with open(data_dir+'slicing.yml', 'r') as file:
 		slicing_meta = yaml.safe_load(file)
@@ -89,7 +89,7 @@ def main():
 	
 			np.savetxt(data_dir+'curve_sliced_relative/baselayer'+str(i)+'_'+str(x)+'.csv',curve_sliced_relative_base[i][x],delimiter=',')
 
-
+	set_axes_equal(ax)
 	plt.title(dataset[:-1]+' first '+str(slicing_meta['num_layers'])+' slices')
 	plt.show()
 
