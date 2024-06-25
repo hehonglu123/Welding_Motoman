@@ -5,7 +5,7 @@ sys.path.append('../../toolbox/')
 from flir_toolbox import *
 
 # Load the IR recording data from the pickle file
-data_dir='../../../recorded_data/ER316L/wallbf_100ipm_v10_100ipm_v10/'
+data_dir='../../../recorded_data/ER316L/wallbf_70ipm_v7_70ipm_v7/'
 # data_dir='../../../recorded_data/wall_weld_test/4043_150ipm_2024_06_18_11_16_32/layer_4/'
 
 

@@ -27,24 +27,7 @@ def main():
 	positioner=positioner_obj('D500B',def_path=config_dir+'D500B_robot_default_config.yml',tool_file_path=config_dir+'positioner_tcp.csv',\
 		pulse2deg_file_path=config_dir+'D500B_pulse2deg_real.csv',base_transformation_file=config_dir+'D500B_pose_mocap.csv')
 
-	###define start pose for 3 robtos
-	measure_distance=500
-	H2010_1440=H_inv(robot2.base_H)
-	q_positioner_home=np.array([-15.*np.pi/180.,np.pi/2])
-	p_positioner_home=positioner.fwd(q_positioner_home,world=True).p
-	p_robot2_proj=p_positioner_home+np.array([0,0,50])
-	p2_in_base_frame=np.dot(H2010_1440[:3,:3],p_robot2_proj)+H2010_1440[:3,3]
-	v_z=H2010_1440[:3,:3]@np.array([0,-0.96592582628,-0.2588190451]) ###pointing toward positioner's X with 15deg tiltd angle looking down
-	v_y=VectorPlaneProjection(np.array([-1,0,0]),v_z)	###FLIR's Y pointing toward 1440's -X in 1440's base frame, projected on v_z's plane
-	v_x=np.cross(v_y,v_z)
-	p2_in_base_frame=p2_in_base_frame-measure_distance*v_z			###back project measure_distance-mm away from torch
-	R2=np.vstack((v_x,v_y,v_z)).T
-	q2=robot2.inv(p2_in_base_frame,R2,last_joints=np.zeros(6))[0]
-
-	###jog to start point
-	client=MotionProgramExecClient()
-	ws=WeldSend(client)
-	ws.jog_dual(robot2,positioner,q2,q_positioner_home,v=1)
+	
 
 
 	#################################################################robot 1 welding params####################################################################
@@ -73,6 +56,28 @@ def main():
 	job_offset=450
 	cond_all=[]
 	primitives=[]
+
+
+	#################################################################define start pose for 3 robtos####################################################################
+	measure_distance=500
+	# H2010_1440=H_inv(robot2.base_H)
+	# q_positioner_home=np.array([-15.*np.pi/180.,np.pi/2])
+	# p_positioner_home=positioner.fwd(q_positioner_home,world=True).p
+
+	p_positioner_home=np.mean([p_start_base,p_end_base],axis=0)
+	p_robot2_proj=p_positioner_home+np.array([0,0,50])
+	p2_in_base_frame=np.dot(H2010_1440[:3,:3],p_robot2_proj)+H2010_1440[:3,3]
+	v_z=H2010_1440[:3,:3]@np.array([0,-0.96592582628,-0.2588190451]) ###pointing toward positioner's X with 15deg tiltd angle looking down
+	v_y=VectorPlaneProjection(np.array([-1,0,0]),v_z)	###FLIR's Y pointing toward 1440's -X in 1440's base frame, projected on v_z's plane
+	v_x=np.cross(v_y,v_z)
+	p2_in_base_frame=p2_in_base_frame-measure_distance*v_z			###back project measure_distance-mm away from torch
+	R2=np.vstack((v_x,v_y,v_z)).T
+	q2=robot2.inv(p2_in_base_frame,R2,last_joints=np.zeros(6))[0]
+
+	###jog to start point
+	client=MotionProgramExecClient()
+	ws=WeldSend(client)
+	ws.jog_dual(robot2,positioner,q2,q_positioner_home,v=1)
 
 	####################################Base Layer ####################################
 	for i in range(0,2):

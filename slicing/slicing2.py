@@ -635,13 +635,13 @@ def main_face():
         layer_num+=1
         slice_all.append(slice_ith_layer)
 
-    slice_all,curve_normal_all=post_process(slice_all,point_distance=1)
+    slice_all,curve_normal_all=post_process(slice_all,point_distance)
    
 
     # Plot the original points and the fitted curved plane
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
-    vis_step=1
+    vis_step=5
 
     for i in range(len(slice_all)):
         for x in range(len(slice_all[i])):
@@ -649,7 +649,29 @@ def main_face():
                 break
 
             ax.plot3D(slice_all[i][x][::vis_step,0],slice_all[i][x][::vis_step,1],slice_all[i][x][::vis_step,2],'r.-')
-            # np.savetxt('slicing_result/slice%i_%i.csv'%(i,x),slice_all[i][x],delimiter=',')
+            
+            ###FIX the overhang curve normal
+            if i==0:
+                lam_prev=calc_lam_cs(slice_all[i][x])
+            elif i<len(slice_all)/2:                ###only the bottome half needs to be fixed
+                lam=calc_lam_cs(slice_all[i][x])
+                if lam_prev[-1]<lam[-1]-2:        #if extended more than 2mm
+                    for mm in range(0,int(10/point_distance)):      #check the start 10mm overhang
+                        prev_layer_start_vec = slice_all[i-1][x][0]-slice_all[i][x][mm]
+                        if (slice_all[i][x][1]-slice_all[i][x][0])@prev_layer_start_vec>0:
+                            curve_normal_all[i][x][mm]=prev_layer_start_vec/np.linalg.norm(prev_layer_start_vec)
+                    
+                    for mm in range(-int(10/point_distance),0):
+                        prev_layer_end_vec = slice_all[i-1][x][-1]-slice_all[i][x][mm]
+                        if (slice_all[i][x][-2]-slice_all[i][x][-1])@prev_layer_end_vec>0:
+                            curve_normal_all[i][x][mm]=prev_layer_end_vec/np.linalg.norm(prev_layer_end_vec)
+
+
+                lam_prev=lam
+            
+            ax.quiver(slice_all[i][x][::vis_step,0],slice_all[i][x][::vis_step,1],slice_all[i][x][::vis_step,2],curve_normal_all[i][x][::vis_step,0],curve_normal_all[i][x][::vis_step,1],curve_normal_all[i][x][::vis_step,2],length=10,normalize=True,color='b')
+
+
             np.savetxt('slicing_result/slice%i_%i.csv'%(i,x),np.hstack((slice_all[i][x],curve_normal_all[i][x])),delimiter=',')
 
     ax.set_xlabel('X')
@@ -658,6 +680,8 @@ def main_face():
     set_axes_equal(ax)
     plt.title('STL %fmm Slicing'%slice_height)
     plt.show()
+
+
 
 if __name__ == "__main__":
     main_face()

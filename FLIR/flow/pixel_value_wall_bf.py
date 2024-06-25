@@ -8,7 +8,7 @@ from flir_toolbox import *
 from robot_def import *
 
 
-def center_of_window_below_bbox(bbox,ir_pixel_window_size, num_pixel_below_centroid=8):
+def center_of_window_below_bbox(bbox,ir_pixel_window_size, num_pixel_below_centroid=0):
     # Calculate the bottom center point of the bbox
     x, y, w, h = bbox
 
@@ -30,7 +30,7 @@ with open(data_dir+'/ir_recording.pickle', 'rb') as file:
 ir_ts=np.loadtxt(data_dir+'/ir_stamps.csv', delimiter=',')
 joint_angle=np.loadtxt(data_dir+'weld_js_exe.csv',delimiter=',')
 
-ir_pixel_window_size=5
+ir_pixel_window_size=7
 
 robot=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path=config_dir+'torch.csv',\
 	pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',d=15)
@@ -59,6 +59,7 @@ for i in range(1,len(signs)):
         sign_continuous_time=0
 
 
+cv2.namedWindow("IR Recording", cv2.WINDOW_NORMAL)
 
 
 for layer_num in range(20,len(layer_indices_ir)-1):
@@ -77,7 +78,7 @@ for layer_num in range(20,len(layer_indices_ir)-1):
             ir_normalized=np.clip(ir_normalized, 0, 255)
             ir_bgr = cv2.applyColorMap(ir_normalized.astype(np.uint8), cv2.COLORMAP_INFERNO)
             cv2.rectangle(ir_bgr, (pixel_coord[0]-ir_pixel_window_size//2,pixel_coord[1]-ir_pixel_window_size//2), (pixel_coord[0]+ir_pixel_window_size//2,pixel_coord[1]+ir_pixel_window_size//2), (0,255,0), thickness=1)
-            cv2.imshow("IR bbox", ir_bgr)
+            cv2.imshow("IR Recording", ir_bgr)
             cv2.waitKey(10)
 
     pixel_coord_layer=np.array(pixel_coord_layer)
@@ -98,7 +99,7 @@ for layer_num in range(20,len(layer_indices_ir)-1):
             #find the NxN ir_pixel_window_size average pixel value below centroid
             window = ir_image[coord[1]-ir_pixel_window_size//2:coord[1]+ir_pixel_window_size//2+1,coord[0]-ir_pixel_window_size//2:coord[0]+ir_pixel_window_size//2+1]
             pixel_avg = np.mean(window)
-            mask = (window > 1*pixel_avg/3) # filter out background 
+            mask = (window > 3*pixel_avg/4) # filter out background 
             # mask = (window > 2*pixel_avg/3) & (window < 4*pixel_avg/3)  # filter out background or flame
             pixel_avg = np.mean(window[mask])
             counts_all.append(pixel_avg)
