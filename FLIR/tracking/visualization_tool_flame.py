@@ -14,7 +14,7 @@ with open(data_dir+'/ir_recording.pickle', 'rb') as file:
 ir_ts=np.loadtxt(data_dir+'/ir_stamps.csv', delimiter=',')
 
 #load template
-template = cv2.imread('torch_template.png',0)
+template = cv2.imread('torch_template_temp.png',0)
 
 # Create a window to display the images
 cv2.namedWindow("IR Recording", cv2.WINDOW_NORMAL)

@@ -1,6 +1,7 @@
 import cv2
 import pickle, sys
 import numpy as np
+import matplotlib.pyplot as plt
 sys.path.append('../../toolbox/')
 from flir_toolbox import *
 
@@ -25,7 +26,7 @@ colorbar_min = np.min(ir_recording)
 colorbar_max = np.max(ir_recording)
 
 
-frame=15221
+frame=10000
 ir_image = np.rot90(ir_recording[frame], k=-1)
 
 max_loc=torch_detect(ir_image,template,threshold=0.)
@@ -48,5 +49,3 @@ cv2.imshow("IR Recording", ir_bgr)
 cv2.waitKey()
 # Close the window after the loop is completed
 cv2.destroyAllWindows()
-
-# np.save('torch_template.npy',ir_normalized[max_loc[1]:max_loc[1]+template.shape[0],max_loc[0]:max_loc[0]+template.shape[1]])

@@ -18,10 +18,10 @@ def center_of_window_below_bbox(bbox,ir_pixel_window_size, num_pixel_below_centr
     return center_x, center_y
 
 #load template
-template = cv2.imread('../tracking/torch_template.png',0)
+template = cv2.imread('../tracking/torch_template_temp.png',0)
 
 # Load the IR recording data from the pickle file
-data_dir='../../../recorded_data/ER316L/wallbf_100ipm_v10_100ipm_v10/'
+data_dir='../../../recorded_data/ER316L/wallbf_70ipm_v7_70ipm_v7/'
 # data_dir='../../../recorded_data/wallbf_100ipm_v10_80ipm_v8/'
 # data_dir='../../../recorded_data/wallbf_100ipm_v10_120ipm_v12/'
 config_dir='../../config/'

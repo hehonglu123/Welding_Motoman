@@ -183,8 +183,8 @@ def torch_detect(ir_image,template,threshold=0.3):
     # bolden all edges
     edges=cv2.dilate(edges,None,iterations=1)
 
-    cv2.imshow('edges',edges)
-    cv2.waitKey(0)
+    # cv2.imshow('edges',edges)
+    # cv2.waitKey(0)
     
 
     ###template matching with normalized image
