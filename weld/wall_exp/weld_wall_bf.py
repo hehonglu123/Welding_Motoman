@@ -35,22 +35,24 @@ def main():
 				[ 0.7071, 0.7071,  0.    ],
 				[0.,      0.,     -1.    ]])
 	#ystart -850, yend -775
-	p_start_base=np.array([1710,-825,-260])
-	p_end_base=np.array([1590,-825,-260])
-	p_start=np.array([1700,-825,-260])
-	p_end=np.array([1600,-825,-260])
+	p_start_base=np.array([1710,-810,-260])
+	p_end_base=np.array([1590,-810,-260])
+	p_start=np.array([1700,-810,-260])
+	p_end=np.array([1600,-810,-260])
 	q_seed=np.radians([-35.4291,56.6333,40.5194,4.5177,-52.2505,-11.6546])
 
 
 	base_feedrate=300
-	feedrate=150
+	volume_per_distance=10
 	v_layer=15
+	feedrate=volume_per_distance*v_layer
 	base_layer_height=3
 	v_base=5
-	layer_height=1.1
+	layer_height=0.9
+	num_layer=30
 	#edge params, 1cm left and right
-	feedrate_edge=150
-	v_edge=15
+	feedrate_edge=feedrate
+	v_edge=v_layer
 	q_all=[]
 	v_all=[]
 	job_offset=450
@@ -60,12 +62,11 @@ def main():
 
 	#################################################################define start pose for 3 robtos####################################################################
 	measure_distance=500
-	# H2010_1440=H_inv(robot2.base_H)
-	# q_positioner_home=np.array([-15.*np.pi/180.,np.pi/2])
+	H2010_1440=H_inv(robot2.base_H)
+	q_positioner_home=np.array([-15.*np.pi/180.,np.pi/2])
 	# p_positioner_home=positioner.fwd(q_positioner_home,world=True).p
-
 	p_positioner_home=np.mean([p_start_base,p_end_base],axis=0)
-	p_robot2_proj=p_positioner_home+np.array([0,0,50])
+	p_robot2_proj=p_positioner_home+np.array([0,0,30])
 	p2_in_base_frame=np.dot(H2010_1440[:3,:3],p_robot2_proj)+H2010_1440[:3,3]
 	v_z=H2010_1440[:3,:3]@np.array([0,-0.96592582628,-0.2588190451]) ###pointing toward positioner's X with 15deg tiltd angle looking down
 	v_y=VectorPlaneProjection(np.array([-1,0,0]),v_z)	###FLIR's Y pointing toward 1440's -X in 1440's base frame, projected on v_z's plane
@@ -104,7 +105,7 @@ def main():
 	cond_all=[]
 	primitives=[]
 	####################################Normal Layer ####################################
-	for i in range(2,62):
+	for i in range(2,num_layer+2):
 		if i%2==0:
 			p1=p_start+np.array([0,0,2*base_layer_height+i*layer_height])
 			p2=p_end+np.array([0,0,2*base_layer_height+i*layer_height])
@@ -146,7 +147,7 @@ def main():
 	client.servoMH(False) #stop the motor
 
 
-	recorded_dir='../../../recorded_data/wallbf_%iipm_v%i_%iipm_v%i/'%(feedrate,v_layer,feedrate_edge,v_edge)
+	recorded_dir='../../../recorded_data/ER316L/wallbf_%iipm_v%i_%iipm_v%i/'%(feedrate,v_layer,feedrate_edge,v_edge)
 	os.makedirs(recorded_dir,exist_ok=True)
 	np.savetxt(recorded_dir+'weld_js_exe.csv',np.array(js_recording),delimiter=',')
 	rr_sensors.save_all_sensors(recorded_dir)

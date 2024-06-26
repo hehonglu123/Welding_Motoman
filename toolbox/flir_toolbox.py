@@ -171,15 +171,15 @@ def weld_detection(raw_img,threshold=1.2e4,area_threshold=10):
 
     return centroid, bbox, pixels
 
-def torch_detect(ir_image,template,threshold=0.3):
+def torch_detect(ir_image,template,template_threshold=0.3,pixel_threshold=1e4):
     ###template matching for torch, return the upper left corner of the matched region
     #threshold and normalize ir image
     ir_torch_tracking=ir_image.copy()
-    ir_torch_tracking[ir_torch_tracking>1e4]=1e4
+    ir_torch_tracking[ir_torch_tracking>pixel_threshold]=pixel_threshold
     ir_torch_tracking_normalized = ((ir_torch_tracking - np.min(ir_torch_tracking)) / (np.max(ir_torch_tracking) - np.min(ir_torch_tracking))) * 255
 
     # run edge detection
-    edges = cv2.Canny(ir_torch_tracking_normalized.astype(np.uint8), threshold1=20, threshold2=90)
+    edges = cv2.Canny(ir_torch_tracking_normalized.astype(np.uint8), threshold1=20, threshold2=100)
     # bolden all edges
     edges=cv2.dilate(edges,None,iterations=1)
 
@@ -191,7 +191,7 @@ def torch_detect(ir_image,template,threshold=0.3):
     res = cv2.matchTemplate(edges,template,cv2.TM_CCOEFF_NORMED)
     min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(res)
     
-    if max_val<threshold:
+    if max_val<template_threshold:
         return None
     
     return max_loc
