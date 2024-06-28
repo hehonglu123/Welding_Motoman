@@ -681,7 +681,48 @@ def main_face():
     plt.title('STL %fmm Slicing'%slice_height)
     plt.show()
 
+def main_nose():
+    # Load the STL file
+    filename = '../data/nose/nose.stl'
+    your_mesh = mesh.Mesh.from_file(filename)
+    # Get the number of facets in the STL file
+    num_facets = len(your_mesh)
 
+    slice_height=0.1
+
+    # Extract all vertices
+    vertices = np.zeros((num_facets, 3, 3))
+    for i, facet in enumerate(your_mesh.vectors):
+        vertices[i] = facet
+    # Flatten the vertices array and remove duplicates
+    stl_pc = np.unique(vertices.reshape(-1, 3), axis=0)
+
+    bottom_edge = slicing_uniform(stl_pc,z = np.max(stl_pc[:,2]))
+
+    slice_all=slice_stl(bottom_edge,stl_pc,np.array([0,0,-1]),slice_height=slice_height)
+    slice_all,curve_normal_all=post_process(slice_all,point_distance=1)
+   
+
+    # Plot the original points and the fitted curved plane
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    vis_step=1
+
+    for i in range(len(slice_all)):
+        for x in range(len(slice_all[i])):
+            if len(slice_all[i][x])==0:
+                break
+
+            ax.plot3D(slice_all[i][x][::vis_step,0],slice_all[i][x][::vis_step,1],slice_all[i][x][::vis_step,2],'r.-')
+            # np.savetxt('slicing_result/slice%i_%i.csv'%(i,x),slice_all[i][x],delimiter=',')
+            np.savetxt('slicing_result/slice%i_%i.csv'%(i,x),np.hstack((slice_all[i][x],curve_normal_all[i][x])),delimiter=',')
+
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
+    plt.title('STL %fmm Slicing'%slice_height)
+    plt.show()
 
 if __name__ == "__main__":
-    main_face()
+    # main_face()
+    main_nose()

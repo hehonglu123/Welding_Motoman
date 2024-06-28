@@ -21,9 +21,7 @@ def center_of_window_below_bbox(bbox,ir_pixel_window_size, num_pixel_below_centr
 template = cv2.imread('../tracking/torch_template_ER316L.png',0)
 
 # Load the IR recording data from the pickle file
-data_dir='../../../recorded_data/ER316L_IR_wall_study/wallbf_150ipm_v15_150ipm_v15/'
-# data_dir='../../../recorded_data/wallbf_100ipm_v10_80ipm_v8/'
-# data_dir='../../../recorded_data/wallbf_100ipm_v10_120ipm_v12/'
+data_dir='../../../recorded_data/ER316L_IR_wall_study/wallbf_70ipm_v7_70ipm_v7/'
 config_dir='../../config/'
 with open(data_dir+'/ir_recording.pickle', 'rb') as file:
     ir_recording = pickle.load(file)
@@ -59,11 +57,10 @@ for i in range(1,len(signs)):
         sign_continuous_time=0
 
 
-cv2.namedWindow("IR Recording", cv2.WINDOW_NORMAL)
 
-
+pixel_value_all=[]
+ir_ts_processed=[]
 for layer_num in range(20,len(layer_indices_ir)-1):
-    pixel_coord_layer=[]    #find all pixel regions to record from flame detection
     #find all pixel regions to record from flame detection
     for i in range(layer_indices_ir[layer_num],layer_indices_ir[layer_num+1]):
         ir_image = np.rot90(ir_recording[i], k=-1)
@@ -72,39 +69,12 @@ for layer_num in range(20,len(layer_indices_ir)-1):
         if centroid is not None:
             #find 3x3 average pixel value below centroid
             pixel_coord=center_of_window_below_bbox(bbox,ir_pixel_window_size)
-            pixel_coord_layer.append(pixel_coord)
-            ###DISPLAY THE IMAGE WITH BBOX
-            # ir_normalized = ((ir_image - np.min(ir_image)) / (np.max(ir_image) - np.min(ir_image))) * 255
-            # ir_normalized=np.clip(ir_normalized, 0, 255)
-            # ir_bgr = cv2.applyColorMap(ir_normalized.astype(np.uint8), cv2.COLORMAP_INFERNO)
-            # cv2.rectangle(ir_bgr, (pixel_coord[0]-ir_pixel_window_size//2,pixel_coord[1]-ir_pixel_window_size//2), (pixel_coord[0]+ir_pixel_window_size//2,pixel_coord[1]+ir_pixel_window_size//2), (0,255,0), thickness=1)
-            # cv2.imshow("IR Recording", ir_bgr)
-            # cv2.waitKey(10)
+            pixel_value_all.append(get_pixel_value(ir_image,pixel_coord,ir_pixel_window_size))
+            ir_ts_processed.append(ir_ts[i])
 
-    pixel_coord_layer=np.array(pixel_coord_layer)
-    #remove duplicate pixel regions
-    pixel_coord_layer=np.unique(pixel_coord_layer,axis=0)
-    #smoothout the pixel regions with running average
-    pixel_coord_layer[:,1]=moving_average(pixel_coord_layer[:,1],3,padding=True)
-
-    #go over again for the identified pixel regions value
-    ts_all=[]
-    pixel_all=[]
-    counts_all=[]
-    for i in range(layer_indices_ir[layer_num],layer_indices_ir[layer_num+1]):
-        ir_image = np.rot90(ir_recording[i], k=-1)
-        ts_all.extend([ir_ts[i]]*len(pixel_coord_layer))
-        pixel_all.extend(pixel_coord_layer[:,0])
-        for coord in pixel_coord_layer:
-            #find the NxN ir_pixel_window_size average pixel value below centroid
-            window = get_pixel_value(ir_image,coord,ir_pixel_window_size)
-
-    fig = plt.figure()
-    ax = plt.axes(projection='3d')
-    surf = ax.plot_trisurf(ts_all, pixel_all, counts_all, linewidth=0, antialiased=False, label='-')
-
-    plt.title('Pixel Value vs Time')
-    ax.set_xlabel('Time (s)')
-    ax.set_ylabel('Column/X (pixel)')
-    ax.set_zlabel('Pixel Value (Counts)')
-    plt.show()
+print(np.mean(pixel_value_all))
+plt.title('Pixel Value vs Time (10 layers)')
+plt.plot(ir_ts_processed, pixel_value_all)
+plt.xlabel('Time (s)')
+plt.ylabel('Pixel Value')
+plt.show()

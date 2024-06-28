@@ -195,3 +195,11 @@ def torch_detect(ir_image,template,template_threshold=0.3,pixel_threshold=1e4):
         return None
     
     return max_loc
+
+def get_pixel_value(ir_image,coord,window_size):
+    ###get top 1/4 average pixel value within the window
+    window = ir_image[coord[1]-window_size//2:coord[1]+window_size//2+1,coord[0]-window_size//2:coord[0]+window_size//2+1]
+    pixel_avg = np.mean(window)
+    mask = (window > 3*pixel_avg/4) # filter out background 
+    pixel_avg = np.mean(window[mask])
+    return pixel_avg
