@@ -120,15 +120,15 @@ def main():
 		q_edge1=robot.inv(p_edge1,R,q_seed)[0]
 		q_edge2=robot.inv(p_edge2,R,q_seed)[0]
 		if i==2:	#if start of first normal layer
-			q_all.extend([q_init,q_edge1,q_edge2,q_end])
-			v_all.extend([1,v_edge,v_layer,v_edge])
-			primitives.extend(['movej','movel','movel','movel'])
-			cond_all.extend([0,int(feedrate_edge/10+job_offset),int(feedrate/10+job_offset),int(feedrate_edge/10+job_offset)])
-		else:
-			q_all.extend([q_edge1,q_edge2,q_end])
-			v_all.extend([v_edge,v_layer,v_edge])
-			primitives.extend(['movel','movel','movel'])
-			cond_all.extend([int(feedrate_edge/10+job_offset),int(feedrate/10+job_offset),int(feedrate_edge/10+job_offset)])
+			q_all.extend([q_init])
+			v_all.extend([1])
+			primitives.extend(['movej'])
+			cond_all.extend([0])
+		
+		q_all.extend([q_edge1,q_edge2,q_end])
+		v_all.extend([v_edge,v_layer,v_edge])
+		primitives.extend(['movel','movel','movel'])
+		cond_all.extend([int(feedrate_edge/10+job_offset),int(feedrate/10+job_offset),int(feedrate_edge/10+job_offset)])
 
 
 	ws.weld_segment_single(primitives,robot,q_all,v_all,cond_all,arc=True,wait=0.,blocking=False)

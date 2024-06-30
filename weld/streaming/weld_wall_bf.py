@@ -44,7 +44,9 @@ def main():
 	measure_distance=500
 	H2010_1440=H_inv(robot2.base_H)
 	q_positioner_home=np.array([-15.*np.pi/180.,np.pi/2])
-	p_positioner_home=positioner.fwd(q_positioner_home,world=True).p
+	# p_positioner_home=positioner.fwd(q_positioner_home,world=True).p
+	rob1_js=np.loadtxt(data_dir+'curve_sliced_js/MA2010_js0_0.csv',delimiter=',')
+	p_positioner_home=np.mean([robot.fwd(rob1_js[0]).p,robot.fwd(rob1_js[-1]).p],axis=0)
 	p_robot2_proj=p_positioner_home+np.array([0,0,50])
 	p2_in_base_frame=np.dot(H2010_1440[:3,:3],p_robot2_proj)+H2010_1440[:3,3]
 	v_z=H2010_1440[:3,:3]@np.array([0,-0.96592582628,-0.2588190451]) ###pointing toward positioner's X with 15deg tiltd angle looking down
@@ -137,7 +139,7 @@ def main():
 		q_all.extend(np.hstack((rob1_js_dense[breakpoints],rob2_js_dense[breakpoints],positioner_js_dense[breakpoints])))
 
 		###adjust slice_num
-		slice_num+=int(base_slice_increment)
+		slice_num+=base_slice_increment
 
 	q_all=np.array(q_all)[:,:6]
 
@@ -161,7 +163,7 @@ def main():
 	cond_all=[]
 	cond_indices=[]
 	
-	slice_num=30
+	slice_num=2*base_slice_increment
 	layer_num=2
 	while slice_num<slicing_meta['num_layers'] and layer_num<4:
 
