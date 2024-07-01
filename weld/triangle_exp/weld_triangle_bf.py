@@ -61,7 +61,7 @@ def main():
 	
 	base_feedrate=300
 	volume_per_distance=10
-	v_layer=15
+	v_layer=10
 	feedrate=volume_per_distance*v_layer
 	base_layer_height=3
 	v_base=5
@@ -85,23 +85,23 @@ def main():
 	ws.jog_dual(robot2,positioner,q2,positioner_js[0],v=1)
 
 	#########################################################BASELAYER Welding#########################################################
-	slice_num=0
-	for layer_num in range(2):
-		x=0
-		rob1_js=np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(slice_num)+'_'+str(x)+'.csv',delimiter=',')
-		if layer_num%2==0:
-			rob1_js=np.flip(rob1_js,axis=0)
+	# slice_num=0
+	# for layer_num in range(2):
+	# 	x=0
+	# 	rob1_js=np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(slice_num)+'_'+str(x)+'.csv',delimiter=',')
+	# 	if layer_num%2==0:
+	# 		rob1_js=np.flip(rob1_js,axis=0)
 
 
-		q_all.extend([rob1_js[0],rob1_js[-1]])
-		v_all.extend([1,v_base])
-		primitives.extend(['movej','movel'])
-		cond_all.extend([0,int(base_feedrate/10+job_offset)])
+	# 	q_all.extend([rob1_js[0],rob1_js[-1]])
+	# 	v_all.extend([1,v_base])
+	# 	primitives.extend(['movej','movel'])
+	# 	cond_all.extend([0,int(base_feedrate/10+job_offset)])
 		
-		###adjust slice_num
-		slice_num+=base_slice_increment
+	# 	###adjust slice_num
+	# 	slice_num+=base_slice_increment
 
-	ws.weld_segment_single(primitives,robot,q_all,v_all,cond_all,arc=True,wait=0.,blocking=True)
+	# ws.weld_segment_single(primitives,robot,q_all,v_all,cond_all,arc=True,wait=0.,blocking=True)
 	
 
 	####################################Normal Layer Welding####################################
@@ -111,7 +111,7 @@ def main():
 	primitives=[]
 	slice_num=2*base_slice_increment
 	layer_num=2
-	while slice_num<slicing_meta['num_layers'] and layer_num<4:
+	while slice_num<slicing_meta['num_layers']:
 
 		###############DETERMINE SECTION ORDER###########################
 		sections=[0]

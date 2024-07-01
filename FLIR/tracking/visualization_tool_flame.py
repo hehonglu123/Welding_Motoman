@@ -5,7 +5,8 @@ sys.path.append('../../toolbox/')
 from flir_toolbox import *
 
 # Load the IR recording data from the pickle file
-data_dir='../../../recorded_data/ER316L/wallbf_140ipm_v14_140ipm_v14/'
+# data_dir='../../../recorded_data/ER316L/wallbf_140ipm_v14_140ipm_v14/'
+data_dir='../../../recorded_data/ER316L/trianglebf_100ipm_v10_100ipm_v10/'
 # data_dir='../../../recorded_data/wall_weld_test/4043_150ipm_2024_06_18_11_16_32/layer_4/'
 
 
@@ -14,7 +15,7 @@ with open(data_dir+'/ir_recording.pickle', 'rb') as file:
 ir_ts=np.loadtxt(data_dir+'/ir_stamps.csv', delimiter=',')
 
 #load template
-template = cv2.imread('torch_template_temp.png',0)
+template = cv2.imread('torch_template_ER316L.png',0)
 
 # Create a window to display the images
 cv2.namedWindow("IR Recording", cv2.WINDOW_NORMAL)
