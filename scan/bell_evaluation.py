@@ -102,11 +102,23 @@ target_points=o3d.geometry.PointCloud()
 target_points.points=o3d.utility.Vector3dVector(target_points_pc)
 
 
-scanned_dir='../../evaluation/Bell_ER316L/'
+# scanned_dir='../../evaluation/Bell_ER316L/'
+# ######## read the scanned stl
+# scanned_mesh = o3d.io.read_triangle_mesh(scanned_dir+'ER316L_bell_optimized3.stl')
+# scanned_mesh.compute_vertex_normals()
+# scanned_mesh_temp = o3d.io.read_triangle_mesh(scanned_dir+'ER316L_bell_optimized3.stl')
+
+# scanned_dir='../../evaluation/Bell_ER70S6/'
+# ######## read the scanned stl
+# scanned_mesh = o3d.io.read_triangle_mesh(scanned_dir+'ER70S6_bell_optimized.stl')
+# scanned_mesh.compute_vertex_normals()
+# scanned_mesh_temp = o3d.io.read_triangle_mesh(scanned_dir+'ER70S6_bell_optimized.stl')
+
+scanned_dir='../../evaluation/Bell_ER4043/'
 ######## read the scanned stl
-scanned_mesh = o3d.io.read_triangle_mesh(scanned_dir+'ER316L_bell_optimized3.stl')
+scanned_mesh = o3d.io.read_triangle_mesh(scanned_dir+'ER4043_bell_optimized.stl')
 scanned_mesh.compute_vertex_normals()
-scanned_mesh_temp = o3d.io.read_triangle_mesh(scanned_dir+'ER316L_bell_optimized3.stl')
+scanned_mesh_temp = o3d.io.read_triangle_mesh(scanned_dir+'ER4043_bell_optimized.stl')
 
 
 

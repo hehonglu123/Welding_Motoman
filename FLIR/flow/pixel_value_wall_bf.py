@@ -21,7 +21,8 @@ def center_of_window_below_bbox(bbox,ir_pixel_window_size, num_pixel_below_centr
 template = cv2.imread('../tracking/torch_template_ER316L.png',0)
 
 # Load the IR recording data from the pickle file
-data_dir='../../../recorded_data/ER316L_IR_wall_study/wallbf_150ipm_v15_150ipm_v15/'
+# data_dir='../../../recorded_data/ER316L_IR_wall_study/wallbf_150ipm_v15_150ipm_v15/'
+data_dir='../../../recorded_data/ER316L_IR_wall_study/trianglebf_100ipm_v10_100ipm_v10/'
 # data_dir='../../../recorded_data/wallbf_100ipm_v10_80ipm_v8/'
 # data_dir='../../../recorded_data/wallbf_100ipm_v10_120ipm_v12/'
 config_dir='../../config/'
@@ -97,7 +98,7 @@ for layer_num in range(20,len(layer_indices_ir)-1):
         pixel_all.extend(pixel_coord_layer[:,0])
         for coord in pixel_coord_layer:
             #find the NxN ir_pixel_window_size average pixel value below centroid
-            window = get_pixel_value(ir_image,coord,ir_pixel_window_size)
+            counts_all.append(get_pixel_value(ir_image,coord,ir_pixel_window_size))
 
     fig = plt.figure()
     ax = plt.axes(projection='3d')

@@ -8,8 +8,8 @@ from StreamingSend import *
 
 ########################################################RR STREAMING########################################################
 
-RR_robot_sub = RRN.SubscribeService('rr+tcp://192.168.1.114:59945?service=robot')
-# RR_robot_sub = RRN.SubscribeService('rr+tcp://localhost:59945?service=robot')
+# RR_robot_sub = RRN.SubscribeService('rr+tcp://192.168.1.114:59945?service=robot')
+RR_robot_sub = RRN.SubscribeService('rr+tcp://localhost:59945?service=robot')
 RR_robot_state = RR_robot_sub.SubscribeWire('robot_state')
 RR_robot = RR_robot_sub.GetDefaultClientWait(1)
 robot_const = RRN.GetConstants("com.robotraconteur.robotics.robot", RR_robot)

@@ -35,12 +35,13 @@ for i in range(0,128-section_step,section_step):
 
 cur_layer=np.loadtxt(data_dir+'curve_sliced/slice'+str(1)+'_0.csv',delimiter=',').reshape((-1,6))
 prev_layer=np.loadtxt(data_dir+'curve_sliced/slice'+str(0)+'_115.csv',delimiter=',').reshape((-1,6))
-for i in range(1,slicing_meta['num_layers']-slice_step,slice_step):
+# for i in range(1,slicing_meta['num_layers']-slice_step,slice_step):
+for i in range(1,200-slice_step,slice_step):
     next_layer=np.loadtxt(data_dir+'curve_sliced/slice'+str(i+slice_step)+'_0.csv',delimiter=',').reshape((-1,6))
     cur_layer_copy=copy.deepcopy(cur_layer)
-    # cur_layer=spiralize(cur_layer,next_layer)
-    # cur_layer=spiralize(cur_layer,prev_layer,reversed=True)
-    ax.plot3D(cur_layer[:-3,0],cur_layer[:-3,1],cur_layer[:-3,2],'r.-')
+    cur_layer=spiralize(cur_layer,next_layer)
+    cur_layer=spiralize(cur_layer,prev_layer,reversed=True)
+    ax.plot3D(cur_layer[:-2,0],cur_layer[:-2,1],cur_layer[:-2,2])
     ax.scatter(cur_layer[-3,0],cur_layer[-3,1],cur_layer[-3,2],c='b')
     ax.scatter(cur_layer[0,0],cur_layer[0,1],cur_layer[0,2],c='b')
 

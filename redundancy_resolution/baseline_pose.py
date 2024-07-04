@@ -7,7 +7,7 @@ from robot_def import *
 
 
 def main():
-	dataset='triangle/'
+	dataset='cylinder/'
 	sliced_alg='dense_slice/'
 	data_dir='../data/'+dataset+sliced_alg
 	with open(data_dir+'slicing.yml', 'r') as file:

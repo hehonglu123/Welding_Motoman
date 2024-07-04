@@ -1,5 +1,5 @@
 import cv2,copy
-import pickle, sys
+import pickle, sys, time
 import numpy as np
 import matplotlib.pyplot as plt
 from pandas import read_csv
@@ -21,7 +21,8 @@ def center_of_window_below_bbox(bbox,ir_pixel_window_size, num_pixel_below_centr
 template = cv2.imread('../tracking/torch_template_ER316L.png',0)
 
 # Load the IR recording data from the pickle file
-data_dir='../../../recorded_data/ER316L_IR_wall_study/wallbf_70ipm_v7_70ipm_v7/'
+# data_dir='../../../recorded_data/ER316L_IR_wall_study/wallbf_70ipm_v7_70ipm_v7/'
+data_dir='../../../recorded_data/ER316L_IR_wall_study/trianglebf_100ipm_v10_100ipm_v10/'
 config_dir='../../config/'
 with open(data_dir+'/ir_recording.pickle', 'rb') as file:
     ir_recording = pickle.load(file)
@@ -60,9 +61,11 @@ for i in range(1,len(signs)):
 
 pixel_value_all=[]
 ir_ts_processed=[]
+frame_processing_time=[]
 for layer_num in range(20,len(layer_indices_ir)-1):
     #find all pixel regions to record from flame detection
     for i in range(layer_indices_ir[layer_num],layer_indices_ir[layer_num+1]):
+        start_time=time.time()
         ir_image = np.rot90(ir_recording[i], k=-1)
         # centroid, bbox=flame_detection(ir_image,threshold=1.0e4,area_threshold=10)
         centroid, bbox=flame_detection_no_arc(ir_image,template)
@@ -72,8 +75,10 @@ for layer_num in range(20,len(layer_indices_ir)-1):
             pixel_value_all.append(get_pixel_value(ir_image,pixel_coord,ir_pixel_window_size))
             ir_ts_processed.append(ir_ts[i])
 
-print(np.mean(pixel_value_all))
-plt.title('Pixel Value vs Time (10 layers)')
+            frame_processing_time.append(time.time()-start_time)
+
+print(np.mean(frame_processing_time))
+plt.title('Pixel Value vs Time ')
 plt.plot(ir_ts_processed, pixel_value_all)
 plt.xlabel('Time (s)')
 plt.ylabel('Pixel Value')
