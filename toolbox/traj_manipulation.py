@@ -33,3 +33,18 @@ def warp_traj(rob1_js,rob2_js,positioner_js,rob1_js_x,rob2_js_x,positioner_js_x,
 		rob2_js[traj_length_half:]=spiralize(rob2_js[traj_length_half:],rob2_js_x[traj_length_x_half:],reversed)
 		positioner_js[traj_length_half:]=spiralize(positioner_js[traj_length_half:],positioner_js_x[traj_length_x_half:],reversed)
 	return rob1_js,rob2_js,positioner_js
+
+def warp_traj2(rob1_js,positioner_js,rob1_js_x,positioner_js_x,reversed=False):
+	#same functionality, but without robot2
+	if positioner_js_x.shape==(2,) and rob1_js_x.shape==(6,):
+		return rob1_js,positioner_js
+	traj_length_x_half=int(len(rob1_js_x)/2)
+	traj_length_half=int(len(rob1_js)/2)
+	if reversed:
+		rob1_js[:traj_length_half]=spiralize(rob1_js[:traj_length_half],rob1_js_x[:traj_length_x_half],reversed)
+		positioner_js[:traj_length_half]=spiralize(positioner_js[:traj_length_half],positioner_js_x[:traj_length_x_half],reversed)
+	else:
+		rob1_js[traj_length_half:]=spiralize(rob1_js[traj_length_half:],rob1_js_x[traj_length_x_half:],reversed)
+		positioner_js[traj_length_half:]=spiralize(positioner_js[traj_length_half:],positioner_js_x[traj_length_x_half:],reversed)
+	return rob1_js,positioner_js
+

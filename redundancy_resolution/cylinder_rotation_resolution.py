@@ -26,7 +26,19 @@ def main():
 	for i in range(slicing_meta['num_layers']):
 		curve_sliced.append(np.loadtxt(data_dir+'curve_sliced/slice'+str(i)+'_0.csv',delimiter=',').reshape((-1,6)))
 	
+	H=np.eye(4)
+	H[:3,:3]=Rz(-np.pi/2)
 	curve_sliced_relative=copy.deepcopy(curve_sliced)
+	for i in tqdm(range(len(curve_sliced))):
+		for j in range(len(curve_sliced[i])):
+			
+			curve_sliced_relative[i][j,:3]=np.dot(H,np.hstack((curve_sliced[i][j,:3],[1])).T)[:-1]
+			#convert curve direction to base frame
+			curve_sliced_relative[i][j,3:]=np.dot(H[:3,:3],curve_sliced[i][j,3:]).T
+
+			np.savetxt(data_dir+'curve_sliced_relative/slice'+str(i)+'_0.csv',curve_sliced_relative[i],delimiter=',')
+
+
 	positioner_js=[]
 	for i in range(len(curve_sliced)):
 		x=0

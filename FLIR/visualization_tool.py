@@ -6,7 +6,8 @@ from flir_toolbox import *
 
 # Load the IR recording data from the pickle file
 # data_dir='../../recorded_data/ER316L/wallbf_70ipm_v7_70ipm_v7/'
-data_dir='../../recorded_data/ER316L/trianglebf_100ipm_v10_100ipm_v10/'
+# data_dir='../../recorded_data/ER316L/trianglebf_100ipm_v10_100ipm_v10/'
+data_dir='../../recorded_data/ER316L/cylinderspiral_100ipm_v10/'
 # data_dir='../../recorded_data/wall_weld_test/5356_150ipm_2024_06_17_14_36_16/layer_2'
 with open(data_dir+'/ir_recording.pickle', 'rb') as file:
     ir_recording = pickle.load(file)

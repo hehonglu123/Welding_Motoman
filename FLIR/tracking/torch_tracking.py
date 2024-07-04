@@ -6,14 +6,16 @@ sys.path.append('../../toolbox/')
 from flir_toolbox import *
 
 #load template
-template = cv2.imread('torch_template.png',0)
+template = cv2.imread('torch_template_ER316L.png',0)
 scale_factor=1.0
 template.resize((int(scale_factor*template.shape[0]),int(scale_factor*template.shape[1])))
 # Load the IR recording data from the pickle file
 # with open('../../../recorded_data/ER316L_wall_streaming_bf/layer_394/ir_recording.pickle', 'rb') as file:
 #     ir_recording = pickle.load(file)
 
-data_dir='../../../recorded_data/ER316L/wallbf_70ipm_v7_70ipm_v7/'
+# data_dir='../../../recorded_data/ER316L/wallbf_70ipm_v7_70ipm_v7/'
+data_dir='../../../recorded_data/ER316L/cylinderspiral_100ipm_v10/'
+
 with open(data_dir+'/ir_recording.pickle', 'rb') as file:
     ir_recording = pickle.load(file)
 
@@ -29,7 +31,7 @@ colorbar_max = np.max(ir_recording)
 frame=10000
 ir_image = np.rot90(ir_recording[frame], k=-1)
 
-max_loc=torch_detect(ir_image,template,threshold=0.)
+max_loc=torch_detect(ir_image,template,template_threshold=0.3)
 
 ir_normalized = ((ir_image - np.min(ir_image)) / (np.max(ir_image) - np.min(ir_image))) * 255
 ir_normalized=np.clip(ir_normalized, 0, 255)
