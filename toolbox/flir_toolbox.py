@@ -188,11 +188,11 @@ def flame_detection_yolo(raw_img,yolo_model,threshold=1.5e4,area_threshold=10,pe
     pixel_coordinates = np.flip(np.array(np.where(labels == largest_component_index)).T,axis=1)
 
     ## Torch detection
-    torch_centroid, bbox=torch_detect_yolo(raw_img,yolo_model)
+    torch_centroid, torch_bbox=torch_detect_yolo(raw_img,yolo_model)
     if torch_centroid is None:   #if no torch detected, return None
         print('torch not found')
         return None, None
-    template_bottom_center=bbox[:2]+np.array([bbox[2]/2,bbox[3]])
+    template_bottom_center=torch_bbox[:2]+np.array([torch_bbox[2]/2,torch_bbox[3]])
     hull = cv2.convexHull(pixel_coordinates)
 
     poly = Polygon([tuple(point[0]) for point in hull])
@@ -242,7 +242,7 @@ def flame_detection_yolo(raw_img,yolo_model,threshold=1.5e4,area_threshold=10,pe
     # ##############################################display for debugging END#########################################################
 
 
-    return centroid, bbox
+    return centroid, bbox, torch_centroid, torch_bbox
 
 def weld_detection(raw_img,threshold=1.2e4,area_threshold=10):
     ###flame detection by raw counts thresholding and connected components labeling

@@ -1,17 +1,30 @@
 import numpy as np
 import time, copy
+from RobotRaconteur.Client import *
 
 class StreamingSend(object):
-	def __init__(self,RR_robot,RR_robot_state,RobotJointCommand,streaming_rate=125.,latency=0.1):
-		self.RR_robot=RR_robot
-		self.RR_robot_state=RR_robot_state
+	def __init__(self,RR_robot_sub,streaming_rate=125.,latency=0.1):
+		self.RR_robot_state = RR_robot_sub.SubscribeWire('robot_state')
+		self.RR_robot = RR_robot_sub.GetDefaultClientWait(1)
+		robot_const = RRN.GetConstants("com.robotraconteur.robotics.robot", self.RR_robot)
+		self.halt_mode = robot_const["RobotCommandMode"]["halt"]
+		self.position_mode = robot_const["RobotCommandMode"]["position_command"]
+		self.RobotJointCommand = RRN.GetStructureType("com.robotraconteur.robotics.robot.RobotJointCommand",self.RR_robot)
 		self.RR_robot_state.WireValueChanged += self.robot_state_cb
-		self.RobotJointCommand=RobotJointCommand
 		self.streaming_rate=streaming_rate
 		self.command_seqno=0
 
 		###data logging
 		self.joint_logging_flag=False
+		self.initialize_robot()
+	
+	def initialize_robot(self):
+		self.RR_robot.reset_errors()
+		self.RR_robot.enable()
+		self.RR_robot.command_mode = self.halt_mode
+		time.sleep(0.1)
+		self.RR_robot.command_mode = self.position_mode
+		
 
 	def start_recording(self):
 		self.joint_recording=[]
