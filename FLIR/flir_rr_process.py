@@ -1,8 +1,10 @@
-from RobotRaconteur.Client import *
+import RobotRaconteur as RR
+RRN=RR.RobotRaconteurNode.s
 import time, copy, sys
 import numpy as np
 sys.path.append('../toolbox/flir_toolbox')
 from matplotlib import pyplot as plt
+from ultralytics import YOLO
 
 ir_process="""
 service experimental.ir_process
@@ -86,16 +88,17 @@ class FLIR_RR_Process(object):
 
 def main():
 	yolo_model = YOLO("../tracking/yolov8/torch.pt")
-	flir_service=RRN.ConnectService('rr+tcp://localhost:60827/?service=camera')
-	with RR.ServerNodeSetup("experimental.ir_process", 12182):
-	#Register the service type
-	RRN.RegisterServiceType(ir_process)
-
-	ir_process_obj=FLIR_RR_Process(flir_service, yolo_model)
 	
-	#Register the service
-	RRN.RegisterService("Create","experimental.ir_process.ir_process_obj",ir_process_obj)
-	input("Press enter to quit")
+	with RR.ServerNodeSetup("experimental.ir_process", 12182):
+		flir_service=RRN.ConnectService('rr+tcp://localhost:60827/?service=camera')
+		#Register the service type
+		RRN.RegisterServiceType(ir_process)
+
+		ir_process_obj=FLIR_RR_Process(flir_service, yolo_model)
+		
+		#Register the service
+		RRN.RegisterService("FLIR_RR_PROCESS","experimental.ir_process.ir_process_obj",ir_process_obj)
+		input("Press enter to quit")
 	
 if __name__ == '__main__':
 	main()

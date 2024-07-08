@@ -35,7 +35,7 @@ class StreamingSend(object):
 		return np.array(self.joint_recording)
 	
 	def robot_state_cb(self, sub, value, ts):
-		
+		self.q_cur=value.joint_position
 		if self.joint_logging_flag:
 			self.joint_recording.append(np.hstack(([time.time()],value.joint_position)))
 
