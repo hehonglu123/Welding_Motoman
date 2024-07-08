@@ -28,7 +28,7 @@ colorbar_min = np.min(ir_recording)
 colorbar_max = np.max(ir_recording)
 
 
-frame=10000
+frame=2258
 ir_image = np.rot90(ir_recording[frame], k=-1)
 
 max_loc=torch_detect(ir_image,template,template_threshold=0.3)

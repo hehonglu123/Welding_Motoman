@@ -388,3 +388,4 @@ data/blade0.1/auto_slice/weld_scan*
 
 mocap/ge_testbed/data/*
 *.avi
+*.cache
