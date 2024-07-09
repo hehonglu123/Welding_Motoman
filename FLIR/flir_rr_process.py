@@ -50,7 +50,6 @@ class FLIR_RR_Process(object):
 	
 			
 	def ir_cb(self,pipe_ep):
-
 		# Loop to get the newest frame
 		while (pipe_ep.Available > 0):
 			# Receive the packet
@@ -81,9 +80,9 @@ class FLIR_RR_Process(object):
 					pixel_coord=(center_x,center_y)
 					flame_reading=get_pixel_value(ir_image,pixel_coord,self.ir_pixel_window_size)
 
-					self.flame_reading.OutValue=int(flame_reading)
-					self.torch_bottom.OutValue=torch_bbox.astype(int)
-					self.weld_pool.OutValue=centroid.astype(int)
+					self.flame_reading.OutValue=int(flame_reading)		#flame pixel value
+					self.torch_bottom.OutValue=torch_bbox.astype(int)	#torch bottom center pixel coordinates
+					self.weld_pool.OutValue=centroid.astype(int)		#weld pool pixel coordinates
 
 
 def main():
