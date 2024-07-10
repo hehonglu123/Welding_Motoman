@@ -1,8 +1,6 @@
-import sys, glob
-sys.path.append('../toolbox/')
-from robot_def import *
+from motoman_def import *
 from lambda_calc import *
-from multi_robot import *
+from dual_robot import *
 from dx200_motion_program_exec_client import *
 from WeldSend import *
 from RobotRaconteur.Client import *

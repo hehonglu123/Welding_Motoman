@@ -191,7 +191,7 @@ def flame_detection_yolo(raw_img,yolo_model,threshold=1.5e4,area_threshold=10,pe
     torch_centroid, torch_bbox=torch_detect_yolo(raw_img,yolo_model)
     if torch_centroid is None:   #if no torch detected, return None
         print('torch not found')
-        return None, None
+        return None, None, None, None
     template_bottom_center=torch_bbox[:2]+np.array([torch_bbox[2]/2,torch_bbox[3]])
     hull = cv2.convexHull(pixel_coordinates)
 

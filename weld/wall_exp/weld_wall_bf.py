@@ -1,8 +1,6 @@
-import sys, time, pickle, os
-sys.path.append('../../toolbox/')
-from robot_def import *
+import time, os
+from motoman_def import *
 from WeldSend import *
-sys.path.append('../../sensor_fusion/')
 from dx200_motion_program_exec_client import *
 from RobotRaconteur.Client import *
 from weldRRSensor import *

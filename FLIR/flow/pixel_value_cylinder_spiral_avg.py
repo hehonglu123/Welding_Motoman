@@ -22,7 +22,8 @@ yolo_model = YOLO("../tracking/yolov8/torch.pt")
 
 
 # Load the IR recording data from the pickle file
-data_dir='../../../recorded_data/ER316L/cylinderspiral_100ipm_v10/'
+# data_dir='../../../recorded_data/ER316L/cylinderspiral_100ipm_v10/'
+data_dir='../../../recorded_data/ER316L/streaming/cylinderspiral_100ipm_v10/'
 config_dir='../../config/'
 with open(data_dir+'/ir_recording.pickle', 'rb') as file:
     ir_recording = pickle.load(file)
@@ -37,7 +38,7 @@ pixel_value_all=[]
 ir_ts_processed=[]
 for i in tqdm(range(frame_start, len(ir_recording))):
     ir_image = np.rot90(ir_recording[i], k=-1)
-    centroid, bbox=flame_detection_yolo(ir_image,yolo_model,percentage_threshold=0.8)    #cylinder spiral only
+    centroid, bbox, torch_centroid, torch_bbox=flame_detection_yolo(ir_image,yolo_model,percentage_threshold=0.8)    #cylinder spiral only
     if centroid is not None:
         #find average pixel value 
         pixel_coord=center_of_window_below_bbox(centroid,ir_pixel_window_size)
