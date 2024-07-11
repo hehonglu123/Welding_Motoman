@@ -1,13 +1,11 @@
 import sys, time, pickle, os, glob
-sys.path.append('../../toolbox/')
-from robot_def import *
+from motoman_def import *
 from lambda_calc import *
 from WeldSend import *
-sys.path.append('../../sensor_fusion/')
 from dx200_motion_program_exec_client import *
 from RobotRaconteur.Client import *
 from weldRRSensor import *
-from multi_robot import *
+from dual_robot import *
 from traj_manipulation import *
 
 
@@ -65,15 +63,13 @@ def main():
 	
 	base_feedrate=300
 	volume_per_distance=10
-	v_layer=10
+	v_layer=7
 	feedrate=volume_per_distance*v_layer
 	base_layer_height=5.5
 	v_base=5
 	layer_height=1.1
-	num_layer=30
-	#edge params, 1cm left and right
-	feedrate_edge=feedrate
-	v_edge=v_layer
+	num_layer=99
+
 	q_all=[]
 	v_all=[]
 	job_offset=450
@@ -161,7 +157,6 @@ def main():
 
 	# 	q1_all.extend(rob1_js[breakpoints[1:]].tolist())
 	# 	q2_all.extend(positioner_js[breakpoints[1:]].tolist())
-	# 	# v1_all.extend(s1_all)
 	# 	v1_all.extend([1]*len(s1_all))
 	# 	cond_all.extend([int(base_feedrate/10)+job_offset]*(num_points_layer-1))
 	# 	primitives.extend(['movel']*(num_points_layer-1))

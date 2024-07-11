@@ -13,7 +13,7 @@ def connect_failed(s, client_id, url, err):
 
 sub=RRN.SubscribeService(url)
 obj = sub.GetDefaultClientWait(30)		#connect, timeout=30s
-flame_reading=sub.SubscribeWire("flame_reading")
+ir_process_result=sub.SubscribeWire("ir_process_result")
 
 
 sub.ClientConnectFailed += connect_failed
@@ -21,10 +21,10 @@ sub.ClientConnectFailed += connect_failed
 while True:
     try:
         time.sleep(0.1)
-        wire_packet=flame_reading.TryGetInValue()
+        wire_packet=ir_process_result.TryGetInValue()
         print(wire_packet[0])
         if wire_packet[0]:
-            print(wire_packet[1].Value)
+            print(wire_packet[1].flame_reading, wire_packet[1].torch_bottom, wire_packet[1].weld_pool)
     except:
         traceback.print_exc()
         break

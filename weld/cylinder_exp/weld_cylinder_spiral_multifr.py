@@ -1,13 +1,11 @@
 import sys, time, pickle, os, glob
-sys.path.append('../../toolbox/')
-from robot_def import *
+from motoman_def import *
 from lambda_calc import *
 from WeldSend import *
-sys.path.append('../../sensor_fusion/')
 from dx200_motion_program_exec_client import *
 from RobotRaconteur.Client import *
 from weldRRSensor import *
-from multi_robot import *
+from dual_robot import *
 from traj_manipulation import *
 
 
@@ -71,9 +69,7 @@ def main():
 	v_base=5
 	layer_height=1.1
 	num_layer=30
-	#edge params, 1cm left and right
-	feedrate_edge=feedrate
-	v_edge=v_layer
+
 	q_all=[]
 	v_all=[]
 	job_offset=450
@@ -239,11 +235,13 @@ def main():
 		q2_all.extend(positioner_js[breakpoints[1:]].tolist())
 		# v1_all.extend(s1_all)
 		v1_all.extend([1]*len(s1_all))
-		# cond_all.extend([int(feedrate/10)+job_offset]*(num_points_layer-1))
-		num_points_per_seg=num_points_layer/9	#from 70 to 150
-		for i in range(num_points_layer):
-			feedrate=(i//num_points_per_seg)*10+70
-			cond_all.extend([int(feedrate/10)+job_offset])
+		if layer_counts<10:
+			cond_all.extend([int(feedrate/10)+job_offset]*(num_points_layer-1))
+		else:
+			num_points_per_seg=num_points_layer/9	#from 70 to 150
+			for i in range(num_points_layer):
+				feedrate=(i//num_points_per_seg)*10+70
+				cond_all.extend([int(feedrate/10)+job_offset])
 
 		primitives.extend(['movel']*(num_points_layer-1))
 
@@ -272,7 +270,7 @@ def main():
 	client.servoMH(False) #stop the motor
 
 
-	recorded_dir='../../../recorded_data/ER316L/cylinderspiral_%iipm_v%i/'%(feedrate,v_layer)
+	recorded_dir='../../../recorded_data/ER316L/cylinderspiral_multifr/'
 	os.makedirs(recorded_dir,exist_ok=True)
 	np.savetxt(recorded_dir+'weld_js_exe.csv',np.array(js_recording),delimiter=',')
 	rr_sensors.save_all_sensors(recorded_dir)
