@@ -1,8 +1,7 @@
 import RobotRaconteur as RR
 RRN=RR.RobotRaconteurNode.s
-import time, copy, sys
 import numpy as np
-sys.path.append('../toolbox/flir_toolbox')
+from flir_toolbox import *
 from matplotlib import pyplot as plt
 from ultralytics import YOLO
 

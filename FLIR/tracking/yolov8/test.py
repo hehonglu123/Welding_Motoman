@@ -6,6 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from shapely.geometry import Point, Polygon
 from shapely.ops import nearest_points
+import torch_tracking, inspect, os
 
 
 if __name__ == "__main__":
@@ -30,7 +31,7 @@ if __name__ == "__main__":
     ir_torch_tracking = cv2.cvtColor(ir_torch_tracking_normalized, cv2.COLOR_GRAY2BGR)
 
     #run yolo
-    model = YOLO("best.pt")
+    model = YOLO(os.path.dirname(inspect.getfile(torch_tracking))+"/torch.pt")
     # results = yolo(ir_torch_tracking_normalized)
     # results= model.predict("datasets/torch_yolov8_data/train/images/30_png.rf.0971a2c2d86bf76299a739b019758aa0.jpg",imgsz=320)
     results= model.predict(ir_torch_tracking)

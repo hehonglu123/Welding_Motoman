@@ -240,9 +240,10 @@ def main():
 		# v1_all.extend(s1_all)
 		v1_all.extend([1]*len(s1_all))
 		# cond_all.extend([int(feedrate/10)+job_offset]*(num_points_layer-1))
-		num_points_per_seg=num_points_layer//9	#from 70 to 150
+		num_points_per_seg=num_points_layer/9	#from 70 to 150
 		for i in range(num_points_layer):
-			
+			feedrate=(i//num_points_per_seg)*10+70
+			cond_all.extend([int(feedrate/10)+job_offset])
 
 		primitives.extend(['movel']*(num_points_layer-1))
 
@@ -266,7 +267,7 @@ def main():
 			with client._lock:
 				client.joint_angle=np.hstack((fb_data.group_state[0].feedback_position,fb_data.group_state[1].feedback_position,fb_data.group_state[2].feedback_position))
 				client.state_flag=fb_data.controller_flags
-				js_recording.append(np.array([time.time()]+[fb_data.job_state[0][1]]+client.joint_angle.tolist()))
+				js_recording.append(np.array([time.time(),fb_data.time]+[fb_data.job_state[0][1]]+client.joint_angle.tolist()))
 	rr_sensors.stop_all_sensors()
 	client.servoMH(False) #stop the motor
 
