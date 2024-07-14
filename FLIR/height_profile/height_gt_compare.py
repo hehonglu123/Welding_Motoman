@@ -3,29 +3,11 @@ import matplotlib.pyplot as plt
 import os, yaml, pickle, sys
 import numpy as np
 import matplotlib.pyplot as plt
-sys.path.append('../../toolbox/')
 from flir_toolbox import *
-from robot_def import *
+from motoman_def import *
 from sklearn.neighbors import NearestNeighbors
 from scipy.spatial.transform import Rotation as R
 import open3d as o3d
-
-
-
-def line_intersect(p1,v1,p2,v2):
-    #calculate the intersection of two lines, on line 1
-    #find the closest point on line1 to line2
-    w = p1 - p2
-    a = np.dot(v1, v1)
-    b = np.dot(v1, v2)
-    c = np.dot(v2, v2)
-    d = np.dot(v1, w)
-    e = np.dot(v2, w)
-
-    sc = (b*e - c*d) / (a*c - b*b)
-    closest_point = p1 + sc * v1
-
-    return closest_point
 
 
 config_dir='../../config/'

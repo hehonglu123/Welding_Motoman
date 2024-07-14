@@ -22,8 +22,8 @@ yolo_model = YOLO("../tracking/yolov8/torch.pt")
 
 
 # Load the IR recording data from the pickle file
-# data_dir='../../../recorded_data/ER316L/cylinderspiral_100ipm_v10/'
-data_dir='../../../recorded_data/ER316L/streaming/cylinderspiral_100ipm_v10/'
+data_dir='../../../recorded_data/ER316L/cylinderspiral_multifr/'
+# data_dir='../../../recorded_data/ER316L/streaming/cylinderspiral_100ipm_v10/'
 config_dir='../../config/'
 with open(data_dir+'/ir_recording.pickle', 'rb') as file:
     ir_recording = pickle.load(file)
@@ -32,11 +32,13 @@ joint_angle=np.loadtxt(data_dir+'weld_js_exe.csv',delimiter=',')
 
 
 frame_start=12000
+frame_end=len(ir_recording)
+# frame_end=20000
 ir_pixel_window_size=7
 
 pixel_value_all=[]
 ir_ts_processed=[]
-for i in tqdm(range(frame_start, len(ir_recording))):
+for i in tqdm(range(frame_start, frame_end)):
     ir_image = np.rot90(ir_recording[i], k=-1)
     centroid, bbox, torch_centroid, torch_bbox=flame_detection_yolo(ir_image,yolo_model,percentage_threshold=0.8)    #cylinder spiral only
     if centroid is not None:
@@ -47,9 +49,12 @@ for i in tqdm(range(frame_start, len(ir_recording))):
 
 
 
-
+print("Average pixel value: ", np.mean(pixel_value_all))
 plt.title('Pixel Value vs Time ')
 plt.plot(ir_ts_processed, pixel_value_all)
+#plot the red line at the average pixel value
+plt.axhline(y=np.mean(pixel_value_all), color='r', linestyle='-',label='Average Pixel Value')
 plt.xlabel('Time (s)')
 plt.ylabel('Pixel Value')
+plt.ylim(20000,28000)
 plt.show()

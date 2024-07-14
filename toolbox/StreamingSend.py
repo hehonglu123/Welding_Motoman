@@ -84,7 +84,9 @@ class StreamingSend(object):
 
 		if start_time:
 			while time.time()-start_time<1/self.streaming_rate-0.0007:
+				time.sleep(0)	#sleep 0 for bg thread to run
 				continue
+			
 		
 		return 
 

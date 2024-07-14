@@ -1,25 +1,9 @@
-import cv2, time, os, yaml
+import yaml
 import pickle, sys
 import numpy as np
 import matplotlib.pyplot as plt
-sys.path.append('../../toolbox/')
 from flir_toolbox import *
-from robot_def import *
-
-def line_intersect(p1,v1,p2,v2):
-    #calculate the intersection of two lines, on line 1
-    #find the closest point on line1 to line2
-    w = p1 - p2
-    a = np.dot(v1, v1)
-    b = np.dot(v1, v2)
-    c = np.dot(v2, v2)
-    d = np.dot(v1, w)
-    e = np.dot(v2, w)
-
-    sc = (b*e - c*d) / (a*c - b*b)
-    closest_point = p1 + sc * v1
-
-    return closest_point
+from motoman_def import *
 
 
 config_dir='../../config/'
@@ -34,7 +18,7 @@ positioner=positioner_obj('D500B',def_path=config_dir+'D500B_robot_default_confi
 flir_intrinsic=yaml.load(open(config_dir+'FLIR_A320.yaml'), Loader=yaml.FullLoader)
 
 # Load the IR recording data from the pickle file
-data_dir='../../../recorded_data/wallbf_100ipm_v10_80ipm_v8/'
+data_dir='../../../recorded_data/ER4043/wallbf_100ipm_v10_80ipm_v8/'
 with open(data_dir+'/ir_recording.pickle', 'rb') as file:
     ir_recording = pickle.load(file)
 ir_ts=np.loadtxt(data_dir+'/ir_stamps.csv', delimiter=',')
