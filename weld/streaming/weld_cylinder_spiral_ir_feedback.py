@@ -270,12 +270,14 @@ def main():
 		###choose next slice
 		slice_increment=nominal_slice_increment+wire_length_gain*(nominal_wire_length-np.mean(wire_length))
 		slice_increment=int(min(max(slice_increment,0.5*nominal_slice_increment),2*nominal_slice_increment))
+		print("ADJUSTED slice_increment: ",slice_increment)
 
 		###choose next layer param
 		v_cmd=v_layer+v_gain*(nominal_pixel_reading-np.mean(pixel_reading))
 		v_cmd=min(max(v_cmd,7),15)
 		feedrate=volume_per_distance*v_cmd
 		fronius_client.job_number = int(feedrate/10+job_offset)
+		print("ADJUSTED feedrate: ",feedrate)
 		
 
 		###loop conditions
