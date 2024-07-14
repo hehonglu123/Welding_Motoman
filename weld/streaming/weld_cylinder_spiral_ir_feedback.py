@@ -38,7 +38,7 @@ def main():
 	##############################################################FLIR PRORCESS####################################################################
 	sub=RRN.SubscribeService('rr+tcp://localhost:12182/?service=FLIR_RR_PROCESS')
 	ir_process_result=sub.SubscribeWire("ir_process_result")
-
+	ir_process_result.WireValueChanged += ir_process_cb
 	##############################################################Robot####################################################################
 	###robot kinematics def
 	config_dir='../../config/'
@@ -85,16 +85,16 @@ def main():
 				[0.,      0.,     -1.    ]])
 
 	
-	flipped=False   #spiral direction
-	base_feedrate=300
+	flipped=True   #spiral direction
+	base_feedrate=250
 	volume_per_distance=10
 	v_layer=10
 	feedrate=volume_per_distance*v_layer
-	base_layer_height=5.5
+	base_layer_height=3
 	v_base=5
 	layer_height=1.1
-	num_base_layer=10       #10layers to avoid clamp blocking IR view
-	num_layer=30
+	num_base_layer=15       #20layers to avoid clamp blocking IR view
+	num_layer=20
 	q_cmd_all=[]
 	job_offset=450
 
@@ -104,22 +104,22 @@ def main():
 
 
 	q_positioner_prev=SS.q_cur[-2:]
-	# num2p=np.round((q_positioner_prev-positioner_js[0])/(2*np.pi))
-	# positioner_js+=num2p*2*np.pi
+
 	
-	
-	
+	# ###############################################################################################################################################################
+	# ###############################################################################################################################################################
 	# #####################################################BASE LAYER##########################################################################################
 	# ###PRELOAD ALL SLICES TO SAVE INPROCESS TIME
 	# rob1_js_all_slices=[]
 	# positioner_js_all_slices=[]
 	# for i in range(0,num_base_layer*base_slice_increment):
-	# 	# rob1_js_all_slices.append(np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(i)+'_0.csv',delimiter=','))
-	# 	# positioner_js_all_slices.append(np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(i)+'_0.csv',delimiter=','))
-
-	# 	###spiral rotation direction
-	# 	rob1_js_all_slices.append(np.flip(np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(i)+'_0.csv',delimiter=','),axis=0))
-	# 	positioner_js_all_slices.append(np.flip(np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(i)+'_0.csv',delimiter=','),axis=0))
+	# 	if not flipped:
+	# 		rob1_js_all_slices.append(np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(i)+'_0.csv',delimiter=','))
+	# 		positioner_js_all_slices.append(np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(i)+'_0.csv',delimiter=','))
+	# 	else:
+	# 		###spiral rotation direction
+	# 		rob1_js_all_slices.append(np.flip(np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(i)+'_0.csv',delimiter=','),axis=0))
+	# 		positioner_js_all_slices.append(np.flip(np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(i)+'_0.csv',delimiter=','),axis=0))
 
 	# print("PRELOAD FINISHED")
 
@@ -191,12 +191,12 @@ def main():
 		if not flipped:
 			rob1_js_all_slices.append(np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(i)+'_0.csv',delimiter=','))
 			positioner_js_all_slices.append(np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(i)+'_0.csv',delimiter=','))
-			lam_relative_all_slices.append(np.loadtxt(data_dir+'curve_sliced_relative/slice'+str(i)+'_0.csv',delimiter=','))
+			lam_relative_all_slices.append(calc_lam_cs(np.loadtxt(data_dir+'curve_sliced_relative/slice'+str(i)+'_0.csv',delimiter=',')))
 		else:
 			###spiral rotation direction
 			rob1_js_all_slices.append(np.flip(np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(i)+'_0.csv',delimiter=','),axis=0))
 			positioner_js_all_slices.append(np.flip(np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(i)+'_0.csv',delimiter=','),axis=0))
-			lam_relative_all_slices.append(np.flip(np.loadtxt(data_dir+'curve_sliced_relative/slice'+str(i)+'_0.csv',delimiter=','),axis=0))
+			lam_relative_all_slices.append(calc_lam_cs(np.flip(np.loadtxt(data_dir+'curve_sliced_relative/slice'+str(i)+'_0.csv',delimiter=','),axis=0)))
 
 		
 	print("PRELOAD FINISHED")
@@ -206,84 +206,96 @@ def main():
 	num_layer_end=slicing_meta['num_layers']-1
 	slice_num=num_layer_start
 	layer_counts=0
-	wire_length_gain=1.
+	wire_length_gain=2.
 	nominal_wire_length=20
-	v_gain=1e-3
-	nominal_pixel_reading=22222
+	v_gain=5e-2
+	nominal_pixel_reading=19000
 	slice_increment=nominal_slice_increment
 
 	while layer_counts<num_layer:
+		try:
+			####################DETERMINE CURVE ORDER##############################################
+			x=0
+			rob1_js=copy.deepcopy(rob1_js_all_slices[slice_num])
+			positioner_js=copy.deepcopy(positioner_js_all_slices[slice_num])
+			if positioner_js.shape==(2,) and rob1_js.shape==(6,):
+				continue
+			
+			###TODO: Speed up warping process
+			###TRJAECTORY WARPING
+			if slice_num>num_layer_start:
+				rob1_js_prev=copy.deepcopy(rob1_js_all_slices[slice_num-slice_increment])
+				positioner_js_prev=copy.deepcopy(positioner_js_all_slices[slice_num-slice_increment])
+				rob1_js,positioner_js=warp_traj2(rob1_js,positioner_js,rob1_js_prev,positioner_js_prev,reversed=True)
+			if slice_num<num_layer_end-slice_increment:
+				rob1_js_next=copy.deepcopy(rob1_js_all_slices[slice_num+slice_increment])
+				positioner_js_next=copy.deepcopy(positioner_js_all_slices[slice_num+slice_increment])
+				rob1_js,positioner_js=warp_traj2(rob1_js,positioner_js,rob1_js_next,positioner_js_next,reversed=False)
+					
+			
+			###find closest %2pi
+			num2p=np.round((q_positioner_prev-positioner_js[0])/(2*np.pi))
+			positioner_js+=num2p*2*np.pi
 
-		####################DETERMINE CURVE ORDER##############################################
-		x=0
-		rob1_js=copy.deepcopy(rob1_js_all_slices[slice_num])
-		positioner_js=copy.deepcopy(positioner_js_all_slices[slice_num])
-		if positioner_js.shape==(2,) and rob1_js.shape==(6,):
-			continue
-		
-		###TRJAECTORY WARPING
-		if slice_num>num_layer_start:
-			rob1_js_prev=copy.deepcopy(rob1_js_all_slices[slice_num-slice_increment])
-			positioner_js_prev=copy.deepcopy(positioner_js_all_slices[slice_num-slice_increment])
-			rob1_js,positioner_js=warp_traj2(rob1_js,positioner_js,rob1_js_prev,positioner_js_prev,reversed=True)
-		if slice_num<num_layer_end-slice_increment:
-			rob1_js_next=copy.deepcopy(rob1_js_all_slices[slice_num+slice_increment])
-			positioner_js_next=copy.deepcopy(positioner_js_all_slices[slice_num+slice_increment])
-			rob1_js,positioner_js=warp_traj2(rob1_js,positioner_js,rob1_js_next,positioner_js_next,reversed=False)
+			if layer_counts==0:
+				###jog to start point
+				SS.jog2q(np.hstack((rob1_js[0],q2,positioner_js[0])))
+				rr_sensors.start_all_sensors()
+				SS.start_recording()
+				if weld_arcon:
+					fronius_client.job_number = int(feedrate/10+job_offset)
+					fronius_client.start_weld()
+			
+			############################################################Welding Normal Layers ####################################################################
+			lam_cur=0
+			wire_length=[]
+			pixel_reading=[]
+			while lam_cur<lam_relative_all_slices[slice_num][-1] - v_cmd/SS.streaming_rate:
+				loop_start=time.time()
+
+				lam_cur+=v_cmd/SS.streaming_rate
+				#get closest two indices and interpolate the joint angle
+				lam_idx=np.where(lam_relative_all_slices[slice_num]>=lam_cur)[0][0]
+				ratio=(lam_cur-lam_relative_all_slices[slice_num][lam_idx-1])/(lam_relative_all_slices[slice_num][lam_idx]-lam_relative_all_slices[slice_num][lam_idx-1])
+				q1=rob1_js[lam_idx-1]*(1-ratio)+rob1_js[lam_idx]*ratio
+				q_positioner=positioner_js[lam_idx-1]*(1-ratio)+positioner_js[lam_idx]*ratio
+
+				q_cmd=np.hstack((q1,q2,q_positioner))
+				if ir_updated_flag:			###process IR info and update welding parameters
+					ir_updated_flag=False
+					wire_length.append(np.linalg.norm(ir_process_packet.weld_pool-ir_process_packet.torch_bottom))
+					pixel_reading.append(ir_process_packet.flame_reading)
+
 				
+				q_cmd_all.append(q_cmd)
+				if lam_cur>lam_relative_all_slices[slice_num][-1]-v_cmd/SS.streaming_rate:
+					SS.position_cmd(q_cmd)
+				else:
+					SS.position_cmd(q_cmd,loop_start)
+
+			###choose next slice
+			print("Layer Average Wire Length: ",np.mean(wire_length))
+			slice_increment=nominal_slice_increment+wire_length_gain*(nominal_wire_length-np.mean(wire_length))
+			slice_increment=int(min(max(slice_increment,0.5*nominal_slice_increment),2*nominal_slice_increment))
+			print("ADJUSTED slice_increment: ",slice_increment)
+
+			###choose next layer param
+			print("Layer Average Pixel Reading: ",np.mean(pixel_reading))
+			v_cmd=v_layer+v_gain*(nominal_pixel_reading-np.mean(pixel_reading))
+			v_cmd=min(max(v_cmd,7),15)
+			feedrate=volume_per_distance*v_cmd
+			fronius_client.job_number = int(feedrate/10+job_offset)
+			print("Adjusted Speed: ",v_cmd)
+			print("ADJUSTED feedrate: ",feedrate)
+			
+
+			###loop conditions
+			q_positioner_prev=copy.deepcopy(positioner_js[-1])
+			layer_counts+=1
+			slice_num+=slice_increment
 		
-		###find closest %2pi
-		num2p=np.round((q_positioner_prev-positioner_js[0])/(2*np.pi))
-		positioner_js+=num2p*2*np.pi
-
-		if layer_counts==0:
-			###jog to start point
-			SS.jog2q(np.hstack((rob1_js[0],q2,positioner_js[0])))
-			rr_sensors.start_all_sensors()
-			SS.start_recording()
-			if weld_arcon:
-				fronius_client.job_number = int(feedrate/10+job_offset)
-				fronius_client.start_weld()
-		
-		############################################################Welding Normal Layers ####################################################################
-		lam_cur=0
-		wire_length=[]
-		pixel_reading=[]
-		while lam_cur<lam_relative_all_slices[slice_num][-1]:
-			loop_start=time.time()
-			#get closest two indices and interpolate the joint angle
-			lam_idx=np.where(lam_relative_all_slices[slice_num]>=lam_cur)[0][0]
-			ratio=(lam_cur-lam_relative_all_slices[slice_num][lam_idx-1])/(lam_relative_all_slices[slice_num][lam_idx]-lam_relative_all_slices[slice_num][lam_idx-1])
-			q1=rob1_js[lam_idx-1]*(1-ratio)+rob1_js[lam_idx]*ratio
-			q_positioner=positioner_js[lam_idx-1]*(1-ratio)+positioner_js[lam_idx]*ratio
-
-			q_cmd=np.hstack((q1,q2,q_positioner))
-			if ir_updated_flag:			###process IR info and update welding parameters
-				ir_updated_flag=False
-				wire_length.append(np.linalg.norm(ir_process_packet.weld_pool-ir_process_packet.torch_bottom))
-				pixel_reading.append(ir_process_packet.flame_reading)
-
-			lam_cur+=v_cmd/SS.streaming_rate
-			q_cmd_all.append(q_cmd)
-			SS.position_cmd(q_cmd,loop_start)
-
-		###choose next slice
-		slice_increment=nominal_slice_increment+wire_length_gain*(nominal_wire_length-np.mean(wire_length))
-		slice_increment=int(min(max(slice_increment,0.5*nominal_slice_increment),2*nominal_slice_increment))
-		print("ADJUSTED slice_increment: ",slice_increment)
-
-		###choose next layer param
-		v_cmd=v_layer+v_gain*(nominal_pixel_reading-np.mean(pixel_reading))
-		v_cmd=min(max(v_cmd,7),15)
-		feedrate=volume_per_distance*v_cmd
-		fronius_client.job_number = int(feedrate/10+job_offset)
-		print("ADJUSTED feedrate: ",feedrate)
-		
-
-		###loop conditions
-		q_positioner_prev=copy.deepcopy(positioner_js[-1])
-		layer_counts+=1
-		slice_num+=slice_increment
+		except KeyboardInterrupt:
+			break
 
 	############################################################LOGGING####################################################################
 	if weld_arcon:
@@ -292,7 +304,7 @@ def main():
 	js_recording = SS.stop_recording()
 
 
-	recorded_dir='../../../recorded_data/streaming/ER316L/cylinderspiral_%iipm_v%i/'%(feedrate,v_layer)
+	recorded_dir='../../../recorded_data/streaming/ER316L/cylinderspiral_T%i/'%(nominal_pixel_reading)
 	os.makedirs(recorded_dir,exist_ok=True)
 	np.savetxt(recorded_dir+'weld_js_exe.csv',np.array(js_recording),delimiter=',')
 	np.savetxt(recorded_dir+'weld_js_cmd.csv',np.array(q_cmd_all),delimiter=',')

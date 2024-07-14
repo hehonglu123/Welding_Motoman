@@ -75,7 +75,6 @@ class FLIR_RR_Process(object):
 			ir_image = np.rot90(display_mat, k=-1)
 			centroid, bbox, torch_centroid, torch_bbox=flame_detection_yolo(ir_image,self.yolo_model,percentage_threshold=0.8)
 			if centroid is not None:
-				print('detected')
 				#find 3x3 average pixel value below centroid
 				center_x = centroid[0]
 				center_y = centroid[1]+self.ir_pixel_window_size//2
