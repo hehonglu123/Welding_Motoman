@@ -5,7 +5,7 @@ from RobotRaconteur.Client import *
 from weldRRSensor import *
 from dual_robot import *
 from traj_manipulation import *
-sys.path.append('../../toolbox/')
+sys.path.append('../../../toolbox/')
 from StreamingSend import *
 
 ir_updated_flag=False
@@ -29,7 +29,7 @@ def main():
 
 	dataset='cylinder/'
 	sliced_alg='dense_slice/'
-	data_dir='../../../geometry_data/'+dataset+sliced_alg
+	data_dir='../../../../geometry_data/'+dataset+sliced_alg
 	with open(data_dir+'slicing.yml', 'r') as file:
 		slicing_meta = yaml.safe_load(file)
 
@@ -48,7 +48,7 @@ def main():
 	ir_process_result.WireValueChanged += ir_process_cb
 	##############################################################Robot####################################################################
 	###robot kinematics def
-	config_dir='../../config/'
+	config_dir='../../../config/'
 	robot=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path=config_dir+'torch.csv',\
 		pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',d=15)
 	robot2=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.yml',tool_file_path=config_dir+'flir.csv',\
@@ -100,7 +100,7 @@ def main():
 	base_layer_height=3
 	v_base=5
 	layer_height=1.1
-	num_base_layer=15       #20layers to avoid clamp blocking IR view
+	num_base_layer=10       #10layers to avoid clamp blocking IR view
 	num_layer=20
 	q_cmd_all=[]
 	job_offset=450
@@ -215,23 +215,20 @@ def main():
 	layer_counts=0
 	wire_length_gain=2.
 	nominal_wire_length=20
-	v_gain=5e-2
-	nominal_pixel_reading=19000
+	v_gain=1e-3
+	nominal_pixel_reading=21000
 	slice_increment=nominal_slice_increment
 	feedrate_update_rate=1.	#Hz
-	last_update_time=time.perf_counter()+10.
+	last_update_time=time.perf_counter()+5.
 
 	while layer_counts<num_layer:
 		try:
 			####################DETERMINE CURVE ORDER##############################################
-			now=time.perf_counter()
 			rob1_js=copy.deepcopy(rob1_js_all_slices[slice_num])
 			positioner_js=copy.deepcopy(positioner_js_all_slices[slice_num])
 			if positioner_js.shape==(2,) and rob1_js.shape==(6,):
 				continue
 			
-			print("Copy Time: ",time.perf_counter()-now)
-			###TODO: Speed up warping process
 			###TRJAECTORY WARPING
 			if slice_num>num_layer_start:
 				rob1_js_prev=copy.deepcopy(rob1_js_all_slices[slice_num-slice_increment])
@@ -242,13 +239,11 @@ def main():
 				positioner_js_next=copy.deepcopy(positioner_js_all_slices[slice_num+slice_increment])
 				rob1_js,positioner_js=warp_traj2(rob1_js,positioner_js,rob1_js_next,positioner_js_next,reversed=False)
 
-			print("Spiralization Time: ",time.perf_counter()-now)	
 			
 			###find closest %2pi
 			num2p=np.round((q_positioner_prev-positioner_js[0])/(2*np.pi))
 			positioner_js+=num2p*2*np.pi
 
-			print("Preparation Time: ",time.perf_counter()-now)
 
 			if layer_counts==0:
 				###jog to start point
@@ -256,6 +251,7 @@ def main():
 				rr_sensors.start_all_sensors()
 				SS.start_recording()
 				if weld_arcon:
+					print("Welding Start")
 					fronius_client.job_number = int(feedrate/10+job_offset)
 					fronius_client.start_weld()
 			
@@ -282,12 +278,13 @@ def main():
 				###update welding param
 				if time.perf_counter()-last_update_time>1./feedrate_update_rate:
 					print("Layer Average Pixel Reading: ",np.mean(pixel_reading))
-					v_cmd=v_layer+v_gain*(nominal_pixel_reading-np.mean(pixel_reading))
-					v_cmd=min(max(v_cmd,7),15)
-					feedrate=volume_per_distance*v_cmd
-					fronius_client.async_set_job_number(int(feedrate/10)+job_offset, my_handler)
-					print("Adjusted Speed: ",v_cmd)
-					print("ADJUSTED feedrate: ",feedrate)
+					if not np.isnan(np.mean(pixel_reading)):
+						v_cmd=v_layer+v_gain*(nominal_pixel_reading-np.mean(pixel_reading))
+						v_cmd=min(max(v_cmd,6),17)
+						feedrate=volume_per_distance*v_cmd
+						fronius_client.async_set_job_number(int(feedrate/10)+job_offset, my_handler)
+						print("Adjusted Speed: ",v_cmd)
+						print("ADJUSTED feedrate: ",feedrate)
 					pixel_reading=[]
 					last_update_time=time.perf_counter()
 				
@@ -320,10 +317,10 @@ def main():
 	js_recording = SS.stop_recording()
 
 
-	recorded_dir='../../../recorded_data/streaming/ER316L/cylinderspiral_T%i/'%(nominal_pixel_reading)
+	recorded_dir='../../../../recorded_data/ER316L/streaming/cylinderspiral_T%i/'%(nominal_pixel_reading)
 	os.makedirs(recorded_dir,exist_ok=True)
-	np.savetxt(recorded_dir+'weld_js_exe.csv',np.array(js_recording),delimiter=',')
 	np.savetxt(recorded_dir+'weld_js_cmd.csv',np.array(q_cmd_all),delimiter=',')
+	np.savetxt(recorded_dir+'weld_js_exe.csv',np.array(js_recording),delimiter=',')
 	rr_sensors.save_all_sensors(recorded_dir)
 
 

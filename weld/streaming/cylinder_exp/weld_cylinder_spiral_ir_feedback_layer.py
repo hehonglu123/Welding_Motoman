@@ -5,7 +5,7 @@ from RobotRaconteur.Client import *
 from weldRRSensor import *
 from dual_robot import *
 from traj_manipulation import *
-sys.path.append('../../toolbox/')
+sys.path.append('../../../toolbox/')
 from StreamingSend import *
 
 ir_updated_flag=False
@@ -29,7 +29,7 @@ def main():
 
 	dataset='cylinder/'
 	sliced_alg='dense_slice/'
-	data_dir='../../../geometry_data/'+dataset+sliced_alg
+	data_dir='../../../../geometry_data/'+dataset+sliced_alg
 	with open(data_dir+'slicing.yml', 'r') as file:
 		slicing_meta = yaml.safe_load(file)
 
@@ -48,7 +48,7 @@ def main():
 	ir_process_result.WireValueChanged += ir_process_cb
 	##############################################################Robot####################################################################
 	###robot kinematics def
-	config_dir='../../config/'
+	config_dir='../../../config/'
 	robot=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path=config_dir+'torch.csv',\
 		pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',d=15)
 	robot2=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.yml',tool_file_path=config_dir+'flir.csv',\
@@ -100,7 +100,7 @@ def main():
 	base_layer_height=3
 	v_base=5
 	layer_height=1.1
-	num_base_layer=15       #20layers to avoid clamp blocking IR view
+	num_base_layer=10       #10layers to avoid clamp blocking IR view
 	num_layer=20
 	q_cmd_all=[]
 	job_offset=450
@@ -310,7 +310,7 @@ def main():
 	js_recording = SS.stop_recording()
 
 
-	recorded_dir='../../../recorded_data/streaming/ER316L/cylinderspiral_T%i/'%(nominal_pixel_reading)
+	recorded_dir='../../../../recorded_data/streaming/ER316L/cylinderspiral_T%i/'%(nominal_pixel_reading)
 	os.makedirs(recorded_dir,exist_ok=True)
 	np.savetxt(recorded_dir+'weld_js_exe.csv',np.array(js_recording),delimiter=',')
 	np.savetxt(recorded_dir+'weld_js_cmd.csv',np.array(q_cmd_all),delimiter=',')

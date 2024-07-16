@@ -8,7 +8,7 @@ from ultralytics import YOLO
 # Load the IR recording data from the pickle file
 # data_dir='../../../recorded_data/ER316L/wallbf_140ipm_v14_140ipm_v14/'
 # data_dir='../../../recorded_data/ER316L/trianglebf_100ipm_v10_100ipm_v10/'
-data_dir='../../../recorded_data/ER316L/streaming/cylinderspiral_T19000/'
+data_dir='../../../recorded_data/ER316L/streaming/cylinderspiral_T21000_motion_error_bug/'
 # data_dir='../../../recorded_data/ER4043/wallbf_100ipm_v10_100ipm_v10/'
 # data_dir='../../../recorded_data/wall_weld_test/4043_150ipm_2024_06_18_11_16_32/layer_4/'
 

@@ -1,9 +1,8 @@
 import numpy as np
 from general_robotics_toolbox import *
 import sys
-sys.path.append('../toolbox/')
-from multi_robot import *
-from robot_def import *
+from dual_robot import *
+from motoman_def import *
 import matplotlib.pyplot as plt
 from lambda_calc import *
 
@@ -11,8 +10,8 @@ def main():
 	
 	##############################################################Robot####################################################################
 	###robot kinematics def
-	config_dir='../config/'
-	data_dir='../../recorded_data/ER316L/streaming/cylinderspiral_100ipm_v10/'
+	config_dir='config/'
+	data_dir='../recorded_data/ER316L/streaming/cylinderspiral_T19000/'
 
 	robot=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path=config_dir+'torch.csv',\
 		pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',d=15)
@@ -23,9 +22,9 @@ def main():
 
 	joint_angle=np.loadtxt(data_dir+'weld_js_exe.csv',delimiter=',')
 	#sort by time
-	joint_angle=joint_angle[joint_angle[:,0].argsort()]
+	joint_angle=joint_angle[joint_angle[:,1].argsort()]
 	#get rid of index with same timestamp
-	joint_angle=joint_angle[np.insert(np.diff(joint_angle[:,0]) != 0, 0, True)]
+	joint_angle=joint_angle[np.insert(np.diff(joint_angle[:,1]) != 0, 0, True)]
 
 	curve_exe1,curve_exe2,curve_exe_R1,curve_exe_R2,relative_path_exe,relative_path_exe_R = form_relative_path(joint_angle[:,-14:-8],joint_angle[:,-2:],robot,positioner)
 	lam = calc_lam_cs(relative_path_exe)
@@ -39,7 +38,7 @@ def main():
 	# plt.show()
 
 	###speed profile
-	speed=np.gradient(lam)/np.gradient(joint_angle[:,0])
+	speed=np.gradient(lam)/np.gradient(joint_angle[:,1])
 	print("average speed: ",np.mean(speed))
 	plt.plot(joint_angle[:,0],speed)
 	plt.title('Speed Profile')
