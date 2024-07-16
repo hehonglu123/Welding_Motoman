@@ -37,7 +37,7 @@ class StreamingSend(object):
 	def robot_state_cb(self, sub, value, ts):
 		self.q_cur=value.joint_position
 		if self.joint_logging_flag:
-			self.joint_recording.append(np.hstack(([time.time(),float(value.ts['microseconds'])/1e6],value.joint_position)))
+			self.joint_recording.append(np.hstack(([time.perf_counter(),float(value.ts['microseconds'])/1e6],value.joint_position)))
 
 	# def get_breakpoints(self,lam,vd):
 	# 	###get breakpoints indices with dense lam and vd
@@ -83,7 +83,7 @@ class StreamingSend(object):
 		self.RR_robot.position_command.PokeOutValue(joint_cmd1)
 
 		if start_time:
-			while time.time()-start_time<1/self.streaming_rate-0.0007:
+			while time.perf_counter()-start_time<1/self.streaming_rate-0.0007:
 				time.sleep(0)	#sleep 0 for bg thread to run
 				continue
 			
@@ -100,11 +100,11 @@ class StreamingSend(object):
 
 		for j in range(int(num_points_jogging)):
 			q_target = (q_cur*(num_points_jogging-j))/num_points_jogging+qd*j/num_points_jogging
-			self.position_cmd(q_target,time.time())
+			self.position_cmd(q_target,time.perf_counter())
 			
 		###init point wait
 		for i in range(20):
-			self.position_cmd(qd,time.time())
+			self.position_cmd(qd,time.perf_counter())
 
 
 	def traj_streaming(self,curve_js,ctrl_joints):
@@ -116,11 +116,11 @@ class StreamingSend(object):
 		res, robot_state, _ = self.RR_robot_state.TryGetInValue()
 		q_static=np.take(robot_state.joint_position,(~ctrl_joints.astype(bool)).astype(int).nonzero()[0])
 		for i in range(len(curve_js)):
-			now=time.time()
+			now=time.perf_counter()
 			curve_js_cmd=np.zeros(len(robot_state.joint_position))
 			np.put(curve_js_cmd,(~ctrl_joints.astype(bool)).astype(int).nonzero()[0],q_static)
 			curve_js_cmd[ctrl_joints.nonzero()[0]]=curve_js[i]
-			ts,js=self.position_cmd(curve_js_cmd,time.time())
+			ts,js=self.position_cmd(curve_js_cmd,time.perf_counter())
 			timestamp_recording.append(ts)
 			try:
 				joint_recording.append(js[ctrl_joints.nonzero()[0]])
@@ -162,7 +162,7 @@ class StreamingSend(object):
 	# 	q_cur=np.take(robot_state.joint_position,ctrl_joints.nonzero()[0])
 	# 	q_static=np.take(robot_state.joint_position,(~ctrl_joints.astype(bool)).astype(int).nonzero()[0])
 	# 	for i in range(len(curve_js)):
-	# 		now=time.time()
+	# 		now=time.perf_counter()
 	# 		curve_js_cmd=np.zeros(len(robot_state.joint_position))
 	# 		np.put(curve_js_cmd,(~ctrl_joints.astype(bool)).astype(int).nonzero()[0],q_static)
 	# 		if len(joint_recording)==0:
@@ -191,9 +191,9 @@ class StreamingSend(object):
 	# 	res, robot_state, _ = self.RR_robot_state.TryGetInValue()
 	# 	q_cur=np.take(robot_state.joint_position,ctrl_joints.nonzero()[0])
 	# 	q_static=np.take(robot_state.joint_position,(~ctrl_joints.astype(bool)).astype(int).nonzero()[0])
-	# 	traj_start_time=time.time()
+	# 	traj_start_time=time.perf_counter()
 	# 	while True:
-	# 		now=time.time()
+	# 		now=time.perf_counter()
 
 	# 		lam_now=(now-traj_start_time)*vd
 	# 		lam_idx=np.searchsorted(lam,lam_now)-1

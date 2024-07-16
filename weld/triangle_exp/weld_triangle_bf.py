@@ -136,25 +136,15 @@ def main():
 		layer_num+=1
 	
 	
-	ws.weld_segment_single(primitives,robot,q_all,v_all,cond_all,arc=True,wait=0.,blocking=False)
-	##############################################################Log Joint Data####################################################################
-	js_recording=[]
+	##############################################################Log & Execution####################################################################
 	rr_sensors.start_all_sensors()
-	start_time=time.time()
-	while not(client.state_flag & 0x08 == 0 and time.time()-start_time>1.):
-		res, fb_data = client.fb.try_receive_state_sync(client.controller_info, 0.001)
-		if res:
-			with client._lock:
-				client.joint_angle=np.hstack((fb_data.group_state[0].feedback_position,fb_data.group_state[1].feedback_position,fb_data.group_state[2].feedback_position))
-				client.state_flag=fb_data.controller_flags
-				js_recording.append(np.array([time.time()]+[fb_data.job_state[0][1]]+client.joint_angle.tolist()))
+	global_ts,robot_ts,joint_recording,job_line,_ = ws.weld_segment_single(primitives,robot,q_all,v_all,cond_all,arc=True,wait=0.)
 	rr_sensors.stop_all_sensors()
-	client.servoMH(False) #stop the motor
 
 
 	recorded_dir='../../../recorded_data/ER316L/trianglebf_%iipm_v%i_%iipm_v%i/'%(feedrate,v_layer,feedrate_edge,v_edge)
 	os.makedirs(recorded_dir,exist_ok=True)
-	np.savetxt(recorded_dir+'weld_js_exe.csv',np.array(js_recording),delimiter=',')
+	np.savetxt(recorded_dir+'weld_js_exe.csv',np.hstack((global_ts,robot_ts,job_line,joint_recording)),delimiter=',')
 	rr_sensors.save_all_sensors(recorded_dir)
 
 

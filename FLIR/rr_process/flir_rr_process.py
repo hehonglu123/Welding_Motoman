@@ -73,7 +73,8 @@ class FLIR_RR_Process(object):
 				display_mat = mat
 
 			ir_image = np.rot90(display_mat, k=-1)
-			centroid, bbox, torch_centroid, torch_bbox=flame_detection_yolo(ir_image,self.yolo_model,percentage_threshold=0.8)
+			# centroid, bbox, torch_centroid, torch_bbox=weld_detection_aluminum(ir_image,self.yolo_model,percentage_threshold=0.8)
+			centroid, bbox, torch_centroid, torch_bbox=weld_detection_steel(ir_image,self.yolo_model,percentage_threshold=0.8)
 			if centroid is not None:
 				#find 3x3 average pixel value below centroid
 				center_x = centroid[0]

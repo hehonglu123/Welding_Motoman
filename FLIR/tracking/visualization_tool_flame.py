@@ -8,7 +8,8 @@ from ultralytics import YOLO
 # Load the IR recording data from the pickle file
 # data_dir='../../../recorded_data/ER316L/wallbf_140ipm_v14_140ipm_v14/'
 # data_dir='../../../recorded_data/ER316L/trianglebf_100ipm_v10_100ipm_v10/'
-data_dir='../../../recorded_data/ER316L/cylinderspiral_multifr/'
+data_dir='../../../recorded_data/ER316L/streaming/cylinderspiral_T19000/'
+# data_dir='../../../recorded_data/ER4043/wallbf_100ipm_v10_100ipm_v10/'
 # data_dir='../../../recorded_data/wall_weld_test/4043_150ipm_2024_06_18_11_16_32/layer_4/'
 
 yolo_model = YOLO(os.path.dirname(inspect.getfile(torch_tracking))+"/torch.pt")
@@ -31,9 +32,8 @@ cmap = cv2.COLORMAP_INFERNO
 def update_frame(val):
     i = cv2.getTrackbarPos('Frame', 'IR Recording')
     ir_image = np.rot90(ir_recording[i], k=-1)
-    # centroid, bbox=flame_detection(ir_image,threshold=1.1e4,area_threshold=10)
-    # centroid, bbox=flame_detection_no_arc(ir_image,template)
-    centroid, bbox, torch_centroid, torch_bbox=flame_detection_yolo(ir_image,yolo_model,percentage_threshold=0.8)    #cylinder spiral only
+    # centroid, bbox, torch_centroid, torch_bbox=weld_detection_aluminum(ir_image,yolo_model,percentage_threshold=0.8)
+    centroid, bbox, torch_centroid, torch_bbox=weld_detection_steel(ir_image,yolo_model,percentage_threshold=0.8)
 
     ir_normalized = ((ir_image - np.min(ir_image)) / (np.max(ir_image) - np.min(ir_image))) * 255
     ir_normalized=np.clip(ir_normalized, 0, 255)
@@ -44,6 +44,7 @@ def update_frame(val):
     
     if centroid is not None:
         cv2.rectangle(ir_bgr, (bbox[0],bbox[1]), (bbox[0]+bbox[2],bbox[1]+bbox[3]), (0,255,0), thickness=1)
+        cv2.rectangle(ir_bgr, (torch_bbox[0],torch_bbox[1]), (torch_bbox[0]+torch_bbox[2],torch_bbox[1]+torch_bbox[3]), (0,255,0), thickness=1)
 
     # Display the IR image
     cv2.imshow("IR Recording", ir_bgr)

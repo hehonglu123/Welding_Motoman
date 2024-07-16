@@ -1,12 +1,10 @@
-import cv2,copy
 from tqdm import tqdm
-import pickle, sys, time
+import pickle
 import numpy as np
 import matplotlib.pyplot as plt
 from pandas import read_csv
-sys.path.append('../../toolbox/')
 from flir_toolbox import *
-from robot_def import *
+from motoman_def import *
 from ultralytics import YOLO
 
 
@@ -22,8 +20,9 @@ yolo_model = YOLO("../tracking/yolov8/torch.pt")
 
 
 # Load the IR recording data from the pickle file
-data_dir='../../../recorded_data/ER316L/cylinderspiral_multifr/'
+# data_dir='../../../recorded_data/ER316L/cylinderspiral_multifr/'
 # data_dir='../../../recorded_data/ER316L/streaming/cylinderspiral_100ipm_v10/'
+data_dir='../../../recorded_data/ER316L/streaming/cylinderspiral_T22222/'
 config_dir='../../config/'
 with open(data_dir+'/ir_recording.pickle', 'rb') as file:
     ir_recording = pickle.load(file)
@@ -31,7 +30,7 @@ ir_ts=np.loadtxt(data_dir+'/ir_stamps.csv', delimiter=',')
 joint_angle=np.loadtxt(data_dir+'weld_js_exe.csv',delimiter=',')
 
 
-frame_start=12000
+frame_start=0
 frame_end=len(ir_recording)
 # frame_end=20000
 ir_pixel_window_size=7
@@ -56,5 +55,5 @@ plt.plot(ir_ts_processed, pixel_value_all)
 plt.axhline(y=np.mean(pixel_value_all), color='r', linestyle='-',label='Average Pixel Value')
 plt.xlabel('Time (s)')
 plt.ylabel('Pixel Value')
-plt.ylim(20000,28000)
+plt.ylim(15000,28000)
 plt.show()
