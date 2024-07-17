@@ -14,7 +14,7 @@ yolo_model = YOLO("../tracking/yolov8/torch.pt")
 # Load the IR recording data from the pickle file
 # data_dir='../../../recorded_data/ER316L/cylinderspiral_multifr/'
 # data_dir='../../../recorded_data/ER316L/streaming/cylinderspiral_100ipm_v10/'
-data_dir='../../../recorded_data/ER316L/streaming/cylinderspiral_T25000/'
+data_dir='../../../recorded_data/ER316L/streaming/cylinderspiral_T22222/'
 config_dir='../../config/'
 with open(data_dir+'/ir_recording.pickle', 'rb') as file:
     ir_recording = pickle.load(file)

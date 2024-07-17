@@ -8,7 +8,7 @@ from ultralytics import YOLO
 # Load the IR recording data from the pickle file
 # data_dir='../../../recorded_data/ER316L/wallbf_140ipm_v14_140ipm_v14/'
 # data_dir='../../../recorded_data/ER316L/trianglebf_100ipm_v10_100ipm_v10/'
-data_dir='../../../recorded_data/ER316L/streaming/cylinderspiral_T21000_motion_error_bug/'
+data_dir='../../../recorded_data/ER316L/streaming/cylinderspiral_T25000/'
 # data_dir='../../../recorded_data/ER4043/wallbf_100ipm_v10_100ipm_v10/'
 # data_dir='../../../recorded_data/wall_weld_test/4043_150ipm_2024_06_18_11_16_32/layer_4/'
 
@@ -33,7 +33,7 @@ def update_frame(val):
     i = cv2.getTrackbarPos('Frame', 'IR Recording')
     ir_image = np.rot90(ir_recording[i], k=-1)
     # centroid, bbox, torch_centroid, torch_bbox=weld_detection_aluminum(ir_image,yolo_model,percentage_threshold=0.8)
-    centroid, bbox, torch_centroid, torch_bbox=weld_detection_steel(ir_image,yolo_model,percentage_threshold=0.8)
+    centroid, bbox, torch_centroid, torch_bbox=weld_detection_steel(ir_image,yolo_model,percentage_threshold=0.77)
 
     ir_normalized = ((ir_image - np.min(ir_image)) / (np.max(ir_image) - np.min(ir_image))) * 255
     ir_normalized=np.clip(ir_normalized, 0, 255)

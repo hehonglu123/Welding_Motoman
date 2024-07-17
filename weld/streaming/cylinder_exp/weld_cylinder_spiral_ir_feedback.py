@@ -5,7 +5,6 @@ from RobotRaconteur.Client import *
 from weldRRSensor import *
 from dual_robot import *
 from traj_manipulation import *
-sys.path.append('../../../toolbox/')
 from StreamingSend import *
 
 ir_updated_flag=False
@@ -103,6 +102,7 @@ def main():
 	num_base_layer=10       #10layers to avoid clamp blocking IR view
 	num_layer=20
 	q_cmd_all=[]
+	welding_cmd_all=[]
 	job_offset=450
 
 
@@ -113,75 +113,75 @@ def main():
 	q_positioner_prev=SS.q_cur[-2:]
 
 	
-	# ###############################################################################################################################################################
-	# ###############################################################################################################################################################
-	# #####################################################BASE LAYER##########################################################################################
-	# ###PRELOAD ALL SLICES TO SAVE INPROCESS TIME
-	# rob1_js_all_slices=[]
-	# positioner_js_all_slices=[]
-	# for i in range(0,num_base_layer*base_slice_increment):
-	# 	if not flipped:
-	# 		rob1_js_all_slices.append(np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(i)+'_0.csv',delimiter=','))
-	# 		positioner_js_all_slices.append(np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(i)+'_0.csv',delimiter=','))
-	# 	else:
-	# 		###spiral rotation direction
-	# 		rob1_js_all_slices.append(np.flip(np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(i)+'_0.csv',delimiter=','),axis=0))
-	# 		positioner_js_all_slices.append(np.flip(np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(i)+'_0.csv',delimiter=','),axis=0))
+	###############################################################################################################################################################
+	###############################################################################################################################################################
+	#####################################################BASE LAYER##########################################################################################
+	###PRELOAD ALL SLICES TO SAVE INPROCESS TIME
+	rob1_js_all_slices=[]
+	positioner_js_all_slices=[]
+	for i in range(0,num_base_layer*base_slice_increment):
+		if not flipped:
+			rob1_js_all_slices.append(np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(i)+'_0.csv',delimiter=','))
+			positioner_js_all_slices.append(np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(i)+'_0.csv',delimiter=','))
+		else:
+			###spiral rotation direction
+			rob1_js_all_slices.append(np.flip(np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(i)+'_0.csv',delimiter=','),axis=0))
+			positioner_js_all_slices.append(np.flip(np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(i)+'_0.csv',delimiter=','),axis=0))
 
-	# print("PRELOAD FINISHED")
+	print("PRELOAD FINISHED")
 
-	# num_layer_end=num_base_layer*base_slice_increment
-	# for slice_num in range(0,num_layer_end,base_slice_increment):
+	num_layer_end=num_base_layer*base_slice_increment
+	for slice_num in range(0,num_layer_end,base_slice_increment):
 
-	# 	####################DETERMINE CURVE ORDER##############################################
-	# 	x=0
-	# 	rob1_js=copy.deepcopy(rob1_js_all_slices[slice_num])
-	# 	positioner_js=copy.deepcopy(positioner_js_all_slices[slice_num])
-	# 	curve_sliced_relative=np.loadtxt(data_dir+'curve_sliced_relative/slice'+str(slice_num)+'_'+str(x)+'.csv',delimiter=',')
-	# 	if positioner_js.shape==(2,) and rob1_js.shape==(6,):
-	# 		continue
+		####################DETERMINE CURVE ORDER##############################################
+		x=0
+		rob1_js=copy.deepcopy(rob1_js_all_slices[slice_num])
+		positioner_js=copy.deepcopy(positioner_js_all_slices[slice_num])
+		curve_sliced_relative=np.loadtxt(data_dir+'curve_sliced_relative/slice'+str(slice_num)+'_'+str(x)+'.csv',delimiter=',')
+		if positioner_js.shape==(2,) and rob1_js.shape==(6,):
+			continue
 		
-	# 	###TRJAECTORY WARPING
-	# 	if slice_num>0:
-	# 		rob1_js_prev=copy.deepcopy(rob1_js_all_slices[slice_num-base_slice_increment])
-	# 		positioner_js_prev=copy.deepcopy(positioner_js_all_slices[slice_num-base_slice_increment])
-	# 		rob1_js,positioner_js=warp_traj2(rob1_js,positioner_js,rob1_js_prev,positioner_js_prev,reversed=True)
-	# 	if slice_num<num_layer_end-base_slice_increment:
-	# 		rob1_js_next=copy.deepcopy(rob1_js_all_slices[slice_num+base_slice_increment])
-	# 		positioner_js_next=copy.deepcopy(positioner_js_all_slices[slice_num+base_slice_increment])
-	# 		rob1_js,positioner_js=warp_traj2(rob1_js,positioner_js,rob1_js_next,positioner_js_next,reversed=False)
+		###TRJAECTORY WARPING
+		if slice_num>0:
+			rob1_js_prev=copy.deepcopy(rob1_js_all_slices[slice_num-base_slice_increment])
+			positioner_js_prev=copy.deepcopy(positioner_js_all_slices[slice_num-base_slice_increment])
+			rob1_js,positioner_js=warp_traj2(rob1_js,positioner_js,rob1_js_prev,positioner_js_prev,reversed=True)
+		if slice_num<num_layer_end-base_slice_increment:
+			rob1_js_next=copy.deepcopy(rob1_js_all_slices[slice_num+base_slice_increment])
+			positioner_js_next=copy.deepcopy(positioner_js_all_slices[slice_num+base_slice_increment])
+			rob1_js,positioner_js=warp_traj2(rob1_js,positioner_js,rob1_js_next,positioner_js_next,reversed=False)
 				
 		
 			
-	# 	lam_relative=calc_lam_cs(curve_sliced_relative)
-	# 	lam_relative_dense=np.linspace(0,lam_relative[-1],num=int(lam_relative[-1]/point_distance))
-	# 	rob1_js_dense=interp1d(lam_relative,rob1_js,kind='cubic',axis=0)(lam_relative_dense)
-	# 	positioner_js_dense=interp1d(lam_relative,positioner_js,kind='cubic',axis=0)(lam_relative_dense)
-	# 	breakpoints=SS.get_breakpoints(lam_relative_dense,v_base)
+		lam_relative=calc_lam_cs(curve_sliced_relative)
+		lam_relative_dense=np.linspace(0,lam_relative[-1],num=int(lam_relative[-1]/point_distance))
+		rob1_js_dense=interp1d(lam_relative,rob1_js,kind='cubic',axis=0)(lam_relative_dense)
+		positioner_js_dense=interp1d(lam_relative,positioner_js,kind='cubic',axis=0)(lam_relative_dense)
+		breakpoints=SS.get_breakpoints(lam_relative_dense,v_base)
 
-	# 	###find closest %2pi
-	# 	num2p=np.round((q_positioner_prev-positioner_js_dense[0])/(2*np.pi))
-	# 	positioner_js_dense+=num2p*2*np.pi
+		###find closest %2pi
+		num2p=np.round((q_positioner_prev-positioner_js_dense[0])/(2*np.pi))
+		positioner_js_dense+=num2p*2*np.pi
 		
-	# 	###formulate streaming joint angles
-	# 	q_cmd_all.extend(np.hstack((rob1_js_dense[breakpoints],[q2]*len(breakpoints),positioner_js_dense[breakpoints])))
+		###formulate streaming joint angles
+		q_cmd_all.extend(np.hstack((rob1_js_dense[breakpoints],[q2]*len(breakpoints),positioner_js_dense[breakpoints])))
 		
-	# 	q_positioner_prev=copy.deepcopy(positioner_js_dense[-1])
+		q_positioner_prev=copy.deepcopy(positioner_js_dense[-1])
 
-	# q_cmd_all=np.array(q_cmd_all)
+	q_cmd_all=np.array(q_cmd_all)
 
-	# ###jog to start point
-	# print("BASELAYER CALCULATION FINISHED")
-	# SS.jog2q(q_cmd_all[0])
-	# ##############################################################Base Layers Welding####################################################################
-	# if weld_arcon:
-	# 	fronius_client.job_number = int(base_feedrate/10+job_offset)
-	# 	fronius_client.start_weld()
-	# for i in range(len(q_cmd_all)):
-	# 	SS.position_cmd(q_cmd_all[i],time.perf_counter())
-	# if weld_arcon:
-	# 	fronius_client.stop_weld()
-	# print("BASELAYER WELDING FINISHED")
+	###jog to start point
+	print("BASELAYER CALCULATION FINISHED")
+	SS.jog2q(q_cmd_all[0])
+	##############################################################Base Layers Welding####################################################################
+	if weld_arcon:
+		fronius_client.job_number = int(base_feedrate/10+job_offset)
+		fronius_client.start_weld()
+	for i in range(len(q_cmd_all)):
+		SS.position_cmd(q_cmd_all[i],time.perf_counter())
+	if weld_arcon:
+		fronius_client.stop_weld()
+	print("BASELAYER WELDING FINISHED")
 
 
 
@@ -277,6 +277,7 @@ def main():
 
 				###update welding param
 				if time.perf_counter()-last_update_time>1./feedrate_update_rate:
+					welding_cmd_all.append(np.hstack((time.perf_counter(),layer_counts,v_cmd,feedrate)))
 					print("Layer Average Pixel Reading: ",np.mean(pixel_reading))
 					if not np.isnan(np.mean(pixel_reading)):
 						v_cmd=v_layer+v_gain*(nominal_pixel_reading-np.mean(pixel_reading))
@@ -321,6 +322,7 @@ def main():
 	os.makedirs(recorded_dir,exist_ok=True)
 	np.savetxt(recorded_dir+'weld_js_cmd.csv',np.array(q_cmd_all),delimiter=',')
 	np.savetxt(recorded_dir+'weld_js_exe.csv',np.array(js_recording),delimiter=',')
+	np.savetxt(recorded_dir+'weld_cmd.csv',np.array(welding_cmd_all),delimiter=',')
 	rr_sensors.save_all_sensors(recorded_dir)
 
 

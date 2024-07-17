@@ -48,7 +48,7 @@ class FLIR_RR_Process(object):
 		self.ir_pixel_window_size=7
 		self.yolo_model = yolo_model
 		self.ir_process_struct=RRN.NewStructure("experimental.ir_process.ir_process_struct")
-		
+		self.flame_centroid_history = []
 	
 			
 	def ir_cb(self,pipe_ep):
@@ -74,8 +74,16 @@ class FLIR_RR_Process(object):
 
 			ir_image = np.rot90(display_mat, k=-1)
 			# centroid, bbox, torch_centroid, torch_bbox=weld_detection_aluminum(ir_image,self.yolo_model,percentage_threshold=0.8)
-			centroid, bbox, torch_centroid, torch_bbox=weld_detection_steel(ir_image,self.yolo_model,percentage_threshold=0.8)
+			centroid, bbox, torch_centroid, torch_bbox=weld_detection_steel(ir_image,self.yolo_model,percentage_threshold=0.77)
 			if centroid is not None:
+				###weighted history filter
+				if len(self.flame_centroid_history) > 30:
+					self.flame_centroid_history.pop(0)
+					# Calculate the weight for the previous history values
+					previous_weight = 0.8 / len(self.flame_centroid_history)
+					centroid = 0.2 * centroid + np.sum(np.array(self.flame_centroid_history) * previous_weight, axis=0)
+					self.flame_centroid_history.append(centroid)
+
 				pixel_coord=(centroid[0],centroid[1]+5)
 				flame_reading=get_pixel_value(ir_image,pixel_coord,self.ir_pixel_window_size)
 
