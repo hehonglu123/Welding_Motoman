@@ -290,7 +290,7 @@ def main():
 					last_update_time=time.perf_counter()
 				
 				###Position Command
-				q_cmd_all.append(q_cmd)
+				q_cmd_all.append(np.hstack((time.perf_counter(),layer_counts,q_all)))
 				if lam_cur>lam_relative_all_slices[slice_num][-1]-v_cmd/SS.streaming_rate:
 					SS.position_cmd(q_cmd)
 				else:

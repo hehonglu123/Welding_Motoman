@@ -1,20 +1,23 @@
 from tqdm import tqdm
-import pickle
+import pickle, os, inspect
 import numpy as np
 import matplotlib.pyplot as plt
 from pandas import read_csv
 from flir_toolbox import *
+import torch_tracking
 from motoman_def import *
 from ultralytics import YOLO
 
 #load model
-yolo_model = YOLO("../tracking/yolov8/torch.pt")
+yolo_model = YOLO(os.path.dirname(inspect.getfile(torch_tracking))+"/torch.pt")
 
 
 # Load the IR recording data from the pickle file
 # data_dir='../../../recorded_data/ER316L/cylinderspiral_multifr/'
 # data_dir='../../../recorded_data/ER316L/streaming/cylinderspiral_100ipm_v10/'
-data_dir='../../../recorded_data/ER316L/streaming/cylinderspiral_T22222/'
+# data_dir='../../../recorded_data/ER316L/streaming/cylinderspiral_T22222/'
+data_dir='../../../recorded_data/ER316L/VPD10/cylinderspiral_90ipm_v9/'
+
 config_dir='../../config/'
 with open(data_dir+'/ir_recording.pickle', 'rb') as file:
     ir_recording = pickle.load(file)

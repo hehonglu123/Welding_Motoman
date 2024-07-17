@@ -11,7 +11,8 @@ def main():
 	##############################################################Robot####################################################################
 	###robot kinematics def
 	config_dir='config/'
-	data_dir='../recorded_data/ER316L/streaming/cylinderspiral_T19000/'
+	# data_dir='../recorded_data/ER316L/streaming/cylinderspiral_T19000/'
+	data_dir='../recorded_data/ER316L/VPD10/cylinderspiral_50ipm_v5/'
 
 	robot=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path=config_dir+'torch.csv',\
 		pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',d=15)
