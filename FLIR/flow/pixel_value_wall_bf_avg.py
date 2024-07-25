@@ -3,9 +3,7 @@ import pickle, sys, time
 import numpy as np
 import matplotlib.pyplot as plt
 from pandas import read_csv
-sys.path.append('../../toolbox/')
 from flir_toolbox import *
-from robot_def import *
 
 
 def center_of_window_below_bbox(bbox,ir_pixel_window_size, num_pixel_below_centroid=0):

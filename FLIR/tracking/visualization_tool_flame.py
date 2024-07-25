@@ -2,19 +2,18 @@ import cv2
 import pickle, os, inspect
 import numpy as np
 from flir_toolbox import *
-import torch_tracking 
 from ultralytics import YOLO
 
 # Load the IR recording data from the pickle file
 # data_dir='../../../recorded_data/ER316L/wallbf_140ipm_v14_140ipm_v14/'
 # data_dir='../../../recorded_data/ER316L/trianglebf_100ipm_v10_100ipm_v10/'
 # data_dir='../../../recorded_data/ER316L/streaming/cylinderspiral_T25000/'
-data_dir='../../../recorded_data/ER316L/VPD10/cylinderspiral_90ipm_v9/'
+data_dir='../../../recorded_data/ER316L/VPD10/cylinderspiral_100ipm_v10/'
 # data_dir='../../../recorded_data/ER4043/wallbf_100ipm_v10_100ipm_v10/'
 # data_dir='../../../recorded_data/wall_weld_test/4043_150ipm_2024_06_18_11_16_32/layer_4/'
 
-yolo_model = YOLO(os.path.dirname(inspect.getfile(torch_tracking))+"/torch.pt")
-
+torch_model = YOLO(os.path.dirname(inspect.getfile(flir_toolbox))+"/torch.pt")
+tip_model = YOLO(os.path.dirname(inspect.getfile(flir_toolbox))+"/tip_wire.pt")
 
 with open(data_dir+'/ir_recording.pickle', 'rb') as file:
     ir_recording = pickle.load(file)
@@ -33,8 +32,9 @@ cmap = cv2.COLORMAP_INFERNO
 def update_frame(val):
     i = cv2.getTrackbarPos('Frame', 'IR Recording')
     ir_image = np.rot90(ir_recording[i], k=-1)
-    # centroid, bbox, torch_centroid, torch_bbox=weld_detection_aluminum(ir_image,yolo_model,percentage_threshold=0.8)
-    centroid, bbox, torch_centroid, torch_bbox=weld_detection_steel(ir_image,yolo_model,percentage_threshold=0.77)
+    # centroid, bbox, torch_centroid, torch_bbox=weld_detection_aluminum(ir_image,torch_model,percentage_threshold=0.8)
+    # centroid, bbox, torch_centroid, torch_bbox=weld_detection_steel(ir_image,torch_model,percentage_threshold=0.77)
+    centroid, bbox, torch_centroid, torch_bbox=weld_detection_steel(ir_image,torch_model,tip_model)
 
     ir_normalized = ((ir_image - np.min(ir_image)) / (np.max(ir_image) - np.min(ir_image))) * 255
     ir_normalized=np.clip(ir_normalized, 0, 255)
@@ -45,6 +45,8 @@ def update_frame(val):
     
     if centroid is not None:
         cv2.rectangle(ir_bgr, (bbox[0],bbox[1]), (bbox[0]+bbox[2],bbox[1]+bbox[3]), (0,255,0), thickness=1)
+    
+    if torch_centroid is not None:
         cv2.rectangle(ir_bgr, (torch_bbox[0],torch_bbox[1]), (torch_bbox[0]+torch_bbox[2],torch_bbox[1]+torch_bbox[3]), (0,255,0), thickness=1)
 
     # Display the IR image

@@ -1,6 +1,0 @@
-train: train/images
-val: train/images
-ch: 1
-grey: True
-nc: 1
-names: ['torch']
