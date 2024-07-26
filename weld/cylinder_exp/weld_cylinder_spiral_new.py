@@ -148,11 +148,11 @@ def main():
 	
 	base_feedrate=300
 	VPD=20
-	v_layer=6
+	v_layer=5
 	layer_feedrate=VPD*v_layer
 	base_layer_height=3
 	v_base=5
-	layer_height=1.2
+	layer_height=1.3
 	num_base_layer=2        #2 base layer to establish adhesion to coupon
 	num_support_layer=10     #support layer to raise the cylinder till visible by IR camera
 	support_layer_height=2.0
