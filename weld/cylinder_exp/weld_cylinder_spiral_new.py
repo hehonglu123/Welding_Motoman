@@ -8,7 +8,7 @@ from weldRRSensor import *
 from dual_robot import *
 from traj_manipulation import *
 
-def weld_spiral(robot,positioner,data_dir,v,feedrate,slice_increment,num_layers,slice_start,slice_end,job_offset,waypoint_distance=5,flipped=False):
+def weld_spiral(robot,positioner,data_dir,v,feedrate,slice_increment,num_layers,slice_start,slice_end,job_offset,waypoint_distance=5,flipped=False,q_prev=np.zeros(2)):
 	q1_all=[]
 	q2_all=[]
 	v1_all=[]
@@ -19,7 +19,7 @@ def weld_spiral(robot,positioner,data_dir,v,feedrate,slice_increment,num_layers,
 	###PRELOAD ALL SLICES TO SAVE INPROCESS TIME
 	rob1_js_all_slices=[]
 	positioner_js_all_slices=[]
-	for i in range(slice_start,slice_end):
+	for i in range(0,slice_end):
 		if not flipped:
 			rob1_js_all_slices.append(np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(i)+'_0.csv',delimiter=','))
 			positioner_js_all_slices.append(np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(i)+'_0.csv',delimiter=','))
@@ -145,22 +145,23 @@ def main():
 
 	
 	flipped=True   #spiral direction
-	base_feedrate=250
-	volume_per_distance=10
-	v_layer=13
-	layer_feedrate=volume_per_distance*v_layer
+	
+	base_feedrate=300
+	VPD=20
+	v_layer=6
+	layer_feedrate=VPD*v_layer
 	base_layer_height=3
 	v_base=5
-	layer_height=1.1
+	layer_height=1.2
 	num_base_layer=2        #2 base layer to establish adhesion to coupon
-	num_support_layer=8     #support layer to raise the cylinder till visible by IR camera
-	support_layer_height=1.2
-	support_feedrate=150
+	num_support_layer=10     #support layer to raise the cylinder till visible by IR camera
+	support_layer_height=2.0
+	support_feedrate=300
 	v_support=10
 	weld_num_layer=20
 
-	weld_arcon=False
-	job_offset=450
+	weld_arcon=True
+	job_offset=400
 
 
 	nominal_slice_increment=int(layer_height/slicing_meta['line_resolution'])
@@ -179,25 +180,25 @@ def main():
 	ws.jog_dual(robot2,positioner,q2,positioner_js[0],v=1)
 
 
-	#####################################################BASE LAYER##########################################################################################
+	#####################################################BASE & SUPPORT LAYER##########################################################################################
 	slice_start=0
 	slice_end=int(base_slice_increment*num_base_layer)
-	primitives,q1_all,q2_all,v1_all,v2_all,cond_all = weld_spiral(robot,positioner,data_dir,v_base,base_feedrate,base_slice_increment,num_base_layer,slice_start,slice_end,job_offset,waypoint_distance,flipped)
-	ws.weld_segment_dual(primitives,robot,positioner,q1_all,q2_all,v1_all,v2_all,cond_all,arc=weld_arcon)
-	
+	primitives_base,q1_all_base,q2_all_base,v1_all_base,v2_all_base,cond_all_base = weld_spiral(robot,positioner,data_dir,v_base,base_feedrate,base_slice_increment,num_base_layer,slice_start,slice_end,job_offset,waypoint_distance,flipped,q_prev)
 
-	#####################################################SUPPORT LAYER##########################################################################################
+	q_prev=q2_all_base[-1]
 	slice_start=int(num_base_layer*base_slice_increment)
 	slice_end=int(num_base_layer*base_slice_increment+num_support_layer*support_slice_increment)
-	primitives,q1_all,q2_all,v1_all,v2_all,cond_all = weld_spiral(robot,positioner,data_dir,v_support,support_feedrate,support_slice_increment,num_support_layer,slice_start,slice_end,job_offset,waypoint_distance,flipped)
-	ws.weld_segment_dual(primitives,robot,positioner,q1_all,q2_all,v1_all,v2_all,cond_all,arc=weld_arcon)
-
+	primitives_support,q1_all_support,q2_all_support,v1_all_support,v2_all_support,cond_all_support = weld_spiral(robot,positioner,data_dir,v_support,support_feedrate,support_slice_increment,num_support_layer,slice_start,slice_end,job_offset,waypoint_distance,flipped,q_prev)
+	
+	ws.weld_segment_dual(primitives_base+primitives_support[1:],robot,positioner,q1_all_base+q1_all_support[1:],q2_all_base+q2_all_support[1:],v1_all_base+v1_all_support[1:],v2_all_base+v2_all_support[1:],cond_all_base+cond_all_support[1:],arc=weld_arcon)
+	print("BASE & SUPPORT LAYER FINISHED")
 	
 
 	#####################################################LAYER Welding##########################################################################################
+	q_prev=client.getJointAnglesDB(positioner.pulse2deg)
 	slice_start=int(num_base_layer*base_slice_increment+num_support_layer*support_slice_increment)
 	slice_end=slicing_meta['num_layers']
-	primitives,q1_all,q2_all,v1_all,v2_all,cond_all = weld_spiral(robot,positioner,data_dir,v_layer,layer_feedrate,nominal_slice_increment,weld_num_layer,slice_start,slice_end,job_offset,waypoint_distance,flipped)
+	primitives,q1_all,q2_all,v1_all,v2_all,cond_all = weld_spiral(robot,positioner,data_dir,v_layer,layer_feedrate,nominal_slice_increment,weld_num_layer,slice_start,slice_end,job_offset,waypoint_distance,flipped,q_prev)
 
 	##############################################################Log & Execution####################################################################
 	rr_sensors.start_all_sensors()
@@ -205,7 +206,7 @@ def main():
 	rr_sensors.stop_all_sensors()
 
 
-	recorded_dir='../../../recorded_data/ER316L/VPD%i/cylinderspiral_%iipm_v%i/'%(volume_per_distance,layer_feedrate,v_layer)
+	recorded_dir='../../../recorded_data/ER316L/phi0.9_VPD%i/cylinderspiral_%iipm_v%i/'%(VPD,layer_feedrate,v_layer)
 	os.makedirs(recorded_dir,exist_ok=True)
 	np.savetxt(recorded_dir+'weld_js_exe.csv',np.hstack((global_ts[:, np.newaxis],robot_ts[:, np.newaxis],job_line[:, np.newaxis],joint_recording)),delimiter=',')
 	rr_sensors.save_all_sensors(recorded_dir)

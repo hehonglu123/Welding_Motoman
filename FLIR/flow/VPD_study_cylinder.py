@@ -19,66 +19,54 @@ def get_pixel_value_new(ir_image,coord,window_size):
 torch_model = YOLO(os.path.dirname(inspect.getfile(flir_toolbox))+"/torch.pt")
 tip_wire_model = YOLO(os.path.dirname(inspect.getfile(flir_toolbox))+"/tip_wire.pt")
 
-VPD=10
-vertical_offsets=np.linspace(1,10,10)
-for vertical_offset in vertical_offsets:
-    pixel_avg=[]
-    for v in tqdm(range(5,14)):
-        # Load the IR recording data from the pickle file
-        data_dir='../../../recorded_data/ER316L/VPD10/cylinderspiral_%iipm_v%i/'%(VPD*v,v)
+VPD=20
+for v in tqdm(range(9,14)):
+    # Load the IR recording data from the pickle file
+    data_dir='../../../recorded_data/ER316L/phi0.9_VPD20/cylinderspiral_%iipm_v%i/'%(VPD*v,v)
 
-        config_dir='../../config/'
-        with open(data_dir+'/ir_recording.pickle', 'rb') as file:
-            ir_recording = pickle.load(file)
-        ir_ts=np.loadtxt(data_dir+'/ir_stamps.csv', delimiter=',')
-        joint_angle=np.loadtxt(data_dir+'weld_js_exe.csv',delimiter=',')
+    config_dir='../../config/'
+    with open(data_dir+'/ir_recording.pickle', 'rb') as file:
+        ir_recording = pickle.load(file)
+    ir_ts=np.loadtxt(data_dir+'/ir_stamps.csv', delimiter=',')
+    joint_angle=np.loadtxt(data_dir+'weld_js_exe.csv',delimiter=',')
 
 
-        frame_start=0
-        frame_end=len(ir_recording)
-        # frame_end=20000
-        ir_pixel_window_size=5
+    frame_start=0
+    frame_end=len(ir_recording)
+    # frame_end=20000
+    ir_pixel_window_size=5
 
-        pixel_value_all=[]
-        ir_ts_processed=[]
-        flame_centroid_history = []
-        for i in tqdm(range(frame_start, frame_end)):
-            ir_image = np.rot90(ir_recording[i], k=-1)
-            centroid, bbox, torch_centroid, torch_bbox=weld_detection_steel(ir_image,torch_model,tip_wire_model)
-            if centroid is not None:
-                ###weighted history filter
-                if len(flame_centroid_history) > 30:
-                    flame_centroid_history.pop(0)
-                    # Calculate the weight for the previous history values
-                    previous_weight = 0.8 / len(flame_centroid_history)
-                    centroid = 0.2 * centroid + np.sum(np.array(flame_centroid_history) * previous_weight, axis=0)
-                    flame_centroid_history.append(centroid)
-                                        
-                #find average pixel value 
-                pixel_coord = (int(centroid[0]), int(centroid[1] + vertical_offset))
-                flame_reading=get_pixel_value_new(ir_image,pixel_coord,ir_pixel_window_size)
-                pixel_value_all.append(flame_reading)
-                ir_ts_processed.append(ir_ts[i])
+    pixel_value_all=[]
+    ir_ts_processed=[]
+    flame_centroid_history = []
+    for i in tqdm(range(frame_start, frame_end)):
+        ir_image = np.rot90(ir_recording[i], k=-1)
+        centroid, bbox, torch_centroid, torch_bbox=weld_detection_steel(ir_image,torch_model,tip_wire_model)
+        if centroid is not None:
+            ###weighted history filter
+            if len(flame_centroid_history) > 30:
+                flame_centroid_history.pop(0)
+                # Calculate the weight for the previous history values
+                previous_weight = 0.8 / len(flame_centroid_history)
+                centroid = 0.2 * centroid + np.sum(np.array(flame_centroid_history) * previous_weight, axis=0)
+                flame_centroid_history.append(centroid)
+                                    
+            #find average pixel value 
+            pixel_coord = (int(centroid[0]), int(centroid[1]))
+            flame_reading=get_pixel_value_new(ir_image,pixel_coord,ir_pixel_window_size)
+            pixel_value_all.append(flame_reading)
+            ir_ts_processed.append(ir_ts[i])
 
 
 
-        # print("Average pixel value: ", np.mean(pixel_value_all))
-        # plt.title('Pixel Value vs Time ')
-        # plt.plot(ir_ts_processed, pixel_value_all)
-        # #plot the red line at the average pixel value
-        # plt.axhline(y=np.mean(pixel_value_all), color='r', linestyle='-',label='Average Pixel Value')
-        # plt.xlabel('Time (s)')
-        # plt.ylabel('Pixel Value')
-        # plt.ylim(15000,28000)
-        # plt.savefig('pixel_value_vs_time_%iipm_v%i.png'%(VPD*v,v))
-        # plt.clf()
-
-        pixel_avg.append(np.mean(pixel_value_all))
-    
-    plt.plot(range(5,14),pixel_avg,label="vertical offset %i"%vertical_offset)
-    plt.xlabel('speed (mm/s)')
-    plt.ylabel('Average Pixel Value')
-    plt.title('Average Pixel Value vs Speed')
-    plt.savefig('pixel_avg_vs_speed_@offset%i.png'%vertical_offset)
+    print("Average pixel value: ", np.mean(pixel_value_all))
+    plt.title('Pixel Value vs Time ')
+    plt.plot(ir_ts_processed, pixel_value_all)
+    #plot the red line at the average pixel value
+    plt.axhline(y=np.mean(pixel_value_all), color='r', linestyle='-',label='Average Pixel Value')
+    plt.xlabel('Time (s)')
+    plt.ylabel('Pixel Value')
+    plt.ylim(15000,28000)
+    plt.savefig('pixel_value_vs_time_%iipm_v%i.png'%(VPD*v,v))
     plt.clf()
-        
+
