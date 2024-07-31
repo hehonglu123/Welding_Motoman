@@ -1,28 +1,18 @@
 import cv2,copy
-import pickle, sys
+import pickle, os, inspect
 import numpy as np
 import matplotlib.pyplot as plt
-from pandas import read_csv
-sys.path.append('../../toolbox/')
 from flir_toolbox import *
-from robot_def import *
+from motoman_def import *
+from ultralytics import YOLO
 
-
-def center_of_window_below_bbox(bbox,ir_pixel_window_size, num_pixel_below_centroid=0):
-    # Calculate the bottom center point of the bbox
-    x, y, w, h = bbox
-
-    center_x = int(x + w/2) 
-    center_y = y + max(h+ir_pixel_window_size//2, h//2+num_pixel_below_centroid)
-
-    return center_x, center_y
 
 #load template
 template = cv2.imread('../tracking/torch_template_ER316L.png',0)
 
 # Load the IR recording data from the pickle file
 # data_dir='../../../recorded_data/ER316L_IR_wall_study/wallbf_150ipm_v15_150ipm_v15/'
-data_dir='../../../recorded_data/ER316L_IR_wall_study/trianglebf_100ipm_v10_100ipm_v10/'
+data_dir='../../../recorded_data/ER316L/trianglebf_100ipm_v10_100ipm_v10/'
 # data_dir='../../../recorded_data/wallbf_100ipm_v10_80ipm_v8/'
 # data_dir='../../../recorded_data/wallbf_100ipm_v10_120ipm_v12/'
 config_dir='../../config/'
@@ -39,6 +29,13 @@ robot2=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config
 	pulse2deg_file_path=config_dir+'MA1440_A0_pulse2deg_real.csv',base_transformation_file=config_dir+'MA1440_pose.csv')
 positioner=positioner_obj('D500B',def_path=config_dir+'D500B_robot_default_config.yml',tool_file_path=config_dir+'positioner_tcp.csv',\
 	pulse2deg_file_path=config_dir+'D500B_pulse2deg_real.csv',base_transformation_file=config_dir+'D500B_pose_mocap.csv')
+
+#load model
+torch_model = YOLO(os.path.dirname(inspect.getfile(flir_toolbox))+"/torch.pt")
+tip_wire_model = YOLO(os.path.dirname(inspect.getfile(flir_toolbox))+"/tip_wire.pt")
+
+vertical_offset=3
+horizontal_offset=0
 
 #find indices of each layer by detecting velocity direction change
 p_all=robot.fwd(joint_angle[:,2:8]).p_all
@@ -60,8 +57,6 @@ for i in range(1,len(signs)):
         sign_continuous_time=0
 
 
-cv2.namedWindow("IR Recording", cv2.WINDOW_NORMAL)
-
 
 for layer_num in range(20,len(layer_indices_ir)-1):
     pixel_coord_layer=[]    #find all pixel regions to record from flame detection
@@ -69,18 +64,12 @@ for layer_num in range(20,len(layer_indices_ir)-1):
     for i in range(layer_indices_ir[layer_num],layer_indices_ir[layer_num+1]):
         ir_image = np.rot90(ir_recording[i], k=-1)
         # centroid, bbox=flame_detection(ir_image,threshold=1.0e4,area_threshold=10)
-        centroid, bbox=flame_detection_no_arc(ir_image,template)
+
+        centroid, bbox, torch_centroid, torch_bbox=weld_detection_steel(ir_image,torch_model,tip_wire_model)
         if centroid is not None:
-            #find 3x3 average pixel value below centroid
-            pixel_coord=center_of_window_below_bbox(bbox,ir_pixel_window_size)
+            #find average pixel value 
+            pixel_coord = (int(centroid[0]) + horizontal_offset, int(centroid[1]) + vertical_offset)
             pixel_coord_layer.append(pixel_coord)
-            ###DISPLAY THE IMAGE WITH BBOX
-            # ir_normalized = ((ir_image - np.min(ir_image)) / (np.max(ir_image) - np.min(ir_image))) * 255
-            # ir_normalized=np.clip(ir_normalized, 0, 255)
-            # ir_bgr = cv2.applyColorMap(ir_normalized.astype(np.uint8), cv2.COLORMAP_INFERNO)
-            # cv2.rectangle(ir_bgr, (pixel_coord[0]-ir_pixel_window_size//2,pixel_coord[1]-ir_pixel_window_size//2), (pixel_coord[0]+ir_pixel_window_size//2,pixel_coord[1]+ir_pixel_window_size//2), (0,255,0), thickness=1)
-            # cv2.imshow("IR Recording", ir_bgr)
-            # cv2.waitKey(10)
 
     pixel_coord_layer=np.array(pixel_coord_layer)
     #remove duplicate pixel regions

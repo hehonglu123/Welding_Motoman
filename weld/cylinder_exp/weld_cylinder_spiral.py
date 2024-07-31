@@ -8,7 +8,90 @@ from weldRRSensor import *
 from dual_robot import *
 from traj_manipulation import *
 
+def weld_spiral(robot,positioner,data_dir,v,feedrate,slice_increment,num_layers,slice_start,slice_end,job_offset,waypoint_distance=5,flipped=False,q_prev=np.zeros(2)):
+	q1_all=[]
+	q2_all=[]
+	v1_all=[]
+	v2_all=[]
+	cond_all=[]
+	primitives=[]
+	arcon_set=False
+	###PRELOAD ALL SLICES TO SAVE INPROCESS TIME
+	rob1_js_all_slices=[]
+	positioner_js_all_slices=[]
+	for i in range(0,slice_end):
+		if not flipped:
+			rob1_js_all_slices.append(np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(i)+'_0.csv',delimiter=','))
+			positioner_js_all_slices.append(np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(i)+'_0.csv',delimiter=','))
+		else:
+			###spiral rotation direction
+			rob1_js_all_slices.append(np.flip(np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(i)+'_0.csv',delimiter=','),axis=0))
+			positioner_js_all_slices.append(np.flip(np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(i)+'_0.csv',delimiter=','),axis=0))
 
+	print("LAYERS PRELOAD FINISHED")
+
+	slice_num=slice_start
+	layer_counts=0
+	while layer_counts<num_layers:
+
+		####################DETERMINE CURVE ORDER##############################################
+		x=0
+		rob1_js=copy.deepcopy(rob1_js_all_slices[slice_num])
+		positioner_js=copy.deepcopy(positioner_js_all_slices[slice_num])
+		curve_sliced_relative=np.loadtxt(data_dir+'curve_sliced_relative/slice'+str(slice_num)+'_'+str(x)+'.csv',delimiter=',')
+		if positioner_js.shape==(2,) and rob1_js.shape==(6,):
+			continue
+		
+		###TRJAECTORY WARPING
+		if slice_num>0:
+			rob1_js_prev=copy.deepcopy(rob1_js_all_slices[slice_num-slice_increment])
+			positioner_js_prev=copy.deepcopy(positioner_js_all_slices[slice_num-slice_increment])
+			rob1_js,positioner_js=warp_traj2(rob1_js,positioner_js,rob1_js_prev,positioner_js_prev,reversed=True)
+		if slice_num<slice_end-slice_increment:
+			rob1_js_next=copy.deepcopy(rob1_js_all_slices[slice_num+slice_increment])
+			positioner_js_next=copy.deepcopy(positioner_js_all_slices[slice_num+slice_increment])
+			rob1_js,positioner_js=warp_traj2(rob1_js,positioner_js,rob1_js_next,positioner_js_next,reversed=False)
+				
+		
+			
+		lam_relative=calc_lam_cs(curve_sliced_relative)
+		lam1=calc_lam_js(rob1_js,robot)
+		lam2=calc_lam_js(positioner_js,positioner)
+		num_points_layer=max(2,int(lam_relative[-1]/waypoint_distance))
+		breakpoints=np.linspace(0,len(rob1_js)-1,num=num_points_layer).astype(int)
+		s1_all,s2_all=calc_individual_speed(v,lam1,lam2,lam_relative,breakpoints)
+		# s1_all=[0.1]*len(s1_all)
+		###find closest %2pi
+		num2p=np.round((q_prev-positioner_js[0])/(2*np.pi))
+		positioner_js+=num2p*2*np.pi
+		###no need for acron/off when spiral, positioner not moving at all
+		if not arcon_set:
+			arcon_set=True
+			q1_all.append(rob1_js[breakpoints[0]])
+			q2_all.append(positioner_js[breakpoints[0]])
+			v1_all.append(1)
+			v2_all.append(1)
+			cond_all.append(0)
+			primitives.append('movej')
+		
+
+		q1_all.extend(rob1_js[breakpoints[1:]].tolist())
+		q2_all.extend(positioner_js[breakpoints[1:]].tolist())
+		v1_all.extend([1]*len(s1_all))
+		cond_all.extend([int(feedrate/10)+job_offset]*(num_points_layer-1))
+		primitives.extend(['movel']*(num_points_layer-1))
+
+		for j in range(1,len(breakpoints)):
+			positioner_w=v/np.linalg.norm(curve_sliced_relative[breakpoints[j]][:2])
+			v2_all.append(min(100,100*positioner_w/positioner.joint_vel_limit[1]))
+		
+		q_prev=copy.deepcopy(positioner_js[-1])
+		layer_counts+=1
+		slice_num+=slice_increment
+
+	return primitives,q1_all,q2_all,v1_all,v2_all,cond_all
+
+	
 def main():
 
 	dataset='cylinder/'
@@ -62,206 +145,68 @@ def main():
 
 	
 	flipped=True   #spiral direction
-	base_feedrate=250
-	volume_per_distance=10
-	v_layer=13
-	feedrate=volume_per_distance*v_layer
+	
+	base_feedrate=300
+	VPD=20
+	v_layer=5
+	layer_feedrate=VPD*v_layer
 	base_layer_height=3
 	v_base=5
-	layer_height=1.1
-	num_base_layer=10       #10layers to avoid clamp blocking IR view
-	num_layer=20
+	layer_height=1.3
+	num_base_layer=2        #2 base layer to establish adhesion to coupon
+	num_support_layer=10     #support layer to raise the cylinder till visible by IR camera
+	support_layer_height=2.0
+	support_feedrate=300
+	v_support=10
+	weld_num_layer=20
 
-	q_all=[]
-	v_all=[]
-	job_offset=450
-	cond_all=[]
-	primitives=[]
+	weld_arcon=True
+	job_offset=400
+
 
 	nominal_slice_increment=int(layer_height/slicing_meta['line_resolution'])
 	base_slice_increment=int(base_layer_height/slicing_meta['line_resolution'])
+	support_slice_increment=int(support_layer_height/slicing_meta['line_resolution'])
 
 
 	
 
-	###jog to start point
+	###jog rob2 & positioner to start point
 	client=MotionProgramExecClient()
 	ws=WeldSend(client)
 	q_prev=client.getJointAnglesDB(positioner.pulse2deg)
 	num2p=np.round((q_prev-positioner_js[0])/(2*np.pi))
 	positioner_js+=num2p*2*np.pi
 	ws.jog_dual(robot2,positioner,q2,positioner_js[0],v=1)
-	q1_all=[]
-	q2_all=[]
-	v1_all=[]
-	v2_all=[]
-	cond_all=[]
-	primitives=[]
-	arcon_set=False
 
-	# ########################################################################################
-	# ######################################################################################################
-	# #####################################################BASE LAYER##########################################################################################
-	# num_layer_end=num_base_layer*base_slice_increment
-	# ###PRELOAD ALL SLICES TO SAVE INPROCESS TIME
-	# rob1_js_all_slices=[]
-	# positioner_js_all_slices=[]
-	# for i in range(0,num_layer_end):
-	# 	if not flipped:
-	# 		rob1_js_all_slices.append(np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(i)+'_0.csv',delimiter=','))
-	# 		positioner_js_all_slices.append(np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(i)+'_0.csv',delimiter=','))
-	# 	else:
-	# 		###spiral rotation direction
-	# 		rob1_js_all_slices.append(np.flip(np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(i)+'_0.csv',delimiter=','),axis=0))
-	# 		positioner_js_all_slices.append(np.flip(np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(i)+'_0.csv',delimiter=','),axis=0))
 
-	# print("PRELOAD FINISHED")
+	#####################################################BASE & SUPPORT LAYER##########################################################################################
+	slice_start=0
+	slice_end=int(base_slice_increment*num_base_layer)
+	primitives_base,q1_all_base,q2_all_base,v1_all_base,v2_all_base,cond_all_base = weld_spiral(robot,positioner,data_dir,v_base,base_feedrate,base_slice_increment,num_base_layer,slice_start,slice_end,job_offset,waypoint_distance,flipped,q_prev)
 
+	q_prev=q2_all_base[-1]
+	slice_start=int(num_base_layer*base_slice_increment)
+	slice_end=int(num_base_layer*base_slice_increment+num_support_layer*support_slice_increment)
+	primitives_support,q1_all_support,q2_all_support,v1_all_support,v2_all_support,cond_all_support = weld_spiral(robot,positioner,data_dir,v_support,support_feedrate,support_slice_increment,num_support_layer,slice_start,slice_end,job_offset,waypoint_distance,flipped,q_prev)
 	
-	# for slice_num in range(0,num_layer_end,base_slice_increment):
-
-	# 	####################DETERMINE CURVE ORDER##############################################
-	# 	x=0
-	# 	rob1_js=copy.deepcopy(rob1_js_all_slices[slice_num])
-	# 	positioner_js=copy.deepcopy(positioner_js_all_slices[slice_num])
-	# 	curve_sliced_relative=np.loadtxt(data_dir+'curve_sliced_relative/slice'+str(slice_num)+'_'+str(x)+'.csv',delimiter=',')
-	# 	if positioner_js.shape==(2,) and rob1_js.shape==(6,):
-	# 		continue
-		
-	# 	###TRJAECTORY WARPING
-	# 	if slice_num>0:
-	# 		rob1_js_prev=copy.deepcopy(rob1_js_all_slices[slice_num-base_slice_increment])
-	# 		positioner_js_prev=copy.deepcopy(positioner_js_all_slices[slice_num-base_slice_increment])
-	# 		rob1_js,positioner_js=warp_traj2(rob1_js,positioner_js,rob1_js_prev,positioner_js_prev,reversed=True)
-	# 	if slice_num<num_layer_end-base_slice_increment:
-	# 		rob1_js_next=copy.deepcopy(rob1_js_all_slices[slice_num+base_slice_increment])
-	# 		positioner_js_next=copy.deepcopy(positioner_js_all_slices[slice_num+base_slice_increment])
-	# 		rob1_js,positioner_js=warp_traj2(rob1_js,positioner_js,rob1_js_next,positioner_js_next,reversed=False)
-				
-		
-			
-	# 	lam_relative=calc_lam_cs(curve_sliced_relative)
-	# 	lam1=calc_lam_js(rob1_js,robot)
-	# 	lam2=calc_lam_js(positioner_js,positioner)
-	# 	num_points_layer=max(2,int(lam_relative[-1]/waypoint_distance))
-	# 	breakpoints=np.linspace(0,len(rob1_js)-1,num=num_points_layer).astype(int)
-	# 	s1_all,s2_all=calc_individual_speed(v_base,lam1,lam2,lam_relative,breakpoints)
-	# 	# s1_all=[0.1]*len(s1_all)
-	# 	###find closest %2pi
-	# 	num2p=np.round((q_prev-positioner_js[0])/(2*np.pi))
-	# 	positioner_js+=num2p*2*np.pi
-	# 	###no need for acron/off when spiral, positioner not moving at all
-	# 	if not arcon_set:
-	# 		arcon_set=True
-	# 		q1_all.append(rob1_js[breakpoints[0]])
-	# 		q2_all.append(positioner_js[breakpoints[0]])
-	# 		v1_all.append(1)
-	# 		v2_all.append(1)
-	# 		cond_all.append(0)
-	# 		primitives.append('movej')
-		
-
-	# 	q1_all.extend(rob1_js[breakpoints[1:]].tolist())
-	# 	q2_all.extend(positioner_js[breakpoints[1:]].tolist())
-	# 	v1_all.extend([1]*len(s1_all))
-	# 	cond_all.extend([int(base_feedrate/10)+job_offset]*(num_points_layer-1))
-	# 	primitives.extend(['movel']*(num_points_layer-1))
-
-	# 	for j in range(1,len(breakpoints)):
-	# 		positioner_w=v_base/np.linalg.norm(curve_sliced_relative[breakpoints[j]][:2])
-	# 		v2_all.append(min(100,100*positioner_w/positioner.joint_vel_limit[1]))
-		
-	# 	q_prev=copy.deepcopy(positioner_js[-1])
-
-	# ws.weld_segment_dual(primitives,robot,positioner,q1_all,q2_all,v1_all,v2_all,cond_all,arc=arcon_set)
-
+	ws.weld_segment_dual(primitives_base+primitives_support[1:],robot,positioner,q1_all_base+q1_all_support[1:],q2_all_base+q2_all_support[1:],v1_all_base+v1_all_support[1:],v2_all_base+v2_all_support[1:],cond_all_base+cond_all_support[1:],arc=weld_arcon)
+	print("BASE & SUPPORT LAYER FINISHED")
 	
-	##########################################################################################
-	########################################################################################################
+
 	#####################################################LAYER Welding##########################################################################################
-	###PRELOAD ALL SLICES TO SAVE INPROCESS TIME
-	rob1_js_all_slices=[]
-	positioner_js_all_slices=[]
-	for i in range(slicing_meta['num_layers']):
-		if not flipped:
-			rob1_js_all_slices.append(np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(i)+'_0.csv',delimiter=','))
-			positioner_js_all_slices.append(np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(i)+'_0.csv',delimiter=','))
-		else:
-			###spiral rotation direction
-			rob1_js_all_slices.append(np.flip(np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(i)+'_0.csv',delimiter=','),axis=0))
-			positioner_js_all_slices.append(np.flip(np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(i)+'_0.csv',delimiter=','),axis=0))
-
-	print("PRELOAD FINISHED")
-
-	num_layer_start=int(num_base_layer*base_slice_increment)
-	num_layer_end=slicing_meta['num_layers']-1
-	slice_num=num_layer_start
-	layer_counts=0
-	while layer_counts<num_layer:
-
-		####################DETERMINE CURVE ORDER##############################################
-		x=0
-		rob1_js=copy.deepcopy(rob1_js_all_slices[slice_num])
-		positioner_js=copy.deepcopy(positioner_js_all_slices[slice_num])
-		curve_sliced_relative=np.loadtxt(data_dir+'curve_sliced_relative/slice'+str(slice_num)+'_'+str(x)+'.csv',delimiter=',')
-		if positioner_js.shape==(2,) and rob1_js.shape==(6,):
-			continue
-		
-		###TRJAECTORY WARPING
-		if slice_num>num_layer_start:
-			rob1_js_prev=copy.deepcopy(rob1_js_all_slices[slice_num-nominal_slice_increment])
-			positioner_js_prev=copy.deepcopy(positioner_js_all_slices[slice_num-nominal_slice_increment])
-			rob1_js,positioner_js=warp_traj2(rob1_js,positioner_js,rob1_js_prev,positioner_js_prev,reversed=True)
-		if slice_num<num_layer_end-nominal_slice_increment:
-			rob1_js_next=copy.deepcopy(rob1_js_all_slices[slice_num+nominal_slice_increment])
-			positioner_js_next=copy.deepcopy(positioner_js_all_slices[slice_num+nominal_slice_increment])
-			rob1_js,positioner_js=warp_traj2(rob1_js,positioner_js,rob1_js_next,positioner_js_next,reversed=False)
-				
-		
-			
-		lam_relative=calc_lam_cs(curve_sliced_relative)
-		lam1=calc_lam_js(rob1_js,robot)
-		lam2=calc_lam_js(positioner_js,positioner)
-		num_points_layer=max(2,int(lam_relative[-1]/waypoint_distance))
-		breakpoints=np.linspace(0,len(rob1_js)-1,num=num_points_layer).astype(int)
-		s1_all,s2_all=calc_individual_speed(v_layer,lam1,lam2,lam_relative,breakpoints)
-		# s1_all=[0.1]*len(s1_all)
-		###find closest %2pi
-		num2p=np.round((q_prev-positioner_js[0])/(2*np.pi))
-		positioner_js+=num2p*2*np.pi
-		###no need for acron/off when spiral, positioner not moving at all
-		if not arcon_set:
-			arcon_set=True
-			q1_all.append(rob1_js[breakpoints[0]])
-			q2_all.append(positioner_js[breakpoints[0]])
-			v1_all.append(1)
-			v2_all.append(1)
-			cond_all.append(0)
-			primitives.append('movej')
-		
-
-		q1_all.extend(rob1_js[breakpoints[1:]].tolist())
-		q2_all.extend(positioner_js[breakpoints[1:]].tolist())
-		# v1_all.extend(s1_all)
-		v1_all.extend([1]*len(s1_all))
-		cond_all.extend([int(feedrate/10)+job_offset]*(num_points_layer-1))
-		primitives.extend(['movel']*(num_points_layer-1))
-
-		for j in range(1,len(breakpoints)):
-			positioner_w=v_layer/np.linalg.norm(curve_sliced_relative[breakpoints[j]][:2])
-			v2_all.append(min(100,100*positioner_w/positioner.joint_vel_limit[1]))
-		
-		q_prev=copy.deepcopy(positioner_js[-1])
-		layer_counts+=1
-		slice_num+=nominal_slice_increment
+	q_prev=client.getJointAnglesDB(positioner.pulse2deg)
+	slice_start=int(num_base_layer*base_slice_increment+num_support_layer*support_slice_increment)
+	slice_end=slicing_meta['num_layers']
+	primitives,q1_all,q2_all,v1_all,v2_all,cond_all = weld_spiral(robot,positioner,data_dir,v_layer,layer_feedrate,nominal_slice_increment,weld_num_layer,slice_start,slice_end,job_offset,waypoint_distance,flipped,q_prev)
 
 	##############################################################Log & Execution####################################################################
 	rr_sensors.start_all_sensors()
-	global_ts,robot_ts,joint_recording,job_line,_ = ws.weld_segment_dual(primitives,robot,positioner,q1_all,q2_all,v1_all,v2_all,cond_all,arc=arcon_set)
+	global_ts,robot_ts,joint_recording,job_line,_ = ws.weld_segment_dual(primitives,robot,positioner,q1_all,q2_all,v1_all,v2_all,cond_all,arc=weld_arcon)
 	rr_sensors.stop_all_sensors()
 
 
-	recorded_dir='../../../recorded_data/ER316L/VPD%i/cylinderspiral_%iipm_v%i/'%(volume_per_distance,feedrate,v_layer)
+	recorded_dir='../../../recorded_data/ER316L/phi0.9_VPD%i/cylinderspiral_%iipm_v%i/'%(VPD,layer_feedrate,v_layer)
 	os.makedirs(recorded_dir,exist_ok=True)
 	np.savetxt(recorded_dir+'weld_js_exe.csv',np.hstack((global_ts[:, np.newaxis],robot_ts[:, np.newaxis],job_line[:, np.newaxis],joint_recording)),delimiter=',')
 	rr_sensors.save_all_sensors(recorded_dir)

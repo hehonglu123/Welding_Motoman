@@ -7,20 +7,14 @@ from flir_toolbox import *
 from motoman_def import *
 from ultralytics import YOLO
 
-def get_pixel_value_new(ir_image,coord,window_size):
-    ###get pixel value larger than avg within the window
-    window = ir_image[coord[1]-window_size//2:coord[1]+window_size//2+1,coord[0]-window_size//2:coord[0]+window_size//2+1]
-    pixel_avg = np.mean(window)
-    mask = (window > pixel_avg) # filter out background 
-    pixel_avg = np.mean(window[mask])
-    return pixel_avg
-
 #load model
 torch_model = YOLO(os.path.dirname(inspect.getfile(flir_toolbox))+"/torch.pt")
 tip_wire_model = YOLO(os.path.dirname(inspect.getfile(flir_toolbox))+"/tip_wire.pt")
 
 VPD=20
-for v in tqdm(range(9,14)):
+vertical_offset=3
+horizontal_offset=0
+for v in tqdm(range(5,16)):
     # Load the IR recording data from the pickle file
     data_dir='../../../recorded_data/ER316L/phi0.9_VPD20/cylinderspiral_%iipm_v%i/'%(VPD*v,v)
 
@@ -31,10 +25,10 @@ for v in tqdm(range(9,14)):
     joint_angle=np.loadtxt(data_dir+'weld_js_exe.csv',delimiter=',')
 
 
-    frame_start=0
+    frame_start=5*len(ir_recording)//20     ###get rid of the first 5 layers
     frame_end=len(ir_recording)
     # frame_end=20000
-    ir_pixel_window_size=5
+    ir_pixel_window_size=7
 
     pixel_value_all=[]
     ir_ts_processed=[]
@@ -52,8 +46,8 @@ for v in tqdm(range(9,14)):
                 flame_centroid_history.append(centroid)
                                     
             #find average pixel value 
-            pixel_coord = (int(centroid[0]), int(centroid[1]))
-            flame_reading=get_pixel_value_new(ir_image,pixel_coord,ir_pixel_window_size)
+            pixel_coord = (int(centroid[0]) + horizontal_offset, int(centroid[1]) + vertical_offset)
+            flame_reading=get_pixel_value(ir_image,pixel_coord,ir_pixel_window_size)
             pixel_value_all.append(flame_reading)
             ir_ts_processed.append(ir_ts[i])
 

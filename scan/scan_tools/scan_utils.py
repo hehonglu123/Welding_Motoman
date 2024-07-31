@@ -2,20 +2,16 @@ from cProfile import label
 import sys
 import matplotlib
 
-sys.path.append('../../toolbox/')
-from robot_def import *
-from utils import *
+# from utils import *
 from general_robotics_toolbox import *
 import open3d as o3d
 
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import colors as mcolors
-import time
 from copy import deepcopy
 import colorsys
-import math
-import pickle
+
 
 table_colors = list(mcolors.TABLEAU_COLORS.values())
 

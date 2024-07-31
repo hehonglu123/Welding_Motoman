@@ -1,10 +1,6 @@
 import sys
-import matplotlib
-sys.path.append('../../toolbox/')
 sys.path.append('../scan_tools/')
-from robot_def import *
 from scan_utils import *
-from utils import *
 from lambda_calc import *
 from general_robotics_toolbox import *
 import open3d as o3d

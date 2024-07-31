@@ -1,12 +1,12 @@
 from copy import deepcopy
 from pathlib import Path
 import sys
-sys.path.append('../../toolbox/')
 sys.path.append('../../redundancy_resolution/')
 sys.path.append('../redundancy_resolution/')
 sys.path.append('../scan_tools/')
-from robot_def import *
-from multi_robot import *
+from motoman_def import *
+from dual_robot import *
+from lambda_calc import *
 from scan_utils import *
 from scan_continuous import *
 from redundancy_resolution_scanner import *
