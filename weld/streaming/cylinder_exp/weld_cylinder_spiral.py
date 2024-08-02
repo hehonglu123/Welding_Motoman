@@ -5,7 +5,6 @@ from RobotRaconteur.Client import *
 from weldRRSensor import *
 from dual_robot import *
 from traj_manipulation import *
-sys.path.append('../../toolbox/')
 from StreamingSend import *
 
 

@@ -3,14 +3,13 @@ from tqdm import tqdm
 import sys, traceback, time, copy, glob
 from general_robotics_toolbox import *
 from redundancy_resolution import *
-sys.path.append('../toolbox')
-from robot_def import *
+from motoman_def import *
 
 
 def main():
-	dataset='cylinder/'
+	dataset='tube/'
 	sliced_alg='dense_slice/'
-	data_dir='../data/'+dataset+sliced_alg
+	data_dir='../../geometry_data/'+dataset+sliced_alg
 	with open(data_dir+'slicing.yml', 'r') as file:
 		slicing_meta = yaml.safe_load(file)
 
