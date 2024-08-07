@@ -2,12 +2,10 @@ from copy import deepcopy
 from pathlib import Path
 import pickle, sys, time, datetime, traceback, glob
 sys.path.append('../../scan/scan_tools/')
-sys.path.append('../../scan/scan_process/')
 
 from motoman_def import *
 from scan_utils import *
 from robotics_utils import *
-from scanProcess import *
 from weldRRSensor import *
 from WeldSend import *
 from dual_robot import *
@@ -55,7 +53,7 @@ def main():
 	##############################################################Robot####################################################################
 	###robot kinematics def
 	config_dir='../../config/'
-	robot2=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.yml',tool_file_path=config_dir+'mti.csv',\
+	robot_scan=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.yml',tool_file_path=config_dir+'mti.csv',\
 		pulse2deg_file_path=config_dir+'MA1440_A0_pulse2deg_real.csv',base_transformation_file=config_dir+'MA1440_pose.csv')
 	positioner=positioner_obj('D500B',def_path=config_dir+'D500B_robot_extended_config.yml',tool_file_path=config_dir+'positioner_tcp.csv',\
 		pulse2deg_file_path=config_dir+'D500B_pulse2deg_real.csv',base_transformation_file=config_dir+'D500B_pose_mocap.csv')
@@ -112,23 +110,23 @@ def main():
 	# plt.show()
 
 	
-	rrd=redundancy_resolution_dual(robot2,positioner,scan_p,scan_R)
-	q_out1, q_out2=rrd.dual_arm_6dof_stepwise(r2_mid,positioner_init,w1=0.1,w2=0.01)	#more weights on robot2 to make it move slower
+	rrd=redundancy_resolution_dual(robot_scan,positioner,scan_p,scan_R)
+	q_out1, q_out2=rrd.dual_arm_6dof_stepwise(r2_mid,positioner_init,w1=0.1,w2=0.01)	#more weights on robot_scan to make it move slower
 
-	lam1=calc_lam_js(q_out1,robot2)
+	lam1=calc_lam_js(q_out1,robot_scan)
 	lam2=calc_lam_js(q_out2,positioner)
 	lam_relative=calc_lam_cs(scan_p)
 	q_bp1,q_bp2,s1_all,s2_all=gen_motion_program_dual(lam1,lam2,lam_relative,q_out1,q_out2,v=10)
 
 
 	# ## move to start
-	# ws.jog_dual(robot2,positioner,r2_mid,q_bp2[0][0])
-	# ws.jog_dual(robot2,positioner,q_bp1[0][0],q_bp2[0][0])
+	# ws.jog_dual(robot_scan,positioner,r2_mid,q_bp2[0][0])
+	# ws.jog_dual(robot_scan,positioner,q_bp1[0][0],q_bp2[0][0])
 
 	# input("Press Enter to start moving and scanning")
 
 	# ## motion start
-	# mp = MotionProgram(ROBOT_CHOICE='RB2',ROBOT_CHOICE2='ST1',pulse2deg=robot2.pulse2deg,pulse2deg_2=positioner.pulse2deg)
+	# mp = MotionProgram(ROBOT_CHOICE='RB2',ROBOT_CHOICE2='ST1',pulse2deg=robot_scan.pulse2deg,pulse2deg_2=positioner.pulse2deg)
 	# # calibration motion
 	# target2=['MOVJ',np.degrees(q_bp2[1][0]),s2_all[0]]
 	# mp.MoveL(np.degrees(q_bp1[1][0]), scan_speed, 0, target2=target2)
@@ -145,7 +143,8 @@ def main():
 	# start_time=time.time()
 	# state_flag=0
 	# joint_recording=[]
-	# robot_stamps=[]
+	# robot_ts=[]
+	# global_ts=[]
 	# mti_recording=[]
 	# while True:
 	# 	if state_flag & STATUS_RUNNING == 0 and time.time()-start_time>1.:
@@ -156,7 +155,8 @@ def main():
 	# 		state_flag=fb_data.controller_flags
 	# 		joint_recording.append(joint_angle)
 	# 		timestamp=fb_data.time
-	# 		robot_stamps.append(timestamp)
+	# 		robot_ts.append(timestamp)
+	# 		global_ts.append(time.perf_counter())
 	# 		###MTI scans YZ point from tool frame
 	# 		mti_recording.append(deepcopy(np.array([mti_client.lineProfile.X_data,mti_client.lineProfile.Z_data])))
 	# ws.client.servoMH(False)
@@ -166,7 +166,7 @@ def main():
 	# q_out_exe=joint_recording[:,6:]
 
 
-	# ws.jog_single(robot2,r2_mid)
+	# ws.jog_single(robot_scan,r2_mid)
 
 
 	# ###########################################################Save Scanning Data###########################################################
@@ -174,8 +174,7 @@ def main():
 	# ## save traj
 	# Path(out_scan_dir).mkdir(exist_ok=True)
 	# # save poses
-	# np.savetxt(out_scan_dir + 'scan_js_exe.csv',q_out_exe,delimiter=',')
-	# np.savetxt(out_scan_dir + 'scan_robot_stamps.csv',robot_stamps,delimiter=',')
+	# np.savetxt(out_scan_dir + 'scan_js_exe.csv',np.hstack((np.array(global_ts).reshape(-1,1),np.array(robot_ts).reshape(-1,1),q_out_exe)),delimiter=',')
 	# with open(out_scan_dir + 'mti_scans.pickle', 'wb') as file:
 	# 	pickle.dump(mti_recording, file)
 
