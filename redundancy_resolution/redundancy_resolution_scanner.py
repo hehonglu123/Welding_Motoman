@@ -96,7 +96,13 @@ class redundancy_resolution_scanner(object):
                     H=(H+np.transpose(H))/2
 
                     vd = self.scan_p[i]-dpt1t2_t2
-                    omega_d=s_err_func(Rt1_t2@self.scan_R[i].T)
+                    
+                    k,theta = R2rot(Rt1_t2@self.scan_R[i].T)
+                    print("HERE",np.sin(theta/2), k )
+                    
+                    s=np.sin(theta/2)*k 
+                    omega_d = -s
+                    # omega_d=s_err_func(Rt1_t2@self.scan_R[i].T)
                     # omega_d=s_err_func(self.scan_R[i].T@Rt1_t2)
 
                     f=-np.dot(np.transpose(J_all_p),vd)+Kw*np.dot(np.transpose(J_all_R),omega_d)

@@ -53,6 +53,8 @@ def main():
 	##############################################################Robot####################################################################
 	###robot kinematics def
 	config_dir='../../config/'
+	robot=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path=config_dir+'torch.csv',\
+		pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',d=15)
 	robot_scan=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.yml',tool_file_path=config_dir+'mti.csv',\
 		pulse2deg_file_path=config_dir+'MA1440_A0_pulse2deg_real.csv',base_transformation_file=config_dir+'MA1440_pose.csv')
 	positioner=positioner_obj('D500B',def_path=config_dir+'D500B_robot_extended_config.yml',tool_file_path=config_dir+'positioner_tcp.csv',\
@@ -66,17 +68,17 @@ def main():
 	slice_num=num_layers*nominal_slice_increment
 	curve_sliced_relative=np.loadtxt(data_dir+'curve_sliced_relative/slice%i_0.csv'%slice_num,delimiter=',')
 
-	# ###########################################################Robot Control#######################################################
-	# client=MotionProgramExecClient()
-	# ws=WeldSend(client)
+	###########################################################Robot Control#######################################################
+	client=MotionProgramExecClient()
+	ws=WeldSend(client)
 
-	# ##############################################################SENSORS####################################################################
-	# mti_client = RRN.ConnectService("rr+tcp://192.168.55.10:60830/?service=MTI2D")
-	# mti_client.setExposureTime("25")
+	##############################################################SENSORS####################################################################
+	mti_client = RRN.ConnectService("rr+tcp://192.168.55.10:60830/?service=MTI2D")
+	mti_client.setExposureTime("25")
 
 
 	###########################################################Generate Scanning Path###########################################################
-	r2_mid = np.radians([43.7851,20,-10,0,0,0])
+	r2_mid = np.radians([-7.48,27.4,-13.9,-50.7,-43,63.1])
 
 	### scan parameters
 	scan_speed=10 # scanning speed (mm/sec)
@@ -85,8 +87,8 @@ def main():
 	Ry_angle = np.radians(0) # rotate in y a bit
 	bounds_theta = np.radians(1) ## circular motion at start and end
 	all_scan_angle = np.radians([0]) ## scan angle
-	# positioner_init=client.getJointAnglesDB(positioner.pulse2deg) ## init table
-	positioner_init=np.radians([-15,200]) ## init table
+	positioner_init=client.getJointAnglesDB(positioner.pulse2deg) ## init table
+	# positioner_init=np.radians([-15,200]) ## init table
 	scan_p,scan_R=scan_path_gen(curve_sliced_relative,scan_stand_off_d)
 	
 
@@ -111,72 +113,71 @@ def main():
 
 	
 	rrd=redundancy_resolution_dual(robot_scan,positioner,scan_p,scan_R)
-	q_out1, q_out2=rrd.dual_arm_6dof_stepwise(r2_mid,positioner_init,w1=0.1,w2=0.01)	#more weights on robot_scan to make it move slower
+	q_out1, q_out2=rrd.dual_arm_6dof_stepwise(copy.deepcopy(r2_mid),positioner_init,w1=0.1,w2=0.01)	#more weights on robot_scan to make it move slower
 
 	lam1=calc_lam_js(q_out1,robot_scan)
 	lam2=calc_lam_js(q_out2,positioner)
 	lam_relative=calc_lam_cs(scan_p)
 	q_bp1,q_bp2,s1_all,s2_all=gen_motion_program_dual(lam1,lam2,lam_relative,q_out1,q_out2,v=10)
 
+	## move to start
+	ws.jog_single(robot,[0.,0.,np.pi/6,0.,0.,0.])
+	ws.jog_dual(robot_scan,positioner,r2_mid,q_bp2[0])
+	ws.jog_dual(robot_scan,positioner,q_bp1[0],q_bp2[0])
 
-	# ## move to start
-	# ws.jog_dual(robot_scan,positioner,r2_mid,q_bp2[0][0])
-	# ws.jog_dual(robot_scan,positioner,q_bp1[0][0],q_bp2[0][0])
+	input("Press Enter to start moving and scanning")
 
-	# input("Press Enter to start moving and scanning")
+	## motion start
+	mp = MotionProgram(ROBOT_CHOICE='RB2',ROBOT_CHOICE2='ST1',pulse2deg=robot_scan.pulse2deg,pulse2deg_2=positioner.pulse2deg)
+	# calibration motion
+	target2=['MOVJ',np.degrees(q_bp2[1]),s2_all[0]]
+	mp.MoveL(np.degrees(q_bp1[1]), scan_speed, 0, target2=target2)
+	# routine motion
+	for path_i in range(2,len(q_bp1)-1):
+		target2=['MOVJ',np.degrees(q_bp2[path_i]),s2_all[path_i]]
+		mp.MoveL(np.degrees(q_bp1[path_i]), s1_all[path_i], target2=target2)
+	target2=['MOVJ',np.degrees(q_bp2[-1]),s2_all[-1]]
+	mp.MoveL(np.degrees(q_bp1[-1]), s1_all[-1], 0, target2=target2)
 
-	# ## motion start
-	# mp = MotionProgram(ROBOT_CHOICE='RB2',ROBOT_CHOICE2='ST1',pulse2deg=robot_scan.pulse2deg,pulse2deg_2=positioner.pulse2deg)
-	# # calibration motion
-	# target2=['MOVJ',np.degrees(q_bp2[1][0]),s2_all[0]]
-	# mp.MoveL(np.degrees(q_bp1[1][0]), scan_speed, 0, target2=target2)
-	# # routine motion
-	# for path_i in range(2,len(q_bp1)-1):
-	# 	target2=['MOVJ',np.degrees(q_bp2[path_i][0]),s2_all[path_i]]
-	# 	mp.MoveL(np.degrees(q_bp1[path_i][0]), s1_all[path_i], target2=target2)
-	# target2=['MOVJ',np.degrees(q_bp2[-1][0]),s2_all[-1]]
-	# mp.MoveL(np.degrees(q_bp1[-1][0]), s1_all[-1], 0, target2=target2)
-
-	# ws.client.execute_motion_program_nonblocking(mp)
-	# ###streaming
-	# ws.client.StartStreaming()
-	# start_time=time.time()
-	# state_flag=0
-	# joint_recording=[]
-	# robot_ts=[]
-	# global_ts=[]
-	# mti_recording=[]
-	# while True:
-	# 	if state_flag & STATUS_RUNNING == 0 and time.time()-start_time>1.:
-	# 		break 
-	# 	res, fb_data = ws.client.fb.try_receive_state_sync(ws.client.controller_info, 0.001)
-	# 	if res:
-	# 		joint_angle=np.hstack((fb_data.group_state[0].feedback_position,fb_data.group_state[1].feedback_position,fb_data.group_state[2].feedback_position))
-	# 		state_flag=fb_data.controller_flags
-	# 		joint_recording.append(joint_angle)
-	# 		timestamp=fb_data.time
-	# 		robot_ts.append(timestamp)
-	# 		global_ts.append(time.perf_counter())
-	# 		###MTI scans YZ point from tool frame
-	# 		mti_recording.append(deepcopy(np.array([mti_client.lineProfile.X_data,mti_client.lineProfile.Z_data])))
-	# ws.client.servoMH(False)
+	ws.client.execute_motion_program_nonblocking(mp)
+	###streaming
+	ws.client.StartStreaming()
+	start_time=time.time()
+	state_flag=0
+	joint_recording=[]
+	robot_ts=[]
+	global_ts=[]
+	mti_recording=[]
+	while True:
+		if state_flag & STATUS_RUNNING == 0 and time.time()-start_time>1.:
+			break 
+		res, fb_data = ws.client.fb.try_receive_state_sync(ws.client.controller_info, 0.001)
+		if res:
+			joint_angle=np.hstack((fb_data.group_state[0].feedback_position,fb_data.group_state[1].feedback_position,fb_data.group_state[2].feedback_position))
+			state_flag=fb_data.controller_flags
+			joint_recording.append(joint_angle)
+			timestamp=fb_data.time
+			robot_ts.append(timestamp)
+			global_ts.append(time.perf_counter())
+			###MTI scans YZ point from tool frame
+			mti_recording.append(deepcopy(np.array([mti_client.lineProfile.X_data,mti_client.lineProfile.Z_data])))
+	ws.client.servoMH(False)
 	
-	# mti_recording=np.array(mti_recording)
-	# joint_recording=np.array(joint_recording)
-	# q_out_exe=joint_recording[:,6:]
+	mti_recording=np.array(mti_recording)
+	joint_recording=np.array(joint_recording)
 
 
-	# ws.jog_single(robot_scan,r2_mid)
+	ws.jog_single(robot_scan,r2_mid)
 
 
-	# ###########################################################Save Scanning Data###########################################################
-	# out_scan_dir = 'scans/'
-	# ## save traj
-	# Path(out_scan_dir).mkdir(exist_ok=True)
-	# # save poses
-	# np.savetxt(out_scan_dir + 'scan_js_exe.csv',np.hstack((np.array(global_ts).reshape(-1,1),np.array(robot_ts).reshape(-1,1),q_out_exe)),delimiter=',')
-	# with open(out_scan_dir + 'mti_scans.pickle', 'wb') as file:
-	# 	pickle.dump(mti_recording, file)
+	###########################################################Save Scanning Data###########################################################
+	out_scan_dir = 'scans/'
+	## save traj
+	Path(out_scan_dir).mkdir(exist_ok=True)
+	# save poses
+	np.savetxt(out_scan_dir + 'scan_js_exe.csv',np.hstack((np.array(global_ts).reshape(-1,1),np.array(robot_ts).reshape(-1,1),joint_recording)),delimiter=',')
+	with open(out_scan_dir + 'mti_scans.pickle', 'wb') as file:
+		pickle.dump(mti_recording, file)
 
 
 if __name__ == '__main__':

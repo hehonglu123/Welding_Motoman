@@ -105,7 +105,8 @@ def main():
 	##############################################################SENSORS####################################################################
 	# weld state logging
 	# weld_ser = RRN.SubscribeService('rr+tcp://192.168.55.10:60823?service=welder')
-	cam_ser=RRN.ConnectService('rr+tcp://localhost:60827/?service=camera')
+	# cam_ser=RRN.ConnectService('rr+tcp://localhost:60827/?service=camera')
+	cam_ser=None
 	# mic_ser = RRN.ConnectService('rr+tcp://192.168.55.20:60828?service=microphone')
 	## RR sensor objects
 	rr_sensors = WeldRRSensor(weld_service=None,cam_service=cam_ser,microphone_service=None)
@@ -147,8 +148,8 @@ def main():
 	flipped=True   #spiral direction
 	
 	base_feedrate=300
-	VPD=20
-	v_layer=5
+	VPD=10
+	v_layer=10
 	layer_feedrate=VPD*v_layer
 	base_layer_height=3
 	v_base=5
@@ -156,12 +157,12 @@ def main():
 	num_base_layer=2        #2 base layer to establish adhesion to coupon
 	num_support_layer=10     #support layer to raise the cylinder till visible by IR camera
 	support_layer_height=2.0
-	support_feedrate=300
+	support_feedrate=200
 	v_support=10
 	weld_num_layer=20
 
 	weld_arcon=True
-	job_offset=400
+	job_offset=200
 
 
 	nominal_slice_increment=int(layer_height/slicing_meta['line_resolution'])
@@ -206,7 +207,7 @@ def main():
 	rr_sensors.stop_all_sensors()
 
 
-	recorded_dir='../../../recorded_data/ER316L/phi0.9_VPD%i/cylinderspiral_%iipm_v%i/'%(VPD,layer_feedrate,v_layer)
+	# recorded_dir='../../../recorded_data/ER316L/phi0.9_VPD%i/cylinderspiral_%iipm_v%i/'%(VPD,layer_feedrate,v_layer)
 	os.makedirs(recorded_dir,exist_ok=True)
 	np.savetxt(recorded_dir+'weld_js_exe.csv',np.hstack((global_ts[:, np.newaxis],robot_ts[:, np.newaxis],job_line[:, np.newaxis],joint_recording)),delimiter=',')
 	rr_sensors.save_all_sensors(recorded_dir)
