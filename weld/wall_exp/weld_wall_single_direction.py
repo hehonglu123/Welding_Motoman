@@ -130,10 +130,10 @@ def main():
 	rr_sensors.stop_all_sensors()
 
 
-	recorded_dir='../../../recorded_data/ER316L/wallbf_%iipm_v%i_%iipm_v%i/'%(feedrate,v_layer,feedrate_edge,v_edge)
-	os.makedirs(recorded_dir,exist_ok=True)
-	np.savetxt(recorded_dir+'weld_js_exe.csv',np.hstack((global_ts,robot_ts,job_line,joint_recording)),delimiter=',')
-	rr_sensors.save_all_sensors(recorded_dir)
+	# recorded_dir='../../../recorded_data/ER316L/wallbf_%iipm_v%i_%iipm_v%i/'%(feedrate,v_layer,feedrate_edge,v_edge)
+	# os.makedirs(recorded_dir,exist_ok=True)
+	# np.savetxt(recorded_dir+'weld_js_exe.csv',np.hstack((global_ts,robot_ts,job_line,joint_recording)),delimiter=',')
+	# rr_sensors.save_all_sensors(recorded_dir)
 
 if __name__ == '__main__':
 	main()
