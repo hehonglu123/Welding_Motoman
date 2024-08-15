@@ -8,7 +8,7 @@ from weldRRSensor import *
 
 def main():
 
-	dataset='triangle/'
+	dataset='right_triangle/'
 	sliced_alg='dense_slice/'
 	data_dir='../../../geometry_data/'+dataset+sliced_alg
 	with open(data_dir+'slicing.yml', 'r') as file:
@@ -99,7 +99,7 @@ def main():
 	# 	###adjust slice_num
 	# 	slice_num+=base_slice_increment
 
-	# ws.weld_segment_single(primitives,robot,q_all,v_all,cond_all,arc=True,wait=0.,blocking=True)
+	# ws.weld_segment_single(primitives,robot,q_all,v_all,cond_all,arc=False,wait=0.,blocking=True)
 	
 
 	####################################Normal Layer Welding####################################
@@ -136,11 +136,11 @@ def main():
 	
 	##############################################################Log & Execution####################################################################
 	rr_sensors.start_all_sensors()
-	global_ts,robot_ts,joint_recording,job_line,_ = ws.weld_segment_single(primitives,robot,q_all,v_all,cond_all,arc=True,wait=0.)
+	global_ts,robot_ts,joint_recording,job_line,_ = ws.weld_segment_single(primitives,robot,q_all,v_all,cond_all,arc=False,wait=0.)
 	rr_sensors.stop_all_sensors()
 
 
-	recorded_dir='../../../recorded_data/ER316L/trianglebf_%iipm_v%i_%iipm_v%i/'%(feedrate,v_layer,feedrate_edge,v_edge)
+	recorded_dir='../../../recorded_data/ER316L/right_trianglebf_%iipm_v%i_%iipm_v%i/'%(feedrate,v_layer,feedrate_edge,v_edge)
 	os.makedirs(recorded_dir,exist_ok=True)
 	np.savetxt(recorded_dir+'weld_js_exe.csv',np.hstack((global_ts,robot_ts,job_line,joint_recording)),delimiter=',')
 	rr_sensors.save_all_sensors(recorded_dir)

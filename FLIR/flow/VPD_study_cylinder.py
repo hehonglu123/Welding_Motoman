@@ -11,12 +11,12 @@ from ultralytics import YOLO
 torch_model = YOLO(os.path.dirname(inspect.getfile(flir_toolbox))+"/torch.pt")
 tip_wire_model = YOLO(os.path.dirname(inspect.getfile(flir_toolbox))+"/tip_wire.pt")
 
-VPD=20
+VPD=10
 vertical_offset=3
 horizontal_offset=0
-for v in tqdm(range(5,16)):
+for v in tqdm(range(10,16)):
     # Load the IR recording data from the pickle file
-    data_dir='../../../recorded_data/ER316L/phi0.9_VPD20/cylinderspiral_%iipm_v%i/'%(VPD*v,v)
+    data_dir='../../../recorded_data/ER316L/VPD%i/tubespiral_%iipm_v%i/'%(VPD,VPD*v,v)
 
     config_dir='../../config/'
     with open(data_dir+'/ir_recording.pickle', 'rb') as file:

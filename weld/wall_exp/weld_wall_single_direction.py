@@ -42,12 +42,12 @@ def main():
 
 	base_feedrate=300
 	volume_per_distance=10
-	v_layer=15
+	v_layer=10
 	feedrate=volume_per_distance*v_layer
 	base_layer_height=3
 	v_base=5
 	layer_height=0.9
-	num_layer=30
+	num_layer=20
 	#edge params, 1cm left and right
 	feedrate_edge=feedrate
 	v_edge=v_layer
@@ -130,10 +130,10 @@ def main():
 	rr_sensors.stop_all_sensors()
 
 
-	# recorded_dir='../../../recorded_data/ER316L/wallbf_%iipm_v%i_%iipm_v%i/'%(feedrate,v_layer,feedrate_edge,v_edge)
-	# os.makedirs(recorded_dir,exist_ok=True)
-	# np.savetxt(recorded_dir+'weld_js_exe.csv',np.hstack((global_ts,robot_ts,job_line,joint_recording)),delimiter=',')
-	# rr_sensors.save_all_sensors(recorded_dir)
+	recorded_dir='../../../recorded_data/ER316L/wall_single_direction_%iipm_v%i_%iipm_v%i/'%(feedrate,v_layer,feedrate_edge,v_edge)
+	os.makedirs(recorded_dir,exist_ok=True)
+	np.savetxt(recorded_dir+'weld_js_exe.csv',np.hstack((global_ts.reshape(-1, 1),robot_ts.reshape(-1, 1),job_line.reshape(-1, 1),joint_recording)),delimiter=',')
+	rr_sensors.save_all_sensors(recorded_dir)
 
 if __name__ == '__main__':
 	main()

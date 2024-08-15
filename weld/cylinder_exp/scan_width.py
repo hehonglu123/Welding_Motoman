@@ -40,7 +40,7 @@ def scan_path_gen(curve_sliced_relative,scan_stand_off_d):
 
 
 def main():
-	dataset='cylinder/'
+	dataset='tube/'
 	sliced_alg='dense_slice/'
 	data_dir='../../../geometry_data/'+dataset+sliced_alg
 	with open(data_dir+'slicing.yml', 'r') as file:
@@ -83,10 +83,6 @@ def main():
 	### scan parameters
 	scan_speed=10 # scanning speed (mm/sec)
 	scan_stand_off_d = 95 ## mm
-	Rz_angle = np.radians(0) # point direction w.r.t welds
-	Ry_angle = np.radians(0) # rotate in y a bit
-	bounds_theta = np.radians(1) ## circular motion at start and end
-	all_scan_angle = np.radians([0]) ## scan angle
 	positioner_init=client.getJointAnglesDB(positioner.pulse2deg) ## init table
 	# positioner_init=np.radians([-15,200]) ## init table
 	scan_p,scan_R=scan_path_gen(curve_sliced_relative,scan_stand_off_d)

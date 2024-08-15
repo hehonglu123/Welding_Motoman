@@ -7,10 +7,11 @@ from ultralytics import YOLO
 # Load the IR recording data from the pickle file
 # data_dir='../../../recorded_data/ER316L/wallbf_140ipm_v14_140ipm_v14/'
 # data_dir='../../../recorded_data/ER316L/trianglebf_100ipm_v10_100ipm_v10/'
-data_dir='../../../recorded_data/ER316L/streaming/cylinderspiral_T25000/'
+# data_dir='../../../recorded_data/ER316L/streaming/cylinderspiral_T25000/'
 # data_dir='../../../recorded_data/ER316L/phi0.9_VPD20/cylinderspiral_180ipm_v9/'
 # data_dir='../../../recorded_data/ER4043/wallbf_100ipm_v10_100ipm_v10/'
 # data_dir='../../../recorded_data/wall_weld_test/4043_150ipm_2024_06_18_11_16_32/layer_8/'
+data_dir='../../../recorded_data/ER316L/VPD10/tubespiral_150ipm_v15/'
 
 torch_model = YOLO(os.path.dirname(inspect.getfile(flir_toolbox))+"/torch.pt")
 tip_model = YOLO(os.path.dirname(inspect.getfile(flir_toolbox))+"/tip_wire.pt")
