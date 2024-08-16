@@ -174,7 +174,7 @@ def main():
 	
 	base_feedrate=300
 	VPD=10
-	v_layer=7
+	v_layer=20
 	layer_feedrate=VPD*v_layer
 	base_layer_height=3
 	v_base=5

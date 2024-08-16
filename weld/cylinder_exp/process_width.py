@@ -26,7 +26,7 @@ def main():
 		pulse2deg_file_path=config_dir+'D500B_pulse2deg_real.csv',base_transformation_file=config_dir+'D500B_pose_mocap.csv')
 
 
-	recorded_dir='../../../recorded_data/ER316L/VPD10/tubespiral_70ipm_v7/'
+	recorded_dir='../../../recorded_data/ER316L/VPD10/tubespiral_170ipm_v17/'
 	joint_recording=np.loadtxt(recorded_dir+'scan_js_exe.csv',delimiter=',')
 	with open(recorded_dir+'mti_scans.pickle', 'rb') as f:
 		mti_recording = pickle.load(f)
@@ -48,7 +48,7 @@ def main():
 
 		###########################################Y FILTERING############################################
 		###filter the points within +/- 4mm of scan y
-		scan_points = scan_points[:, (scan_points[0] > -4) & (scan_points[0] < 4)]
+		scan_points = scan_points[:, (scan_points[0] > -6) & (scan_points[0] < 6)]
 
 		filtered_scan_points.append(scan_points)
 		if scan_points[0].size > 0:

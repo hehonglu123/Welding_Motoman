@@ -1,4 +1,4 @@
-import sys, time, os, copy
+import time, os, copy
 from motoman_def import *
 from lambda_calc import *
 from RobotRaconteur.Client import *
@@ -275,7 +275,7 @@ def main():
 					pixel_reading.append(ir_process_packet.flame_reading)
 
 				
-				q_cmd_all.append(np.hstack((time.perf_counter(),layer_counts,q_all)))
+				q_cmd_all.append(np.hstack((time.perf_counter(),layer_counts,q_cmd)))
 				if lam_cur>lam_relative_all_slices[slice_num][-1]-v_cmd/SS.streaming_rate:
 					SS.position_cmd(q_cmd)
 				else:
@@ -290,7 +290,7 @@ def main():
 			###choose next layer param
 			print("Layer Average Pixel Reading: ",np.mean(pixel_reading))
 			v_cmd=v_layer+v_gain*(nominal_pixel_reading-np.mean(pixel_reading))
-			v_cmd=min(max(v_cmd,7),15)
+			v_cmd=min(max(v_cmd,5),17)
 			feedrate=volume_per_distance*v_cmd
 			fronius_client.job_number = int(feedrate/10+job_offset)
 			print("Adjusted Speed: ",v_cmd)

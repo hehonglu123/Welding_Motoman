@@ -2,9 +2,8 @@ import RobotRaconteur as RR
 RRN=RR.RobotRaconteurNode.s
 import numpy as np
 from flir_toolbox import *
-from matplotlib import pyplot as plt
 from ultralytics import YOLO
-import torch_tracking, os, inspect, traceback
+import inspect, traceback, os
 
 ir_process="""
 service experimental.ir_process
@@ -20,7 +19,7 @@ end object
 
 
 class FLIR_RR_Process(object):
-	def __init__(self,flir_service, yolo_model):
+	def __init__(self,flir_service, torch_model, tip_wire_model):
 		
 		self.flir_service=flir_service
 		self.ir_image_consts = RRN.GetConstants('com.robotraconteur.image', self.flir_service)
@@ -46,9 +45,14 @@ class FLIR_RR_Process(object):
 		
 		#processing parameters
 		self.ir_pixel_window_size=7
-		self.yolo_model = yolo_model
+		self.torch_model = torch_model
+		self.tip_wire_model = tip_wire_model
 		self.ir_process_struct=RRN.NewStructure("experimental.ir_process.ir_process_struct")
 		self.flame_centroid_history = []
+		###bbox offset for pixel value from flame centroid
+		self.vertical_offset=3
+		self.horizontal_offset=0
+		self.ir_pixel_window_size=7
 	
 			
 	def ir_cb(self,pipe_ep):
@@ -74,7 +78,7 @@ class FLIR_RR_Process(object):
 
 			ir_image = np.rot90(display_mat, k=-1)
 			# centroid, bbox, torch_centroid, torch_bbox=weld_detection_aluminum(ir_image,self.yolo_model,percentage_threshold=0.8)
-			centroid, bbox, torch_centroid, torch_bbox=weld_detection_steel(ir_image,self.yolo_model,percentage_threshold=0.77)
+			centroid, bbox, torch_centroid, torch_bbox=weld_detection_steel(ir_image,self.torch_model,self.tip_wire_model)
 			if centroid is not None:
 				###weighted history filter
 				if len(self.flame_centroid_history) > 30:
@@ -84,7 +88,8 @@ class FLIR_RR_Process(object):
 					centroid = 0.2 * centroid + np.sum(np.array(self.flame_centroid_history) * previous_weight, axis=0)
 					self.flame_centroid_history.append(centroid)
 
-				pixel_coord=(centroid[0],centroid[1]+5)
+				#find average pixel value 
+				pixel_coord = (int(centroid[0]) + self.horizontal_offset, int(centroid[1]) + self.vertical_offset)
 				flame_reading=get_pixel_value(ir_image,pixel_coord,self.ir_pixel_window_size)
 
 				print(flame_reading, torch_bbox, centroid)
@@ -100,14 +105,16 @@ class FLIR_RR_Process(object):
 
 
 def main():
-	yolo_model = YOLO(os.path.dirname(inspect.getfile(torch_tracking))+"/torch.pt")
+	#load model
+	torch_model = YOLO(os.path.dirname(inspect.getfile(flir_toolbox))+"/torch.pt")
+	tip_wire_model = YOLO(os.path.dirname(inspect.getfile(flir_toolbox))+"/tip_wire.pt")
 	
 	with RR.ServerNodeSetup("experimental.ir_process", 12182):
 		flir_service=RRN.ConnectService('rr+tcp://localhost:60827/?service=camera')
 		#Register the service type
 		RRN.RegisterServiceType(ir_process)
 
-		ir_process_obj=FLIR_RR_Process(flir_service, yolo_model)
+		ir_process_obj=FLIR_RR_Process(flir_service, torch_model, tip_wire_model)
 		
 		#Register the service
 		RRN.RegisterService("FLIR_RR_PROCESS","experimental.ir_process.ir_process_obj",ir_process_obj)

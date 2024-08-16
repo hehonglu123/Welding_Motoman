@@ -1,4 +1,4 @@
-import sys, time, os, copy
+import time, os, copy
 from motoman_def import *
 from lambda_calc import *
 from RobotRaconteur.Client import *
@@ -26,7 +26,7 @@ def ir_process_cb(sub, value, ts):
 def main():
 	global ir_updated_flag, ir_process_packet
 
-	dataset='cylinder/'
+	dataset='tube/'
 	sliced_alg='dense_slice/'
 	data_dir='../../../../geometry_data/'+dataset+sliced_alg
 	with open(data_dir+'slicing.yml', 'r') as file:
@@ -91,7 +91,7 @@ def main():
 				[0.,      0.,     -1.    ]])
 
 	
-	flipped=True   #spiral direction
+	flipped=False   #spiral direction
 	base_feedrate=250
 	volume_per_distance=10
 	v_layer=10
@@ -216,7 +216,7 @@ def main():
 	wire_length_gain=2.
 	nominal_wire_length=20
 	v_gain=1e-3
-	nominal_pixel_reading=21000
+	nominal_pixel_reading=25000
 	slice_increment=nominal_slice_increment
 	feedrate_update_rate=1.	#Hz
 	last_update_time=time.perf_counter()+5.
@@ -281,7 +281,7 @@ def main():
 					print("Layer Average Pixel Reading: ",np.mean(pixel_reading))
 					if not np.isnan(np.mean(pixel_reading)):
 						v_cmd=v_layer+v_gain*(nominal_pixel_reading-np.mean(pixel_reading))
-						v_cmd=min(max(v_cmd,6),17)
+						v_cmd=min(max(v_cmd,5),17)
 						feedrate=volume_per_distance*v_cmd
 						fronius_client.async_set_job_number(int(feedrate/10)+job_offset, my_handler)
 						print("Adjusted Speed: ",v_cmd)
@@ -290,7 +290,7 @@ def main():
 					last_update_time=time.perf_counter()
 				
 				###Position Command
-				q_cmd_all.append(np.hstack((time.perf_counter(),layer_counts,q_all)))
+				q_cmd_all.append(np.hstack((time.perf_counter(),layer_counts,q_cmd)))
 				if lam_cur>lam_relative_all_slices[slice_num][-1]-v_cmd/SS.streaming_rate:
 					SS.position_cmd(q_cmd)
 				else:
@@ -318,7 +318,7 @@ def main():
 	js_recording = SS.stop_recording()
 
 
-	recorded_dir='../../../../recorded_data/ER316L/streaming/cylinderspiral_T%i/'%(nominal_pixel_reading)
+	recorded_dir='../../../../recorded_data/ER316L/streaming/tubespiral_T%i/'%(nominal_pixel_reading)
 	os.makedirs(recorded_dir,exist_ok=True)
 	np.savetxt(recorded_dir+'weld_js_cmd.csv',np.array(q_cmd_all),delimiter=',')
 	np.savetxt(recorded_dir+'weld_js_exe.csv',np.array(js_recording),delimiter=',')

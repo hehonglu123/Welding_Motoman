@@ -7,8 +7,8 @@ from StreamingSend import *
 
 ########################################################RR STREAMING########################################################
 
-# RR_robot_sub = RRN.SubscribeService('rr+tcp://192.168.1.114:59945?service=robot')
-RR_robot_sub = RRN.SubscribeService('rr+tcp://192.168.55.12:59945?service=robot')
+RR_robot_sub = RRN.SubscribeService('rr+tcp://localhost:59945?service=robot')
+# RR_robot_sub = RRN.SubscribeService('rr+tcp://192.168.55.12:59945?service=robot')
 
 
 SS=StreamingSend(RR_robot_sub)
