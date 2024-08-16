@@ -13,7 +13,7 @@ from tqdm import tqdm
 def main():
 	
 	torch_height=44
-	scan_stand_off_d = 95
+	scan_stand_off_d = 90
 	
 	##############################################################Robot####################################################################
 	###robot kinematics def
@@ -26,7 +26,7 @@ def main():
 		pulse2deg_file_path=config_dir+'D500B_pulse2deg_real.csv',base_transformation_file=config_dir+'D500B_pose_mocap.csv')
 
 
-	recorded_dir='../../../recorded_data/ER316L/VPD10/tubespiral_150ipm_v15/'
+	recorded_dir='../../../recorded_data/ER316L/VPD10/tubespiral_70ipm_v7/'
 	joint_recording=np.loadtxt(recorded_dir+'scan_js_exe.csv',delimiter=',')
 	with open(recorded_dir+'mti_scans.pickle', 'rb') as f:
 		mti_recording = pickle.load(f)
@@ -36,11 +36,19 @@ def main():
 	valid_scan_indices=[]
 	
 	for scan_i in tqdm(range(len(joint_recording))):
-		#filter the points within the torch height
 		scan_points=mti_recording[scan_i]
-		scan_points = scan_points[:, (scan_points[1] > scan_stand_off_d - 10) & (scan_points[1] < scan_stand_off_d + 10)]
-		#filter the points within +/- 10mm of scan y
-		scan_points = scan_points[:, (scan_points[0] > -10) & (scan_points[0] < 10)]
+
+		###########################################Z FILTERING############################################
+		###filter the points within the torch height
+		scan_points = scan_points[:, (scan_points[1] > scan_stand_off_d - 15) & (scan_points[1] < scan_stand_off_d + 15)]
+		###get the average z distance
+		avg_z=np.mean(scan_points[1])
+		###filter within +/- 1mm of the average z distance
+		scan_points = scan_points[:, (scan_points[1] > avg_z - 2) & (scan_points[1] < avg_z + 2)]
+
+		###########################################Y FILTERING############################################
+		###filter the points within +/- 4mm of scan y
+		scan_points = scan_points[:, (scan_points[0] > -4) & (scan_points[0] < 4)]
 
 		filtered_scan_points.append(scan_points)
 		if scan_points[0].size > 0:
@@ -49,6 +57,7 @@ def main():
 
 	lam=calc_lam_js(joint_recording[:,-8:-2],robot)
 
+	width=replace_outliers(np.array(width),m=1)	#filter noise
 	print("Average width: ",np.mean(width))
 	plt.plot(lam[valid_scan_indices],width)
 	plt.xlabel('$\lambda$')
@@ -69,7 +78,7 @@ def main():
 	#####display filtered pcd
 	scan_process=ScanProcess(robot_scan, positioner)
 	pcd = scan_process.pcd_register_mti(filtered_scan_points,joint_recording[:,-8:],joint_recording[:,1])
-	# pcd = scan_process.pcd_noise_remove(pcd,nb_neighbors=40,std_ratio=1.5,cluster_based_outlier_remove=True,cluster_neighbor=1,min_points=100)
+	# pcd = scan_process.pcd_noise_remove(pcd,nb_neighbors=20,std_ratio=0.1,cluster_based_outlier_remove=True,cluster_neighbor=1,min_points=100)
 	o3d.visualization.draw_geometries([pcd])
 
 if __name__ == '__main__':

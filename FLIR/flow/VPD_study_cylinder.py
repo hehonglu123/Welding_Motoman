@@ -14,7 +14,7 @@ tip_wire_model = YOLO(os.path.dirname(inspect.getfile(flir_toolbox))+"/tip_wire.
 VPD=10
 vertical_offset=3
 horizontal_offset=0
-for v in tqdm(range(10,16)):
+for v in tqdm(range(7,16)):
     # Load the IR recording data from the pickle file
     data_dir='../../../recorded_data/ER316L/VPD%i/tubespiral_%iipm_v%i/'%(VPD,VPD*v,v)
 
