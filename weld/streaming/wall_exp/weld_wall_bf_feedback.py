@@ -1,4 +1,4 @@
-import time, os, copy
+import time, os, copy, traceback, yaml
 from motoman_def import *
 from lambda_calc import *
 from RobotRaconteur.Client import *
@@ -166,20 +166,24 @@ def main():
 	with open(data_dir+'slicing.yml', 'r') as file:
 		slicing_meta = yaml.safe_load(file)
 
+	open_loop=True
 
 	##############################################################SENSORS####################################################################
 	# weld state logging
 	# weld_ser = RRN.SubscribeService('rr+tcp://192.168.55.10:60823?service=welder')
-	# cam_ser=RRN.ConnectService('rr+tcp://localhost:60827/?service=camera')
-	# cam_ser=None
-	mic_ser = RRN.ConnectService('rr+tcp://192.168.55.20:60828?service=microphone')
+	if open_loop:
+		cam_ser=None
+	else:
+		cam_ser=RRN.ConnectService('rr+tcp://localhost:60827/?service=camera')
+	# mic_ser = RRN.ConnectService('rr+tcp://192.168.55.20:60828?service=microphone')
 	## RR sensor objects
 	rr_sensors = WeldRRSensor(weld_service=None,cam_service=cam_ser,microphone_service=None)
 
 	##############################################################FLIR PRORCESS####################################################################
-	sub=RRN.SubscribeService('rr+tcp://localhost:12182/?service=FLIR_RR_PROCESS')
-	ir_process_result=sub.SubscribeWire("ir_process_result")
-	ir_process_result.WireValueChanged += ir_process_cb
+	if not open_loop:
+		sub=RRN.SubscribeService('rr+tcp://localhost:12182/?service=FLIR_RR_PROCESS')
+		ir_process_result=sub.SubscribeWire("ir_process_result")
+		ir_process_result.WireValueChanged += ir_process_cb
 	##############################################################Robot####################################################################
 	###robot kinematics def
 	config_dir='../../../config/'
@@ -208,7 +212,7 @@ def main():
 	q2=robot2.inv(p2_in_base_frame,R2,last_joints=np.zeros(6))[0]
 
 	########################################################RR FRONIUS########################################################
-	weld_arcon=False
+	weld_arcon=True
 	if weld_arcon:
 		fronius_sub=RRN.SubscribeService('rr+tcp://192.168.55.21:60823?service=welder')
 		fronius_client = fronius_sub.GetDefaultClientWait(1)      #connect, timeout=30s
@@ -227,20 +231,21 @@ def main():
 				[0.,      0.,     -1.    ]])
 
 	
-	base_feedrate=300
+	base_feedrate=250
 	VPD=10
-	v_layer=14
+	v_layer=10
 	layer_feedrate=VPD*v_layer
 	base_layer_height=3
 	v_base=5
 	layer_height=1.3
 	num_base_layer=2        #2 base layer to establish adhesion to coupon
-	num_support_layer=5     #support layer to raise the cylinder till visible by IR camera
+	num_support_layer=4     #support layer to raise the cylinder till visible by IR camera
 	support_layer_height=1.5
 	support_feedrate=150
 	v_support=10
 	weld_num_layer=20
 	job_offset=450
+	
 
 
 	nominal_slice_increment=int(layer_height/slicing_meta['line_resolution'])
@@ -252,36 +257,36 @@ def main():
 	
 
 	
-	# ###############################################################################################################################################################
-	# ###############################################################################################################################################################
-	# #####################################################BASE & SUPPORT LAYER##########################################################################################
-	# slice_start=0
-	# slice_end=int(base_slice_increment*num_base_layer)
-	# q1_cmd_all_base,positioner_cmd_all_base=weld_bf_streaming(SS,data_dir,v_base,base_slice_increment,num_base_layer,slice_start,slice_end,point_distance=point_distance,q_positioner_prev=SS.q_cur[-2:])
-	# q_cmd_all_base = np.hstack((q1_cmd_all_base, np.array([q2] * len(q1_cmd_all_base)),positioner_cmd_all_base))
-	# slice_start=int(num_base_layer*base_slice_increment)
-	# slice_end=int(num_base_layer*base_slice_increment+num_support_layer*support_slice_increment)
-	# q1_cmd_all_support,positioner_cmd_all_support=weld_bf_streaming(SS,data_dir,v_support,support_slice_increment,num_support_layer,slice_start,slice_end,point_distance=point_distance,q_positioner_prev=SS.q_cur[-2:])
-	# q_cmd_all_support = np.hstack((q1_cmd_all_support, np.array([q2] * len(q1_cmd_all_support)),positioner_cmd_all_support))
-	# ###jog to start point
-	# print("BASE-SUPPORT CALCULATION FINISHED")
-	# SS.jog2q(q_cmd_all_base[0])
-	# # plt.plot(np.hstack((q1_cmd_all_base[:,0],q1_cmd_all_support[:,0])))
-	# # plt.show()
-	# ##############################################################BASE-SUPPORT Layers Welding####################################################################
-	# if weld_arcon:
-	# 	fronius_client.job_number = int(base_feedrate/10+job_offset)
-	# 	fronius_client.start_weld()
-	# for i in range(len(q_cmd_all_base)):
-	# 	SS.position_cmd(q_cmd_all_base[i],time.perf_counter())
-	# if weld_arcon:
-	# 	fronius_client.job_number = int(support_feedrate/10+job_offset)
-	# 	fronius_client.start_weld()
-	# for i in range(len(q_cmd_all_support)):
-	# 	SS.position_cmd(q_cmd_all_support[i],time.perf_counter())
-	# if weld_arcon:
-	# 	fronius_client.stop_weld()
-	# print("BASE-SUPPORT LAYER WELDING FINISHED")
+	###############################################################################################################################################################
+	###############################################################################################################################################################
+	#####################################################BASE & SUPPORT LAYER##########################################################################################
+	slice_start=0
+	slice_end=int(base_slice_increment*num_base_layer)
+	q1_cmd_all_base,positioner_cmd_all_base=weld_bf_streaming(SS,data_dir,v_base,base_slice_increment,num_base_layer,slice_start,slice_end,point_distance=point_distance,q_positioner_prev=SS.q_cur[-2:])
+	q_cmd_all_base = np.hstack((q1_cmd_all_base, np.array([q2] * len(q1_cmd_all_base)),positioner_cmd_all_base))
+	slice_start=int(num_base_layer*base_slice_increment)
+	slice_end=int(num_base_layer*base_slice_increment+num_support_layer*support_slice_increment)
+	q1_cmd_all_support,positioner_cmd_all_support=weld_bf_streaming(SS,data_dir,v_support,support_slice_increment,num_support_layer,slice_start,slice_end,point_distance=point_distance,q_positioner_prev=SS.q_cur[-2:])
+	q_cmd_all_support = np.hstack((q1_cmd_all_support, np.array([q2] * len(q1_cmd_all_support)),positioner_cmd_all_support))
+	###jog to start point
+	print("BASE-SUPPORT CALCULATION FINISHED")
+	SS.jog2q(q_cmd_all_base[0])
+	# plt.plot(np.hstack((q1_cmd_all_base[:,0],q1_cmd_all_support[:,0])))
+	# plt.show()
+	##############################################################BASE-SUPPORT Layers Welding####################################################################
+	if weld_arcon:
+		fronius_client.job_number = int(base_feedrate/10+job_offset)
+		fronius_client.start_weld()
+	for i in range(len(q_cmd_all_base)):
+		SS.position_cmd(q_cmd_all_base[i],time.perf_counter())
+	if weld_arcon:
+		fronius_client.job_number = int(support_feedrate/10+job_offset)
+		fronius_client.start_weld()
+	for i in range(len(q_cmd_all_support)):
+		SS.position_cmd(q_cmd_all_support[i],time.perf_counter())
+	if weld_arcon:
+		fronius_client.stop_weld()
+	print("BASE-SUPPORT LAYER WELDING FINISHED")
 
 
 
@@ -301,15 +306,16 @@ def main():
 		
 	print("PRELOAD FINISHED")
 	
-	
+	wall_height=50#mm
 	num_slice_start=int(num_base_layer*base_slice_increment)
-	num_slice_end=slicing_meta['num_layers']-1
-	num_slice_end=200
+	num_slice_end=num_slice_start+int(wall_height/slicing_meta['line_resolution'])
+	print("num_slice_end: ",num_slice_end)
 	slice_num=num_slice_start
 	layer_counts=0
 	wire_length_gain=2.
 	nominal_wire_length=20
 	v_gain=1e-3
+	dv_max=2
 	nominal_pixel_reading=25000
 	slice_increment=nominal_slice_increment
 	feedrate_update_rate=1.	#Hz
@@ -382,7 +388,7 @@ def main():
 				q_cmd=np.hstack((q1,q2,q_positioner))
 				if ir_updated_flag:			###process IR info and update welding parameters
 					ir_updated_flag=False
-					wire_length.append(np.linalg.norm(ir_process_packet.weld_pool-ir_process_packet.torch_bottom))
+					wire_length.append(np.linalg.norm(ir_process_packet.arc_centroid-ir_process_packet.torch_bottom))
 					pixel_reading.append(ir_process_packet.flame_reading)
 
 				###update welding param
@@ -391,7 +397,7 @@ def main():
 					print("Layer Average Pixel Reading: ",np.mean(pixel_reading))
 					if not np.isnan(np.mean(pixel_reading)):
 						v_cmd=v_layer+v_gain*(nominal_pixel_reading-np.mean(pixel_reading))
-						v_cmd=min(max(v_cmd,5),17)
+						v_cmd=min(max(v_cmd,max(5,v_cmd-dv_max)),min(20,v_cmd+dv_max))
 						layer_feedrate=VPD*v_cmd
 						fronius_client.async_set_job_number(int(layer_feedrate/10)+job_offset, my_handler)
 						print("Adjusted Speed: ",v_cmd)
@@ -408,9 +414,11 @@ def main():
 
 			###choose next slice
 			print("Layer Average Wire Length: ",np.mean(wire_length))
-			# slice_increment=nominal_slice_increment+wire_length_gain*(nominal_wire_length-np.mean(wire_length))
-			# slice_increment=int(min(max(slice_increment,0.5*nominal_slice_increment),2*nominal_slice_increment))
-			slice_increment=nominal_slice_increment
+			if open_loop:
+				slice_increment=nominal_slice_increment
+			else:
+				slice_increment=nominal_slice_increment+wire_length_gain*(nominal_wire_length-np.mean(wire_length))
+				slice_increment=int(min(max(slice_increment,0.5*nominal_slice_increment),2*nominal_slice_increment))
 			print("ADJUSTED slice_increment: ",slice_increment)
 
 
@@ -419,22 +427,28 @@ def main():
 			layer_counts+=1
 			slice_num+=slice_increment
 		
-		except KeyboardInterrupt:
+		except:
+			traceback.print_exc()
+			if weld_arcon:
+				fronius_client.stop_weld()
+			SS.deinitialize_robot()
 			break
+			
 
 	############################################################LOGGING####################################################################
 	if weld_arcon:
 		fronius_client.stop_weld()
+	SS.deinitialize_robot()
 	rr_sensors.stop_all_sensors()
 	js_recording = SS.stop_recording()
 
-
-	recorded_dir='../../../../recorded_data/ER316L/streaming/wallbf_T%i/'%(nominal_pixel_reading)
-	os.makedirs(recorded_dir,exist_ok=True)
-	np.savetxt(recorded_dir+'weld_js_cmd.csv',np.array(q_cmd_all),delimiter=',')
-	np.savetxt(recorded_dir+'weld_js_exe.csv',np.array(js_recording),delimiter=',')
-	np.savetxt(recorded_dir+'weld_cmd.csv',np.array(welding_cmd_all),delimiter=',')
-	rr_sensors.save_all_sensors(recorded_dir)
+	if not open_loop:
+		recorded_dir='../../../../recorded_data/ER316L/streaming/wallbf_T%i/'%(nominal_pixel_reading)
+		os.makedirs(recorded_dir,exist_ok=True)
+		np.savetxt(recorded_dir+'weld_js_cmd.csv',np.array(q_cmd_all),delimiter=',')
+		np.savetxt(recorded_dir+'weld_js_exe.csv',np.array(js_recording),delimiter=',')
+		np.savetxt(recorded_dir+'weld_cmd.csv',np.array(welding_cmd_all),delimiter=',')
+		rr_sensors.save_all_sensors(recorded_dir)
 
 
 if __name__ == '__main__':

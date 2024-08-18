@@ -81,7 +81,7 @@ def main():
 		fronius_client.prepare_welder()
 	
 	########################################################RR STREAMING########################################################
-	RR_robot_sub = RRN.SubscribeService('rr+tcp://192.168.55.12:59945?service=robot')
+	RR_robot_sub = RRN.SubscribeService('rr+tcp://localhost:59945?service=robot')
 	point_distance=0.04		###STREAMING POINT INTERPOLATED DISTANCE
 	SS=StreamingSend(RR_robot_sub,streaming_rate=125.)
 
