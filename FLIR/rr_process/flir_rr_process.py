@@ -10,7 +10,7 @@ service experimental.ir_process
 struct ir_process_struct
 	field uint16 flame_reading
 	field uint16[] torch_bottom
-	field uint16[] weld_pool
+	field uint16[] arc_centroid
 end 
 object ir_process_obj
 	wire ir_process_struct ir_process_result [readonly]
@@ -96,7 +96,7 @@ class FLIR_RR_Process(object):
 				try:
 					self.ir_process_struct.flame_reading=int(flame_reading)
 					self.ir_process_struct.torch_bottom=np.array([torch_bbox[0]+torch_bbox[2]//2, torch_bbox[1]+torch_bbox[3]]).astype(np.uint16)
-					self.ir_process_struct.weld_pool=centroid.astype(np.uint16)
+					self.ir_process_struct.arc_centroid=centroid.astype(np.uint16)
 					self.ir_process_result.OutValue=self.ir_process_struct
 				except:
 					traceback.print_exc()

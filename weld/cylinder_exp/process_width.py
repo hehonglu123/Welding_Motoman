@@ -13,7 +13,11 @@ from tqdm import tqdm
 def main():
 	
 	torch_height=44
-	scan_stand_off_d = 90
+	scan_stand_off_d = 80		#modify this such the pcd shows full cylinder bead
+
+	z_crop_distance = 15
+	x_offset=-2.2
+	x_crop_distance = 2.5			#modify this such the pcd does not show noise along x
 	
 	##############################################################Robot####################################################################
 	###robot kinematics def
@@ -26,7 +30,7 @@ def main():
 		pulse2deg_file_path=config_dir+'D500B_pulse2deg_real.csv',base_transformation_file=config_dir+'D500B_pose_mocap.csv')
 
 
-	recorded_dir='../../../recorded_data/ER316L/VPD10/tubespiral_170ipm_v17/'
+	recorded_dir='../../../recorded_data/ER316L/VPD10/tubespiral_50ipm_v5/'
 	joint_recording=np.loadtxt(recorded_dir+'scan_js_exe.csv',delimiter=',')
 	with open(recorded_dir+'mti_scans.pickle', 'rb') as f:
 		mti_recording = pickle.load(f)
@@ -40,15 +44,15 @@ def main():
 
 		###########################################Z FILTERING############################################
 		###filter the points within the torch height
-		scan_points = scan_points[:, (scan_points[1] > scan_stand_off_d - 15) & (scan_points[1] < scan_stand_off_d + 15)]
+		scan_points = scan_points[:, (scan_points[1] > scan_stand_off_d - z_crop_distance) & (scan_points[1] < scan_stand_off_d + z_crop_distance)]
 		###get the average z distance
 		avg_z=np.mean(scan_points[1])
 		###filter within +/- 1mm of the average z distance
 		scan_points = scan_points[:, (scan_points[1] > avg_z - 2) & (scan_points[1] < avg_z + 2)]
 
 		###########################################Y FILTERING############################################
-		###filter the points within +/- 4mm of scan y
-		scan_points = scan_points[:, (scan_points[0] > -6) & (scan_points[0] < 6)]
+		###filter the points within +/- 5mm of scan y
+		scan_points = scan_points[:, (scan_points[0] > -x_crop_distance + x_offset) & (scan_points[0] < x_crop_distance + x_offset)]
 
 		filtered_scan_points.append(scan_points)
 		if scan_points[0].size > 0:
