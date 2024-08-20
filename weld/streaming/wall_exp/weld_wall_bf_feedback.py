@@ -204,6 +204,8 @@ def main():
 		pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv')
 	robot2=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.yml',tool_file_path=config_dir+'flir.csv',\
 		pulse2deg_file_path=config_dir+'MA1440_A0_pulse2deg_real.csv',base_transformation_file=config_dir+'MA1440_pose.csv')
+	robot2_imaging=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.yml',tool_file_path=config_dir+'flir_imaging.csv',\
+		pulse2deg_file_path=config_dir+'MA1440_A0_pulse2deg_real.csv',base_transformation_file=config_dir+'MA1440_pose.csv')
 	positioner=positioner_obj('D500B',def_path=config_dir+'D500B_robot_extended_config.yml',tool_file_path=config_dir+'positioner_tcp.csv',\
 		pulse2deg_file_path=config_dir+'D500B_pulse2deg_real.csv',base_transformation_file=config_dir+'D500B_pose_mocap.csv')
 
@@ -400,7 +402,7 @@ def main():
 				if ir_updated_flag:			###process IR info and update welding parameters
 					ir_updated_flag=False
 					torch_pose=robot_no_wire.fwd(SS.q_cur[:6])
-					IR_pose=robot2.fwd(SS.q_cur[6:-2],world=True)
+					IR_pose=robot2_imaging.fwd(SS.q_cur[6:-2],world=True)
 					IR_vector=IR_pose.R@form_vector(ir_process_packet.arc_centroid[0],ir_process_packet.arc_centroid[1],flir_intrinsic)
 					wire_tip=line_intersection(torch_pose.p,torch_pose.R[:,2],IR_pose.p,IR_vector)
 					# wire_tip=line_intersect(torch_pose.p,torch_pose.R[:,2],IR_pose.p,IR_vector)
