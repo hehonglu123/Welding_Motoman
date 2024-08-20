@@ -11,8 +11,13 @@ from flir_toolbox import *
 ir_updated_flag=False
 ir_process_packet=None
 
-def form_vector(c,r,flir_intrinsic):
-	vector=np.array([(c-flir_intrinsic['c0'])/flir_intrinsic['fsx'],(r-flir_intrinsic['r0'])/flir_intrinsic['fsy'],1])
+def form_vector(c,r,flir_intrinsic,rotated=True):
+	if rotated:
+		c_original=r
+		r_original=flir_intrinsic['height']-c
+		vector=np.array([(c_original-flir_intrinsic['c0'])/flir_intrinsic['fsx'],(r_original-flir_intrinsic['r0'])/flir_intrinsic['fsy'],1])
+	else:
+		vector=np.array([(c-flir_intrinsic['c0'])/flir_intrinsic['fsx'],(r-flir_intrinsic['r0'])/flir_intrinsic['fsy'],1])
 	return vector/np.linalg.norm(vector)
 
 def my_handler(exp):
@@ -319,7 +324,7 @@ def main():
 	slice_num=num_slice_start
 	layer_counts=0
 	wire_length_gain=2.
-	nominal_wire_length=20
+	nominal_wire_length=15
 	v_gain=1e-3
 	dv_max=2
 	nominal_pixel_reading=25000
@@ -397,8 +402,8 @@ def main():
 					torch_pose=robot_no_wire.fwd(SS.q_cur[:6])
 					IR_pose=robot2.fwd(SS.q_cur[6:-2],world=True)
 					IR_vector=IR_pose.R@form_vector(ir_process_packet.arc_centroid[0],ir_process_packet.arc_centroid[1],flir_intrinsic)
-					# wire_tip=line_intersection(torch_pose.p,torch_pose.R[:,2],IR_pose.p,IR_vector)
-					wire_tip=line_intersect(torch_pose.p,torch_pose.R[:,2],IR_pose.p,IR_vector)
+					wire_tip=line_intersection(torch_pose.p,torch_pose.R[:,2],IR_pose.p,IR_vector)
+					# wire_tip=line_intersect(torch_pose.p,torch_pose.R[:,2],IR_pose.p,IR_vector)
 					wire_length.append(np.linalg.norm(wire_tip-torch_pose.p))
 					pixel_reading.append(ir_process_packet.flame_reading)
 
