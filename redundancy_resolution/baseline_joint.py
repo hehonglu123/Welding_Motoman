@@ -23,17 +23,17 @@ def main():
 	curve_sliced_relative=[]
 	curve_sliced=[]
 	for i in range(slicing_meta['num_baselayers']):
-		num_sections=len(glob.glob(data_dir+'curve_sliced_relative/baselayer'+str(i)+'_*.csv'))
+		num_sections=len(glob.glob(data_dir+'curve_sliced_relative/base_slice'+str(i)+'_*.csv'))
 		curve_sliced_relative_base_ith_layer=[]
 		for x in range(num_sections):
-			curve_sliced_relative_base_ith_layer.append(np.loadtxt(data_dir+'curve_sliced_relative/baselayer'+str(i)+'_'+str(x)+'.csv',delimiter=',').reshape((-1,6)))
+			curve_sliced_relative_base_ith_layer.append(np.loadtxt(data_dir+'curve_sliced_relative/base_slice'+str(i)+'_'+str(x)+'.csv',delimiter=',').reshape((-1,6)))
 		curve_sliced_relative_base.append(curve_sliced_relative_base_ith_layer)
 	
 	for i in range(slicing_meta['num_supportlayers']):
-		num_sections=len(glob.glob(data_dir+'curve_sliced_relative/supportlayer'+str(i)+'_*.csv'))
+		num_sections=len(glob.glob(data_dir+'curve_sliced_relative/support_slice'+str(i)+'_*.csv'))
 		curve_sliced_relative_support_ith_layer=[]
 		for x in range(num_sections):
-			curve_sliced_relative_support_ith_layer.append(np.loadtxt(data_dir+'curve_sliced_relative/supportlayer'+str(i)+'_'+str(x)+'.csv',delimiter=',').reshape((-1,6)))
+			curve_sliced_relative_support_ith_layer.append(np.loadtxt(data_dir+'curve_sliced_relative/support_slice'+str(i)+'_'+str(x)+'.csv',delimiter=',').reshape((-1,6)))
 		curve_sliced_relative_support.append(curve_sliced_relative_support_ith_layer)
 
 	for i in range(slicing_meta['num_layers']):

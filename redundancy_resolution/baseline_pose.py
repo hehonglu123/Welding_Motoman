@@ -95,7 +95,7 @@ def main():
 	end_vec=support_layer_temp[0][-1,:3]-support_layer_temp[0][-2,:3]
 	end_point=support_layer_temp[0][-1,:3]+extension_length*end_vec/np.linalg.norm(end_vec)
 	end_ext=np.zeros((num_points_extension,6))
-	end_ext[:,:3]=np.linspace(end_point,support_layer_temp[0][-1,:3],num_points_extension,endpoint=False).reshape((-1,3))
+	end_ext[:,:3]=np.flip(np.linspace(end_point,support_layer_temp[0][-1,:3],num_points_extension,endpoint=False).reshape((-1,3)),axis=0)
 	end_ext[:,3:]=support_layer_temp[0][-1,3:]
 
 	support_layer_temp[0]=np.vstack((init_ext,support_layer_temp[0],end_ext))
@@ -108,7 +108,7 @@ def main():
 			ax.plot3D(curve_sliced_relative_support[i][x][::vis_step,0],curve_sliced_relative_support[i][x][::vis_step,1],curve_sliced_relative_support[i][x][::vis_step,2],'g.-')
 			ax.quiver(curve_sliced_relative_support[i][x][::vis_step,0],curve_sliced_relative_support[i][x][::vis_step,1],curve_sliced_relative_support[i][x][::vis_step,2],curve_sliced_relative_support[i][x][::vis_step,3],curve_sliced_relative_support[i][x][::vis_step,4],curve_sliced_relative_support[i][x][::vis_step,5],length=0.3, normalize=True)
 	
-			np.savetxt(data_dir+'curve_sliced_relative/supportlayer'+str(i)+'_'+str(x)+'.csv',curve_sliced_relative_support[i][x],delimiter=',')
+			np.savetxt(data_dir+'curve_sliced_relative/support_slice'+str(i)+'_'+str(x)+'.csv',curve_sliced_relative_support[i][x],delimiter=',')
 
 
 
@@ -121,7 +121,7 @@ def main():
 			curve_sliced_relative_base[-1][x][:,2]-=((slicing_meta['num_baselayers']-i)*base_thickness+slicing_meta['num_supportlayers']*slicing_meta['supportlayer_thickness'])
 			ax.plot3D(curve_sliced_relative_base[i][x][::vis_step,0],curve_sliced_relative_base[i][x][::vis_step,1],curve_sliced_relative_base[i][x][::vis_step,2],'r.-')
 			ax.quiver(curve_sliced_relative_base[i][x][::vis_step,0],curve_sliced_relative_base[i][x][::vis_step,1],curve_sliced_relative_base[i][x][::vis_step,2],curve_sliced_relative_base[i][x][::vis_step,3],curve_sliced_relative_base[i][x][::vis_step,4],curve_sliced_relative_base[i][x][::vis_step,5],length=0.3, normalize=True)
-			np.savetxt(data_dir+'curve_sliced_relative/baselayer'+str(i)+'_'+str(x)+'.csv',curve_sliced_relative_base[i][x],delimiter=',')
+			np.savetxt(data_dir+'curve_sliced_relative/base_slice'+str(i)+'_'+str(x)+'.csv',curve_sliced_relative_base[i][x],delimiter=',')
 
 	
 	set_axes_equal(ax)

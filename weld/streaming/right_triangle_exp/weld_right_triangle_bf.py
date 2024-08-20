@@ -25,149 +25,17 @@ def ir_process_cb(sub, value, ts):
 	ir_updated_flag=True
 
 
-def weld_spiral_streaming(SS,data_dir,v,slice_increment,num_layers,slice_start,slice_end,point_distance=0.04,flipped=False,q_positioner_prev=np.zeros(2)):
-
-	q1_cmd_all=[]
-	positioner_cmd_all=[]
-	###PRELOAD ALL SLICES TO SAVE INPROCESS TIME
-	rob1_js_all_slices=[]
-	positioner_js_all_slices=[]
-	for i in range(0,slice_end):
-		if not flipped:
-			rob1_js_all_slices.append(np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(i)+'_0.csv',delimiter=','))
-			positioner_js_all_slices.append(np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(i)+'_0.csv',delimiter=','))
-		else:
-			###spiral rotation direction
-			rob1_js_all_slices.append(np.flip(np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(i)+'_0.csv',delimiter=','),axis=0))
-			positioner_js_all_slices.append(np.flip(np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(i)+'_0.csv',delimiter=','),axis=0))
-
-	print("LAYERS PRELOAD FINISHED")
-
-	slice_num=slice_start
-	layer_counts=0
-	while layer_counts<num_layers:
-
-		####################DETERMINE CURVE ORDER##############################################
-		x=0
-		rob1_js=copy.deepcopy(rob1_js_all_slices[slice_num])
-		positioner_js=copy.deepcopy(positioner_js_all_slices[slice_num])
-		curve_sliced_relative=np.loadtxt(data_dir+'curve_sliced_relative/slice'+str(slice_num)+'_'+str(x)+'.csv',delimiter=',')
-		if positioner_js.shape==(2,) and rob1_js.shape==(6,):
-			continue
-		
-		###TRJAECTORY WARPING
-		if slice_num>0:
-			rob1_js_prev=copy.deepcopy(rob1_js_all_slices[slice_num-slice_increment])
-			positioner_js_prev=copy.deepcopy(positioner_js_all_slices[slice_num-slice_increment])
-			rob1_js,positioner_js=warp_traj2(rob1_js,positioner_js,rob1_js_prev,positioner_js_prev,reversed=True)
-		if slice_num<slice_end-slice_increment:
-			rob1_js_next=copy.deepcopy(rob1_js_all_slices[slice_num+slice_increment])
-			positioner_js_next=copy.deepcopy(positioner_js_all_slices[slice_num+slice_increment])
-			rob1_js,positioner_js=warp_traj2(rob1_js,positioner_js,rob1_js_next,positioner_js_next,reversed=False)
-				
-		
-			
-		lam_relative=calc_lam_cs(curve_sliced_relative)
-		lam_relative_dense=np.linspace(0,lam_relative[-1],num=int(lam_relative[-1]/point_distance))
-		rob1_js_dense=interp1d(lam_relative,rob1_js,kind='cubic',axis=0)(lam_relative_dense)
-		positioner_js_dense=interp1d(lam_relative,positioner_js,kind='cubic',axis=0)(lam_relative_dense)
-		breakpoints=SS.get_breakpoints(lam_relative_dense,v)
-
-		###find closest %2pi
-		num2p=np.round((q_positioner_prev-positioner_js_dense[0])/(2*np.pi))
-		positioner_js_dense+=num2p*2*np.pi
-		
-		###formulate streaming joint angles
-		q1_cmd_all.extend(rob1_js_dense[breakpoints])
-		positioner_cmd_all.extend(positioner_js_dense[breakpoints])
-		
-		q_positioner_prev=copy.deepcopy(positioner_js_dense[-1])
-
-		layer_counts+=1
-		slice_num+=slice_increment
-
-	return np.array(q1_cmd_all),np.array(positioner_cmd_all)
-
-
-def weld_bf_streaming(SS,data_dir,v,slice_increment,num_layers,slice_start,slice_end,point_distance=0.04,q_positioner_prev=np.zeros(2)):
-
-	q1_cmd_all=[]
-	positioner_cmd_all=[]
-	###PRELOAD ALL SLICES TO SAVE INPROCESS TIME
-	rob1_js_all_slices=[]
-	positioner_js_all_slices=[]
-	for i in range(0,slice_end):
-		rob1_js_all_slices.append(np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(i)+'_0.csv',delimiter=','))
-		positioner_js_all_slices.append(np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(i)+'_0.csv',delimiter=','))
-
-	print("LAYERS PRELOAD FINISHED")
-
-	slice_num=slice_start
-	layer_counts=0
-	while layer_counts<num_layers:
-
-		####################DETERMINE CURVE ORDER##############################################
-		x=0
-		rob1_js=copy.deepcopy(rob1_js_all_slices[slice_num])
-		positioner_js=copy.deepcopy(positioner_js_all_slices[slice_num])
-		curve_sliced_relative=np.loadtxt(data_dir+'curve_sliced_relative/slice'+str(slice_num)+'_'+str(x)+'.csv',delimiter=',')
-		if positioner_js.shape==(2,) and rob1_js.shape==(6,):
-			continue
-		
-		###TRJAECTORY WARPING
-		if layer_counts%2==0:
-			if slice_num>0:
-				rob1_js_prev=copy.deepcopy(rob1_js_all_slices[slice_num-slice_increment])
-				positioner_js_prev=copy.deepcopy(positioner_js_all_slices[slice_num-slice_increment])
-				rob1_js,positioner_js=warp_traj2(rob1_js,positioner_js,rob1_js_prev,positioner_js_prev,reversed=True)
-			if slice_num<slice_end-slice_increment:
-				rob1_js_next=copy.deepcopy(rob1_js_all_slices[slice_num+slice_increment])
-				positioner_js_next=copy.deepcopy(positioner_js_all_slices[slice_num+slice_increment])
-				rob1_js,positioner_js=warp_traj2(rob1_js,positioner_js,rob1_js_next,positioner_js_next,reversed=False)
-		else:
-			if slice_num>0:
-				rob1_js_prev=copy.deepcopy(rob1_js_all_slices[slice_num-slice_increment])
-				positioner_js_prev=copy.deepcopy(positioner_js_all_slices[slice_num-slice_increment])
-				rob1_js,positioner_js=warp_traj2(rob1_js,positioner_js,rob1_js_prev,positioner_js_prev,reversed=False)
-			if slice_num<slice_end-slice_increment:
-				rob1_js_next=copy.deepcopy(rob1_js_all_slices[slice_num+slice_increment])
-				positioner_js_next=copy.deepcopy(positioner_js_all_slices[slice_num+slice_increment])
-				rob1_js,positioner_js=warp_traj2(rob1_js,positioner_js,rob1_js_next,positioner_js_next,reversed=True)
-
-		lam_relative=calc_lam_cs(curve_sliced_relative)
-		lam_relative_dense=np.linspace(0,lam_relative[-1],num=int(lam_relative[-1]/point_distance))
-		rob1_js_dense=interp1d(lam_relative,rob1_js,kind='cubic',axis=0)(lam_relative_dense)
-		positioner_js_dense=interp1d(lam_relative,positioner_js,kind='cubic',axis=0)(lam_relative_dense)
-		breakpoints=SS.get_breakpoints(lam_relative_dense,v)
-
-		###find closest %2pi
-		num2p=np.round((q_positioner_prev-positioner_js_dense[0])/(2*np.pi))
-		positioner_js_dense+=num2p*2*np.pi
-		
-		###formulate streaming joint angles
-		if layer_counts%2==0:
-			q1_cmd_all.extend(rob1_js_dense[breakpoints])
-			positioner_cmd_all.extend(positioner_js_dense[breakpoints])
-		else:
-			q1_cmd_all.extend(np.flip(rob1_js_dense[breakpoints],axis=0))
-			positioner_cmd_all.extend(np.flip(positioner_js_dense[breakpoints],axis=0))
-		
-		q_positioner_prev=copy.deepcopy(positioner_js_dense[-1])
-
-		layer_counts+=1
-		slice_num+=slice_increment
-
-	return np.array(q1_cmd_all),np.array(positioner_cmd_all)
 def main():
 	global ir_updated_flag, ir_process_packet
 
-	dataset='wall/'
+	dataset='right_triangle/'
 	sliced_alg='dense_slice/'
 	data_dir='../../../../geometry_data/'+dataset+sliced_alg
 	with open(data_dir+'slicing.yml', 'r') as file:
 		slicing_meta = yaml.safe_load(file)
 
 	open_loop=True
+	weld_arcon=False
 
 	##############################################################SENSORS####################################################################
 	# weld state logging
@@ -216,7 +84,7 @@ def main():
 	q2=robot2.inv(p2_in_base_frame,R2,last_joints=np.zeros(6))[0]
 
 	########################################################RR FRONIUS########################################################
-	weld_arcon=True
+	
 	if weld_arcon:
 		fronius_sub=RRN.SubscribeService('rr+tcp://192.168.55.21:60823?service=welder')
 		fronius_client = fronius_sub.GetDefaultClientWait(1)      #connect, timeout=30s
@@ -239,56 +107,49 @@ def main():
 	VPD=10
 	v_layer=10
 	layer_feedrate=VPD*v_layer
-	base_layer_height=3
 	v_base=5
 	layer_height=1.3
 	num_base_layer=2        #2 base layer to establish adhesion to coupon
 	num_support_layer=4     #support layer to raise the cylinder till visible by IR camera
-	support_layer_height=1.5
 	support_feedrate=150
 	v_support=10
-	weld_num_layer=20
 	job_offset=450
 	
 
-
 	nominal_slice_increment=int(layer_height/slicing_meta['line_resolution'])
-	base_slice_increment=int(base_layer_height/slicing_meta['line_resolution'])
-	support_slice_increment=int(support_layer_height/slicing_meta['line_resolution'])
 
 	
-
-	
-	###############################################################################################################################################################
-	###############################################################################################################################################################
-	#####################################################BASE & SUPPORT LAYER##########################################################################################
-	slice_start=0
-	slice_end=int(base_slice_increment*num_base_layer)
-	q1_cmd_all_base,positioner_cmd_all_base=weld_bf_streaming(SS,data_dir,v_base,base_slice_increment,num_base_layer,slice_start,slice_end,point_distance=point_distance,q_positioner_prev=SS.q_cur[-2:])
-	q_cmd_all_base = np.hstack((q1_cmd_all_base, np.array([q2] * len(q1_cmd_all_base)),positioner_cmd_all_base))
-	slice_start=int(num_base_layer*base_slice_increment)
-	slice_end=int(num_base_layer*base_slice_increment+num_support_layer*support_slice_increment)
-	q1_cmd_all_support,positioner_cmd_all_support=weld_bf_streaming(SS,data_dir,v_support,support_slice_increment,num_support_layer,slice_start,slice_end,point_distance=point_distance,q_positioner_prev=SS.q_cur[-2:])
-	q_cmd_all_support = np.hstack((q1_cmd_all_support, np.array([q2] * len(q1_cmd_all_support)),positioner_cmd_all_support))
-	###jog to start point
-	print("BASE-SUPPORT CALCULATION FINISHED")
-	SS.jog2q(q_cmd_all_base[0])
-	# plt.plot(np.hstack((q1_cmd_all_base[:,0],q1_cmd_all_support[:,0])))
-	# plt.show()
-	##############################################################BASE-SUPPORT Layers Welding####################################################################
-	if weld_arcon:
-		fronius_client.job_number = int(base_feedrate/10+job_offset)
-		fronius_client.start_weld()
-	for i in range(len(q_cmd_all_base)):
-		SS.position_cmd(q_cmd_all_base[i],time.perf_counter())
-	if weld_arcon:
-		fronius_client.job_number = int(support_feedrate/10+job_offset)
-		fronius_client.start_weld()
-	for i in range(len(q_cmd_all_support)):
-		SS.position_cmd(q_cmd_all_support[i],time.perf_counter())
-	if weld_arcon:
-		fronius_client.stop_weld()
-	print("BASE-SUPPORT LAYER WELDING FINISHED")
+	# ###############################################################################################################################################################
+	# ###############################################################################################################################################################
+	# #####################################################BASE & SUPPORT LAYER##########################################################################################
+	# slice_start=0
+	# slice_end=2
+	# slice_increment=1
+	# q1_cmd_all_base,positioner_cmd_all_base=weld_bf_streaming(SS,data_dir,v_base,slice_increment,num_base_layer,slice_start,slice_end,point_distance=point_distance,q_positioner_prev=SS.q_cur[-2:],layer_name='base_')
+	# q_cmd_all_base = np.hstack((q1_cmd_all_base, np.array([q2] * len(q1_cmd_all_base)),positioner_cmd_all_base))
+	# slice_start=0
+	# slice_end=4
+	# q1_cmd_all_support,positioner_cmd_all_support=weld_bf_streaming(SS,data_dir,v_support,slice_increment,num_support_layer,slice_start,slice_end,point_distance=point_distance,q_positioner_prev=SS.q_cur[-2:],layer_name='support_')
+	# q_cmd_all_support = np.hstack((q1_cmd_all_support, np.array([q2] * len(q1_cmd_all_support)),positioner_cmd_all_support))
+	# ###jog to start point
+	# print("BASE-SUPPORT CALCULATION FINISHED")
+	# SS.jog2q(q_cmd_all_base[0])
+	# # plt.plot(np.hstack((q1_cmd_all_base[:,2],q1_cmd_all_support[:,2])))
+	# # plt.show()
+	# ##############################################################BASE-SUPPORT Layers Welding####################################################################
+	# if weld_arcon:
+	# 	fronius_client.job_number = int(base_feedrate/10+job_offset)
+	# 	fronius_client.start_weld()
+	# for i in range(len(q_cmd_all_base)):
+	# 	SS.position_cmd(q_cmd_all_base[i],time.perf_counter())
+	# if weld_arcon:
+	# 	fronius_client.job_number = int(support_feedrate/10+job_offset)
+	# 	fronius_client.start_weld()
+	# for i in range(len(q_cmd_all_support)):
+	# 	SS.position_cmd(q_cmd_all_support[i],time.perf_counter())
+	# if weld_arcon:
+	# 	fronius_client.stop_weld()
+	# print("BASE-SUPPORT LAYER WELDING FINISHED")
 
 
 
@@ -308,14 +169,13 @@ def main():
 		
 	print("PRELOAD FINISHED")
 	
-	wall_height=50#mm
-	num_slice_start=int(num_base_layer*base_slice_increment)
-	num_slice_end=num_slice_start+int(wall_height/slicing_meta['line_resolution'])
-	print("num_slice_end: ",num_slice_end)
+	num_slice_start=0
+	num_slice_end=slicing_meta['num_layers']
+
 	slice_num=num_slice_start
 	layer_counts=0
 	wire_length_gain=2.
-	nominal_wire_length=20
+	nominal_wire_length=15
 	v_gain=1e-3
 	dv_max=2
 	nominal_pixel_reading=25000
@@ -449,7 +309,7 @@ def main():
 	js_recording = SS.stop_recording()
 
 	if not open_loop:
-		recorded_dir='../../../../recorded_data/ER316L/streaming/wallbf_T%i/'%(nominal_pixel_reading)
+		recorded_dir='../../../../recorded_data/ER316L/streaming/right_triangle_bf_T%i/'%(nominal_pixel_reading)
 		os.makedirs(recorded_dir,exist_ok=True)
 		np.savetxt(recorded_dir+'weld_js_cmd.csv',np.array(q_cmd_all),delimiter=',')
 		np.savetxt(recorded_dir+'weld_js_exe.csv',np.array(js_recording),delimiter=',')
