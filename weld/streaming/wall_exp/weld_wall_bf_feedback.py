@@ -11,6 +11,10 @@ from flir_toolbox import *
 ir_updated_flag=False
 ir_process_packet=None
 
+def form_vector(c,r,flir_intrinsic):
+	vector=np.array([(c-flir_intrinsic['c0'])/flir_intrinsic['fsx'],(r-flir_intrinsic['r0'])/flir_intrinsic['fsy'],1])
+	return vector/np.linalg.norm(vector)
+
 def my_handler(exp):
 	if (exp is not None):
 		# If "err" is not None it means that an exception occurred.
@@ -167,7 +171,7 @@ def main():
 	with open(data_dir+'slicing.yml', 'r') as file:
 		slicing_meta = yaml.safe_load(file)
 
-	open_loop=True
+	open_loop=False
 
 	##############################################################SENSORS####################################################################
 	# weld state logging
@@ -393,7 +397,8 @@ def main():
 					torch_pose=robot_no_wire.fwd(SS.q_cur[:6])
 					IR_pose=robot2.fwd(SS.q_cur[6:-2],world=True)
 					IR_vector=IR_pose.R@form_vector(ir_process_packet.arc_centroid[0],ir_process_packet.arc_centroid[1],flir_intrinsic)
-					wire_tip=line_intersection(torch_pose.p,torch_pose.R[:,2],IR_pose.p,IR_vector)
+					# wire_tip=line_intersection(torch_pose.p,torch_pose.R[:,2],IR_pose.p,IR_vector)
+					wire_tip=line_intersect(torch_pose.p,torch_pose.R[:,2],IR_pose.p,IR_vector)
 					wire_length.append(np.linalg.norm(wire_tip-torch_pose.p))
 					pixel_reading.append(ir_process_packet.flame_reading)
 
@@ -406,8 +411,8 @@ def main():
 						v_cmd=min(max(v_cmd,max(5,v_cmd-dv_max)),min(20,v_cmd+dv_max))
 						layer_feedrate=VPD*v_cmd
 						fronius_client.async_set_job_number(int(layer_feedrate/10)+job_offset, my_handler)
-						print("Adjusted Speed: ",v_cmd)
-						print("ADJUSTED feedrate: ",layer_feedrate)
+						# print("Adjusted Speed: ",v_cmd)
+						# print("ADJUSTED feedrate: ",layer_feedrate)
 					pixel_reading=[]
 					last_update_time=time.perf_counter()
 				
