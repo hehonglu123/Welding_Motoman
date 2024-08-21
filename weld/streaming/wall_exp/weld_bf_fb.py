@@ -7,6 +7,8 @@ from dual_robot import *
 from traj_manipulation import *
 from StreamingSend import *
 from flir_toolbox import *
+from robotics_utils import *
+
 
 ir_updated_flag=False
 ir_process_packet=None
@@ -28,22 +30,19 @@ def ir_process_cb(sub, value, ts):
 def main():
 	global ir_updated_flag, ir_process_packet
 
-	dataset='right_triangle/'
+	dataset='wall2/'
 	sliced_alg='dense_slice/'
 	data_dir='../../../../geometry_data/'+dataset+sliced_alg
 	with open(data_dir+'slicing.yml', 'r') as file:
 		slicing_meta = yaml.safe_load(file)
 
-	open_loop=True
-	weld_arcon=False
+	open_loop=False
+	weld_arcon=True
 
 	##############################################################SENSORS####################################################################
 	# weld state logging
 	# weld_ser = RRN.SubscribeService('rr+tcp://192.168.55.10:60823?service=welder')
-	if open_loop:
-		cam_ser=None
-	else:
-		cam_ser=RRN.ConnectService('rr+tcp://localhost:60827/?service=camera')
+	cam_ser=RRN.ConnectService('rr+tcp://localhost:60827/?service=camera')
 	# mic_ser = RRN.ConnectService('rr+tcp://192.168.55.20:60828?service=microphone')
 	## RR sensor objects
 	rr_sensors = WeldRRSensor(weld_service=None,cam_service=cam_ser,microphone_service=None)
@@ -110,7 +109,7 @@ def main():
 	v_layer=10
 	layer_feedrate=VPD*v_layer
 	v_base=5
-	layer_height=1.3
+	layer_height=1.2
 	num_base_layer=2        #2 base layer to establish adhesion to coupon
 	num_support_layer=4     #support layer to raise the cylinder till visible by IR camera
 	support_feedrate=150
@@ -121,37 +120,37 @@ def main():
 	nominal_slice_increment=int(layer_height/slicing_meta['line_resolution'])
 
 	
-	# ###############################################################################################################################################################
-	# ###############################################################################################################################################################
-	# #####################################################BASE & SUPPORT LAYER##########################################################################################
-	# slice_start=0
-	# slice_end=2
-	# slice_increment=1
-	# q1_cmd_all_base,positioner_cmd_all_base=weld_bf_streaming(SS,data_dir,v_base,slice_increment,num_base_layer,slice_start,slice_end,point_distance=point_distance,q_positioner_prev=SS.q_cur[-2:],layer_name='base_')
-	# q_cmd_all_base = np.hstack((q1_cmd_all_base, np.array([q2] * len(q1_cmd_all_base)),positioner_cmd_all_base))
-	# slice_start=0
-	# slice_end=4
-	# q1_cmd_all_support,positioner_cmd_all_support=weld_bf_streaming(SS,data_dir,v_support,slice_increment,num_support_layer,slice_start,slice_end,point_distance=point_distance,q_positioner_prev=SS.q_cur[-2:],layer_name='support_')
-	# q_cmd_all_support = np.hstack((q1_cmd_all_support, np.array([q2] * len(q1_cmd_all_support)),positioner_cmd_all_support))
-	# ###jog to start point
-	# print("BASE-SUPPORT CALCULATION FINISHED")
-	# SS.jog2q(q_cmd_all_base[0])
-	# # plt.plot(np.hstack((q1_cmd_all_base[:,2],q1_cmd_all_support[:,2])))
-	# # plt.show()
-	# ##############################################################BASE-SUPPORT Layers Welding####################################################################
-	# if weld_arcon:
-	# 	fronius_client.job_number = int(base_feedrate/10+job_offset)
-	# 	fronius_client.start_weld()
-	# for i in range(len(q_cmd_all_base)):
-	# 	SS.position_cmd(q_cmd_all_base[i],time.perf_counter())
-	# if weld_arcon:
-	# 	fronius_client.job_number = int(support_feedrate/10+job_offset)
-	# 	fronius_client.start_weld()
-	# for i in range(len(q_cmd_all_support)):
-	# 	SS.position_cmd(q_cmd_all_support[i],time.perf_counter())
-	# if weld_arcon:
-	# 	fronius_client.stop_weld()
-	# print("BASE-SUPPORT LAYER WELDING FINISHED")
+	###############################################################################################################################################################
+	###############################################################################################################################################################
+	#####################################################BASE & SUPPORT LAYER##########################################################################################
+	slice_start=0
+	slice_end=2
+	slice_increment=1
+	q1_cmd_all_base,positioner_cmd_all_base=weld_bf_streaming(SS,data_dir,v_base,slice_increment,num_base_layer,slice_start,slice_end,point_distance=point_distance,q_positioner_prev=SS.q_cur[-2:],layer_name='base_')
+	q_cmd_all_base = np.hstack((q1_cmd_all_base, np.array([q2] * len(q1_cmd_all_base)),positioner_cmd_all_base))
+	slice_start=0
+	slice_end=4
+	q1_cmd_all_support,positioner_cmd_all_support=weld_bf_streaming(SS,data_dir,v_support,slice_increment,num_support_layer,slice_start,slice_end,point_distance=point_distance,q_positioner_prev=SS.q_cur[-2:],layer_name='support_')
+	q_cmd_all_support = np.hstack((q1_cmd_all_support, np.array([q2] * len(q1_cmd_all_support)),positioner_cmd_all_support))
+	###jog to start point
+	print("BASE-SUPPORT CALCULATION FINISHED")
+	SS.jog2q(q_cmd_all_base[0])
+	# plt.plot(np.hstack((q1_cmd_all_base[:,2],q1_cmd_all_support[:,2])))
+	# plt.show()
+	##############################################################BASE-SUPPORT Layers Welding####################################################################
+	if weld_arcon:
+		fronius_client.job_number = int(base_feedrate/10+job_offset)
+		fronius_client.start_weld()
+	for i in range(len(q_cmd_all_base)):
+		SS.position_cmd(q_cmd_all_base[i],time.perf_counter())
+	if weld_arcon:
+		fronius_client.job_number = int(support_feedrate/10+job_offset)
+		fronius_client.start_weld()
+	for i in range(len(q_cmd_all_support)):
+		SS.position_cmd(q_cmd_all_support[i],time.perf_counter())
+	if weld_arcon:
+		fronius_client.stop_weld()
+	print("BASE-SUPPORT LAYER WELDING FINISHED")
 
 
 
@@ -299,6 +298,7 @@ def main():
 			traceback.print_exc()
 			if weld_arcon:
 				fronius_client.stop_weld()
+				fronius_client.release_welder()
 			SS.deinitialize_robot()
 			break
 			
@@ -306,18 +306,21 @@ def main():
 	############################################################LOGGING####################################################################
 	if weld_arcon:
 		fronius_client.stop_weld()
+		fronius_client.release_welder()
 	SS.deinitialize_robot()
 	rr_sensors.stop_all_sensors()
 	js_recording = SS.stop_recording()
 
 	if not open_loop:
-		recorded_dir='../../../../recorded_data/ER316L/streaming/right_triangle_bf_T%i/'%(nominal_pixel_reading)
-		os.makedirs(recorded_dir,exist_ok=True)
-		np.savetxt(recorded_dir+'weld_js_cmd.csv',np.array(q_cmd_all),delimiter=',')
-		np.savetxt(recorded_dir+'weld_js_exe.csv',np.array(js_recording),delimiter=',')
-		np.savetxt(recorded_dir+'weld_cmd.csv',np.array(welding_cmd_all),delimiter=',')
-		rr_sensors.save_all_sensors(recorded_dir)
+		recorded_dir='../../../../recorded_data/ER316L/streaming/'+dataset+'bf_T%i/'%(nominal_pixel_reading)
+	else:
+		recorded_dir='../../../../recorded_data/ER316L/streaming/'+dataset+'bf_ol_v%i_f%i/'%(v_layer,layer_feedrate)
 
+	os.makedirs(recorded_dir,exist_ok=True)
+	np.savetxt(recorded_dir+'weld_js_cmd.csv',np.array(q_cmd_all),delimiter=',')
+	np.savetxt(recorded_dir+'weld_js_exe.csv',np.array(js_recording),delimiter=',')
+	np.savetxt(recorded_dir+'weld_cmd.csv',np.array(welding_cmd_all),delimiter=',')
+	rr_sensors.save_all_sensors(recorded_dir)
 
 if __name__ == '__main__':
 	main()
