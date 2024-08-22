@@ -11,7 +11,8 @@ from ultralytics import YOLO
 # data_dir='../../../recorded_data/ER316L/phi0.9_VPD20/cylinderspiral_180ipm_v9/'
 # data_dir='../../../recorded_data/ER4043/wallbf_100ipm_v10_100ipm_v10/'
 # data_dir='../../../recorded_data/wall_weld_test/4043_150ipm_2024_06_18_11_16_32/layer_8/'
-data_dir='../../../recorded_data/ER316L/VPD10/tubespiral_180ipm_v18/'
+# data_dir='../../../recorded_data/ER316L/VPD10/tubespiral_180ipm_v18/'
+data_dir='../../../recorded_data/ER316L/streaming/right_triangle/bf_ol_v10_f100/'
 
 torch_model = YOLO(os.path.dirname(inspect.getfile(flir_toolbox))+"/torch.pt")
 tip_model = YOLO(os.path.dirname(inspect.getfile(flir_toolbox))+"/tip_wire.pt")

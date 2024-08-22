@@ -26,6 +26,13 @@ def ir_process_cb(sub, value, ts):
 	ir_process_packet=copy.deepcopy(value)
 	ir_updated_flag=True
 
+def layer_idle_monitoring(rr_sensors,threshold):
+	###monitoring the highest temperature, and wait until drop down to a certain threshold
+	max_reading=99999
+	while max_reading>threshold:
+		max_reading=np.max(rr_sensors.ir_recording[-1])
+		time.sleep(0.1)
+	return
 
 def main():
 	global ir_updated_flag, ir_process_packet
@@ -180,9 +187,11 @@ def main():
 	v_gain=1e-3
 	dv_max=2
 	nominal_pixel_reading=25000
+	continuous_stopping_threshold=nominal_pixel_reading+2000
 	slice_increment=nominal_slice_increment
 	feedrate_update_rate=1.	#Hz
 	last_update_time=time.perf_counter()+5.
+	arc_off=True
 
 	q_cmd_all=[]
 	welding_cmd_all=[]
@@ -229,15 +238,17 @@ def main():
 				SS.jog2q(np.hstack((rob1_js[0],q2,positioner_js[0])))
 				rr_sensors.start_all_sensors()
 				SS.start_recording()
-				if weld_arcon:
-					print("Welding Start")
-					fronius_client.job_number = int(layer_feedrate/10+job_offset)
-					fronius_client.start_weld()
+			if arc_off and weld_arcon:
+				print("Welding Start")
+				fronius_client.job_number = int(layer_feedrate/10+job_offset)
+				fronius_client.start_weld()
+				arc_off=False
 			
 			############################################################Welding Normal Layers ####################################################################
 			lam_cur=0
 			wire_length=[]
 			pixel_reading=[]
+			pixel_reading_layer=[]
 			while lam_cur<lam_relative_all_slices[slice_num][-1] - v_cmd/SS.streaming_rate:
 				loop_start=time.perf_counter()
 
@@ -257,6 +268,7 @@ def main():
 					wire_tip=line_intersection(torch_pose.p,torch_pose.R[:,2],IR_pose.p,IR_vector)
 					wire_length.append(np.linalg.norm(wire_tip-torch_pose.p))
 					pixel_reading.append(ir_process_packet.flame_reading)
+					pixel_reading_layer.append(ir_process_packet.flame_reading)
 
 				###update welding param
 				if time.perf_counter()-last_update_time>1./feedrate_update_rate:
@@ -289,11 +301,23 @@ def main():
 			print("ADJUSTED slice_increment: ",slice_increment)
 
 
+			###LAYER IDLE CONDITION
+			if weld_arcon:
+				if np.mean(pixel_reading_layer)>continuous_stopping_threshold:
+					print("Continuous Stopping Condition Reached")
+					fronius_client.stop_weld()
+					arc_off=True
+					layer_idle_monitoring(rr_sensors,continuous_stopping_threshold)
+
+		
+
 			###loop conditions
 			q_positioner_prev=copy.deepcopy(positioner_js[-1])
 			layer_counts+=1
 			slice_num+=slice_increment
-		
+			pixel_reading_layer=[]
+
+			
 		except:
 			traceback.print_exc()
 			if weld_arcon:
