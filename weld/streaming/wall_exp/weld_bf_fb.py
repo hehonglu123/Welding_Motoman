@@ -30,14 +30,14 @@ def layer_idle_monitoring(rr_sensors,threshold):
 	###monitoring the highest temperature, and wait until drop down to a certain threshold
 	max_reading=99999
 	while max_reading>threshold:
-		max_reading=np.max(rr_sensors.ir_recording[-1])
 		time.sleep(0.1)
+		max_reading=np.max(rr_sensors.ir_recording[-1])
 	return
 
 def main():
 	global ir_updated_flag, ir_process_packet
 
-	dataset='wall2/'
+	dataset='right_triangle/'
 	sliced_alg='dense_slice/'
 	data_dir='../../../../geometry_data/'+dataset+sliced_alg
 	with open(data_dir+'slicing.yml', 'r') as file:
@@ -182,22 +182,25 @@ def main():
 
 	slice_num=num_slice_start
 	layer_counts=0
-	wire_length_gain=2.
 	nominal_wire_length=15
+	prev_wire_length=nominal_wire_length
 	v_gain=1e-3
 	dv_max=2
 	nominal_pixel_reading=25000
-	continuous_stopping_threshold=nominal_pixel_reading+2000
+	continuous_stopping_threshold=nominal_pixel_reading+1000
 	slice_increment=nominal_slice_increment
 	feedrate_update_rate=1.	#Hz
 	last_update_time=time.perf_counter()+5.
 	arc_off=True
+	high_temp_triggered=False
+	high_temp_triggered_counts=0
 
 	q_cmd_all=[]
 	welding_cmd_all=[]
 
 	q_positioner_prev=SS.q_cur[-2:]
 	while slice_num<num_slice_end:
+		print("CURRENT SLICE: ",slice_num)
 		try:
 			####################DETERMINE CURVE ORDER##############################################
 			rob1_js=copy.deepcopy(rob1_js_all_slices[slice_num])
@@ -250,6 +253,7 @@ def main():
 			pixel_reading=[]
 			pixel_reading_layer=[]
 			while lam_cur<lam_relative_all_slices[slice_num][-1] - v_cmd/SS.streaming_rate:
+
 				loop_start=time.perf_counter()
 
 				lam_cur+=v_cmd/SS.streaming_rate
@@ -273,14 +277,16 @@ def main():
 				###update welding param
 				if time.perf_counter()-last_update_time>1./feedrate_update_rate:
 					welding_cmd_all.append(np.hstack((time.perf_counter(),layer_counts,v_cmd,layer_feedrate)))
-					print("Layer Average Pixel Reading: ",np.mean(pixel_reading))
+					print("Interval Average Pixel Reading: ",np.mean(pixel_reading))
 					if not np.isnan(np.mean(pixel_reading)):
 						v_cmd=v_layer+v_gain*(nominal_pixel_reading-np.mean(pixel_reading))
 						v_cmd=min(max(v_cmd,max(5,v_cmd-dv_max)),min(20,v_cmd+dv_max))
+						if high_temp_triggered:
+							v_cmd=5
 						layer_feedrate=VPD*v_cmd
 						fronius_client.async_set_job_number(int(layer_feedrate/10)+job_offset, my_handler)
-						print("Adjusted Speed: ",v_cmd)
-						print("ADJUSTED feedrate: ",layer_feedrate)
+						# print("Adjusted Speed: ",v_cmd)
+						# print("ADJUSTED feedrate: ",layer_feedrate)
 					pixel_reading=[]
 					last_update_time=time.perf_counter()
 				
@@ -296,8 +302,13 @@ def main():
 			if open_loop:
 				slice_increment=nominal_slice_increment
 			else:
-				slice_increment=nominal_slice_increment+wire_length_gain*(nominal_wire_length-np.mean(wire_length))
-				slice_increment=int(min(max(slice_increment,0.5*nominal_slice_increment),2*nominal_slice_increment))
+				act_layer_height=slice_increment*slicing_meta['line_resolution']-(np.mean(wire_length)-prev_wire_length)
+				print("MEASURED ACTUAL LAYER HEIGHT: ",act_layer_height)
+				slice_increment=(nominal_wire_length-np.mean(wire_length)+act_layer_height)/slicing_meta['line_resolution']
+				###safety bound
+				slice_increment=int(min(max(slice_increment,1),1.5*nominal_slice_increment))
+
+
 			print("ADJUSTED slice_increment: ",slice_increment)
 
 
@@ -307,7 +318,11 @@ def main():
 					print("Continuous Stopping Condition Reached")
 					fronius_client.stop_weld()
 					arc_off=True
-					layer_idle_monitoring(rr_sensors,continuous_stopping_threshold)
+					high_temp_triggered_counts+=1
+					if high_temp_triggered_counts>2:
+						high_temp_triggered=True
+					layer_idle_monitoring(rr_sensors,nominal_pixel_reading-2000)
+					print("Continuous Stopping Condition Cleared")
 
 		
 
@@ -316,6 +331,7 @@ def main():
 			layer_counts+=1
 			slice_num+=slice_increment
 			pixel_reading_layer=[]
+			prev_wire_length=np.mean(wire_length)
 
 			
 		except:
