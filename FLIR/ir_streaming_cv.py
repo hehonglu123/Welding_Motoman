@@ -2,7 +2,6 @@
 
 from RobotRaconteur.Client import *
 import numpy as np
-import matplotlib.pyplot as plt
 import time, cv2
 
 def packet_received(self, pipe):
@@ -11,7 +10,7 @@ def packet_received(self, pipe):
 image_consts = None
 
 def main():
-    cv2.namedWindow("IR Recording", cv2.WINDOW_AUTOSIZE)
+    cv2.namedWindow("IR Recording", cv2.WINDOW_NORMAL)
     cmap = cv2.COLORMAP_INFERNO
 
     now=time.time()
@@ -31,9 +30,6 @@ def main():
     try:
         c1.start_streaming()
     except: pass
-
-
-    fig = plt.figure(1)
     
     try:
         while True:
