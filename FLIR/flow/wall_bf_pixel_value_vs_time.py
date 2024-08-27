@@ -7,12 +7,13 @@ from motoman_def import *
 from ultralytics import YOLO
 
 
-#load template
-template = cv2.imread('../tracking/torch_template_ER316L.png',0)
-
 # Load the IR recording data from the pickle file
 # data_dir='../../../recorded_data/ER316L_IR_wall_study/wallbf_70ipm_v7_70ipm_v7/'
-data_dir='../../../recorded_data/ER316L/trianglebf_100ipm_v10_100ipm_v10/'
+# data_dir='../../../recorded_data/ER316L/trianglebf_100ipm_v10_100ipm_v10/'
+data_dir='../../../recorded_data/ER316L/streaming/right_triangle/bf_T25000/'
+# data_dir='../../../recorded_data/ER316L/streaming/wall2/bf_ol_v10_f100/'
+# data_dir='../../../recorded_data/ER316L/streaming/wall2/bf_T25000/'
+
 config_dir='../../config/'
 with open(data_dir+'/ir_recording.pickle', 'rb') as file:
     ir_recording = pickle.load(file)
@@ -23,10 +24,6 @@ ir_pixel_window_size=7
 
 robot=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path=config_dir+'torch.csv',\
 	pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',d=15)
-robot2=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.yml',tool_file_path=config_dir+'flir.csv',\
-	pulse2deg_file_path=config_dir+'MA1440_A0_pulse2deg_real.csv',base_transformation_file=config_dir+'MA1440_pose.csv')
-positioner=positioner_obj('D500B',def_path=config_dir+'D500B_robot_default_config.yml',tool_file_path=config_dir+'positioner_tcp.csv',\
-	pulse2deg_file_path=config_dir+'D500B_pulse2deg_real.csv',base_transformation_file=config_dir+'D500B_pose_mocap.csv')
 
 #load model
 torch_model = YOLO(os.path.dirname(inspect.getfile(flir_toolbox))+"/torch.pt")
@@ -38,8 +35,9 @@ horizontal_offset=0
 #find indices of each layer by detecting velocity direction change
 p_all=robot.fwd(joint_angle[:,2:8]).p_all
 v_all=np.gradient(p_all,axis=0)/np.gradient(joint_angle[:,0])[:,None]
-v_direction=v_all@(p_all[len(p_all)//2]-p_all[len(p_all)//2-1])
+v_direction=v_all@(p_all[len(p_all)//2]-p_all[len(p_all)//2-2])
 signs=np.sign(np.sign(v_direction)+0.1)
+
 layer_indices_js=[0]
 layer_indices_ir=[0]
 sign_cur=signs[0]
@@ -55,11 +53,10 @@ for i in range(1,len(signs)):
         sign_continuous_time=0
 
 
-
 pixel_value_all=[]
 ir_ts_processed=[]
 frame_processing_time=[]
-for layer_num in tqdm(range(20,len(layer_indices_ir)-1)):
+for layer_num in tqdm(range(len(layer_indices_ir)-1)):
     #find all pixel regions to record from flame detection
     for i in range(layer_indices_ir[layer_num],layer_indices_ir[layer_num+1]):
         start_time=time.time()
@@ -73,6 +70,7 @@ for layer_num in tqdm(range(20,len(layer_indices_ir)-1)):
 
             frame_processing_time.append(time.time()-start_time)
 
+ir_ts_processed=np.array(ir_ts_processed)-ir_ts_processed[0]
 plt.title('Pixel Value vs Time ')
 plt.plot(ir_ts_processed, pixel_value_all)
 plt.xlabel('Time (s)')
