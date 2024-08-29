@@ -37,7 +37,7 @@ def layer_idle_monitoring(rr_sensors,threshold):
 def main():
 	global ir_updated_flag, ir_process_packet
 
-	dataset='right_triangle/'
+	dataset='wall2/'
 	sliced_alg='dense_slice/'
 	data_dir='../../../../geometry_data/'+dataset+sliced_alg
 	with open(data_dir+'slicing.yml', 'r') as file:
@@ -187,7 +187,7 @@ def main():
 	v_gain=1e-3
 	dv_max=2
 	nominal_pixel_reading=25000
-	continuous_stopping_threshold=nominal_pixel_reading+1000
+	continuous_stopping_threshold=nominal_pixel_reading+1500
 	slice_increment=nominal_slice_increment
 	feedrate_update_rate=1.	#Hz
 	last_update_time=time.perf_counter()+5.
@@ -202,34 +202,35 @@ def main():
 	while slice_num<num_slice_end:
 		print("CURRENT SLICE: ",slice_num)
 		try:
+			next_slice_nominal=min(slice_num+slice_increment,num_slice_end-1)
 			####################DETERMINE CURVE ORDER##############################################
 			rob1_js=copy.deepcopy(rob1_js_all_slices[slice_num])
 			positioner_js=copy.deepcopy(positioner_js_all_slices[slice_num])
 			if positioner_js.shape==(2,) and rob1_js.shape==(6,):
 				continue
-			
-			###TRJAECTORY WARPING
-			if layer_counts%2==0:
-				if slice_num>num_slice_start:
-					rob1_js_prev=copy.deepcopy(rob1_js_all_slices[slice_num-slice_increment])
-					positioner_js_prev=copy.deepcopy(positioner_js_all_slices[slice_num-slice_increment])
-					rob1_js,positioner_js=warp_traj2(rob1_js,positioner_js,rob1_js_prev,positioner_js_prev,reversed=True)
-				if slice_num<num_slice_end-slice_increment:
-					rob1_js_next=copy.deepcopy(rob1_js_all_slices[slice_num+slice_increment])
-					positioner_js_next=copy.deepcopy(positioner_js_all_slices[slice_num+slice_increment])
-					rob1_js,positioner_js=warp_traj2(rob1_js,positioner_js,rob1_js_next,positioner_js_next,reversed=False)
-			else:
-				if slice_num>num_slice_start:
-					rob1_js_prev=copy.deepcopy(rob1_js_all_slices[slice_num-slice_increment])
-					positioner_js_prev=copy.deepcopy(positioner_js_all_slices[slice_num-slice_increment])
-					rob1_js,positioner_js=warp_traj2(rob1_js,positioner_js,rob1_js_prev,positioner_js_prev,reversed=False)
-				if slice_num<num_slice_end-slice_increment:
-					rob1_js_next=copy.deepcopy(rob1_js_all_slices[slice_num+slice_increment])
-					positioner_js_next=copy.deepcopy(positioner_js_all_slices[slice_num+slice_increment])
-					rob1_js,positioner_js=warp_traj2(rob1_js,positioner_js,rob1_js_next,positioner_js_next,reversed=True)
-				
-				rob1_js=np.flip(rob1_js,axis=0)
-				positioner_js=np.flip(positioner_js,axis=0)
+			if len(positioner_js_all_slices[next_slice_nominal])>2:
+				###TRJAECTORY WARPING
+				if layer_counts%2==0:
+					if slice_num>num_slice_start:
+						rob1_js_prev=copy.deepcopy(rob1_js_all_slices[slice_num-slice_increment])
+						positioner_js_prev=copy.deepcopy(positioner_js_all_slices[slice_num-slice_increment])
+						rob1_js,positioner_js=warp_traj2(rob1_js,positioner_js,rob1_js_prev,positioner_js_prev,reversed=True)
+					if slice_num<num_slice_end-slice_increment:
+						rob1_js_next=copy.deepcopy(rob1_js_all_slices[next_slice_nominal])
+						positioner_js_next=copy.deepcopy(positioner_js_all_slices[next_slice_nominal])
+						rob1_js,positioner_js=warp_traj2(rob1_js,positioner_js,rob1_js_next,positioner_js_next,reversed=False)
+				else:
+					if slice_num>num_slice_start:
+						rob1_js_prev=copy.deepcopy(rob1_js_all_slices[slice_num-slice_increment])
+						positioner_js_prev=copy.deepcopy(positioner_js_all_slices[slice_num-slice_increment])
+						rob1_js,positioner_js=warp_traj2(rob1_js,positioner_js,rob1_js_prev,positioner_js_prev,reversed=False)
+					if slice_num<num_slice_end-slice_increment:
+						rob1_js_next=copy.deepcopy(rob1_js_all_slices[next_slice_nominal])
+						positioner_js_next=copy.deepcopy(positioner_js_all_slices[next_slice_nominal])
+						rob1_js,positioner_js=warp_traj2(rob1_js,positioner_js,rob1_js_next,positioner_js_next,reversed=True)
+					
+					rob1_js=np.flip(rob1_js,axis=0)
+					positioner_js=np.flip(positioner_js,axis=0)
 			
 			###find closest %2pi
 			num2p=np.round((q_positioner_prev-positioner_js[0])/(2*np.pi))
@@ -306,7 +307,7 @@ def main():
 				print("MEASURED ACTUAL LAYER HEIGHT: ",act_layer_height)
 				slice_increment=(nominal_wire_length-np.mean(wire_length)+act_layer_height)/slicing_meta['line_resolution']
 				###safety bound
-				slice_increment=int(min(max(slice_increment,1),1.5*nominal_slice_increment))
+				slice_increment=int(min(max(slice_increment,1),1.1*nominal_slice_increment))
 
 
 			print("ADJUSTED slice_increment: ",slice_increment)
