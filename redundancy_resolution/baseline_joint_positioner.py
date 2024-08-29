@@ -2,8 +2,7 @@ import numpy as np
 import sys, traceback, time, copy, glob, yaml
 from general_robotics_toolbox import *
 from redundancy_resolution import *
-sys.path.append('../toolbox')
-from robot_def import *
+from motoman_def import *
 
 
 def main():

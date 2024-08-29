@@ -10,7 +10,7 @@ service experimental.ir_process
 struct ir_process_struct
 	field uint16 flame_reading
 	field uint16[] torch_bottom
-	field uint16[] weld_pool
+	field uint16[] arc_centroid
 end 
 object ir_process_obj
 	wire ir_process_struct ir_process_result [readonly]

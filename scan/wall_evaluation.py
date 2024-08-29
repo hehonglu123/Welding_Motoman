@@ -7,7 +7,7 @@ from result_analysis import *
 
 
     
-dataset='wall2/'
+dataset='right_triangle/'
 sliced_alg='dense_slice/'
 data_dir='../../geometry_data/'+dataset+sliced_alg
 with open(data_dir+'slicing.yml', 'r') as file:
@@ -28,7 +28,8 @@ target_points=o3d.geometry.PointCloud()
 target_points.points=o3d.utility.Vector3dVector(target_points_pc)
 
 
-scanned_dir='../../recorded_data/ER316L/streaming/'+dataset+'/bf_ol_v10_f100/'
+# scanned_dir='../../recorded_data/ER316L/streaming/'+dataset+'/bf_ol_v10_f100/'
+scanned_dir='../../recorded_data/ER316L/streaming/'+dataset+'/bf_T25000/'
 ######## read the scanned stl
 scanned_mesh = o3d.io.read_triangle_mesh(scanned_dir+'scan.stl')
 scanned_mesh.compute_vertex_normals()
