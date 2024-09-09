@@ -56,7 +56,7 @@ def main():
 
 	rr=redundancy_resolution(robot,positioner,curve_sliced)
 
-	positioner_js,curve_sliced_js,positioner_js_support,curve_sliced_js_support,positioner_js_base,curve_sliced_js_base=rr.baseline_joint(R_torch,curve_sliced_relative,curve_sliced_relative_support,curve_sliced_relative_base,q_seed,slicing_meta['q_positioner_seed'],smooth_filter=slicing_meta['smooth_filter'])
+	positioner_js,curve_sliced_js,positioner_js_support,curve_sliced_js_support,positioner_js_base,curve_sliced_js_base=rr.followy_joint(R_torch,curve_sliced_relative,curve_sliced_relative_support,curve_sliced_relative_base,q_seed,slicing_meta['q_positioner_seed'],smooth_filter=slicing_meta['smooth_filter'])
 
 	for i in range(slicing_meta['num_layers']):
 		for x in range(len(positioner_js[i])):

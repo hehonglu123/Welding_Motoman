@@ -1,13 +1,13 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import os, yaml, pickle, sys
-import numpy as np
+import os, yaml, pickle, inspect
 import matplotlib.pyplot as plt
 from flir_toolbox import *
 from motoman_def import *
 from sklearn.neighbors import NearestNeighbors
 from scipy.spatial.transform import Rotation as R
 import open3d as o3d
+from ultralytics import YOLO
 
 
 config_dir='../../config/'
@@ -23,6 +23,8 @@ flir_intrinsic=yaml.load(open(config_dir+'FLIR_A320.yaml'), Loader=yaml.FullLoad
 
 
 data_dir='../../../recorded_data/wall_weld_test/4043_150ipm_2024_06_18_11_16_32/'
+#load model
+torch_model = YOLO(os.path.dirname(inspect.getfile(flir_toolbox))+"/torch.pt")
 
 #get the number of folders
 num_layers=len([name for name in os.listdir(data_dir) if os.path.isdir(os.path.join(data_dir, name))])
@@ -43,7 +45,7 @@ for i in range(2,num_layers):
         
         ir_image = ir_recording[i]
 
-        centroid, bbox=flame_detection(ir_image,threshold=1.0e4,area_threshold=10)
+        centroid, bbox = flame_detection_aluminum(ir_image,threshold=1.0e4,area_threshold=10)
         if centroid is not None:
             #find spatial vector ray from camera sensor
             vector=np.array([(centroid[0]-flir_intrinsic['c0'])/flir_intrinsic['fsx'],(centroid[1]-flir_intrinsic['r0'])/flir_intrinsic['fsy'],1])
@@ -57,7 +59,7 @@ for i in range(2,num_layers):
             p1=robot1_pose.p
             v1=robot1_pose.R[:,2]
             #find intersection point
-            intersection=line_intersect(p1,v1,p2,v2)
+            intersection=line_intersection(p1,v1,p2,v2)
             flame_3d_layer.append(intersection)
 
             ##########################################################DEBUGGING & VISUALIZATION: plot out p1,v1,p2,v2,intersection##########################################################

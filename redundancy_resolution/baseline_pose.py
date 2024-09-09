@@ -6,7 +6,7 @@ from motoman_def import *
 
 
 def main():
-	dataset='wall2/'
+	dataset='bell/'
 	sliced_alg='dense_slice/'
 	data_dir='../../geometry_data/'+dataset+sliced_alg
 	with open(data_dir+'slicing.yml', 'r') as file:
