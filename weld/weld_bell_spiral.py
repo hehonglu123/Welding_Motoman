@@ -5,6 +5,7 @@ from dx200_motion_program_exec_client import *
 from WeldSend import *
 from RobotRaconteur.Client import *
 from traj_manipulation import *
+import glob
 
 timestamp=[]
 voltage=[]
@@ -22,8 +23,8 @@ def wire_cb(sub, value, ts):
 	energy.append(value.welding_energy)
 
 dataset='bell/'
-sliced_alg='circular_slice/'
-data_dir='../data/'+dataset+sliced_alg
+sliced_alg='dense_slice/'
+data_dir='../../geometry_data/'+dataset+sliced_alg
 with open(data_dir+'slicing.yml', 'r') as file:
 	slicing_meta = yaml.safe_load(file)
 recorded_dir='recorded_data/bell_ER316L/'
@@ -45,21 +46,15 @@ ws=WeldSend(client)
 
 client=MotionProgramExecClient()
 ws=WeldSend(client)
-q1_all=[]
-q2_all=[]
-v1_all=[]
-v2_all=[]
-cond_all=[]
-primitives=[]
-arcon_set=False
 
 
+weld_arcon=False
 q_prev=client.getJointAnglesDB(positioner.pulse2deg)
 # q_prev=[0,0]
 
 
 ###set up control parameters
-job_offset=200 		###200 for Aluminum ER4043, 300 for Steel Alloy ER70S-6, 400 for Stainless Steel ER316L
+job_offset=100 		###200 for Aluminum ER4043, 300 for Steel Alloy ER70S-6, 400 for Stainless Steel ER316L
 nominal_feedrate=170
 nominal_vd_relative=5
 nominal_wire_length=25 #pixels
@@ -118,68 +113,82 @@ vd_relative_adjustment=2
 
 
 ######################################################BASE LAYER##########################################################################################
-# slice_num=0
-# num_sections=len(glob.glob(data_dir+'curve_sliced_relative/slice'+str(slice_num)+'_*.csv'))
-# mp=MotionProgram(ROBOT_CHOICE='RB1',ROBOT_CHOICE2='ST1',pulse2deg=robot.pulse2deg,pulse2deg_2=positioner.pulse2deg, tool_num = 12)
+q1_all=[]
+q2_all=[]
+v1_all=[]
+v2_all=[]
+cond_all=[]
+primitives=[]
+arcon_set=False
+slice_num=0
+num_sections=len(glob.glob(data_dir+'curve_sliced_relative/slice'+str(slice_num)+'_*.csv'))
+mp=MotionProgram(ROBOT_CHOICE='RB1',ROBOT_CHOICE2='ST1',pulse2deg=robot.pulse2deg,pulse2deg_2=positioner.pulse2deg, tool_num = 12)
 
-# try:
-# 	for x in range(0,num_sections,layer_width_num):
-# 		rob1_js=np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(slice_num)+'_'+str(x)+'.csv',delimiter=',')
-# 		rob2_js=np.loadtxt(data_dir+'curve_sliced_js/MA1440_js'+str(slice_num)+'_'+str(x)+'.csv',delimiter=',')
-# 		positioner_js=np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(slice_num)+'_'+str(x)+'.csv',delimiter=',')
-# 		curve_sliced_relative=np.loadtxt(data_dir+'curve_sliced_relative/slice'+str(slice_num)+'_'+str(x)+'.csv',delimiter=',')
-# 		if positioner_js.shape==(2,) and rob1_js.shape==(6,):
-# 			continue
-# 		if x>0:
-# 			rob1_js_prev=np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(slice_num)+'_'+str(x-layer_width_num)+'.csv',delimiter=',')
-# 			rob2_js_prev=np.loadtxt(data_dir+'curve_sliced_js/MA1440_js'+str(slice_num)+'_'+str(x-layer_width_num)+'.csv',delimiter=',')
-# 			positioner_js_prev=np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(slice_num)+'_'+str(x-layer_width_num)+'.csv',delimiter=',')
-# 			rob1_js,rob2_js,positioner_js=warp_traj(rob1_js,rob2_js,positioner_js,rob1_js_prev,rob2_js_prev,positioner_js_prev,reversed=True)
-# 			if x<num_sections-layer_width_num:
-# 				rob1_js_next=np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(slice_num)+'_'+str(x+layer_width_num)+'.csv',delimiter=',')
-# 				rob2_js_next=np.loadtxt(data_dir+'curve_sliced_js/MA1440_js'+str(slice_num)+'_'+str(x+layer_width_num)+'.csv',delimiter=',')
-# 				positioner_js_next=np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(slice_num)+'_'+str(x+layer_width_num)+'.csv',delimiter=',')
-# 				rob1_js,rob2_js,positioner_js=warp_traj(rob1_js,rob2_js,positioner_js,rob1_js_next,rob2_js_next,positioner_js_next,reversed=False)
+try:
+	for x in range(0,num_sections,layer_width_num):
+		rob1_js=np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(slice_num)+'_'+str(x)+'.csv',delimiter=',')
+		rob2_js=np.loadtxt(data_dir+'curve_sliced_js/MA1440_js'+str(slice_num)+'_'+str(x)+'.csv',delimiter=',')
+		positioner_js=np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(slice_num)+'_'+str(x)+'.csv',delimiter=',')
+		curve_sliced_relative=np.loadtxt(data_dir+'curve_sliced_relative/slice'+str(slice_num)+'_'+str(x)+'.csv',delimiter=',')
+		if positioner_js.shape==(2,) and rob1_js.shape==(6,):
+			continue
+		if x>0:
+			rob1_js_prev=np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(slice_num)+'_'+str(x-layer_width_num)+'.csv',delimiter=',')
+			rob2_js_prev=np.loadtxt(data_dir+'curve_sliced_js/MA1440_js'+str(slice_num)+'_'+str(x-layer_width_num)+'.csv',delimiter=',')
+			positioner_js_prev=np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(slice_num)+'_'+str(x-layer_width_num)+'.csv',delimiter=',')
+			rob1_js,rob2_js,positioner_js=warp_traj(rob1_js,rob2_js,positioner_js,rob1_js_prev,rob2_js_prev,positioner_js_prev,reversed=True)
+			if x<num_sections-layer_width_num:
+				rob1_js_next=np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(slice_num)+'_'+str(x+layer_width_num)+'.csv',delimiter=',')
+				rob2_js_next=np.loadtxt(data_dir+'curve_sliced_js/MA1440_js'+str(slice_num)+'_'+str(x+layer_width_num)+'.csv',delimiter=',')
+				positioner_js_next=np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(slice_num)+'_'+str(x+layer_width_num)+'.csv',delimiter=',')
+				rob1_js,rob2_js,positioner_js=warp_traj(rob1_js,rob2_js,positioner_js,rob1_js_next,rob2_js_next,positioner_js_next,reversed=False)
 			
-# 		lam_relative=calc_lam_cs(curve_sliced_relative)
-# 		lam1=calc_lam_js(rob1_js,robot)
-# 		lam2=calc_lam_js(positioner_js,positioner)
-# 		num_points_layer=max(2,int(lam_relative[-1]/waypoint_distance))
-# 		breakpoints=np.linspace(0,len(rob1_js)-1,num=num_points_layer).astype(int)
+		lam_relative=calc_lam_cs(curve_sliced_relative)
+		lam1=calc_lam_js(rob1_js,robot)
+		lam2=calc_lam_js(positioner_js,positioner)
+		num_points_layer=max(2,int(lam_relative[-1]/waypoint_distance))
+		breakpoints=np.linspace(0,len(rob1_js)-1,num=num_points_layer).astype(int)
 
-# 		s1_all,s2_all=calc_individual_speed(base_vd,lam1,lam2,lam_relative,breakpoints)
+		s1_all,s2_all=calc_individual_speed(base_vd,lam1,lam2,lam_relative,breakpoints)
 
-# 		###find closest %2pi
-# 		num2p=np.round((q_prev-positioner_js[0])/(2*np.pi))
-# 		positioner_js+=num2p*2*np.pi
-# 		###no need for acron/off when spiral, positioner not moving at all
-# 		if not arcon_set:
-# 			arcon_set=True
-# 			q1_all.append(rob1_js[breakpoints[0]])
-# 			q2_all.append(positioner_js[breakpoints[0]])
-# 			v1_all.append(5)
-# 			v2_all.append(5)
-# 			cond_all.append(0)
-# 			primitives.append('movej')
+		###find closest %2pi
+		num2p=np.round((q_prev-positioner_js[0])/(2*np.pi))
+		positioner_js+=num2p*2*np.pi
+		###no need for acron/off when spiral, positioner not moving at all
+		if not arcon_set:
+			arcon_set=True
+			q1_all.append(rob1_js[breakpoints[0]])
+			q2_all.append(positioner_js[breakpoints[0]])
+			v1_all.append(5)
+			v2_all.append(5)
+			cond_all.append(0)
+			primitives.append('movej')
 
 
 		
 
-# 		q1_all.extend(rob1_js[breakpoints[1:]].tolist())
-# 		q2_all.extend(positioner_js[breakpoints[1:]].tolist())
-# 		v1_all.extend(s1_all)
-# 		v2_all.extend([0]*len(s1_all))
-# 		cond_all.extend([int(base_feedrate_cmd/10)+job_offset]*(num_points_layer-1))
-# 		primitives.extend(['movel']*(num_points_layer-1))
+		q1_all.extend(rob1_js[breakpoints[1:]].tolist())
+		q2_all.extend(positioner_js[breakpoints[1:]].tolist())
+		v1_all.extend(s1_all)
+		v2_all.extend([0]*len(s1_all))
+		cond_all.extend([int(base_feedrate_cmd/10)+job_offset]*(num_points_layer-1))
+		primitives.extend(['movel']*(num_points_layer-1))
 
-# 	q_prev=positioner_js[breakpoints[-1]]
-# 	timestamp_robot,joint_recording,job_line,_=ws.weld_segment_dual(primitives,robot,positioner,q1_all,q2_all,v1_all,v2_all,cond_all,arc=True)
+	q_prev=positioner_js[breakpoints[-1]]
+	ws.weld_segment_dual(primitives,robot,positioner,q1_all,q2_all,v1_all,v2_all,cond_all,arc=weld_arcon)
 
-# except:
-# 	traceback.print_exc()
+except:
+	traceback.print_exc()
 
 
 ##################################################### LAYER Welding##########################################################################################
+q1_all=[]
+q2_all=[]
+v1_all=[]
+v2_all=[]
+cond_all=[]
+primitives=[]
+arcon_set=False
 ###PRELOAD ALL SLICES TO SAVE INPROCESS TIME
 rob1_js_all_slices=[]
 rob2_js_all_slices=[]
@@ -239,7 +248,7 @@ for slice_num in range(num_layer_start,num_layer_end,nominal_slice_increment):
 		q1_all.append(rob1_js[breakpoints[0]])
 		q2_all.append(positioner_js[breakpoints[0]])
 		v1_all.append(20)
-		v2_all.append(5)
+		v2_all.append(10)
 		cond_all.append(0)
 		primitives.append('movej')
 	
@@ -263,4 +272,4 @@ for slice_num in range(num_layer_start,num_layer_end,nominal_slice_increment):
 
 	q_prev=copy.deepcopy(positioner_js[-1])
 
-timestamp_robot,joint_recording,job_line,_=ws.weld_segment_dual(primitives,robot,positioner,q1_all,q2_all,v1_all,v2_all,cond_all,arc=False)
+ws.weld_segment_dual(primitives,robot,positioner,q1_all,q2_all,v1_all,v2_all,cond_all,arc=weld_arcon)
