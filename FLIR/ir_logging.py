@@ -15,7 +15,7 @@ def main():
     global logging, ts
 
     now=time.time()
-    url='rr+tcp://192.168.55.10:60827/?service=camera'
+    url='rr+tcp://localhost:60827/?service=camera'
 
     c1=RRN.ConnectService(url)
     c1.setf_param("focus_pos", RR.VarValue(int(1400),"int32"))
@@ -26,7 +26,7 @@ def main():
     c1.setf_param("ext_optics_temperature", RR.VarValue(293.15,"double"))
     c1.setf_param("ext_optics_transmission", RR.VarValue(0.99,"double"))
 
-    # c1.setf_param("current_case", RR.VarValue(2,"int32"))
+    c1.setf_param("current_case", RR.VarValue(2,"int32"))
     c1.setf_param("ir_format", RR.VarValue("temperature_linear_100mK","string"))
     # c1.setf_param("ir_format", RR.VarValue("radiometric","string"))
 

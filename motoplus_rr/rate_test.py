@@ -3,12 +3,13 @@ import time
 import matplotlib.pyplot as plt
 import numpy as np
 
-rate = RRN.CreateRate(125)
+rate = RRN.CreateRate(1000)
 
 t1 = time.perf_counter()
 t = []
-for i in range(125):
-    rate.Sleep()
+for i in range(1000):
+    # rate.Sleep()
+    time.sleep(0.001)
     t.append(time.perf_counter())
 t2 = time.perf_counter()
 

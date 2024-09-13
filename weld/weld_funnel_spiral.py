@@ -66,8 +66,8 @@ v2_all=[]
 cond_all=[]
 primitives=[]
 arcon_set=False
-layer_start=178
-layer_end=190
+layer_start=60
+layer_end=120
 num_layer_start=int(layer_start*layer_height_num)
 num_layer_end=int(layer_end*layer_height_num)
 
@@ -155,4 +155,4 @@ for slice_num in range(num_layer_start,num_layer_end,nominal_slice_increment):
 
 	q_prev=copy.deepcopy(positioner_js[-1])
 
-timestamp_robot,joint_recording,job_line,_=ws.weld_segment_dual(primitives,robot,positioner,q1_all,q2_all,v1_all,v2_all,cond_all,arc=True)
+timestamp_robot,joint_recording,job_line,_=ws.weld_segment_dual(primitives,robot,positioner,q1_all,q2_all,v1_all,v2_all,cond_all,arc=False)

@@ -394,4 +394,4 @@ data/circle_large/static_stepwise_shift/weld_scan*
 mocap/ge_testbed/data/*
 weld/ILC/data/weld_scan*
 *.avi
-
+*.cache

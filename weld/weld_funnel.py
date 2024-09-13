@@ -30,8 +30,8 @@ client=MotionProgramExecClient()
 ###########################################layer welding############################################
 mp=MotionProgram(ROBOT_CHOICE='RB1',ROBOT_CHOICE2='ST1',pulse2deg=robot.pulse2deg,pulse2deg_2=positioner.pulse2deg, tool_num = 12)
 arcon_set=False
-num_layer_start=int(180*layer_height_num)
-num_layer_end=int(190*layer_height_num)
+num_layer_start=int(50*layer_height_num)
+num_layer_end=int(100*layer_height_num)
 
 q_prev=client.getJointAnglesDB(positioner.pulse2deg)
 # q_prev=slicing_meta['q_positioner_seed']
@@ -78,17 +78,17 @@ for layer in range(num_layer_start,num_layer_end,layer_height_num):
 			mp.MoveL(np.degrees(waypoint_q), 10,target2=target2)
 
 		target2=['MOVJ',np.degrees(positioner_js[breakpoints[0]]),15]
-		mp.MoveL(np.degrees(curve_sliced_js[breakpoints[0]]), s1_all[0],target2=target2)
+		mp.MoveJ(np.degrees(curve_sliced_js[breakpoints[0]]), s1_all[0],target2=target2)
 
 		###no need for acron/off when spiral, positioner not moving at all
 		if np.linalg.norm(np.std(positioner_js,axis=0))>0.1 or not arcon_set:
 			arcon_set=True
-			mp.setArc(True,cond_num=410)
+			# mp.setArc(True,cond_num=410)
 
 		for j in range(1,len(breakpoints)):
 			positioner_w=vd_relative/np.linalg.norm(curve_sliced_relative[breakpoints[j]][:2])
 			target2=['MOVJ',np.degrees(positioner_js[breakpoints[j]]),min(100,100*positioner_w/positioner.joint_vel_limit[1])]
-			mp.MoveJ(np.degrees(curve_sliced_js[breakpoints[j]]), max(s1_all[j],0.1),target2=target2)
+			mp.MoveJ(np.degrees(curve_sliced_js[breakpoints[j]]), max(s1_all[j-1],0.1),target2=target2)
 		
 		if np.linalg.norm(np.std(positioner_js,axis=0))>0.1:
 			mp.setArc(False)

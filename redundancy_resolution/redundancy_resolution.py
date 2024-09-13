@@ -5,8 +5,7 @@ import matplotlib.pyplot as plt
 from qpsolvers import solve_qp
 from scipy.optimize import differential_evolution, shgo, NonlinearConstraint, minimize, fminbound
 
-sys.path.append('../toolbox')
-from robot_def import *
+from motoman_def import *
 from lambda_calc import *
 # from utils import *
 
@@ -134,7 +133,7 @@ class redundancy_resolution(object):
 
 
 
-	def baseline_joint(self,R_torch,curve_sliced_relative,curve_sliced_relative_base,q_init=np.zeros(6),q_positioner_seed=[0,-2],smooth_filter=True):
+	def baseline_joint(self,R_torch,curve_sliced_relative,curve_sliced_relative_support,curve_sliced_relative_base,q_init=np.zeros(6),q_positioner_seed=[0,-2],smooth_filter=True):
 		####baseline redundancy resolution, with fixed orientation
 		positioner_js=self.positioner_resolution(curve_sliced_relative,q_seed=q_positioner_seed,smooth_filter=smooth_filter)		#solve for positioner first
 		
@@ -147,23 +146,55 @@ class redundancy_resolution(object):
 
 		
 		###append base layers positioner
-		positioner_js_base=[copy.deepcopy(positioner_js[0])]*len(curve_sliced_relative_base)
+		positioner_js_base_value=positioner_js[0][0][0]
+		positioner_js_base=[]
 		curve_sliced_js_base=[]
 		for i in range(len(curve_sliced_relative_base)):			#solve for robot invkin
 			curve_sliced_js_base_ith_layer=[]
+			positioner_js_base_ith_layer=[]
 			for x in range(len(curve_sliced_relative_base[i])):
 				curve_sliced_js_base_ith_xth_section=[]
+				positioner_js_base_ith_xth_section=[]
 				for j in range(len(curve_sliced_relative_base[i][x])): 
 					###get positioner TCP world pose
-					positioner_pose=self.positioner.fwd(positioner_js_base[i][x][j],world=True)
+					positioner_pose=self.positioner.fwd(positioner_js_base_value,world=True)
 					p=positioner_pose.R@curve_sliced_relative_base[i][x][j,:3]+positioner_pose.p
 					###solve for invkin
 					q=self.robot.inv(p,R_torch,last_joints=q_init)[0]
 
 					curve_sliced_js_base_ith_xth_section.append(q)
+					positioner_js_base_ith_xth_section.append(positioner_js_base_value)
 				curve_sliced_js_base_ith_layer.append(np.array(curve_sliced_js_base_ith_xth_section))
+				positioner_js_base_ith_layer.append(np.array(positioner_js_base_ith_xth_section))
 			curve_sliced_js_base.append(curve_sliced_js_base_ith_layer)
+			positioner_js_base.append(positioner_js_base_ith_layer)
 
+		positioner_js_support=None
+		curve_sliced_js_support=None
+		if len(curve_sliced_relative_support)>0:
+			###append support layers positioner
+			positioner_js_support_value=positioner_js[0][0][0]
+			curve_sliced_js_support=[]
+			positioner_js_support=[]
+			for i in range(len(curve_sliced_relative_support)):			#solve for robot invkin
+				curve_sliced_js_support_ith_layer=[]
+				positioner_js_support_ith_layer=[]
+				for x in range(len(curve_sliced_relative_support[i])):
+					curve_sliced_js_support_ith_xth_section=[]
+					positioner_js_support_ith_xth_section=[]
+					for j in range(len(curve_sliced_relative_support[i][x])): 
+						###get positioner TCP world pose
+						positioner_pose=self.positioner.fwd(positioner_js_support_value,world=True)
+						p=positioner_pose.R@curve_sliced_relative_support[i][x][j,:3]+positioner_pose.p
+						###solve for invkin
+						q=self.robot.inv(p,R_torch,last_joints=q_init)[0]
+
+						curve_sliced_js_support_ith_xth_section.append(q)
+						positioner_js_support_ith_xth_section.append(positioner_js_support_value)
+					curve_sliced_js_support_ith_layer.append(np.array(curve_sliced_js_support_ith_xth_section))
+					positioner_js_support_ith_layer.append(np.array(positioner_js_support_ith_xth_section))
+				curve_sliced_js_support.append(curve_sliced_js_support_ith_layer)
+				positioner_js_support.append(positioner_js_support_ith_layer)
 
 		curve_sliced_js=[]
 		for i in range(len(curve_sliced_relative)):			#solve for robot invkin
@@ -187,7 +218,109 @@ class redundancy_resolution(object):
 			curve_sliced_js.append(curve_sliced_js_ith_layer)
 
 
-		return positioner_js,curve_sliced_js,positioner_js_base,curve_sliced_js_base
+		return positioner_js,curve_sliced_js,positioner_js_support,curve_sliced_js_support,positioner_js_base,curve_sliced_js_base
+	
+	def followy_joint(self,R_torch,curve_sliced_relative,curve_sliced_relative_support,curve_sliced_relative_base,q_init=np.zeros(6),q_positioner_seed=[0,-2],smooth_filter=True):
+		#### redundancy resolution while torch traveling direction follows TCP Y, ignore base/support layers, with fixed orientation
+		positioner_js=self.positioner_resolution(curve_sliced_relative,q_seed=q_positioner_seed,smooth_filter=smooth_filter)		#solve for positioner first
+		
+		###singularity js smoothing
+		positioner_js=self.introducing_tolerance2(positioner_js)
+		positioner_js=self.conditional_rolling_average(positioner_js)
+		if smooth_filter:
+			positioner_js=self.rolling_average(positioner_js)
+		positioner_js[0][0][:,1]=positioner_js[1][0][0,1]
+
+		
+		###append base layers positioner
+		positioner_js_base_value=positioner_js[0][0][0]
+		positioner_js_base=[]
+		curve_sliced_js_base=[]
+		for i in range(len(curve_sliced_relative_base)):			#solve for robot invkin
+			curve_sliced_js_base_ith_layer=[]
+			positioner_js_base_ith_layer=[]
+			for x in range(len(curve_sliced_relative_base[i])):
+				curve_sliced_js_base_ith_xth_section=[]
+				positioner_js_base_ith_xth_section=[]
+				for j in range(len(curve_sliced_relative_base[i][x])): 
+					###get positioner TCP world pose
+					positioner_pose=self.positioner.fwd(positioner_js_base_value,world=True)
+					p=positioner_pose.R@curve_sliced_relative_base[i][x][j,:3]+positioner_pose.p
+					###solve for invkin
+					q=self.robot.inv(p,R_torch,last_joints=q_init)[0]
+
+					curve_sliced_js_base_ith_xth_section.append(q)
+					positioner_js_base_ith_xth_section.append(positioner_js_base_value)
+				curve_sliced_js_base_ith_layer.append(np.array(curve_sliced_js_base_ith_xth_section))
+				positioner_js_base_ith_layer.append(np.array(positioner_js_base_ith_xth_section))
+			curve_sliced_js_base.append(curve_sliced_js_base_ith_layer)
+			positioner_js_base.append(positioner_js_base_ith_layer)
+
+		positioner_js_support=None
+		curve_sliced_js_support=None
+		if len(curve_sliced_relative_support)>0:
+			###append support layers positioner
+			positioner_js_support_value=positioner_js[0][0][0]
+			curve_sliced_js_support=[]
+			positioner_js_support=[]
+			for i in range(len(curve_sliced_relative_support)):			#solve for robot invkin
+				curve_sliced_js_support_ith_layer=[]
+				positioner_js_support_ith_layer=[]
+				for x in range(len(curve_sliced_relative_support[i])):
+					curve_sliced_js_support_ith_xth_section=[]
+					positioner_js_support_ith_xth_section=[]
+					for j in range(len(curve_sliced_relative_support[i][x])): 
+						###get positioner TCP world pose
+						positioner_pose=self.positioner.fwd(positioner_js_support_value,world=True)
+						p=positioner_pose.R@curve_sliced_relative_support[i][x][j,:3]+positioner_pose.p
+						###solve for invkin
+						q=self.robot.inv(p,R_torch,last_joints=q_init)[0]
+
+						curve_sliced_js_support_ith_xth_section.append(q)
+						positioner_js_support_ith_xth_section.append(positioner_js_support_value)
+					curve_sliced_js_support_ith_layer.append(np.array(curve_sliced_js_support_ith_xth_section))
+					positioner_js_support_ith_layer.append(np.array(positioner_js_support_ith_xth_section))
+				curve_sliced_js_support.append(curve_sliced_js_support_ith_layer)
+				positioner_js_support.append(positioner_js_support_ith_layer)
+
+		curve_sliced_js=[]
+		for i in range(len(curve_sliced_relative)):			#solve for robot invkin
+			curve_sliced_js_ith_layer=[]
+			for x in range(len(curve_sliced_relative[i])):
+				curve_sliced_js_ith_layer_xth_section=[]
+				for j in range(len(curve_sliced_relative[i][x])): 
+					###get positioner TCP world pose
+					positioner_pose=self.positioner.fwd(positioner_js[i][x][j],world=True)
+					p=positioner_pose.R@curve_sliced_relative[i][x][j,:3]+positioner_pose.p
+					###solve for invkin with moving direction along TCP Y
+					rz=np.array([0,0,-1])
+					if j==0:
+						direction_relative=curve_sliced_relative[i][x][j+1,:3]-curve_sliced_relative[i][x][j,:3]
+					else:
+						direction_relative=curve_sliced_relative[i][x][j,:3]-curve_sliced_relative[i][x][j-1,:3]
+					direction_relative=direction_relative/np.linalg.norm(direction_relative)
+					ry=positioner_pose.R@direction_relative
+					Rx=np.cross(ry,rz)
+					R_torch_followy=np.vstack((Rx,ry,rz)).T
+					# print(direction_relative)
+					# print(ry)
+					# print(R_torch_followy)
+					if i==0: 	#first layer is different because positioner static due to up normal 
+						if x==0 and j==0:
+							q=self.robot.inv(p,R_torch,last_joints=q_init)[0]
+						else:
+							q=self.robot.inv(p,R_torch,last_joints=q_prev)[0]
+						q_prev=q
+					else:		#Torch follow Y
+						q=self.robot.inv(p,R_torch_followy,last_joints=q_prev)[0]
+						q_prev=q
+
+					curve_sliced_js_ith_layer_xth_section.append(q)
+				curve_sliced_js_ith_layer.append(np.array(curve_sliced_js_ith_layer_xth_section))
+			curve_sliced_js.append(curve_sliced_js_ith_layer)
+
+
+		return positioner_js,curve_sliced_js,positioner_js_support,curve_sliced_js_support,positioner_js_base,curve_sliced_js_base
 
 	def baseline_pose(self,vec=np.array([1,0])):
 		###where to place the welded part on positioner

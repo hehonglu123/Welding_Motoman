@@ -5,7 +5,6 @@ sys.path.append('../../toolbox/')
 from robot_def import *
 from lambda_calc import *
 from multi_robot import *
-from dx200_motion_program_exec_client import *
 from StreamingSend import *
 
 ########################################################RR STREAMING########################################################

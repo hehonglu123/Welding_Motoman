@@ -1,0 +1,28 @@
+[build-system]
+requires = ["poetry-core>=1.8.0", "wheel",]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry]
+name = "waam-motoman"
+version = "0.1.0"
+description = "WAAM Motoman."
+
+
+
+authors = ["Honglu He <heh6@rpi.edu>",]
+maintainers = ["Honglu He <heh6@rpi.edu>",]
+
+include = ["CHANGELOG.md", "LICENSE", "py.typed",]
+license = "BSD-3-Clause"
+readme = "README.md"
+
+repository = "https://github.com/hehonglu123/Welding_Motoman"
+
+
+[tool.poetry.dependencies]
+python = ">=3.8,<=3.11"
+flir_waam = { git = "https://github.com/hehonglu123/flir_waam.git"}
+convergent_manufacturing_utils = { git = "https://github.com/hehonglu123/convergent_manufacturing_utils.git"}
+dual_robot = { git = "https://github.com/hehonglu123/dual_robot.git"}
+lambda_calc = { git = "https://github.com/hehonglu123/lambda_calc"}
+robotics_utils = { git = "https://github.com/hehonglu123/robotics_utils.git"}
