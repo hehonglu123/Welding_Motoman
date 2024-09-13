@@ -234,19 +234,19 @@ scan_change=sub.SubscribeWire("lineProfile")
 sub.ClientConnectFailed += connect_failed
 
 
+first_layer=np.loadtxt(data_dir+'curve_sliced_relative/slice0_0.csv',delimiter=',')[:,:3]
+
+
 # Create a visualizer window
 vis = o3d.visualization.Visualizer()
 vis.create_window()
 
 # Create an initial point cloud
 pcd = o3d.geometry.PointCloud()
+pcd.points = o3d.utility.Vector3dVector(first_layer)
 
-#############################
-first_layer=np.loadtxt(data_dir+'curve_sliced_relative/slice0_0.csv',delimiter=',')[:,:3]
-second_layer=np.loadtxt(data_dir+'curve_sliced_relative/slice10_0.csv',delimiter=',')[:,:3]
-third_layer=np.loadtxt(data_dir+'curve_sliced_relative/slice20_0.csv',delimiter=',')[:,:3]
-print(first_layer.shape,second_layer.shape,third_layer.shape)
-pcd.points = o3d.utility.Vector3dVector(np.vstack((first_layer,second_layer,third_layer)))
+
+vis.add_geometry(pcd)
 ###########################
 
 # Add the point cloud to the visualizer
@@ -269,15 +269,23 @@ while True:
 		wire_packet=scan_change.TryGetInValue()
 		valid_indices=np.where(wire_packet[1].I_data>50)[0]
 		points_new_cam_frame=np.vstack((np.zeros(len(valid_indices)),wire_packet[1].Y_data[valid_indices],wire_packet[1].Z_data[valid_indices])).T
+		
 		cam_pose=robot_fuji.fwd(q1_cur)
 		positioner_pose=positioner.fwd(positioner_cur)
 		###transform to positioner's frame
 		H_cam=H_from_RT(cam_pose.R,cam_pose.p)
 		H_positioner=H_from_RT(positioner_pose.R,positioner_pose.p)
 		H_cam2positioner=H_inv(H_positioner)@H_cam
-		points_new=H_cam2positioner[:3,:3]@points_new_cam_frame.T+H_cam2positioner[:3,3].reshape(-1,1)
-		points_new=points_new.T
+		points_new=(H_cam2positioner[:3,:3]@points_new_cam_frame.T+H_cam2positioner[:3,3].reshape(3,1)).T
 		all_points = np.vstack((np.asarray(pcd.points), points_new)) if counts > 0 else points_new
+		####scatter in plt first
+		fig = plt.figure()
+		ax = fig.add_subplot(111, projection='3d')
+		ax.scatter(all_points[:,0], all_points[:,1], all_points[:,2], c='r', marker='o')
+		ax.scatter(first_layer[:,0], first_layer[:,1], first_layer[:,2], c='b', marker='o')
+		set_axes_equal(ax)
+		plt.show()
+
 		counts+=1
 
 	pcd.points = o3d.utility.Vector3dVector(all_points)
