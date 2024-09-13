@@ -725,4 +725,5 @@ def main_nose():
 
 if __name__ == "__main__":
     # main_face()
-    main_nose()
+    # main_nose()
+    main_blade()
