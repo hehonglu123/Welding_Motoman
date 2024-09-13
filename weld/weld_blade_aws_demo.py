@@ -30,7 +30,7 @@ with open(data_dir+'slicing.yml', 'r') as file:
 waypoint_distance=5 	###waypoint separation
 layer_width_num=int(4/slicing_meta['line_resolution'])
 
-weld_arcon=True
+weld_arcon=False
 # #######################################ER4043########################################################
 job_offset=200
 vd_relative=8
@@ -72,63 +72,70 @@ robot_fuji=robot_obj('MA2010_A0',def_path='../config/MA2010_A0_robot_default_con
 robot2=robot_obj('MA1440_A0',def_path='../config/MA1440_A0_robot_default_config.yml',tool_file_path='../config/flir.csv',\
 	pulse2deg_file_path='../config/MA1440_A0_pulse2deg_real.csv',base_transformation_file='../config/MA1440_pose.csv')
 positioner=positioner_obj('D500B',def_path='../config/D500B_robot_default_config.yml',tool_file_path='../config/positioner_tcp.csv',\
-	pulse2deg_file_path='../config/D500B_pulse2deg_real.csv',base_transformation_file='../config/D500B_pose_mocap.csv')
+	pulse2deg_file_path='../config/D500B_pulse2deg_real.csv',base_transformation_file='../config/D500B_pose.csv')
 
 mp=MotionProgram(ROBOT_CHOICE='RB1',ROBOT_CHOICE2='ST1',pulse2deg=robot.pulse2deg,pulse2deg_2=positioner.pulse2deg, tool_num = 12)
 client=MotionProgramExecClient()
 ws=WeldSend(client)
 
-###########################################base layer welding############################################
-q1_all=[]
-positioner_all=[]
-q2_all=[]
-v1_all=[]
-cond_all=[]
-primitives=[]
+# ###########################################base layer welding############################################
+# q1_all=[]
+# positioner_all=[]
+# q2_all=[]
+# v1_all=[]
+# cond_all=[]
+# primitives=[]
 
-num_baselayer=2
-q_prev=np.array([-3.791547245558870571e-01,7.167996965635117235e-01,2.745092098742105691e-01,2.111291009755724701e-01,-7.843516348888318612e-01,-5.300740197588397207e-01])
-mp=MotionProgram(ROBOT_CHOICE='RB1',ROBOT_CHOICE2='ST1',pulse2deg=robot.pulse2deg,pulse2deg_2=positioner.pulse2deg, tool_num = 12)
-for base_layer in range(num_baselayer):
-	num_sections=len(glob.glob(data_dir+'curve_sliced_relative/base_slice'+str(base_layer)+'_*.csv'))
-	for x in range(num_sections):
-		rob1_js=np.loadtxt(data_dir+'curve_sliced_js/MA2010_base_js'+str(base_layer)+'_'+str(x)+'.csv',delimiter=',')
-		positioner_js=np.loadtxt(data_dir+'curve_sliced_js/D500B_base_js'+str(base_layer)+'_'+str(x)+'.csv',delimiter=',')
-		curve_sliced_relative=np.loadtxt(data_dir+'curve_sliced_relative/base_slice'+str(base_layer)+'_'+str(x)+'.csv',delimiter=',')
+# num_baselayer=2
+# ###far end
+# # q_prev=np.array([-3.250117036572426343e-01,8.578573591937989073e-01,5.007170842167016911e-01,4.055312631131529622e-01,-1.119412117298938414e+00,-1.407346519936740536e+00])
+# ###close end
+# q_prev=np.array([-3.791544713877046391e-01,7.156749523014762637e-01,2.756772964158371586e-01,2.106493295914119712e-01,-7.865937103692784982e-01,-5.293956242391706368e-01])
 
-		lam1=calc_lam_js(rob1_js,robot)
-		lam2=calc_lam_js(positioner_js,positioner)
-		lam_relative=calc_lam_cs(curve_sliced_relative)
+# mp=MotionProgram(ROBOT_CHOICE='RB1',ROBOT_CHOICE2='ST1',pulse2deg=robot.pulse2deg,pulse2deg_2=positioner.pulse2deg, tool_num = 12)
+# for base_layer in range(num_baselayer):
+# 	num_sections=len(glob.glob(data_dir+'curve_sliced_relative/base_slice'+str(base_layer)+'_*.csv'))
+# 	for x in range(num_sections):
+# 		rob1_js=np.loadtxt(data_dir+'curve_sliced_js/MA2010_base_js'+str(base_layer)+'_'+str(x)+'.csv',delimiter=',')
+# 		positioner_js=np.loadtxt(data_dir+'curve_sliced_js/D500B_base_js'+str(base_layer)+'_'+str(x)+'.csv',delimiter=',')
+# 		curve_sliced_relative=np.loadtxt(data_dir+'curve_sliced_relative/base_slice'+str(base_layer)+'_'+str(x)+'.csv',delimiter=',')
 
-		q_start,q_end=extend_simple(rob1_js,positioner_js,curve_sliced_relative,lam_relative,d=10)
+# 		lam1=calc_lam_js(rob1_js,robot)
+# 		lam2=calc_lam_js(positioner_js,positioner)
+# 		lam_relative=calc_lam_cs(curve_sliced_relative)
 
-		num_points_layer=max(2,int(lam_relative[-1]/waypoint_distance))
-		###find which end to start
-		if np.linalg.norm(q_prev-rob1_js[0])<np.linalg.norm(q_prev-rob1_js[-1]):
-			breakpoints=np.linspace(0,len(rob1_js)-1,num=num_points_layer).astype(int)
-		else:
-			temp=copy.deepcopy(q_start)
-			q_start=copy.deepcopy(q_end)
-			q_end=temp
-			breakpoints=np.linspace(len(rob1_js)-1,0,num=num_points_layer).astype(int)
+# 		q_start,q_end=extend_simple(rob1_js,positioner_js,curve_sliced_relative,lam_relative,d=10)
 
-		s1_all,_=calc_individual_speed(base_vd_relative,lam1,lam2,lam_relative,breakpoints)
+# 		num_points_layer=max(2,int(lam_relative[-1]/waypoint_distance))
+# 		###find which end to start
+# 		if np.linalg.norm(q_prev-rob1_js[0])<np.linalg.norm(q_prev-rob1_js[-1]):
+# 			breakpoints=np.linspace(0,len(rob1_js)-1,num=num_points_layer).astype(int)
+# 		else:
+# 			temp=copy.deepcopy(q_start)
+# 			q_start=copy.deepcopy(q_end)
+# 			q_end=temp
+# 			breakpoints=np.linspace(len(rob1_js)-1,0,num=num_points_layer).astype(int)
 
-		primitives.extend(['movej']+['movel']*(num_points_layer+1))
-		q1_all.extend([q_start]+rob1_js[breakpoints].tolist()+[q_end])
-		q2_all.extend([positioner_js[breakpoints[0]]]+positioner_js[breakpoints].tolist()+[positioner_js[breakpoints[-1]]])
-		v1_all.extend([1]+[s1_all[0]]+s1_all+[s1_all[-1]])
-		cond_all.extend([0]+[int(base_feedrate_cmd/10+job_offset)]*(num_points_layer+1))					###extended baselayer welding
+# 		s1_all,_=calc_individual_speed(base_vd_relative,lam1,lam2,lam_relative,breakpoints)
+
+# 		primitives.extend(['movej']+['movel']*(num_points_layer+1))
+# 		q1_all.extend([q_start]+rob1_js[breakpoints].tolist()+[q_end])
+# 		q2_all.extend([positioner_js[breakpoints[0]]]+positioner_js[breakpoints].tolist()+[positioner_js[breakpoints[-1]]])
+# 		v1_all.extend([1]+[s1_all[0]]+s1_all+[s1_all[-1]])
+# 		cond_all.extend([0]+[int(base_feedrate_cmd/10+job_offset)]*(num_points_layer+1))					###extended baselayer welding
 		
 
-		q_prev=rob1_js[breakpoints[-1]]
+# 		q_prev=rob1_js[breakpoints[-1]]
 
 
-ws.weld_segment_dual(primitives,robot,positioner,q1_all,q2_all,v1_all,10*np.ones(len(v1_all)),cond_all,arc=weld_arcon)
+# ws.weld_segment_dual(primitives,robot,positioner,q1_all,q2_all,v1_all,10*np.ones(len(v1_all)),cond_all,arc=weld_arcon)
 
 ###########################################layer welding############################################
-# q_prev=np.array([-3.791544713877046391e-01,7.156749523014762637e-01,2.756772964158371586e-01,2.106493295914119712e-01,-7.865937103692784982e-01,-5.293956242391706368e-01])
-q_prev=client.getJointAnglesMH(robot.pulse2deg)
+###far end
+# q_prev=np.array([-3.250117036572426343e-01,8.578573591937989073e-01,5.007170842167016911e-01,4.055312631131529622e-01,-1.119412117298938414e+00,-1.407346519936740536e+00])
+###close end
+q_prev=np.array([-3.791544713877046391e-01,7.156749523014762637e-01,2.756772964158371586e-01,2.106493295914119712e-01,-7.865937103692784982e-01,-5.293956242391706368e-01])
+# q_prev=client.getJointAnglesMH(robot.pulse2deg)
 
 q1_all=[]
 positioner_all=[]
@@ -233,11 +240,18 @@ vis.create_window()
 
 # Create an initial point cloud
 pcd = o3d.geometry.PointCloud()
-#it needs initialization
-pcd.points = o3d.utility.Vector3dVector(np.random.rand(2, 3))
+
+#############################
+first_layer=np.loadtxt(data_dir+'curve_sliced_relative/slice0_0.csv',delimiter=',')[:,:3]
+second_layer=np.loadtxt(data_dir+'curve_sliced_relative/slice10_0.csv',delimiter=',')[:,:3]
+third_layer=np.loadtxt(data_dir+'curve_sliced_relative/slice20_0.csv',delimiter=',')[:,:3]
+print(first_layer.shape,second_layer.shape,third_layer.shape)
+pcd.points = o3d.utility.Vector3dVector(np.vstack((first_layer,second_layer,third_layer)))
+###########################
 
 # Add the point cloud to the visualizer
 vis.add_geometry(pcd)
+vis.update_geometry(pcd)
 
 total_points_threshold=1e6
 
@@ -262,12 +276,15 @@ while True:
 		H_positioner=H_from_RT(positioner_pose.R,positioner_pose.p)
 		H_cam2positioner=H_inv(H_positioner)@H_cam
 		points_new=H_cam2positioner[:3,:3]@points_new_cam_frame.T+H_cam2positioner[:3,3].reshape(-1,1)
+		points_new=points_new.T
 		all_points = np.vstack((np.asarray(pcd.points), points_new)) if counts > 0 else points_new
+		counts+=1
+
+	pcd.points = o3d.utility.Vector3dVector(all_points)
 
 	# Downsample the point cloud if the number of points exceeds the threshold
 	if len(pcd.points) > total_points_threshold:
 		pcd = pcd.random_down_sample(total_points_threshold / len(pcd.points))
-	pcd.points = o3d.utility.Vector3dVector(all_points)
 	
 	# Update the visualizer
 	vis.update_geometry(pcd)
