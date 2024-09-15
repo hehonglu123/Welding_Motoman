@@ -67,7 +67,7 @@ layer_height_num=int(1.45/slicing_meta['line_resolution'])
 robot=robot_obj('MA2010_A0',def_path='../config/MA2010_A0_robot_default_config.yml',tool_file_path='../config/torch.csv',\
 	pulse2deg_file_path='../config/MA2010_A0_pulse2deg_real.csv',d=15)
 #TODO: change to fujicam tool file
-robot_fuji=robot_obj('MA2010_A0',def_path='../config/MA2010_A0_robot_default_config.yml',tool_file_path='../config/torch.csv',\
+robot_fuji=robot_obj('MA2010_A0',def_path='../config/MA2010_A0_robot_default_config.yml',tool_file_path='../config/fujicam.csv',\
 	pulse2deg_file_path='../config/MA2010_A0_pulse2deg_real.csv')
 robot2=robot_obj('MA1440_A0',def_path='../config/MA1440_A0_robot_default_config.yml',tool_file_path='../config/flir.csv',\
 	pulse2deg_file_path='../config/MA1440_A0_pulse2deg_real.csv',base_transformation_file='../config/MA1440_pose.csv')
@@ -271,20 +271,20 @@ while True:
 		points_new_cam_frame=np.vstack((np.zeros(len(valid_indices)),wire_packet[1].Y_data[valid_indices],wire_packet[1].Z_data[valid_indices])).T
 		
 		cam_pose=robot_fuji.fwd(q1_cur)
-		positioner_pose=positioner.fwd(positioner_cur)
+		positioner_pose=positioner.fwd(positioner_cur,world=True)
 		###transform to positioner's frame
 		H_cam=H_from_RT(cam_pose.R,cam_pose.p)
 		H_positioner=H_from_RT(positioner_pose.R,positioner_pose.p)
 		H_cam2positioner=H_inv(H_positioner)@H_cam
 		points_new=(H_cam2positioner[:3,:3]@points_new_cam_frame.T+H_cam2positioner[:3,3].reshape(3,1)).T
 		all_points = np.vstack((np.asarray(pcd.points), points_new)) if counts > 0 else points_new
-		####scatter in plt first
-		fig = plt.figure()
-		ax = fig.add_subplot(111, projection='3d')
-		ax.scatter(all_points[:,0], all_points[:,1], all_points[:,2], c='r', marker='o')
-		ax.scatter(first_layer[:,0], first_layer[:,1], first_layer[:,2], c='b', marker='o')
-		set_axes_equal(ax)
-		plt.show()
+		# ####scatter in plt first
+		# fig = plt.figure()
+		# ax = fig.add_subplot(111, projection='3d')
+		# ax.scatter(all_points[:,0], all_points[:,1], all_points[:,2], c='r', marker='o')
+		# ax.scatter(first_layer[:,0], first_layer[:,1], first_layer[:,2], c='b', marker='o')
+		# set_axes_equal(ax)
+		# plt.show()
 
 		counts+=1
 
