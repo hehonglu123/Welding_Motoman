@@ -32,12 +32,12 @@ layer_width_num=int(4/slicing_meta['line_resolution'])
 
 weld_arcon=False
 # #######################################ER4043########################################################
-job_offset=200
-vd_relative=8
-feedrate_cmd=110
-base_vd_relative=5
-base_feedrate_cmd=250
-layer_height_num=int(1.45/slicing_meta['line_resolution'])
+# job_offset=200
+# vd_relative=8
+# feedrate_cmd=110
+# base_vd_relative=5
+# base_feedrate_cmd=250
+# layer_height_num=int(1.45/slicing_meta['line_resolution'])
 
 #######################################ER70S-6########################################################
 # job_offset=300
@@ -47,7 +47,7 @@ layer_height_num=int(1.45/slicing_meta['line_resolution'])
 # base_feedrate_cmd=300
 # layer_height_num=int(1.04/slicing_meta['line_resolution'])
 
-# #######################################ER316L THICK########################################################
+# #######################################ER316L THIN########################################################
 # job_offset=400
 # vd_relative=7
 # feedrate_cmd=250
@@ -55,13 +55,13 @@ layer_height_num=int(1.45/slicing_meta['line_resolution'])
 # base_feedrate_cmd=250
 # layer_height_num=int(1.5/slicing_meta['line_resolution'])
 
-# #######################################ER316L THIN########################################################
-# job_offset=400
-# vd_relative=7
-# feedrate_cmd=140
-# base_vd_relative=5
-# base_feedrate_cmd=250
-# layer_height_num=int(1.4/slicing_meta['line_resolution'])
+#######################################ER316L THICK########################################################
+job_offset=450
+vd_relative=7
+feedrate_cmd=140
+base_vd_relative=5
+base_feedrate_cmd=250
+layer_height_num=int(1.4/slicing_meta['line_resolution'])
 
 
 robot=robot_obj('MA2010_A0',def_path='../config/MA2010_A0_robot_default_config.yml',tool_file_path='../config/torch.csv',\
@@ -78,7 +78,7 @@ mp=MotionProgram(ROBOT_CHOICE='RB1',ROBOT_CHOICE2='ST1',pulse2deg=robot.pulse2de
 client=MotionProgramExecClient()
 ws=WeldSend(client)
 
-# ###########################################base layer welding############################################
+###########################################base layer welding############################################
 # q1_all=[]
 # positioner_all=[]
 # q2_all=[]
@@ -234,7 +234,7 @@ scan_change=sub.SubscribeWire("lineProfile")
 sub.ClientConnectFailed += connect_failed
 
 
-first_layer=np.loadtxt(data_dir+'curve_sliced_relative/slice0_0.csv',delimiter=',')[:,:3]
+all_points=np.loadtxt(data_dir+'curve_sliced_relative/slice0_0.csv',delimiter=',')[:,:3]
 
 
 # Create a visualizer window
@@ -243,7 +243,7 @@ vis.create_window()
 
 # Create an initial point cloud
 pcd = o3d.geometry.PointCloud()
-pcd.points = o3d.utility.Vector3dVector(first_layer)
+pcd.points = o3d.utility.Vector3dVector(all_points)
 
 
 vis.add_geometry(pcd)
@@ -267,7 +267,7 @@ while True:
 		positioner_cur=fb_data.group_state[2].feedback_position
 		###get scan data
 		wire_packet=scan_change.TryGetInValue()
-		valid_indices=np.where(wire_packet[1].I_data>50)[0]
+		valid_indices=np.where(wire_packet[1].I_data>10)[0]
 		points_new_cam_frame=np.vstack((np.zeros(len(valid_indices)),wire_packet[1].Y_data[valid_indices],wire_packet[1].Z_data[valid_indices])).T
 		
 		cam_pose=robot_fuji.fwd(q1_cur)
@@ -291,8 +291,8 @@ while True:
 	pcd.points = o3d.utility.Vector3dVector(all_points)
 
 	# Downsample the point cloud if the number of points exceeds the threshold
-	if len(pcd.points) > total_points_threshold:
-		pcd = pcd.random_down_sample(total_points_threshold / len(pcd.points))
+	# if len(pcd.points) > total_points_threshold:
+	# 	pcd = pcd.random_down_sample(total_points_threshold / len(pcd.points))
 	
 	# Update the visualizer
 	vis.update_geometry(pcd)
