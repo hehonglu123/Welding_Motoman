@@ -47,7 +47,7 @@ for i in range(len(ir_recording)):
     if centroid is not None:
         centroids_all.append(centroid)
         # cv2.rectangle(ir_bgr, (bbox[0],bbox[1]), (bbox[0]+bbox[2],bbox[1]+bbox[3]), (0,255,0), thickness=1)   #flame bbox
-        bbox_below_size=10
+        bbox_below_size=10  #number of pixels below the centroid
         centroid_below=(int(centroid[0]+bbox[2]/2+bbox_below_size/2),centroid[1])
         cv2.rectangle(ir_bgr, (int(centroid_below[0]-bbox_below_size/2),int(centroid_below[1]-bbox_below_size/2)), (int(centroid_below[0]+bbox_below_size/2),int(centroid_below[1]+bbox_below_size/2)), (0,255,0), thickness=1)   #flame below centroid
         cv2.line(ir_bgr,(139,136),(int(centroid[0]),int(centroid[1])),(0,255,0))
@@ -59,11 +59,11 @@ for i in range(len(ir_recording)):
     # Write the IR image to the video file
     result.write(ir_bgr)
 
-    # # Display the IR image
-    # cv2.imshow("IR Recording", ir_bgr)
+    # Display the IR image
+    cv2.imshow("IR Recording", ir_bgr)
 
-    # # Wait for a specific time (in milliseconds) before displaying the next frame
-    # cv2.waitKey(int(1000*(ir_ts[i+1]-ir_ts[i])))
+    # Wait for a specific time (in milliseconds) before displaying the next frame
+    cv2.waitKey(int(1000*(ir_ts[i+1]-ir_ts[i])))
 
 result.release()
 # Close the window after the loop is completed

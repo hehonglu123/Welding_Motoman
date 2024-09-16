@@ -6,7 +6,7 @@ import numpy as np
 import yaml, copy, time
 import pickle
 from utils import *
-
+from qpsolvers import solve_qp
 
 ex=np.array([[1.],[0.],[0.]])
 ey=np.array([[0.],[1.],[0.]])
@@ -262,6 +262,51 @@ class robot_obj(object):
 		q_all=robot6_sphericalwrist_invkin(self.robot,pose,last_joints)
 		
 		return q_all
+
+	def inv_iter(self,p,R=np.eye(3),q_seed=None,lim_factor=0):
+		## qp IK
+		q_sol = np.array(q_seed) # initial guess
+		Kw=0.1
+		Kq=0.00001*np.eye(6)
+		alpha=1
+		error_fb=999
+		termination_error=10-8
+		while error_fb>0.0001:
+			robot_T = self.fwd(q_sol)
+			## error=euclideans norm (p)+forbinius norm (R)
+			p_norm= np.linalg.norm(robot_T.p-p)
+			R_norm=np.linalg.norm(np.matmul(robot_T.R.T,R)-np.eye(3))
+			last_error_fb=error_fb
+			error_fb=p_norm+R_norm
+   
+			# termination condition
+			if np.abs(last_error_fb-error_fb)<termination_error:
+				# print("Termination condition reached. The error is not decaying anymore")
+				break
+
+			# print(error_fb)
+			if error_fb>1000:
+				print("Error too large:",error_fb)
+				raise AssertionError
+			
+			## prepare Jacobian matrix w.r.t positioner
+			J=self.jacobian(q_sol)
+			J_all_p=J[3:,:]
+			J_all_R=J[:3,:]
+
+			H=np.dot(np.transpose(J_all_p),J_all_p)+Kq+Kw*np.dot(np.transpose(J_all_R),J_all_R)
+			H=(H+np.transpose(H))/2
+
+			vd = p-robot_T.p
+			omega_d=s_err_func(robot_T.R@R.T)
+			# omega_d=s_err_func(self.scan_R[i].T@Rt1_t2)
+
+			f=-np.dot(np.transpose(J_all_p),vd)+Kw*np.dot(np.transpose(J_all_R),omega_d)
+			qdot=solve_qp(H,f,lb=self.lower_limit-q_sol+lim_factor*np.ones(6),\
+						ub=self.upper_limit-q_sol-lim_factor*np.ones(6),solver='quadprog')
+			
+			q_sol=q_sol+alpha*qdot
+		return q_sol
 
 	###find a continous trajectory given Cartesion pose trajectory
 	def find_curve_js(self,curve,curve_R,q_seed=None):

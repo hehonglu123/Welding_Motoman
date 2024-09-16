@@ -334,10 +334,11 @@ print(train_set)
 #### Gradient
 plot_grad=False
 plot_error=True
-plot_block=False
+plot_block=True
 save_PH = False
 all_testing_pose=np.arange(N_per_pose)
 # max_iteration = 500
+# max_iteration = 1000
 max_iteration = 200
 terminate_eps = 0.0002
 terminate_ori_error=999
@@ -350,7 +351,7 @@ dH_up_range = np.radians(0.1)
 dH_low_range = np.radians(0.03)
 H_size = 6
 dH_rotate_axis = [[Rx,Ry],[Rz,Rx],[Rz,Rx],[Ry,Rz],[Rz,Rx],[Ry,Rz]]
-alpha=0.5
+alpha=0.1
 # weight_ori = 0.1
 weight_ori = 1
 weight_pos = 1
@@ -366,6 +367,7 @@ for N in train_set:
     print(np.degrees(robot.robot.joint_lower_limit))
     print("Progress:",str(N)+"/"+str(total_pose),"Time Pass:",str(np.round(time.time()-start_t)))
 
+    st_iter = time.time()
     pos_error_progress = []
     pos_error_norm_progress = []
     ori_error_progress = []
@@ -444,8 +446,8 @@ for N in train_set:
         pos_error_norm_progress.append(np.linalg.norm(error_pos,ord=2,axis=1))
         ori_error_progress.append(error_ori[0])
         ori_error_norm_progress.append(np.linalg.norm(error_ori,ord=2,axis=1))
-        if iter_N>0 and np.linalg.norm(pos_error_norm_progress[-1]-pos_error_norm_progress[-2])<terminate_eps and np.mean(ori_error_norm_progress[-1])<terminate_ori_error:
-            break
+        # if iter_N>0 and np.linalg.norm(pos_error_norm_progress[-1]-pos_error_norm_progress[-2])<terminate_eps and np.mean(ori_error_norm_progress[-1])<terminate_ori_error:
+        #     break
 
         # print(np.array(d_T_all).shape)
         # print(np.array(d_pH_all).shape)
@@ -483,6 +485,7 @@ for N in train_set:
 
     print("Final Mean Position Error:",np.mean(pos_error_norm_progress[-1]))
     print("Final Mean Orientation Error:",np.mean(ori_error_norm_progress[-1]))
+    print("Time iteration:",time.time()-st_iter)
     print('P:',np.round(robot_opt_P,3).T)
     print('H:',np.round(robot_opt_H,3).T)
 
@@ -491,26 +494,26 @@ for N in train_set:
             plt.close(fig)
         except:
             pass
-        # fig,axs = plt.subplots(2,3)
-        # axs[0,0].plot(np.array(pos_error_progress))
-        # axs[0,0].set_title("Position XYZ error of Pose 1")
-        # axs[0,1].plot(np.array(pos_error_norm_progress))
-        # axs[0,1].set_title("Position error norm of all poses")
-        # pos_error_diff = np.linalg.norm(np.diff(pos_error_norm_progress,axis=0),axis=1).flatten()
-        # axs[0,2].plot(np.array(pos_error_diff))
-        # axs[0,2].set_title("Position Error Norm Diff")
-        # axs[1,0].plot(np.array(ori_error_progress))
-        # axs[1,0].set_title("Orientation kdtheta error of Pose 1")
-        # axs[1,1].plot(np.array(ori_error_norm_progress))
-        # axs[1,1].set_title("Orientation error norm of all poses")
-        # ori_error_diff = np.linalg.norm(np.diff(ori_error_norm_progress,axis=0),axis=1).flatten()
-        # axs[1,2].plot(np.array(ori_error_diff))
-        # axs[1,2].set_title("Orientation Error Norm Diff")
-        # # fig.canvas.manager.window.wm_geometry("+%d+%d" % (1920+10,10))
-        # # fig.set_size_inches([13.95,7.92],forward=True)
-        # plt.tight_layout()
-        # plt.show(block=plot_block)
-        # plt.pause(0.01)
+        fig,axs = plt.subplots(2,3)
+        axs[0,0].plot(np.array(pos_error_progress))
+        axs[0,0].set_title("Position XYZ error of Pose 1")
+        axs[0,1].plot(np.array(pos_error_norm_progress))
+        axs[0,1].set_title("Position error norm of all poses")
+        pos_error_diff = np.linalg.norm(np.diff(pos_error_norm_progress,axis=0),axis=1).flatten()
+        axs[0,2].plot(np.array(pos_error_diff))
+        axs[0,2].set_title("Position Error Norm Diff")
+        axs[1,0].plot(np.array(ori_error_progress))
+        axs[1,0].set_title("Orientation kdtheta error of Pose 1")
+        axs[1,1].plot(np.array(ori_error_norm_progress))
+        axs[1,1].set_title("Orientation error norm of all poses")
+        ori_error_diff = np.linalg.norm(np.diff(ori_error_norm_progress,axis=0),axis=1).flatten()
+        axs[1,2].plot(np.array(ori_error_diff))
+        axs[1,2].set_title("Orientation Error Norm Diff")
+        # fig.canvas.manager.window.wm_geometry("+%d+%d" % (1920+10,10))
+        # fig.set_size_inches([13.95,7.92],forward=True)
+        plt.tight_layout()
+        plt.show(block=plot_block)
+        plt.pause(0.01)
         
         plt.errorbar(np.arange(len(pos_error_norm_progress)),np.mean(pos_error_norm_progress,axis=1),\
             yerr=np.mean(pos_error_norm_progress,axis=1))

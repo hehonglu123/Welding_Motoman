@@ -45,15 +45,15 @@ positioner=positioner_obj('D500B',def_path=config_dir+'D500B_robot_default_confi
     base_transformation_file=config_dir+'D500B_pose.csv',pulse2deg_file_path=config_dir+'D500B_pulse2deg_real.csv',\
     base_marker_config_file=S1_marker_dir+'D500B_'+S1_ph_dataset_date+'_marker_config.yaml',tool_marker_config_file=S1_tcp_marker_dir+'positioner_tcp_marker_config.yaml')
 
-# data_dir='data/weld_scan_error_grad_2023_11_07_15_39_30/'
+data_dir='data/weld_scan_error_grad_2023_11_07_15_39_30/'
 # data_dir='data/weld_scan_error_smooth_2023_11_07_16_48_39/'
 # data_dir='data/weld_scan_error_smooth_dh_2023_11_08_13_25_03/'
-data_dir='data/weld_scan_2023_11_08_14_34_15/'
-learn_layer=0
+# data_dir='data/weld_scan_error_smooth_dh_first_2023_11_08_14_34_15/'
+learn_layer=1
 seg_dist=1.6
 dh=2.5
 yk_d=[dh]
-smooth=True
+smooth=False
 if 'smooth' in data_dir or smooth:
     yk0=np.loadtxt(data_dir+'iteration_0/yk.csv',delimiter=',')
     yk_d=[np.mean(yk0)]
@@ -61,8 +61,10 @@ if 'smooth' in data_dir or smooth:
 ipm_weld=250
 ipm_for_calculation=210
 uk_nom=dh2v_loglog(dh,mode=ipm_for_calculation)
+if 'dh' in data_dir:
+    uk_nom=dh
 
-total_iteration=12
+total_iteration=6
 
 show_pcd=False
 show_yk=True
@@ -72,8 +74,10 @@ show_grad=False
 show_norm=True
 show_norm_parts=False
 
+show_iter=[0,1,2,3,4,5]
+
 ## show pcd of iterations
-show_pcd=[]
+show_pcd=[5]
 if show_pcd:
     for iter_read in range(total_iteration):
         if iter_read in show_pcd:
@@ -91,15 +95,15 @@ if show_pcd:
 if show_yk:
     plt.axhline(y = yk_d[0], color = 'r', linestyle = '-',label='desired h') 
     for iter_read in range(total_iteration):
-
-        yk=np.loadtxt(data_dir+'iteration_'+str(iter_read)+'/yk.csv',delimiter=',')
-        # yk=yk[4:-9]
-        # try:
-        #     yk_prime=np.loadtxt(data_dir+'iteration_'+str(iter_read)+'/yk_prime.csv',delimiter=',')
-        # except:
-        #     yk_prime=deepcopy(yk)
-        plt.plot(np.arange(len(yk))*seg_dist,yk,marker='o',markersize=4,linewidth=2,label='iter '+str(iter_read))
-        # plt.scatter(np.arange(len(yk_prime)),yk_prime)
+        if iter_read in show_iter:
+            yk=np.loadtxt(data_dir+'iteration_'+str(iter_read)+'/yk.csv',delimiter=',')
+            # yk=yk[4:-9]
+            # try:
+            #     yk_prime=np.loadtxt(data_dir+'iteration_'+str(iter_read)+'/yk_prime.csv',delimiter=',')
+            # except:
+            #     yk_prime=deepcopy(yk)
+            plt.plot(np.arange(len(yk))*seg_dist,yk,marker='o',markersize=4,linewidth=2,label='iter '+str(iter_read))
+            # plt.scatter(np.arange(len(yk_prime)),yk_prime)
     plt.xlabel("L (mm)",fontsize=14)
     plt.ylabel("Height (mm)",fontsize=14)
     plt.legend()
@@ -124,18 +128,24 @@ if show_actual_uk:
 
 ## show input of iterations (uk)
 if show_uk:
-    plt.axhline(y = uk_nom, color = 'r', linestyle = '-',label='desired h') 
+    if 'dh' in data_dir:
+        plt.axhline(y = uk_nom, color = 'r', linestyle = '-',label='desired h') 
+    else:
+        plt.axhline(y = uk_nom, color = 'r', linestyle = '-',label='nominal v') 
     for iter_read in range(total_iteration):
-
-        uk=np.loadtxt(data_dir+'iteration_'+str(iter_read)+'/input_uk.csv',delimiter=',')
-        # try:
-        #     yk_prime=np.loadtxt(data_dir+'iteration_'+str(iter_read)+'/yk_prime.csv',delimiter=',')
-        # except:
-        #     yk_prime=deepcopy(yk)
-        plt.plot(np.arange(len(uk))*seg_dist,uk,marker='o',markersize=4,linewidth=2,label='iter '+str(iter_read))
-        # plt.scatter(np.arange(len(yk_prime)),yk_prime)
+        if iter_read in show_iter:
+            uk=np.loadtxt(data_dir+'iteration_'+str(iter_read)+'/input_uk.csv',delimiter=',')
+            # try:
+            #     yk_prime=np.loadtxt(data_dir+'iteration_'+str(iter_read)+'/yk_prime.csv',delimiter=',')
+            # except:
+            #     yk_prime=deepcopy(yk)
+            plt.plot(np.arange(len(uk))*seg_dist,uk,marker='o',markersize=4,linewidth=2,label='iter '+str(iter_read))
+            # plt.scatter(np.arange(len(yk_prime)),yk_prime)
     plt.xlabel("L (mm)",fontsize=14)
-    plt.ylabel("Height (mm)",fontsize=14)
+    if 'dh' in data_dir:
+        plt.ylabel("Height (mm)",fontsize=14)
+    else:
+        plt.ylabel("Speed (mm/sec)",fontsize=14)
     plt.legend()
     plt.title("Input u of iterations",fontsize=14)
     plt.show()

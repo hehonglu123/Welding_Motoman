@@ -1,8 +1,7 @@
 import sys, glob
-sys.path.append('../toolbox/')
-from robot_def import *
+from motoman_def import *
 from lambda_calc import *
-from multi_robot import *
+from dual_robot import *
 from dx200_motion_program_exec_client import *
 from WeldSend import *
 
@@ -24,9 +23,12 @@ def extend_simple(curve_sliced_js,positioner_js,curve_sliced_relative,lam_relati
 
 dataset='blade0.1/'
 sliced_alg='auto_slice/'
-data_dir='../data/'+dataset+sliced_alg
+data_dir='../../geometry_data/'+dataset+sliced_alg
 with open(data_dir+'slicing.yml', 'r') as file:
 	slicing_meta = yaml.safe_load(file)
+job_offset=100
+base_feedrate=250
+feedrate=120
 
 waypoint_distance=5 	###waypoint separation
 layer_height_num=int(1.5/slicing_meta['line_resolution'])
@@ -79,7 +81,7 @@ primitives=[]
 # 		q1_all.extend([q_start]+curve_sliced_js[breakpoints].tolist()+[q_end])
 # 		q2_all.extend([positioner_js[breakpoints[0]]]+positioner_js[breakpoints].tolist()+[positioner_js[breakpoints[-1]]])
 # 		v1_all.extend([1]+[s1_all[0]]+s1_all+[s1_all[-1]])
-# 		cond_all.extend([0]+[218]*(num_points_layer+1))					###extended baselayer welding
+# 		cond_all.extend([0]+[job_offset+int(base_feedrate/10)]*(num_points_layer+1))					###extended baselayer welding
 		
 
 # 		q_prev=curve_sliced_js[breakpoints[-1]]
@@ -145,7 +147,7 @@ for layer in range(num_layer_start,num_layer_end,layer_height_num):
 		q1_all.extend(curve_sliced_js[breakpoints].tolist())
 		q2_all.extend(positioner_js[breakpoints].tolist())
 		v1_all.extend([1]+s1_all)
-		cond_all.extend([0]+[200]*(num_points_layer-1))
+		cond_all.extend([0]+[job_offset+int(feedrate/10)]*(num_points_layer-1))
 		primitives.extend(['movej']+['movel']*(num_points_layer-1))
 
 
@@ -154,4 +156,4 @@ for layer in range(num_layer_start,num_layer_end,layer_height_num):
 
 
 timestamp_robot,joint_recording,job_line,_=ws.weld_segment_dual(primitives,robot,positioner,q1_all,q2_all,v1_all,10*np.ones(len(v1_all)),cond_all,arc=True)
-np.savetxt('joint_recording.csv',np.hstack((timestamp_robot.reshape(-1, 1),job_line.reshape(-1, 1),joint_recording)),delimiter=',')
+# np.savetxt('joint_recording.csv',np.hstack((timestamp_robot.reshape(-1, 1),job_line.reshape(-1, 1),joint_recording)),delimiter=',')

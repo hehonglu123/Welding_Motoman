@@ -1,0 +1,1 @@
+python310 -m robotraconteur_microphone_driver -d=1

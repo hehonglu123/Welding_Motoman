@@ -16,11 +16,11 @@ Rx=np.array([1,0,0])
 Ry=np.array([0,1,0])
 Rz=np.array([0,0,1])
 
-ph_dataset_date='0801'
-test_dataset_date='0801'
+ph_dataset_date='0804'
+test_dataset_date='0804'
 config_dir='../config/'
 
-robot_type = 'R1'
+robot_type = 'R2'
 
 if robot_type == 'R1':
     robot_marker_dir=config_dir+'MA2010_marker_config/'
@@ -48,8 +48,8 @@ elif robot_type == 'R2':
     nom_H=np.array([[0,0,1],[0,1,0],[0,-1,0],\
                    [-1,0,0],[0,-1,0],[-1,0,0]]).T
 
-T_base_basemarker = robot.T_base_basemarker
-T_basemarker_base = T_base_basemarker.inv()
+# T_base_basemarker = robot.T_base_basemarker
+# T_basemarker_base = T_base_basemarker.inv()
 
 #### using rigid body
 use_toolmaker=True
@@ -133,8 +133,15 @@ if use_raw:
 print(len(test_mocap_T))
 assert len(test_robot_q)==len(test_mocap_T), f"Need to have the same amount of robot_q and mocap_T"
 
-with open(PH_data_dir+'calib_PH_q.pickle','rb') as file:
+use_analytical_calib = True
+use_minimal_calib = False
+
+calib_file_name = 'calib_PH_q_ana.pickle' if use_analytical_calib else 'calib_PH_q.pickle'
+calib_file_name = calib_file_name[:-7]+'_minimal.pickle' if use_minimal_calib else calib_file_name
+print(calib_file_name)
+with open(PH_data_dir+calib_file_name,'rb') as file:
     PH_q=pickle.load(file)
+
 #### all train data q
 train_q = []
 training_error=[]
@@ -161,9 +168,13 @@ qzero_H = PH_q[train_q_zero_key]['H']
 #############################
 
 try:
-    with open(PH_data_dir+'calib_one_PH.pickle','rb') as file:
+    calib_file_name = 'calib_one_PH_ana.pickle' if use_analytical_calib else 'calib_one_PH.pickle'
+    calib_file_name = calib_file_name[:-7]+'_minimal.pickle' if use_minimal_calib else calib_file_name
+    print(calib_file_name)
+    with open(PH_data_dir+calib_file_name,'rb') as file:
         PH_q_one=pickle.load(file)
 except:
+    print("One PH not found")
     PH_q_one=PH_q[train_q_zero_key]
 #### one PH for all ####
 universal_P = PH_q_one['P']

@@ -259,8 +259,6 @@ while slice_num<slicing_meta['num_layers']:
 				SS.jog2q(np.hstack((rob1_js_dense[breakpoints[0]],rob2_js_dense[breakpoints[0]],positioner_js_dense[breakpoints[0]])))
 				welding_started=True
 				fronius_client.start_weld()
-			else:
-				rr_sensors.clear_all_sensors()
 				
 			rr_sensors.start_all_sensors()
 			for bp_idx in range(len(breakpoints)):

@@ -1,16 +1,17 @@
 from copy import deepcopy
 from pathlib import Path
 import sys
-sys.path.append('../../toolbox/')
 sys.path.append('../../redundancy_resolution/')
 sys.path.append('../redundancy_resolution/')
 sys.path.append('../scan_tools/')
-from robot_def import *
-from multi_robot import *
+from motoman_def import *
+from dual_robot import *
+from lambda_calc import *
 from scan_utils import *
 from scan_continuous import *
 from redundancy_resolution_scanner import *
 from dx200_motion_program_exec_client import *
+from redundancy_resolution_dual import *
 
 from general_robotics_toolbox import *
 from RobotRaconteur.Client import *
@@ -276,48 +277,28 @@ class ScanPathGen():
 
         elif solve_js_method==1:
             ### Method 2: stepwise qp, turntable involved
-            rrs = redundancy_resolution_scanner(self.robot,self.positioner,scan_p,scan_R)
-            
-            # for ddeg in np.arange(-180,180,10):
-            #     try:
-            #         pose_R2_table=T_S1Base_R2Base*self.positioner.fwd(q_init_table+np.radians([0,ddeg]))
-            #         print(ddeg)
-            #         q_init_robot = self.robot.inv(np.matmul(pose_R2_table.R,scan_p[0])+pose_R2_table.p,np.matmul(pose_R2_table.R,scan_R[0]),zero_config)[0]
-            #         print(np.degrees(q_init_robot))
-            #     except:
-            #         continue
-            # exit()
+            rrd=redundancy_resolution_dual(self.robot,self.positioner,scan_p,scan_R)
 
-            # searching and qp
-            q_init_table_origin = np.array(deepcopy(q_init_table))
-            search_r = np.radians(3)
-            search_dir = np.array([])
-            if np.fabs(self.positioner.upper_limit[0]-q_init_table_origin[0])>np.fabs(self.positioner.lower_limit[0]-q_init_table_origin[0]):
-                search_dir=np.append(search_dir,self.positioner.upper_limit[0]-q_init_table_origin[0])
-            else:
-                search_dir=np.append(search_dir,self.positioner.lower_limit[0]-q_init_table_origin[0])
-            if np.fabs(self.positioner.upper_limit[1]-q_init_table_origin[1])>np.fabs(self.positioner.lower_limit[1]-q_init_table_origin[1]):
-                search_dir=np.append(search_dir,self.positioner.upper_limit[1]-q_init_table_origin[1])
-            else:
-                search_dir=np.append(search_dir,self.positioner.lower_limit[1]-q_init_table_origin[1])
-            search_dir=search_dir/np.linalg.norm(search_dir)
-            
-            for test_i in range(999999):
-                dq_table = test_i*search_r*search_dir
-                q_init_table=q_init_table_origin+dq_table
-                
-                pose_R2_table=T_S1Base_R2Base*self.positioner.fwd(q_init_table)
-                q_init_robot = self.robot.inv(np.matmul(pose_R2_table.R,scan_p[0])+pose_R2_table.p,np.matmul(pose_R2_table.R,scan_R[0]),zero_config)[0]
-                # print(np.degrees(q_init_robot))
-                q_out1, q_out2, j_out1, j_out2=rrs.arm_table_stepwise_opt(q_init_robot,q_init_table,w1=R1_w,w2=R2_w)
-            
-                if len(q_out1)!=0:
-                    break
-            # q_out1, q_out2, j_out1, j_out2=rrs.arm_table_stepwise_opt_Rz(q_init_robot,q_init_table,w2=0.03)
-            # q_out1, q_out2, j_out1, j_out2=rrs.arm_table_stepwise_opt_Rz(q_init_robot,q_init_table,w2=5)
 
-            q_out1=np.array(q_out1)
-            q_out2=np.array(q_out2)
+            ###plot in 3d scan_p
+            fig = plt.figure()
+            ax = fig.add_subplot(111, projection='3d')
+            ax.plot(scan_p[:,0],scan_p[:,1],scan_p[:,2])
+            # ax.quiver(scan_p[:,0],scan_p[:,1],scan_p[:,2],scan_R[:,0,-1],scan_R[:,1,-1],scan_R[:,2,-1],color='r')
+            plt.show()
+            
+            
+            T_S1TCP_S1Base = self.positioner.fwd(q_init_table)
+            T_S1TCP_R2Base = T_S1Base_R2Base*T_S1TCP_S1Base
+            scan_p_R2Base = np.matmul(T_S1TCP_R2Base.R,scan_p.T).T + T_S1TCP_R2Base.p
+            scan_R_R2Base = np.matmul(T_S1TCP_R2Base.R,scan_R)
+            # ik
+            q_init=self.robot.inv(scan_p_R2Base[0],scan_R_R2Base[0],zero_config)[0]
+            q_out1, q_out2 = rrd.dual_arm_6dof_stepwise(q_init,q_init_table,w1=R1_w,w2=R2_w)
+
+            # q_out1, q_out2 = rrd.dual_arm_6dof(q_init,q_init_table)
+
+
             # print(np.degrees(q_out1[:,-1]))
             # if np.mean(q_out1[:,-1])>=np.radians(135) or np.mean(q_out1[:,-1])<=np.radians(-135):
             #     print("Reversed Scan R")
@@ -356,28 +337,18 @@ class ScanPathGen():
     def gen_scan_path(self,all_curve_sliced_relative,all_layer,all_scan_angle,solve_js_method=1,q_init_table=np.radians([-15,180]),R_path=np.eye(3),\
                       R1_w=0.01,R2_w=0.01,scan_path_dir=None):
         
-        try:
-            scan_T=np.loadtxt(scan_path_dir + 'scan_T.csv',delimiter=',')
-            scan_p=[]
-            scan_R=[]
-            for this_scan_T in scan_T:
-                scan_p.append(this_scan_T[:3])
-                scan_R.append(q2R(this_scan_T[3:]))
 
-            q_out1=np.loadtxt(scan_path_dir + 'scan_js1.csv',delimiter=',')
-            q_out2=np.loadtxt(scan_path_dir + 'scan_js2.csv',delimiter=',')
-        except:
-            # generate cartesian path
-            scan_p,scan_R = self._gen_scan_path(all_curve_sliced_relative,all_layer,all_scan_angle,R_path)
-            # generate joint space path
-            q_out1,q_out2 = self._gen_js_path(scan_p,scan_R,solve_js_method,q_init_table,R1_w=0.01,R2_w=0.01)
-            if scan_path_dir:
-                scan_T=[]
-                for i in range(len(scan_p)):
-                    scan_T.append(np.append(scan_p[i],R2q(scan_R[i])))
-                np.savetxt(scan_path_dir + 'scan_T.csv',scan_T,delimiter=',')
-                np.savetxt(scan_path_dir + 'scan_js1.csv',q_out1,delimiter=',')
-                np.savetxt(scan_path_dir + 'scan_js2.csv',q_out2,delimiter=',')
+        # generate cartesian path
+        scan_p,scan_R = self._gen_scan_path(all_curve_sliced_relative,all_layer,all_scan_angle,R_path)
+        # generate joint space path
+        q_out1,q_out2 = self._gen_js_path(scan_p,scan_R,solve_js_method,q_init_table,R1_w=0.01,R2_w=0.01)
+        if scan_path_dir:
+            scan_T=[]
+            for i in range(len(scan_p)):
+                scan_T.append(np.append(scan_p[i],R2q(scan_R[i])))
+            np.savetxt(scan_path_dir + 'scan_T.csv',scan_T,delimiter=',')
+            np.savetxt(scan_path_dir + 'scan_js1.csv',q_out1,delimiter=',')
+            np.savetxt(scan_path_dir + 'scan_js2.csv',q_out2,delimiter=',')
 
         return scan_p,scan_R,q_out1,q_out2
 

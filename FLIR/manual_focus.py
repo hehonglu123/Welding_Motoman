@@ -12,7 +12,7 @@ top.title("MANUAL FOCUS TOOL")
 focus= Scale(orient='vertical', label='focus control',from_=100, length=500,resolution=1, to=4207)
 focus.pack(side=RIGHT)
 
-url='rr+tcp://192.168.55.10:60827/?service=camera'
+url='rr+tcp://localhost:60827/?service=camera'
 
 c1=RRN.ConnectService(url)
 
