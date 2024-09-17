@@ -4,6 +4,8 @@ from lambda_calc import *
 from dual_robot import *
 from dx200_motion_program_exec_client import *
 from WeldSend import *
+from scipy.ndimage import gaussian_filter1d
+
 
 def extend_simple(curve_sliced_js,positioner_js,curve_sliced_relative,lam_relative,d=10):
 	pose0=robot.fwd(curve_sliced_js[0])
@@ -30,7 +32,7 @@ with open(data_dir+'slicing.yml', 'r') as file:
 waypoint_distance=5 	###waypoint separation
 layer_width_num=int(4/slicing_meta['line_resolution'])
 
-weld_arcon=False
+weld_arcon=True
 # #######################################ER4043########################################################
 # job_offset=200
 # vd_relative=8
@@ -79,56 +81,56 @@ client=MotionProgramExecClient()
 ws=WeldSend(client)
 
 ###########################################base layer welding############################################
-# q1_all=[]
-# positioner_all=[]
-# q2_all=[]
-# v1_all=[]
-# cond_all=[]
-# primitives=[]
+q1_all=[]
+positioner_all=[]
+q2_all=[]
+v1_all=[]
+cond_all=[]
+primitives=[]
 
-# num_baselayer=2
-# ###far end
-# # q_prev=np.array([-3.250117036572426343e-01,8.578573591937989073e-01,5.007170842167016911e-01,4.055312631131529622e-01,-1.119412117298938414e+00,-1.407346519936740536e+00])
-# ###close end
-# q_prev=np.array([-3.791544713877046391e-01,7.156749523014762637e-01,2.756772964158371586e-01,2.106493295914119712e-01,-7.865937103692784982e-01,-5.293956242391706368e-01])
+num_baselayer=2
+###far end
+# q_prev=np.array([-3.250117036572426343e-01,8.578573591937989073e-01,5.007170842167016911e-01,4.055312631131529622e-01,-1.119412117298938414e+00,-1.407346519936740536e+00])
+###close end
+q_prev=np.array([-3.791544713877046391e-01,7.156749523014762637e-01,2.756772964158371586e-01,2.106493295914119712e-01,-7.865937103692784982e-01,-5.293956242391706368e-01])
 
-# mp=MotionProgram(ROBOT_CHOICE='RB1',ROBOT_CHOICE2='ST1',pulse2deg=robot.pulse2deg,pulse2deg_2=positioner.pulse2deg, tool_num = 12)
-# for base_layer in range(num_baselayer):
-# 	num_sections=len(glob.glob(data_dir+'curve_sliced_relative/base_slice'+str(base_layer)+'_*.csv'))
-# 	for x in range(num_sections):
-# 		rob1_js=np.loadtxt(data_dir+'curve_sliced_js/MA2010_base_js'+str(base_layer)+'_'+str(x)+'.csv',delimiter=',')
-# 		positioner_js=np.loadtxt(data_dir+'curve_sliced_js/D500B_base_js'+str(base_layer)+'_'+str(x)+'.csv',delimiter=',')
-# 		curve_sliced_relative=np.loadtxt(data_dir+'curve_sliced_relative/base_slice'+str(base_layer)+'_'+str(x)+'.csv',delimiter=',')
+mp=MotionProgram(ROBOT_CHOICE='RB1',ROBOT_CHOICE2='ST1',pulse2deg=robot.pulse2deg,pulse2deg_2=positioner.pulse2deg, tool_num = 12)
+for base_layer in range(num_baselayer):
+	num_sections=len(glob.glob(data_dir+'curve_sliced_relative/base_slice'+str(base_layer)+'_*.csv'))
+	for x in range(num_sections):
+		rob1_js=np.loadtxt(data_dir+'curve_sliced_js/MA2010_base_js'+str(base_layer)+'_'+str(x)+'.csv',delimiter=',')
+		positioner_js=np.loadtxt(data_dir+'curve_sliced_js/D500B_base_js'+str(base_layer)+'_'+str(x)+'.csv',delimiter=',')
+		curve_sliced_relative=np.loadtxt(data_dir+'curve_sliced_relative/base_slice'+str(base_layer)+'_'+str(x)+'.csv',delimiter=',')
 
-# 		lam1=calc_lam_js(rob1_js,robot)
-# 		lam2=calc_lam_js(positioner_js,positioner)
-# 		lam_relative=calc_lam_cs(curve_sliced_relative)
+		lam1=calc_lam_js(rob1_js,robot)
+		lam2=calc_lam_js(positioner_js,positioner)
+		lam_relative=calc_lam_cs(curve_sliced_relative)
 
-# 		q_start,q_end=extend_simple(rob1_js,positioner_js,curve_sliced_relative,lam_relative,d=10)
+		q_start,q_end=extend_simple(rob1_js,positioner_js,curve_sliced_relative,lam_relative,d=10)
 
-# 		num_points_layer=max(2,int(lam_relative[-1]/waypoint_distance))
-# 		###find which end to start
-# 		if np.linalg.norm(q_prev-rob1_js[0])<np.linalg.norm(q_prev-rob1_js[-1]):
-# 			breakpoints=np.linspace(0,len(rob1_js)-1,num=num_points_layer).astype(int)
-# 		else:
-# 			temp=copy.deepcopy(q_start)
-# 			q_start=copy.deepcopy(q_end)
-# 			q_end=temp
-# 			breakpoints=np.linspace(len(rob1_js)-1,0,num=num_points_layer).astype(int)
+		num_points_layer=max(2,int(lam_relative[-1]/waypoint_distance))
+		###find which end to start
+		if np.linalg.norm(q_prev-rob1_js[0])<np.linalg.norm(q_prev-rob1_js[-1]):
+			breakpoints=np.linspace(0,len(rob1_js)-1,num=num_points_layer).astype(int)
+		else:
+			temp=copy.deepcopy(q_start)
+			q_start=copy.deepcopy(q_end)
+			q_end=temp
+			breakpoints=np.linspace(len(rob1_js)-1,0,num=num_points_layer).astype(int)
 
-# 		s1_all,_=calc_individual_speed(base_vd_relative,lam1,lam2,lam_relative,breakpoints)
+		s1_all,_=calc_individual_speed(base_vd_relative,lam1,lam2,lam_relative,breakpoints)
 
-# 		primitives.extend(['movej']+['movel']*(num_points_layer+1))
-# 		q1_all.extend([q_start]+rob1_js[breakpoints].tolist()+[q_end])
-# 		q2_all.extend([positioner_js[breakpoints[0]]]+positioner_js[breakpoints].tolist()+[positioner_js[breakpoints[-1]]])
-# 		v1_all.extend([1]+[s1_all[0]]+s1_all+[s1_all[-1]])
-# 		cond_all.extend([0]+[int(base_feedrate_cmd/10+job_offset)]*(num_points_layer+1))					###extended baselayer welding
+		primitives.extend(['movej']+['movel']*(num_points_layer+1))
+		q1_all.extend([q_start]+rob1_js[breakpoints].tolist()+[q_end])
+		q2_all.extend([positioner_js[breakpoints[0]]]+positioner_js[breakpoints].tolist()+[positioner_js[breakpoints[-1]]])
+		v1_all.extend([1]+[s1_all[0]]+s1_all+[s1_all[-1]])
+		cond_all.extend([0]+[int(base_feedrate_cmd/10+job_offset)]*(num_points_layer+1))					###extended baselayer welding
 		
 
-# 		q_prev=rob1_js[breakpoints[-1]]
+		q_prev=rob1_js[breakpoints[-1]]
 
 
-# ws.weld_segment_dual(primitives,robot,positioner,q1_all,q2_all,v1_all,10*np.ones(len(v1_all)),cond_all,arc=weld_arcon)
+ws.weld_segment_dual(primitives,robot,positioner,q1_all,q2_all,v1_all,10*np.ones(len(v1_all)),cond_all,arc=weld_arcon)
 
 ###########################################layer welding############################################
 ###far end
@@ -146,7 +148,8 @@ primitives=[]
 
 
 num_layer_start=int(0*layer_height_num)
-num_layer_end=int(50*layer_height_num)
+num_layer_end=int(55*layer_height_num)
+curve_slices_pc=[]
 num_sections=1
 for layer in range(num_layer_start,num_layer_end,layer_height_num):
 	num_sections_prev=num_sections
@@ -172,6 +175,7 @@ for layer in range(num_layer_start,num_layer_end,layer_height_num):
 		rob2_js=np.loadtxt(data_dir+'curve_sliced_js/MA1440_js'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
 		positioner_js=np.loadtxt(data_dir+'curve_sliced_js/D500B_js'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
 		curve_sliced_relative=np.loadtxt(data_dir+'curve_sliced_relative/slice'+str(layer)+'_'+str(x)+'.csv',delimiter=',')
+		curve_slices_pc.append(curve_sliced_relative[:,:3])
 
 		
 		lam1=calc_lam_js(rob1_js,robot)
@@ -217,6 +221,8 @@ ws.weld_segment_tri(primitives,robot,positioner,robot2,q1_all,positioner_all,q2_
 ####################################################Real Time PCD Update############################################
 import open3d as o3d
 from RobotRaconteur.Client import *     #import RR client library
+# time.sleep(5)
+curve_sliced_pc=np.vstack(curve_slices_pc)
 
 #RR client setup, connect to turtle service
 url='rr+tcp://localhost:12181/?service=fujicam'
@@ -267,8 +273,13 @@ while True:
 		positioner_cur=fb_data.group_state[2].feedback_position
 		###get scan data
 		wire_packet=scan_change.TryGetInValue()
-		valid_indices=np.where(wire_packet[1].I_data>10)[0]
-		points_new_cam_frame=np.vstack((np.zeros(len(valid_indices)),wire_packet[1].Y_data[valid_indices],wire_packet[1].Z_data[valid_indices])).T
+		valid_indices=np.where(wire_packet[1].I_data>1)[0]
+		valid_indices=np.intersect1d(valid_indices,np.where(np.abs(wire_packet[1].Z_data)>50)[0])
+		line_profile=np.hstack((wire_packet[1].Y_data[valid_indices].reshape(-1,1),wire_packet[1].Z_data[valid_indices].reshape(-1,1)))
+		#filter Y within +/10mm
+		line_profile=line_profile[np.where(np.abs(line_profile[:,0])<10)]
+		line_profile = gaussian_filter1d(line_profile, sigma=0.2)
+		points_new_cam_frame=np.vstack((np.zeros(len(line_profile)),line_profile.T)).T
 		
 		cam_pose=robot_fuji.fwd(q1_cur)
 		positioner_pose=positioner.fwd(positioner_cur,world=True)
@@ -277,6 +288,18 @@ while True:
 		H_positioner=H_from_RT(positioner_pose.R,positioner_pose.p)
 		H_cam2positioner=H_inv(H_positioner)@H_cam
 		points_new=(H_cam2positioner[:3,:3]@points_new_cam_frame.T+H_cam2positioner[:3,3].reshape(3,1)).T
+		
+		###3d filtering based on Z
+		valid_indices=np.where(points_new[:,2]>-10)[0]
+		points_new=points_new[valid_indices]
+		###3d filtering based on distances to original blade
+		valid_indices=[]
+		for i in range(len(points_new)):
+			distances=np.linalg.norm(curve_sliced_pc-points_new[i],axis=1)
+			if np.min(distances)<20:
+				valid_indices.append(i)
+		points_new=points_new[valid_indices]
+
 		all_points = np.vstack((np.asarray(pcd.points), points_new)) if counts > 0 else points_new
 		# ####scatter in plt first
 		# fig = plt.figure()
