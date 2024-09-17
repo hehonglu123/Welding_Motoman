@@ -12,7 +12,7 @@ import pickle
 
 config_dir='../config/'
 
-R1_dataset_date='0926'
+R1_dataset_date='06162024'
 robot_marker_dir=config_dir+'MA2010_marker_config/'
 tool_marker_dir=config_dir+'weldgun_marker_config/'
 robot_1=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',\
@@ -22,7 +22,7 @@ robot_1=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_confi
                     base_marker_config_file=robot_marker_dir+'MA2010_'+R1_dataset_date+'_marker_config.yaml',\
                     tool_marker_config_file=tool_marker_dir+'weldgun_'+R1_dataset_date+'_marker_config.yaml')
 
-R2_dataset_date='0926'
+R2_dataset_date='06162024'
 robot_marker_dir=config_dir+'MA1440_marker_config/'
 tool_marker_dir=config_dir+'mti_marker_config/'
 robot_2=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.yml',\

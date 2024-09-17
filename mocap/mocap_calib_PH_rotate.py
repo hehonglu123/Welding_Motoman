@@ -126,12 +126,12 @@ def to_frame(curve_p,curve_R,mocap_stamps,target_frame,markers_id):
 
 config_dir='../config/'
 
-# robot_type='R1'
-robot_type='R2'
+robot_type='R1'
+# robot_type='R2'
 # robot_type='S1'
 
 # all_datasets=['train_data','valid_data_1','valid_data_2']
-dataset_date='0927'
+dataset_date='09162024'
 # all_datasets=['test'+dataset_date+'_R1_aftercalib/train_data']
 all_datasets=['test'+dataset_date+'_'+robot_type+'/train_data']
 
@@ -435,6 +435,8 @@ with open(output_base_marker_config_file,'w') as file:
 
 # calibrate tool (using zero config pose)
 curve_p,curve_R,mocap_stamps = read_and_convert_frame(raw_data_dir+'_zero',robot.base_rigid_id,[robot.tool_rigid_id])
+tm_p,_,mocap_stamps = read_and_convert_frame(raw_data_dir+'_zero',robot.tool_rigid_id,robot.tool_markers_id)
+
 # read q
 with open(raw_data_dir+'_zero_robot_q.pickle', 'rb') as handle:
     robot_q = pickle.load(handle)
@@ -464,6 +466,8 @@ for i in range(len(curve_p[toolid])):
     T_toolmarker_basemarker=Transform(curve_R[toolid][i],curve_p[toolid][i])
     T_toolmarker_base=T_basemarker_base*T_toolmarker_basemarker
     T_toolmarker_flange=T_base_flange*T_toolmarker_base
+
+
     T_flange_toolmaker=T_toolmarker_flange.inv()
     T_tool_toolmarker=T_flange_toolmaker*T_tool_flange
     all_tool_toolmarker_p.append(T_tool_toolmarker.p)
@@ -513,3 +517,12 @@ tool_marker_data['calib_toolmarker_flange_pose']['orientation']['z'] = float(qua
 with open(output_tool_marker_config_file,'w') as file:
     yaml.safe_dump(tool_marker_data,file)
 print("Done")
+
+##### Tool-flange calibration
+print("Toolmarker to flange:",T_toolmarker_flange)
+
+for marker_id in tm_p:
+    marker_ave = np.mean(tm_p[marker_id],axis=0)
+    marker_ave_flange = np.matmul(T_toolmarker_flange.R,marker_ave) + T_toolmarker_flange.p
+    print("Marker:",marker_id,"average:",marker_ave_flange,"Before trans:",marker_ave)
+    

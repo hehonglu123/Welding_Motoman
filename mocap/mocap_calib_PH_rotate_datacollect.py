@@ -56,7 +56,7 @@ class CalibRobotPH:
                 mp.MoveJ(paths[j][1],rob_speed,0)
             mp.MoveJ(start_p[j],rob_speed,0)
             self.mpl_obj.run_pose_listener()
-            robot_stamps,curve_exe, job_line,job_step = client.execute_motion_program(mp)
+            _,robot_stamps,curve_exe, job_line,job_step = client.execute_motion_program(mp)
             self.mpl_obj.stop_pose_listener()
             curve_p,curve_R,timestamps = self.mpl_obj.get_frames_traj()
 
@@ -80,7 +80,7 @@ class CalibRobotPH:
         mp.MoveJ(start_p[-1],rob_speed,0)
         mp.setWaitTime(5)
         self.mpl_obj.run_pose_listener()
-        robot_stamps,curve_exe, job_line,job_step = client.execute_motion_program(mp)
+        _,robot_stamps,curve_exe, job_line,job_step = client.execute_motion_program(mp)
         self.mpl_obj.stop_pose_listener()
         curve_p,curve_R,timestamps = self.mpl_obj.get_frames_traj()
         
@@ -211,45 +211,6 @@ def calib_R1():
     q5_2=start_p[4] + np.array([0,0,0,0,-80,0])
     q6_1=start_p[5] + np.array([0,0,0,0,0,-120])
     q6_2=start_p[5] + np.array([0,0,0,0,0,120])
-    ## out stretch
-    # start_p = np.array([[0,50,31,0,0,0],
-    #                     [0,50,31,0,0,0],
-    #                     [0,50,31,0,0,0],
-    #                     [0,50,31,0,0,0],
-    #                     [0,50,31,0,0,0],
-    #                     [0,50,31,0,0,0]])
-    # q1_1=start_p[0] + np.array([-53,0,0,0,0,0])
-    # q1_2=start_p[0] + np.array([44,0,0,0,0,0])
-    # q2_1=start_p[1] + np.array([0,30,0,0,0,0])
-    # q2_2=start_p[1] + np.array([0,-10,0,0,0,0])
-    # q3_1=start_p[2] + np.array([0,0,-50,0,0,0])
-    # q3_2=start_p[2] + np.array([0,0,50,0,0,0])
-    # q4_1=start_p[3] + np.array([0,0,0,-120,0,0])
-    # q4_2=start_p[3] + np.array([0,0,0,120,0,0])
-    # q5_1=start_p[4] + np.array([0,0,0,0,80,0])
-    # q5_2=start_p[4] + np.array([0,0,0,0,-80,0])
-    # q6_1=start_p[5] + np.array([0,0,0,0,0,-180])
-    # q6_2=start_p[5] + np.array([0,0,0,0,0,180])
-    ## inward
-    # start_p = np.array([[0,-66,-66,0,0,0],
-    #                     [0,-66,-66,0,0,0],
-    #                     [0,-66,-66,0,0,0],
-    #                     [0,-66,-66,0,0,0],
-    #                     [0,-66,-66,0,0,0],
-    #                     [0,-66,-66,0,0,0]])
-    # q1_1=start_p[0] + np.array([-80,0,0,0,0,0])
-    # q1_2=start_p[0] + np.array([60,0,0,0,0,0])
-    # q2_1=start_p[1] + np.array([0,70,0,0,0,0])
-    # q2_2=start_p[1] + np.array([0,0,0,0,0,0])
-    # q3_1=start_p[2] + np.array([0,0,-8,0,0,0])
-    # q3_2=start_p[2] + np.array([0,0,30,0,0,0])
-    # q4_1=start_p[3] + np.array([0,0,0,-120,0,0])
-    # q4_2=start_p[3] + np.array([0,0,0,120,0,0])
-    # q5_1=start_p[4] + np.array([0,0,0,0,80,0])
-    # q5_2=start_p[4] + np.array([0,0,0,0,-80,0])
-    # q6_1=start_p[5] + np.array([0,0,0,0,0,-180])
-    # q6_2=start_p[5] + np.array([0,0,0,0,0,180])
-
     q_paths = [[q1_1,q1_2],[q2_1,q2_2],[q3_1,q3_2],[q4_1,q4_2],[q5_1,q5_2],[q6_1,q6_2]]
 
     Path('PH_rotate_data/recorded_data/').mkdir(exist_ok=True)
@@ -266,7 +227,7 @@ def calib_R1():
 
 if __name__=='__main__':
 
-    # calib_R1()
+    calib_R1()
     
     # calib_S1()
-    calib_R2()
+    # calib_R2()
