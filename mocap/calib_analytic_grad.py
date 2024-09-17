@@ -231,12 +231,6 @@ def jacobian_param(param,robot,theta,unit='radians',minimal=True):
         dhdb = hat(robot.param_k2[j])@rot_k2_beta[j]@rot_k1_alpha[j]@Hn[j]
         dRdb = np.sin(theta[j])*hat(dhdb)+(1-np.cos(theta[j]))*(hat(dhdb)@hat(H[j])+hat(H[j])@hat(dhdb))
         dR0jdb = last_R0j@dRdb
-        # if j==3:
-        #     print(hat(robot.param_k2[j]))
-        #     print(last_R0j)
-        #     print(last_R0j@hat(robot.param_k2[j]))
-        #     print(drot_beta@RjT)
-        #     exit
         J[:3,total_p+2*j+1]=invhat(dR0jdb@RjT@(R0T.T))
         J[3:,total_p+2*j+1]=dR0jdb@pjT_j
         last_R0j=R0j

@@ -5,6 +5,10 @@ from torch.autograd import Function
 
 from calib_analytic_grad import *
 
+import sys
+sys.path.append('../toolbox/')
+from robot_def import *
+
 # Custom Weighted MSE Loss for element-wise weighting
 class WeightedMSELoss(nn.Module):
     def __init__(self):
@@ -27,12 +31,12 @@ class TransformationLossFunction(Function):
 
         error_all = []
         for i,(q,ph,T) in enumerate(zip(joint_angles,predict_PH,target)):
-            robot = get_PH_from_param(ph.numpy(),robot,unit='radians')
+            robot = get_PH_from_param(ph.detach().numpy(),robot,unit='radians')
             T_pred = robot.fwd(q)
             p_error = np.linalg.norm(T_pred.p - T.p)
             omega_d= np.linalg.norm(s_err_func(T_pred.R@T.R.T))
             error_all.append(weight_pos*p_error + weight_ori*omega_d)
-        loss = np.mean(error_all)
+        loss = torch.tensor(np.mean(error_all))
 
         return loss
 
@@ -53,9 +57,36 @@ class TransformationLoss(nn.Module):
     def forward(self, input, target):
         # Use the custom autograd function for the forward pass
         return TransformationLossFunction.apply(input, target)
+    
 
-# Example usage
-if __name__ == "__main__":
+def test_FWD_loss():
+    
+    # defined robot
+    ph_dataset_date='0801'
+    test_dataset_date='0801'
+    config_dir='../config/'
+    robot_type = 'R1'
+    robot_marker_dir=config_dir+'MA2010_marker_config/'
+    tool_marker_dir=config_dir+'weldgun_marker_config/'
+    robot=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',\
+                        tool_file_path=config_dir+'torch.csv',d=15,\
+                        #  tool_file_path='',d=0,\
+                        pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',\
+                        base_marker_config_file=robot_marker_dir+'MA2010_'+ph_dataset_date+'_marker_config.yaml',\
+                        tool_marker_config_file=tool_marker_dir+'weldgun_'+ph_dataset_date+'_marker_config.yaml')
+    nom_P=np.array([[0,0,0],[150,0,0],[0,0,760],\
+                   [1082,0,200],[0,0,0],[0,0,0],[100,0,0]]).T
+    nom_H=np.array([[0,0,1],[0,1,0],[0,-1,0],\
+                   [-1,0,0],[0,-1,0],[-1,0,0]]).T
+    # get data
+    PH_data_dir='PH_grad_data/test'+ph_dataset_date+'_'+robot_type+'/train_data_'
+    train_robot_q = np.loadtxt(PH_data_dir+'robot_q_align.csv',delimiter=',')
+    train_mocap_T = np.loadtxt(PH_data_dir+'mocap_T_align.csv',delimiter=',')
+
+    # randomize a tensor with size N(training data size) x 33, between 0 to 0.1
+    predict_PH = torch.rand((train_robot_q.shape[0],33))*0.1
+
+def test_weighted_MSE():
     # Example data: batch of 3 samples, each with 4 output elements
     input = torch.tensor([[2.5, 0.5, 2.0, 1.0],
                           [1.5, 1.0, 3.0, 0.5],
@@ -87,3 +118,8 @@ if __name__ == "__main__":
     squared_diff = diff ** 2
     weighted_squared_diff = squared_diff * weights.numpy()
     print(weighted_squared_diff)
+
+# Example usage
+if __name__ == "__main__":
+    # test_weighted_MSE()
+    test_FWD_loss()
