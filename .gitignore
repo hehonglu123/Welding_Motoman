@@ -395,3 +395,5 @@ mocap/ge_testbed/data/*
 weld/ILC/data/weld_scan*
 *.avi
 *.cache
+
+mocap/PH_NN_results/*
