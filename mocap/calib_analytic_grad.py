@@ -216,11 +216,6 @@ def jacobian_param(param,robot,theta,unit='radians',minimal=True):
             J[3:,3*j:3*(j+1)]=last_R0j@projection_P # move only in the direction orthogonal to Hn (a plane)
         else:
             J[3:,3*j:3*(j+1)]=last_R0j
-        # print(j)
-        # print(last_R0j)
-        # print(projection_P@last_R0j)
-        # input("=")
-        # J[3:,3*j:3*(j+1)]=last_R0j
         # gradient of R0T,P0T w.r.t alpha  
         dhda = rot_k2_beta[j]@hat(robot.param_k1[j])@rot_k1_alpha[j]@Hn[j]
         dRda = np.sin(theta[j])*hat(dhda)+(1-np.cos(theta[j]))*(hat(dhda)@hat(H[j])+hat(H[j])@hat(dhda))

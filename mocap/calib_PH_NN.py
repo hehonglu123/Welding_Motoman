@@ -50,14 +50,14 @@ class NeuralNetwork(nn.Module):
         x = self.output(x)
         return x
 
-def test_fwd_accuracy(model, data_q, data_T,robot,param_nomimal):
+def test_fwd_accuracy(model, data_q, data_T,robot,param_nominal):
     
     p_error_all = []
     for i,q in enumerate(data_q):
         q2q3 = np.array([q[1],q[2]])
         q2q3 = torch.tensor(q2q3, dtype=torch.float32)
         pred_PH = model(q2q3)
-        pred_PH = pred_PH.detach().numpy() + param_nomimal
+        pred_PH = pred_PH.detach().numpy() + param_nominal
         robot = get_PH_from_param(pred_PH,robot,unit='radians')
         T_pred = robot.fwd(q)
         p_error = np.linalg.norm(T_pred.p - data_T[i][:3])
@@ -65,7 +65,7 @@ def test_fwd_accuracy(model, data_q, data_T,robot,param_nomimal):
     return p_error_all
 
 
-def train(inputs_q2q3, targets_PH, training_q, training_T, testing_q, testing_T,robot,param_nomimal):
+def train(inputs_q2q3, targets_PH, training_q, training_T, testing_q, testing_T,robot,param_nominal,robot_type):
 
     print(np.degrees(inputs_q2q3).shape)
     print(targets_PH.shape)
@@ -86,7 +86,7 @@ def train(inputs_q2q3, targets_PH, training_q, training_T, testing_q, testing_T,
     print(model)
     # Define the loss function
     loss_fn = nn.MSELoss()
-    weighted = True
+    weighted = False
     if weighted:
         loss_fn = WeightedMSELoss()
         # weights = torch.tensor([1]*33, dtype=torch.float32)
@@ -94,7 +94,7 @@ def train(inputs_q2q3, targets_PH, training_q, training_T, testing_q, testing_T,
         weights_H = 180/np.pi
         weights = torch.tensor(np.append(np.ones(21)*weights_P,np.ones(12)*weights_H), dtype=torch.float32)
     # Define the learning rate
-    learning_rate = 0.02
+    learning_rate = 0.00001
     # Define the number of epochs
     num_epochs = 100000
     # Define the optimizer
@@ -106,6 +106,7 @@ def train(inputs_q2q3, targets_PH, training_q, training_T, testing_q, testing_T,
     formatted_string = datetime.datetime.now().strftime("%Y%m%d%H%M")
     formatted_string = formatted_string[2:]
     folder_path = 'PH_NN_results/train_'
+    folder_path += robot_type+'_'
     for h in hidden_sizes:
         folder_path += str(h)+'_'
     folder_path += 'lr'+str(learning_rate)+'_'
@@ -116,6 +117,7 @@ def train(inputs_q2q3, targets_PH, training_q, training_T, testing_q, testing_T,
 
     # save a training parameters meta yaml file to folder_path
     meta_data = {'input_size': input_size, 'hidden_sizes': hidden_sizes, 'output_size': output_size, 'learning_rate': learning_rate, 'num_epochs': num_epochs}
+    meta_data['robot_type'] = robot_type
     meta_data['weighted'] = weighted
     if weighted:
         meta_data['weights_P'] = weights_P
@@ -174,8 +176,8 @@ def train(inputs_q2q3, targets_PH, training_q, training_T, testing_q, testing_T,
         if print_loss:
             print(f'Epoch [{epoch+1}/{num_epochs}], Loss: {loss.item():.4f}')
         if print_error:
-            training_T_error = test_fwd_accuracy(model, training_q, training_T,robot,param_nomimal)
-            testing_T_error = test_fwd_accuracy(model, testing_q, testing_T,robot,param_nomimal)
+            training_T_error = test_fwd_accuracy(model, training_q, training_T,robot,param_nominal)
+            testing_T_error = test_fwd_accuracy(model, testing_q, testing_T,robot,param_nominal)
             # print training and testing error, mean, max
             print(f'Training error: mean={np.mean(training_T_error):.4f}, max={np.max(training_T_error):.4f}')
             print(f'Testing error: mean={np.mean(testing_T_error):.4f}, max={np.max(testing_T_error):.4f}')
@@ -202,11 +204,11 @@ Rx=np.array([1,0,0])
 Ry=np.array([0,1,0])
 Rz=np.array([0,0,1])
 
-ph_dataset_date='0801'
-test_dataset_date='0801'
+ph_dataset_date='0804'
+test_dataset_date='0804'
 config_dir='../config/'
 
-robot_type = 'R1'
+robot_type = 'R2'
 
 if robot_type == 'R1':
     robot_marker_dir=config_dir+'MA2010_marker_config/'
@@ -241,7 +243,7 @@ robot.H_nominal=deepcopy(robot.robot.H)
 robot.P_nominal=robot.P_nominal.T
 robot.H_nominal=robot.H_nominal.T
 robot = get_H_param_axis(robot) # get the axis to parametrize H
-param_nomimal = np.array(np.reshape(robot.robot.P.T,-1).tolist()+[0]*12)
+param_nominal = np.array(np.reshape(robot.robot.P.T,-1).tolist()+[0]*12)
 
 #### using rigid body
 use_toolmaker=True
@@ -296,12 +298,12 @@ for qkey in PH_q.keys():
         theta_sol = theta_sol[0] if theta_sol[0][0]<np.pi/2 and theta_sol[0][0]>-np.pi/2 else theta_sol[1]
         param_H.extend(theta_sol[::-1])
     param_PH = np.array(np.reshape(PH_q[qkey]['P'].T,-1).tolist()+param_H)
-    param_PH_q.append(param_PH-param_nomimal) # relative to nominal, predict the difference
+    param_PH_q.append(param_PH-param_nominal) # relative to nominal, predict the difference
 
 ## NN input: training q, 2x1
 ## NN output: training param_PH, 33x1
 ## train the NN
-train(np.array(train_q),np.array(param_PH_q),train_robot_q,train_mocap_T,test_robot_q,test_mocap_T,robot,param_nomimal)
+train(np.array(train_q),np.array(param_PH_q),train_robot_q,train_mocap_T,test_robot_q,test_mocap_T,robot,param_nominal,robot_type)
 
 
         

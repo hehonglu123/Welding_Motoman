@@ -18,40 +18,48 @@ from robot_def import *
 # Custom transformation error with manually specified gradient, the analytical gradient using autograd.Function
 class TransformationLossFunction(Function):
     @staticmethod
-    def forward(ctx, predict_PH, target, joint_angles, robot, param_nomimal, weight_pos=1, weight_ori=1):
+    def forward(ctx, predict_PH, target, joint_angles, robot, param_nominal, weight_pos=1, weight_ori=1):
 
-        error_all = []
         p_error_all = []
         ori_error_all = []
         for i,(q,ph,T) in enumerate(zip(joint_angles,predict_PH,target)):
-            robot = get_PH_from_param(ph.detach().numpy()+param_nomimal,robot,unit='radians')
+            robot = get_PH_from_param(ph.detach().numpy()+param_nominal,robot,unit='radians')
             T_pred = robot.fwd(q)
-            p_error = np.linalg.norm(T_pred.p - T.p)
-            omega_d= np.linalg.norm(s_err_func(T_pred.R@T.R.T))
-            error_all.append(weight_pos*p_error + weight_ori*omega_d)
+            p_error = T_pred.p - T.p
+            omega_d= s_err_func(T_pred.R@T.R.T)
             p_error_all.append(p_error)
             ori_error_all.append(omega_d)
-        loss = torch.tensor(np.mean(error_all))
+        loss = torch.tensor(np.mean(weight_pos*np.linalg.norm(p_error_all,axis=1)+weight_ori*np.linalg.norm(ori_error_all,axis=1)))
+
+        # save additional arguments for backward
+        ctx.save_for_backward(predict_PH)
+        ctx.additional_args = p_error_all, ori_error_all, joint_angles, robot, param_nominal, weight_pos, weight_ori
 
         return loss, p_error_all, ori_error_all
 
     @staticmethod
-    def backward(ctx, grad_output):
-        # Retrieve saved tensors from the forward pass
-        input, target = ctx.saved_tensors
-        # Manually compute the gradient: grad_input = input - target
-        grad_input = input - target
-        # Apply the chain rule: multiply by grad_output
-        return grad_input * grad_output, None
+    def backward(ctx, grad_output, dum_a, dum_b):
+
+        predict_PH, = ctx.saved_tensors
+        p_error_all, ori_error_all, joint_angles, robot, param_nominal, weight_pos, weight_ori = ctx.additional_args
+
+        grad = []
+        N = len(predict_PH)
+        for i,(q,ph,p_error,ori_error) in enumerate(zip(joint_angles,predict_PH,p_error_all,ori_error_all)):
+            J_ana_part = jacobian_param(ph.detach().numpy()+param_nominal,robot,q)
+            mu = np.append(ori_error*weight_ori/N,p_error*weight_pos/N)
+            grad.append(torch.tensor(np.dot(mu,J_ana_part)))
+        
+        return torch.stack(grad), None, None, None, None, None, None
 
 # Custom loss class that inherits from nn.Module
 class TransformationLoss(nn.Module):
     def __init__(self):
         super(TransformationLoss, self).__init__()
 
-    def forward(self, predict_PH, target, joint_angles, robot, param_nomimal, weight_pos=1, weight_ori=1):
+    def forward(self, predict_PH, target, joint_angles, robot, param_nominal, weight_pos=1, weight_ori=1):
         # Use the custom autograd function for the forward pass
-        loss, p_error_all, ori_error_all = TransformationLossFunction.apply(predict_PH, target, joint_angles, robot, param_nomimal, weight_pos, weight_ori)
+        loss, p_error_all, ori_error_all = TransformationLossFunction.apply(predict_PH, target, joint_angles, robot, param_nominal, weight_pos, weight_ori)
         return loss, p_error_all, ori_error_all
 
 class NeuralNetwork(nn.Module):
@@ -76,31 +84,41 @@ class NeuralNetwork(nn.Module):
         return x
 
 
-def train(training_q, training_T_data, testing_q, testing_T,robot,param_nomimal):
+def train(training_q, training_T_data, testing_q, testing_T_data,robot,param_nominal):
 
     print(np.degrees(training_q).shape)
     print(training_T_data.shape)
+    print(np.degrees(testing_q).shape)
+    print(testing_T_data.shape)
 
     # data preprocessing
     inputs_q2q3 = []
     training_T = []
     test_inputs_q2q3 = []
     testing_T = []
-    for (q,T,test_q,test_T) in zip(training_q,training_T_data,testing_q,testing_T):
+    for (q,T) in zip(training_q,training_T_data):
         inputs_q2q3.append(torch.tensor([q[1],q[2]], dtype=torch.float32))
         training_T.append(Transform(q2R(T[3:]),T[:3]))
+    for (test_q,test_T) in zip(testing_q,testing_T_data):
         test_inputs_q2q3.append(torch.tensor([test_q[1],test_q[2]], dtype=torch.float32))
         testing_T.append(Transform(q2R(test_T[3:]),test_T[:3]))
+    print(len(inputs_q2q3))
+    print(len(test_inputs_q2q3))
+
     inputs_q2q3 = torch.stack(inputs_q2q3)
     test_inputs_q2q3 = torch.stack(test_inputs_q2q3)
 
     # Define the input size, hidden size, and output size
     input_size = 2
-    hidden_sizes = [400,400]
+    hidden_sizes = [400,400,400]
     output_size = 33
 
     # Create an instance of the neural network
     model = NeuralNetwork(input_size, output_size, hidden_sizes=hidden_sizes)
+    # read model from previous trained
+    # print("Load model from previous trained")
+    # model.load_state_dict(torch.load('PH_NN_results/train_200_200_lr0.02_2409161742/best_testing_model.pt'))
+    
 
     # Print the model architecture
     print(model)
@@ -108,9 +126,11 @@ def train(training_q, training_T_data, testing_q, testing_T,robot,param_nomimal)
     loss_fn = TransformationLoss()
     # weights = torch.tensor([1]*33, dtype=torch.float32)
     weights_pos = 1
-    weights_ori = 180/np.pi # weights_ori = 1
+    weights_ori = 180/np.pi 
+    # weights_ori = 1
+    
     # Define the learning rate
-    learning_rate = 0.02
+    learning_rate = 0.0001
     # Define the number of epochs
     num_epochs = 100000
     # Define the optimizer
@@ -121,7 +141,7 @@ def train(training_q, training_T_data, testing_q, testing_T,robot,param_nomimal)
     # get save folder path
     formatted_string = datetime.datetime.now().strftime("%Y%m%d%H%M")
     formatted_string = formatted_string[2:]
-    folder_path = 'PH_NN_results/train_'
+    folder_path = 'PH_NN_results/trainDirect_'
     for h in hidden_sizes:
         folder_path += str(h)+'_'
     folder_path += 'lr'+str(learning_rate)+'_'
@@ -150,35 +170,41 @@ def train(training_q, training_T_data, testing_q, testing_T,robot,param_nomimal)
     best_training_error = 1e10
     best_testing_error = 1e10
 
+    print("Start training")
     training_start_time = time.time()
     for epoch in range(num_epochs):
 
         # get testing data loss
-        test_outputs = model(test_inputs_q2q3)
-        test_loss, test_p_error_all, test_ori_error_all = loss_fn(test_outputs, testing_T, testing_q, robot, param_nomimal, weights_pos, weights_ori)
-        
+        model.eval()
+        with torch.no_grad():
+            test_outputs = model(test_inputs_q2q3)
+            test_loss, test_p_error_all, test_ori_error_all = loss_fn(test_outputs, testing_T, testing_q, robot, param_nominal, weights_pos, weights_ori)
+            test_p_error_norm_all = np.linalg.norm(test_p_error_all,axis=1)
+
         # Forward pass
-        outputs = model(inputs_q2q3)
+        model.train()
+        optimizer.zero_grad() # set the gradients to zero
+        outputs = model(inputs_q2q3) # get the output
         # Compute loss
-        loss, p_error_all, ori_error_all = loss_fn(outputs, training_T, training_q, robot, param_nomimal, weights_pos, weights_ori)
+        loss, p_error_all, ori_error_all = loss_fn(outputs, training_T, training_q, robot, param_nominal, weights_pos, weights_ori)
+        p_error_norm_all = np.linalg.norm(p_error_all,axis=1)
 
         # Backward pass and optimization
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
+        loss.backward() # compute the gradients
+        optimizer.step() # update the weights
 
         # Print the loss for every N epochs
         print_loss = False
-        if epoch<1001:
-            if (epoch+1) % 10 == 0:
+        if epoch<101:
+            if (epoch+1) % 1 == 0:
                 print_loss = True
         else:
             if (epoch+1) % 100 == 0:
                 print_loss = True
         if print_loss:
             print(f'Epoch [{epoch+1}/{num_epochs}], Loss: {loss.item():.4f}, Test Loss: {test_loss.item():.4f}')
-            print(f'Train error: mean={np.mean(p_error_all):.4f}, max={np.max(p_error_all):.4f}')
-            print(f'Test error: mean={np.mean(test_p_error_all):.4f}, max={np.max(test_p_error_all):.4f}')
+            print(f'Train error: mean={np.mean(p_error_norm_all):.4f}, max={np.max(p_error_norm_all):.4f}')
+            print(f'Test error: mean={np.mean(test_p_error_norm_all):.4f}, max={np.max(test_p_error_norm_all):.4f}')
         # save model if the test loss is the best
         if best_loss > test_loss.item():
             best_loss = test_loss.item()
@@ -188,18 +214,19 @@ def train(training_q, training_T_data, testing_q, testing_T,robot,param_nomimal)
         np.save(folder_path+'loss_all.npy',np.array(loss_all)) # save the loss
         np.save(folder_path+'test_loss_all.npy',np.array(test_loss_all)) # save the test loss
         # save the model if the training error is the best
-        if best_training_error > np.max(p_error_all):
-            best_training_error = np.max(p_error_all)
+        if best_training_error > np.max(p_error_norm_all):
+            best_training_error = np.max(p_error_norm_all)
             torch.save(model.state_dict(), folder_path+'best_training_model.pt')
         # save the model if the testing error is the best
-        if best_testing_error > np.max(test_p_error_all):
-            best_testing_error = np.max(test_p_error_all)
+        if best_testing_error > np.max(test_p_error_norm_all):
+            best_testing_error = np.max(test_p_error_norm_all)
             torch.save(model.state_dict(), folder_path+'best_testing_model.pt')
         # save the training and testing position error
-        training_mean_error_all.append(np.mean(p_error_all))
-        testing_mean_error_all.append(np.mean(test_p_error_all))
-        training_max_error_all.append(np.max(p_error_all))
-        testing_max_error_all.append(np.max(test_p_error_all))
+        training_mean_error_all.append(np.mean(p_error_norm_all))
+        testing_mean_error_all.append(np.mean(test_p_error_norm_all))
+        training_max_error_all.append(np.max(p_error_norm_all))
+        testing_max_error_all.append(np.max(test_p_error_norm_all))
+        data_sample_epoches.append(epoch)
         np.save(folder_path+'training_mean_error_all.npy',np.array(training_mean_error_all))
         np.save(folder_path+'testing_mean_error_all.npy',np.array(testing_mean_error_all))
         np.save(folder_path+'training_max_error_all.npy',np.array(training_max_error_all))
@@ -251,7 +278,7 @@ robot.H_nominal=deepcopy(robot.robot.H)
 robot.P_nominal=robot.P_nominal.T
 robot.H_nominal=robot.H_nominal.T
 robot = get_H_param_axis(robot) # get the axis to parametrize H
-param_nomimal = np.array(np.reshape(robot.robot.P.T,-1).tolist()+[0]*12)
+param_nominal = np.array(np.reshape(robot.robot.P.T,-1).tolist()+[0]*12)
 
 #### using rigid body
 use_toolmaker=True
@@ -281,37 +308,47 @@ test_mocap_T = np.loadtxt(test_data_dir+'mocap_T_align.csv',delimiter=',')
 train_robot_q = np.loadtxt(PH_data_dir+'robot_q_align.csv',delimiter=',')
 train_mocap_T = np.loadtxt(PH_data_dir+'mocap_T_align.csv',delimiter=',')
 
+# randomly choose half of test data as training data
+# np.random.seed(0)
+# rand_index = np.random.permutation(len(test_robot_q))
+# train_robot_q = np.vstack((train_robot_q,test_robot_q[rand_index[:int(len(rand_index)/2)]]))
+# train_mocap_T = np.vstack((train_mocap_T,test_mocap_T[rand_index[:int(len(rand_index)/2)]]))
+# test_robot_q = test_robot_q[rand_index[int(len(rand_index)/2):]]
+# test_mocap_T = test_mocap_T[rand_index[int(len(rand_index)/2):]]
+
+train(train_robot_q,train_mocap_T,test_robot_q,test_mocap_T,robot,param_nominal)
+
 # split_index = len(train_robot_q)
 # test_robot_q = np.vstack((train_robot_q,test_robot_q))
 # test_mocap_T = np.vstack((train_mocap_T,test_mocap_T))
 
-calib_file_name = 'calib_PH_q_ana.pickle'
-with open(PH_data_dir+calib_file_name,'rb') as file:
-    PH_q=pickle.load(file)
+# calib_file_name = 'calib_PH_q_ana.pickle'
+# with open(PH_data_dir+calib_file_name,'rb') as file:
+#     PH_q=pickle.load(file)
 
-# ph_param_fbf=PH_Param(nom_P,nom_H)
-# ph_param_fbf.fit(PH_q,method='FBF')
+# # ph_param_fbf=PH_Param(nom_P,nom_H)
+# # ph_param_fbf.fit(PH_q,method='FBF')
 
-# get theta phi
-train_q=[]
-param_PH_q = []
-for qkey in PH_q.keys():
-    # NN data input: q2 q3
-    train_q.append(np.array(qkey))
-    # NN output: P H
-    this_H = PH_q[qkey]['H']
-    param_H = []
-    for i,h in enumerate(this_H.T):
-        theta_sol = subproblem2(nom_H[:,i], h, robot.param_k2[i], robot.param_k1[i])
-        theta_sol = theta_sol[0] if theta_sol[0][0]<np.pi/2 and theta_sol[0][0]>-np.pi/2 else theta_sol[1]
-        param_H.extend(theta_sol[::-1])
-    param_PH = np.array(np.reshape(PH_q[qkey]['P'].T,-1).tolist()+param_H)
-    param_PH_q.append(param_PH-param_nomimal) # relative to nominal, predict the difference
+# # get theta phi
+# train_q=[]
+# param_PH_q = []
+# for qkey in PH_q.keys():
+#     # NN data input: q2 q3
+#     train_q.append(np.array(qkey))
+#     # NN output: P H
+#     this_H = PH_q[qkey]['H']
+#     param_H = []
+#     for i,h in enumerate(this_H.T):
+#         theta_sol = subproblem2(nom_H[:,i], h, robot.param_k2[i], robot.param_k1[i])
+#         theta_sol = theta_sol[0] if theta_sol[0][0]<np.pi/2 and theta_sol[0][0]>-np.pi/2 else theta_sol[1]
+#         param_H.extend(theta_sol[::-1])
+#     param_PH = np.array(np.reshape(PH_q[qkey]['P'].T,-1).tolist()+param_H)
+#     param_PH_q.append(param_PH-param_nominal) # relative to nominal, predict the difference
 
-## NN input: training q, 2x1
-## NN output: training param_PH, 33x1
-## train the NN
-train(np.array(train_q),np.array(param_PH_q),train_robot_q,train_mocap_T,test_robot_q,test_mocap_T,robot,param_nomimal)
+# ## NN input: training q, 2x1
+# ## NN output: training param_PH, 33x1
+# ## train the NN
+# train(np.array(train_q),np.array(param_PH_q),train_robot_q,train_mocap_T,test_robot_q,test_mocap_T,robot,param_nominal)
 
 
         
