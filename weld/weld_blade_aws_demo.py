@@ -271,13 +271,21 @@ while True:
 			break
 		q1_cur=fb_data.group_state[0].feedback_position
 		positioner_cur=fb_data.group_state[2].feedback_position
-		###get scan data
+		###get scan data >1% intensity and >50mm in Z
 		wire_packet=scan_change.TryGetInValue()
 		valid_indices=np.where(wire_packet[1].I_data>1)[0]
 		valid_indices=np.intersect1d(valid_indices,np.where(np.abs(wire_packet[1].Z_data)>50)[0])
 		line_profile=np.hstack((wire_packet[1].Y_data[valid_indices].reshape(-1,1),wire_packet[1].Z_data[valid_indices].reshape(-1,1)))
 		#filter Y within +/10mm
 		line_profile=line_profile[np.where(np.abs(line_profile[:,0])<10)]
+		#NEW: filter through number of neighbors
+		outlier_indices=[]
+		for i in range(1,len(line_profile)-1):
+			distances=np.linalg.norm(line_profile-line_profile[i],axis=1)
+			if np.sum(distances<2)<5:
+				outlier_indices.append(i)
+		line_profile=np.delete(line_profile,outlier_indices,axis=0)
+		#guassian filter
 		line_profile = gaussian_filter1d(line_profile, sigma=0.2)
 		points_new_cam_frame=np.vstack((np.zeros(len(line_profile)),line_profile.T)).T
 		

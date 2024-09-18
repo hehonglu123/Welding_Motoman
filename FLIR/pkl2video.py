@@ -5,7 +5,7 @@ sys.path.append('../toolbox/')
 from flir_toolbox import *
 
 # Load the IR recording data from the pickle file
-data_dir='../../recorded_data/ER316L/streaming/right_triangle/video_bf_ol_v10_f100'
+data_dir='../../recorded_data/ER316L/streaming/right_triangle/video_bf_T25000'
 with open(data_dir+'/ir_recording.pickle', 'rb') as file:
     ir_recording = pickle.load(file)
 ir_ts=np.loadtxt(data_dir+'/ir_stamps.csv', delimiter=',')
@@ -20,12 +20,13 @@ fps = 30  # Frames per second
 fourcc = cv2.VideoWriter_fourcc(*'mp4v')
 out = cv2.VideoWriter(output_file, fourcc, fps, (frame_width, frame_height))
 
+MAX_THRESHOLD = 30000
 # Loop through each frame and write to the video
 for i in range(len(ir_recording)):
     ir_image = np.rot90(ir_recording[i], k=-1)
 
     # Normalize the IR image
-    ir_normalized = ((ir_image - np.min(ir_image)) / (np.max(ir_image) - np.min(ir_image))) * 255
+    ir_normalized = ((ir_image - np.min(ir_image)) / (MAX_THRESHOLD - np.min(ir_image))) * 255
     ir_normalized = np.clip(ir_normalized, 0, 255)
 
     # Convert the IR image to BGR format with the inferno colormap
