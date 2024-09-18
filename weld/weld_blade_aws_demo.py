@@ -34,12 +34,12 @@ layer_width_num=int(4/slicing_meta['line_resolution'])
 
 weld_arcon=True
 # #######################################ER4043########################################################
-# job_offset=200
-# vd_relative=8
-# feedrate_cmd=110
-# base_vd_relative=5
-# base_feedrate_cmd=250
-# layer_height_num=int(1.45/slicing_meta['line_resolution'])
+job_offset=200
+vd_relative=8
+feedrate_cmd=150
+base_vd_relative=3
+base_feedrate_cmd=300
+layer_height_num=int(1.2/slicing_meta['line_resolution'])
 
 #######################################ER70S-6########################################################
 # job_offset=300
@@ -58,12 +58,12 @@ weld_arcon=True
 # layer_height_num=int(1.5/slicing_meta['line_resolution'])
 
 #######################################ER316L THICK########################################################
-job_offset=450
-vd_relative=7
-feedrate_cmd=140
-base_vd_relative=5
-base_feedrate_cmd=250
-layer_height_num=int(1.4/slicing_meta['line_resolution'])
+# job_offset=450
+# vd_relative=7
+# feedrate_cmd=140
+# base_vd_relative=5
+# base_feedrate_cmd=250
+# layer_height_num=int(1.4/slicing_meta['line_resolution'])
 
 
 robot=robot_obj('MA2010_A0',def_path='../config/MA2010_A0_robot_default_config.yml',tool_file_path='../config/torch.csv',\
@@ -148,14 +148,17 @@ primitives=[]
 
 
 num_layer_start=int(0*layer_height_num)
-num_layer_end=int(55*layer_height_num)
+num_layer_end=int(60*layer_height_num)
 curve_slices_pc=[]
 num_sections=1
 for layer in range(num_layer_start,num_layer_end,layer_height_num):
 	num_sections_prev=num_sections
 	num_sections=len(glob.glob(data_dir+'curve_sliced_relative/slice'+str(layer)+'_*.csv'))
 
+
 	###############DETERMINE SECTION ORDER###########################
+	if num_sections==0:
+		break
 	if num_sections==1:
 		sections=[0]
 	else:
@@ -268,6 +271,7 @@ while True:
 	res, fb_data = client.fb.try_receive_state_sync(client.controller_info, 0.001)
 	if res:
 		if fb_data.controller_flags & 0x08 == 0 and counts>1000:
+			client.servoMH(False)
 			break
 		q1_cur=fb_data.group_state[0].feedback_position
 		positioner_cur=fb_data.group_state[2].feedback_position
@@ -278,11 +282,11 @@ while True:
 		line_profile=np.hstack((wire_packet[1].Y_data[valid_indices].reshape(-1,1),wire_packet[1].Z_data[valid_indices].reshape(-1,1)))
 		#filter Y within +/10mm
 		line_profile=line_profile[np.where(np.abs(line_profile[:,0])<10)]
-		#NEW: filter through number of neighbors
+		#NEW: filter through number of neighbors 2d
 		outlier_indices=[]
 		for i in range(1,len(line_profile)-1):
 			distances=np.linalg.norm(line_profile-line_profile[i],axis=1)
-			if np.sum(distances<2)<5:
+			if np.sum(distances<2)<10:
 				outlier_indices.append(i)
 		line_profile=np.delete(line_profile,outlier_indices,axis=0)
 		#guassian filter
@@ -298,28 +302,32 @@ while True:
 		points_new=(H_cam2positioner[:3,:3]@points_new_cam_frame.T+H_cam2positioner[:3,3].reshape(3,1)).T
 		
 		###3d filtering based on Z
-		valid_indices=np.where(points_new[:,2]>-10)[0]
+		valid_indices=np.where(points_new[:,2]>-5)[0]
 		points_new=points_new[valid_indices]
 		###3d filtering based on distances to original blade
 		valid_indices=[]
 		for i in range(len(points_new)):
-			distances=np.linalg.norm(curve_sliced_pc-points_new[i],axis=1)
-			if np.min(distances)<20:
+			distances_w_original=np.linalg.norm(curve_sliced_pc-points_new[i],axis=1)
+			if np.min(distances_w_original)<20:
 				valid_indices.append(i)
+			# distances_w_existing=np.linalg.norm(all_points-points_new[i],axis=1)
+			# if np.min(distances_w_original)<20 and np.sum(distances_w_existing<5)<20:
+			# 	valid_indices.append(i)
 		points_new=points_new[valid_indices]
 
 		all_points = np.vstack((np.asarray(pcd.points), points_new)) if counts > 0 else points_new
-		# ####scatter in plt first
-		# fig = plt.figure()
-		# ax = fig.add_subplot(111, projection='3d')
-		# ax.scatter(all_points[:,0], all_points[:,1], all_points[:,2], c='r', marker='o')
-		# ax.scatter(first_layer[:,0], first_layer[:,1], first_layer[:,2], c='b', marker='o')
-		# set_axes_equal(ax)
-		# plt.show()
+
 
 		counts+=1
 
 	pcd.points = o3d.utility.Vector3dVector(all_points)
+	###3d cluster filtering
+	# labels = np.array(pcd.cluster_dbscan(eps=0.75, min_points=50, print_progress=False))
+	# pcd=pcd.select_by_index(np.argwhere(labels>=0))
+	
+	###outliers removing
+	# cl, ind = pcd.remove_statistical_outlier(nb_neighbors=20, std_ratio=100.0)
+	# pcd = pcd.select_by_index(ind)
 
 	# Downsample the point cloud if the number of points exceeds the threshold
 	# if len(pcd.points) > total_points_threshold:
@@ -331,3 +339,5 @@ while True:
 	vis.update_renderer()
 	
 	
+
+input("Press Enter to quit...")
