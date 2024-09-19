@@ -36,10 +36,10 @@ weld_arcon=True
 # #######################################ER4043########################################################
 job_offset=200
 vd_relative=8
-feedrate_cmd=150
+feedrate_cmd=110
 base_vd_relative=3
 base_feedrate_cmd=300
-layer_height_num=int(1.2/slicing_meta['line_resolution'])
+layer_height_num=int(1.15/slicing_meta['line_resolution'])
 
 #######################################ER70S-6########################################################
 # job_offset=300
@@ -136,8 +136,10 @@ ws.weld_segment_dual(primitives,robot,positioner,q1_all,q2_all,v1_all,10*np.ones
 ###far end
 # q_prev=np.array([-3.250117036572426343e-01,8.578573591937989073e-01,5.007170842167016911e-01,4.055312631131529622e-01,-1.119412117298938414e+00,-1.407346519936740536e+00])
 ###close end
-q_prev=np.array([-3.791544713877046391e-01,7.156749523014762637e-01,2.756772964158371586e-01,2.106493295914119712e-01,-7.865937103692784982e-01,-5.293956242391706368e-01])
+# q_prev=np.array([-3.791544713877046391e-01,7.156749523014762637e-01,2.756772964158371586e-01,2.106493295914119712e-01,-7.865937103692784982e-01,-5.293956242391706368e-01])
+q_prev=np.array([-0.35223283,  0.69407904,  0.30906425,  0.40782731, -1.21226259, -1.72635375])
 # q_prev=client.getJointAnglesMH(robot.pulse2deg)
+
 
 q1_all=[]
 positioner_all=[]
@@ -148,7 +150,7 @@ primitives=[]
 
 
 num_layer_start=int(0*layer_height_num)
-num_layer_end=int(60*layer_height_num)
+num_layer_end=int(70*layer_height_num)
 curve_slices_pc=[]
 num_sections=1
 for layer in range(num_layer_start,num_layer_end,layer_height_num):
@@ -166,7 +168,7 @@ for layer in range(num_layer_start,num_layer_end,layer_height_num):
 		rob1_js_first=np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(layer)+'_0.csv',delimiter=',')
 		rob1_js_last=np.loadtxt(data_dir+'curve_sliced_js/MA2010_js'+str(layer)+'_'+str(num_sections-1)+'.csv',delimiter=',')
 		endpoints=np.array([rob1_js_first[0],rob1_js_first[-1],rob1_js_last[0],rob1_js_last[-1]])
-		clost_idx=np.argmin(np.linalg.norm(endpoints-q_prev,axis=1))
+		clost_idx=np.argmin(np.linalg.norm(endpoints[:,:5]-q_prev[:5],axis=1))
 		if clost_idx>1:
 			sections=reversed(range(num_sections))
 		else:
@@ -188,15 +190,16 @@ for layer in range(num_layer_start,num_layer_end,layer_height_num):
 		num_points_layer=max(2,int(lam_relative[-1]/waypoint_distance))
 
 		###find which end to start
-		if np.linalg.norm(q_prev-rob1_js[0])<np.linalg.norm(q_prev-rob1_js[-1]):
+		if np.linalg.norm(q_prev[:3]-rob1_js[0][:3])<np.linalg.norm(q_prev[:3]-rob1_js[-1][:3]):
 			breakpoints=np.linspace(0,len(rob1_js)-1,num=num_points_layer).astype(int)
 		else:
 			breakpoints=np.linspace(len(rob1_js)-1,0,num=num_points_layer).astype(int)
 
+		# print(breakpoints)
 		s1_all,_=calc_individual_speed(vd_relative,lam1,lam2,lam_relative,breakpoints)
 		
 		###move to intermidieate waypoint for collision avoidance if multiple section
-		if num_sections>1 or num_sections<num_sections_prev:
+		if num_sections>1 or num_sections<num_sections_prev or layer==int(1*layer_height_num):
 			waypoint_pose=robot.fwd(rob1_js[breakpoints[0]])
 			waypoint_pose.p[-1]+=30
 			waypoint_q=robot.inv(waypoint_pose.p,waypoint_pose.R,rob1_js[breakpoints[0]])[0]
@@ -216,9 +219,8 @@ for layer in range(num_layer_start,num_layer_end,layer_height_num):
 		primitives.extend(['movej']+['movel']*(num_points_layer-1))
 
 
-		q_prev=rob1_js[breakpoints[-1]]
+		q_prev=copy.deepcopy(q1_all[-1])
 	
-
 
 ws.weld_segment_tri(primitives,robot,positioner,robot2,q1_all,positioner_all,q2_all,v1_all,v1_all,cond_all,arc=weld_arcon,blocking=False)
 ####################################################Real Time PCD Update############################################
@@ -242,8 +244,12 @@ obj = sub.GetDefaultClientWait(2)		#connect, timeout=2s
 scan_change=sub.SubscribeWire("lineProfile")
 sub.ClientConnectFailed += connect_failed
 
+# get matplotlib color map
+cmap = plt.get_cmap('jet')
+estimated_max_height = 65
 
 all_points=np.loadtxt(data_dir+'curve_sliced_relative/slice0_0.csv',delimiter=',')[:,:3]
+all_points_color = np.tile(cmap(np.mean(all_points[:,2]) / estimated_max_height)[:3], (len(all_points), 1))
 
 
 # Create a visualizer window
@@ -316,11 +322,13 @@ while True:
 		points_new=points_new[valid_indices]
 
 		all_points = np.vstack((np.asarray(pcd.points), points_new)) if counts > 0 else points_new
+		all_points_color = np.vstack((np.asarray(pcd.colors), np.tile(cmap(np.mean(points_new[:,2]) / estimated_max_height)[:3], (len(points_new), 1)))) if counts > 0 else np.tile(cmap(np.mean(points_new[:,2]) / estimated_max_height)[:3], (len(points_new), 1))
 
 
 		counts+=1
 
 	pcd.points = o3d.utility.Vector3dVector(all_points)
+	pcd.colors = o3d.utility.Vector3dVector(all_points_color)
 	###3d cluster filtering
 	# labels = np.array(pcd.cluster_dbscan(eps=0.75, min_points=50, print_progress=False))
 	# pcd=pcd.select_by_index(np.argwhere(labels>=0))
@@ -338,6 +346,12 @@ while True:
 	vis.poll_events()
 	vis.update_renderer()
 	
-	
+while True:
+	try:
+		# Update the visualizer
+		vis.update_geometry(pcd)
+		vis.poll_events()
+		vis.update_renderer()
+	except:
+		break
 
-input("Press Enter to quit...")
