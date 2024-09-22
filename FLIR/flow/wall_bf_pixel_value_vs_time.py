@@ -8,8 +8,8 @@ from ultralytics import YOLO
 
 
 # Load the IR recording data from the pickle file
-data_dir='../../../recorded_data/ER316L/streaming/right_triangle/bf_T25000/'
-# data_dir='../../../recorded_data/ER316L/streaming/wall2/bf_ol_v10_f100/'
+# data_dir='../../../recorded_data/ER316L/streaming/right_triangle/bf_T25000/'
+data_dir='../../../recorded_data/ER316L/streaming/right_triangle/bf_ol_v10_f100/'
 # data_dir='../../../recorded_data/ER316L/streaming/wall2/bf_T25000/'
 
 config_dir='../../config/'
@@ -52,7 +52,8 @@ throw_away_idx=[]
 for i in range(len(idle_time_interval)):
     throw_away_idx.append(np.where((ir_ts>=idle_time_interval[i][0]) & (ir_ts<=idle_time_interval[i][1]))[0])
 
-throw_away_idx=np.concatenate(throw_away_idx)
+if len(throw_away_idx)>0:
+    throw_away_idx=np.concatenate(throw_away_idx)
 
 # ir_ts=np.delete(ir_ts,throw_away_idx)
 ir_recording=np.delete(ir_recording,throw_away_idx,axis=0)
@@ -89,9 +90,10 @@ for i in range(frames_per_process,len(pixel_value_all)):
         pixel_value_all_processed.append(np.mean(pixel_value_all[i-frames_per_process:i]))
         ir_ts_processed_new.append(ir_ts_processed[i])
 
-pixel_value_all=moving_average(pixel_value_all,n=31,padding=True)
-plt.title('Pixel Value vs Time ')
+pixel_value_all=moving_average(pixel_value_all,n=3,padding=True)
+plt.title('Pixel Value All Layers')
 plt.plot(ir_ts_processed_new, pixel_value_all_processed)
 plt.xlabel('Time (s)')
 plt.ylabel('Pixel Value')
+plt.ylim([19000,29000])
 plt.show()
