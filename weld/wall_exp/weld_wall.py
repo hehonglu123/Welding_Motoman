@@ -65,4 +65,4 @@ for i in range(2,10):
 	cond_all.extend([0,int(feedrate/10+job_offset)])
 
 
-ws.weld_segment_single(primitives,robot,q_all,v_all,cond_all,arc=True,wait=0.)
+ws.weld_segment_single(primitives,robot,q_all,v_all,cond_all,arc=False,wait=0.)

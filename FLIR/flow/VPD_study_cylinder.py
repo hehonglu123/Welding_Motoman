@@ -14,7 +14,11 @@ tip_wire_model = YOLO(os.path.dirname(inspect.getfile(flir_toolbox))+"/tip_wire.
 VPD=10
 vertical_offset=3
 horizontal_offset=0
-for v in tqdm(range(5,21)):
+
+pixel_value_avg_all=[]
+pixel_value_std_all=[]
+v_all=np.arange(5,21)
+for v in tqdm(v_all):
     # Load the IR recording data from the pickle file
     data_dir='../../../recorded_data/ER316L/VPD%i/tubespiral_%iipm_v%i/'%(VPD,VPD*v,v)
 
@@ -52,7 +56,8 @@ for v in tqdm(range(5,21)):
             ir_ts_processed.append(ir_ts[i])
 
 
-
+    pixel_value_avg_all.append(np.mean(pixel_value_all))
+    pixel_value_std_all.append(np.std(pixel_value_all))
     print("Average pixel value: ", np.mean(pixel_value_all))
     plt.title('Pixel Value vs Time ')
     plt.plot(ir_ts_processed, pixel_value_all)
@@ -64,3 +69,9 @@ for v in tqdm(range(5,21)):
     plt.savefig('pixel_value_vs_time_%iipm_v%i.png'%(VPD*v,v))
     plt.clf()
 
+
+plt.errorbar(v_all, pixel_value_avg_all, yerr=pixel_value_std_all, fmt='-o', capsize=5)
+plt.xlabel('Speed (mm/s)')
+plt.ylabel('Pixel Value')
+plt.title('Pixel Value for 20 layers')
+plt.show()

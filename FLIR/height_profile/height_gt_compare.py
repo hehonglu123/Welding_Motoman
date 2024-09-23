@@ -17,7 +17,7 @@ robot=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.
 robot2=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.yml',tool_file_path=config_dir+'flir.csv',\
 	pulse2deg_file_path=config_dir+'MA1440_A0_pulse2deg_real.csv',base_transformation_file=config_dir+'MA1440_pose.csv')
 positioner=positioner_obj('D500B',def_path=config_dir+'D500B_robot_default_config.yml',tool_file_path=config_dir+'positioner_tcp.csv',\
-	pulse2deg_file_path=config_dir+'D500B_pulse2deg_real.csv',base_transformation_file=config_dir+'D500B_pose_mocap.csv')
+	pulse2deg_file_path=config_dir+'D500B_pulse2deg_real.csv',base_transformation_file=config_dir+'D500B_pose.csv')
 
 flir_intrinsic=yaml.load(open(config_dir+'FLIR_A320.yaml'), Loader=yaml.FullLoader)
 
@@ -145,6 +145,7 @@ target.paint_uniform_color([0, 0, 1])  # Green color for target
 o3d.visualization.draw_geometries([target,source])
 
 
+
 # plt.plot(np.asarray(source.points)[:,0],np.asarray(source.points)[:,1],c='r',label='IR Flame Detection')
 # plt.plot(np.asarray(target.points)[:,0],np.asarray(target.points)[:,1],c='b',label='MTI Scanning')
 # plt.title('Height Profile Comparison')
@@ -152,3 +153,12 @@ o3d.visualization.draw_geometries([target,source])
 # plt.ylabel('Z')
 # plt.legend()
 # plt.show()
+
+
+###################################WORST CASE ERROR CALCULATION##############################################
+error_all=[]
+for point in np.asarray(source.points):
+    distances=np.linalg.norm(np.asarray(target.points)-point,axis=1)
+    error_all.append(np.min(distances))
+error_all=np.array(error_all)
+print('Worst case error: ',np.max(error_all))

@@ -28,8 +28,8 @@ target_points=o3d.geometry.PointCloud()
 target_points.points=o3d.utility.Vector3dVector(target_points_pc)
 
 
-# scanned_dir='../../recorded_data/ER316L/streaming/'+dataset+'/bf_ol_v10_f100/'
-scanned_dir='../../recorded_data/ER316L/streaming/'+dataset+'/bf_T24000/'
+scanned_dir='../../recorded_data/ER316L/streaming/'+dataset+'/bf_ol_v10_f100/'
+# scanned_dir='../../recorded_data/ER316L/streaming/'+dataset+'/bf_T24000/'
 ######## read the scanned stl
 scanned_mesh = o3d.io.read_triangle_mesh(scanned_dir+'scan.stl')
 scanned_mesh.compute_vertex_normals()
@@ -56,11 +56,20 @@ reg_p2p = o3d.pipelines.registration.registration_icp(
             o3d.pipelines.registration.TransformationEstimationPointToPoint(),
             o3d.pipelines.registration.ICPConvergenceCriteria(max_iteration=max_iteration))
 H = reg_p2p.transformation
+
+#############MANUAL H ADJUSTMENT FOR OL TRIANGULAR WALL#############
+# H_new=np.eye(4)
+# H_new[:3,:3]=Ry(-np.pi/35)@H[:3,:3]
+# H_new[:3,3]=H[:3,3]+np.array([2,0,-5])
+##################################################################
+
+
 scanned_points=scanned_points.transform(H)
-
-
 target_points_transform=np.array(target_points.points)
 scanned_points_tranform=np.array(scanned_points.points)
+
+# print(np.max(scanned_points_tranform[:,2]),np.max(target_points_transform[:,2]))
+
 ###thresholding top layers
 scanned_points_tranform=scanned_points_tranform[scanned_points_tranform[:,2]<height_threshold]
 

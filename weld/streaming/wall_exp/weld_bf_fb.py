@@ -37,13 +37,13 @@ def layer_idle_monitoring(rr_sensors,threshold):
 def main():
 	global ir_updated_flag, ir_process_packet
 
-	dataset='wall2/'
+	dataset='right_triangle/'
 	sliced_alg='dense_slice/'
 	data_dir='../../../../geometry_data/'+dataset+sliced_alg
 	with open(data_dir+'slicing.yml', 'r') as file:
 		slicing_meta = yaml.safe_load(file)
 
-	open_loop=False
+	open_loop=True
 	weld_arcon=True
 
 	##############################################################SENSORS####################################################################
@@ -72,7 +72,7 @@ def main():
 	robot2_flir_imaging=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.yml',tool_file_path=config_dir+'flir_imaging.csv',\
 		pulse2deg_file_path=config_dir+'MA1440_A0_pulse2deg_real.csv',base_transformation_file=config_dir+'MA1440_pose.csv')
 	positioner=positioner_obj('D500B',def_path=config_dir+'D500B_robot_extended_config.yml',tool_file_path=config_dir+'positioner_tcp.csv',\
-		pulse2deg_file_path=config_dir+'D500B_pulse2deg_real.csv',base_transformation_file=config_dir+'D500B_pose_mocap.csv')
+		pulse2deg_file_path=config_dir+'D500B_pulse2deg_real.csv',base_transformation_file=config_dir+'D500B_pose.csv')
 
 	###define start pose for 3 robtos
 	measure_distance=500
@@ -353,9 +353,9 @@ def main():
 	js_recording = SS.stop_recording()
 
 	if not open_loop:
-		recorded_dir='../../../../recorded_data/ER316L/streaming/'+dataset+'bf_T%i/'%(nominal_pixel_reading)
+		recorded_dir='../../../../recorded_data/ER316L/streaming/'+dataset+'video_bf_T%i/'%(nominal_pixel_reading)
 	else:
-		recorded_dir='../../../../recorded_data/ER316L/streaming/'+dataset+'bf_ol_v%i_f%i/'%(v_layer,layer_feedrate)
+		recorded_dir='../../../../recorded_data/ER316L/streaming/'+dataset+'video_bf_ol_v%i_f%i/'%(v_layer,layer_feedrate)
 
 	os.makedirs(recorded_dir,exist_ok=True)
 	np.savetxt(recorded_dir+'weld_js_cmd.csv',np.array(q_cmd_all),delimiter=',')
