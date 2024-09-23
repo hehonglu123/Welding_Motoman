@@ -4,8 +4,9 @@ import sys
 sys.path.append('../../redundancy_resolution/')
 sys.path.append('../redundancy_resolution/')
 sys.path.append('../scan_tools/')
-from motoman_def import *
-from dual_robot import *
+# from motoman_def import *
+from robot_def import *
+# from dual_robot import *
 from lambda_calc import *
 from scan_utils import *
 from scan_continuous import *
