@@ -62,30 +62,44 @@ zero_config=np.zeros(6)
 config_dir='../../config/'
 robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',d=15,tool_file_path=config_dir+'torch.csv',\
     pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',\
-    base_marker_config_file=config_dir+'MA2010_marker_config.yaml',tool_marker_config_file=config_dir+'weldgun_marker_config.yaml')
+    base_marker_config_file=config_dir+'MA2010_marker_config/MA2010_marker_config.yaml',tool_marker_config_file=config_dir+'weldgun_marker_config/weldgun_marker_config.yaml')
 robot_scan=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path=config_dir+'fujicam.csv',\
     pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv')
 robot_flir=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.yml',tool_file_path=config_dir+'flir.csv',\
 	pulse2deg_file_path=config_dir+'MA1440_A0_pulse2deg_real.csv',base_transformation_file=config_dir+'MA1440_pose.csv')
 positioner=positioner_obj('D500B',def_path=config_dir+'D500B_robot_default_config.yml',tool_file_path=config_dir+'positioner_tcp.csv',\
     base_transformation_file=config_dir+'D500B_pose.csv',pulse2deg_file_path=config_dir+'D500B_pulse2deg_real.csv',\
-    base_marker_config_file=config_dir+'D500B_marker_config.yaml',tool_marker_config_file=config_dir+'positioner_tcp_marker_config.yaml')
+    base_marker_config_file=config_dir+'D500B_marker_config/D500B_marker_config.yaml',tool_marker_config_file=config_dir+'positioner_tcp_marker_config/positioner_tcp_marker_config.yaml')
 
 Table_home_T = positioner.fwd(np.radians([-15,180]))
-T_S1TCP_R1Base = np.linalg.inv(np.matmul(positioner.base_H,H_from_RT(Table_home_T.R,Table_home_T.p)))
-T_R1Base_S1TCP = np.linalg.inv(T_S1TCP_R1Base)
+S1_base_T = Transform(positioner.base_H[:3,:3],positioner.base_H[:3,-1])
+T_S1TCP_R1Base = S1_base_T*Table_home_T
+T_R1Base_S1TCP = T_S1TCP_R1Base.inv()
 
-print("T_R1Base_S1TCP:",T_R1Base_S1TCP)   
-
-# p_top = np.zeros(3)
-# R_top = np.eye(3)
-
-exit()
+### the laser scanner is lagging about 33 mm in y direction
+# print("Robot Weld TCP:",robot_weld.fwd(np.zeros(6)))
+# scan_tcp = robot_scan.fwd(np.zeros(6))
+# print("Robot Scan TCP:",robot_scan.fwd(np.zeros(6)))
+# print("Robot Scan TCP adjust:",scan_tcp.p + scan_tcp.R[:,-1]*110)
+# print(T_S1TCP_R1Base)
+# p_relative = np.array([0,0,0])
+# R = np.array([[0,1,0],[1,0,0],[0,0,-1]]).T
+# T_test_R1 = Transform(T_S1TCP_R1Base.R@R,T_S1TCP_R1Base.R@p_relative+T_S1TCP_R1Base.p)
+# print("Test R1:",T_test_R1)
+# j_test = robot_weld.inv(T_test_R1.p,T_test_R1.R,zero_config)[0]
+# print("Test joint:",j_test)
+# T_scan_R1 = robot_scan.fwd(j_test)
+# T_scan_S1 = Transform(T_R1Base_S1TCP.R@T_scan_R1.R,T_R1Base_S1TCP.R@T_scan_R1.p+T_R1Base_S1TCP.p)
+# print("Test Scan:",T_scan_S1)
+# print("Test Scan Adjust:",T_scan_S1.p+T_scan_S1.R[:,-1]*109)
+# exit()
 
 #### Welding Parameters ####
 total_base_layer = 2
 total_weld_layer = 10
 weld_arcon=False
+
+nominal_base_height = 3
 
 torch_angle = 0 # 0, 40,-40
 ############################
@@ -104,6 +118,10 @@ to_home_speed=5
 # ir pose
 r2_ir_q = np.radians([43.3469,36.0996,-63.0900,142.5838,-83.0429,-96.0737])
 r2_mid = np.radians([43.7851,20,-10,0,0,0])
+
+slice_dp=0.025
+laser_lagging=33
+laser_lagging_N = int(laser_lagging/slice_dp)
 ##################################
 
 ####### Data parameters #######
@@ -124,18 +142,14 @@ print('Feedrate:',feedrate_cmd)
 print("Moving start/home speed:",to_start_speed,to_home_speed)
 
 ## rr drivers and all other drivers
-robot_client=MotionProgramExecClient()
-ws=WeldSend(robot_client)
-# weld state logging
-weld_ser = RRN.SubscribeService('rr+tcp://192.168.55.10:60823?service=welder')
-cam_ser=RRN.ConnectService('rr+tcp://192.168.55.10:60827/?service=camera')
-mic_ser = RRN.ConnectService('rr+tcp://192.168.55.20:60828?service=microphone')
-## RR sensor objects
-rr_sensors = WeldRRSensor(weld_service=weld_ser,cam_service=cam_ser,microphone_service=mic_ser)
-
-# MTI connect to RR
-mti_client = RRN.ConnectService("rr+tcp://192.168.55.10:60830/?service=MTI2D")
-mti_client.setExposureTime("25")
+# robot_client=MotionProgramExecClient()
+# ws=WeldSend(robot_client)
+# # weld state logging
+# weld_ser = RRN.SubscribeService('rr+tcp://192.168.55.10:60823?service=welder')
+# cam_ser=RRN.ConnectService('rr+tcp://192.168.55.10:60827/?service=camera')
+# mic_ser = RRN.ConnectService('rr+tcp://192.168.55.20:60828?service=microphone')
+# ## RR sensor objects
+# rr_sensors = WeldRRSensor(weld_service=weld_ser,cam_service=cam_ser,microphone_service=mic_ser)
 
 ### test sensor (camera, microphone)
 if test_sensor_only:
@@ -146,12 +160,44 @@ if test_sensor_only:
 ###############
 
 ## pre-generate robot joint path
+curve_RWeld_js_layers = []
+curve_slice_relative_layers = []
 for base_i in range(total_base_layer):
-    pass
+    print(base_i)
+    curve_sliced_relative_start = np.array([-42.5,0,base_i*nominal_base_height])
+    curve_sliced_relative_end = np.array([42.5,0,base_i*nominal_base_height])
+    if base_i%2==1:
+        curve_sliced_relative_start,curve_sliced_relative_end = curve_sliced_relative_end,curve_sliced_relative_start
+    
+    slice_N = int(np.linalg.norm(curve_sliced_relative_end-curve_sliced_relative_start)/slice_dp)
+    curve_slice_relative_p = np.linspace(curve_sliced_relative_start,curve_sliced_relative_end,slice_N)
+    # get Rotation matrix and solve joint angles
+    curve_js = [zero_config]
+    curve_slice_relative = []
+    for i,curve_p in enumerate(curve_slice_relative_p):
+        if i<=laser_lagging_N:
+            Ry = curve_slice_relative_p[0]-curve_slice_relative_p[laser_lagging_N]
+            Ry = Ry/np.linalg.norm(Ry)
+        else:
+            Ry = curve_slice_relative_p[i-laser_lagging_N]-curve_slice_relative_p[i]
+            Ry = Ry/np.linalg.norm(Ry)
+        Rz = np.array([0,0,-1])
+        Ry = Ry - np.dot(Ry,Rz)*Rz
+        Ry = Ry/np.linalg.norm(Ry)
+        Rx = np.cross(Ry,Rz)
+        # R_S1TCP = (np.array([Rx,Ry,Rz]).T)@rot([1,0,0],torch_angle)
+        R_S1TCP = np.array([Rx,Ry,Rz]).T
+        Target_R1Base = Transform(T_S1TCP_R1Base.R@R_S1TCP,T_S1TCP_R1Base.R@curve_p+T_S1TCP_R1Base.p)
+        print(Target_R1Base)
+        print(robot_weld.inv(Target_R1Base.p,Target_R1Base.R))
+        this_q = robot_weld.inv(Target_R1Base.p,Target_R1Base.R,curve_js[-1])[0]
+        curve_js.append(this_q)
+        curve_slice_relative.append(np.append(Target_R1Base.p,R2q(Target_R1Base.R)))
+    curve_js = curve_js[1:]
+    curve_RWeld_js_layers.append(curve_js)
+    curve_slice_relative_layers.append(curve_slice_relative)
 
-
-
-
+exit()
 ###################################
 base_layer = True
 profile_height=None
@@ -205,13 +251,13 @@ for i in range(0,end_layer):
         path_T=all_path_T[0]
         curve_sliced_relative=[]
         for path_p in path_T:
-            this_p = np.matmul(T_S1TCP_R1Base[:3,:3],path_p.p)+T_S1TCP_R1Base[:3,-1]
-            this_n = np.matmul(T_S1TCP_R1Base[:3,:3],path_p.R[:,-1])
+            this_p = np.matmul(T_S1TCP_R1Base.R,path_p.p)+T_S1TCP_R1Base.p
+            this_n = np.matmul(T_S1TCP_R1Base.R,path_p.R[:,-1])
             curve_sliced_relative.append(np.append(this_p,this_n))
         curve_sliced_relative=curve_sliced_relative[1:-1] # the start and end is for collision prevention
         print(path_T[0])
         print(curve_sliced_relative)
-        R_S1TCP = np.matmul(T_S1TCP_R1Base[:3,:3],path_p.R)
+        R_S1TCP = np.matmul(T_S1TCP_R1Base.R,path_p.R)
 
         #### Correction ####
         # TODO: Add fitering if near threshold
@@ -233,7 +279,7 @@ for i in range(0,end_layer):
                 h_target = mean_h+dh_last_layer
 
                 dh_direction = np.array([0,0,h_target-curve_sliced_relative[0][2]])
-                dh_direction_R1 = T_R1Base_S1TCP[:3,:3]@dh_direction
+                dh_direction_R1 = T_R1Base_S1TCP.R@dh_direction
 
                 for curve_i in range(len(curve_sliced_relative)):
                     curve_sliced_relative[curve_i][2]=h_target
@@ -293,8 +339,8 @@ for i in range(0,end_layer):
             # find curve in R1 frame
             path_T=[]
             for tcp_T in path_T_S1:
-                this_p = T_R1Base_S1TCP[:3,:3]@tcp_T.p+T_R1Base_S1TCP[:3,-1]
-                this_R = T_R1Base_S1TCP[:3,:3]@tcp_T.R
+                this_p = T_R1Base_S1TCP.R@tcp_T.p+T_R1Base_S1TCP.p
+                this_R = T_R1Base_S1TCP.R@tcp_T.R
                 path_T.append(Transform(this_R,this_p))
             # add path collision avoidance
             path_T.insert(0,Transform(path_T[0].R,path_T[0].p+np.array([0,0,10])))
