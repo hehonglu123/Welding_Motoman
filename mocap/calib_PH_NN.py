@@ -137,7 +137,10 @@ def train(inputs_q2q3, targets_PH, training_q, training_T, testing_q, testing_T,
     best_testing_error = 1e10
 
     training_start_time = time.time()
+    training_t_epoch = []
     for epoch in range(num_epochs):
+        epoch_start_time = time.time()
+
         # Forward pass
         outputs = model(inputs_q2q3)
         if weighted:
@@ -198,6 +201,12 @@ def train(inputs_q2q3, targets_PH, training_q, training_T, testing_q, testing_T,
             np.save(folder_path+'training_max_error_all.npy',np.array(training_max_error_all))
             np.save(folder_path+'testing_max_error_all.npy',np.array(testing_max_error_all))
             np.save(folder_path+'data_sample_epoches.npy',np.array(data_sample_epoches))
+
+        # training time for each epoch
+        epoch_end_time = time.time()
+        training_t_epoch.append(epoch_end_time-epoch_start_time)
+        print(f'Mean epoch time: {np.mean(training_t_epoch):.5f}, Total time: {epoch_end_time-training_start_time:.2f}')
+
     print('Training time:',time.time()-training_start_time)            
 
 Rx=np.array([1,0,0])

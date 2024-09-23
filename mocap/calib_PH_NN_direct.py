@@ -110,14 +110,14 @@ def train(training_q, training_T_data, testing_q, testing_T_data,robot,param_nom
 
     # Define the input size, hidden size, and output size
     input_size = 2
-    hidden_sizes = [400,400,400]
+    hidden_sizes = [200,200,200]
     output_size = 33
 
     # Create an instance of the neural network
     model = NeuralNetwork(input_size, output_size, hidden_sizes=hidden_sizes)
     # read model from previous trained
     # print("Load model from previous trained")
-    # model.load_state_dict(torch.load('PH_NN_results/train_200_200_lr0.02_2409161742/best_testing_model.pt'))
+    model.load_state_dict(torch.load('PH_NN_results/train_200_200_200_lr0.02_2409171041/best_testing_model.pt'))
     
 
     # Print the model architecture
@@ -172,7 +172,9 @@ def train(training_q, training_T_data, testing_q, testing_T_data,robot,param_nom
 
     print("Start training")
     training_start_time = time.time()
+    training_t_epoch = []
     for epoch in range(num_epochs):
+        epoch_start_time = time.time()
 
         # get testing data loss
         model.eval()
@@ -194,13 +196,13 @@ def train(training_q, training_T_data, testing_q, testing_T_data,robot,param_nom
         optimizer.step() # update the weights
 
         # Print the loss for every N epochs
-        print_loss = False
-        if epoch<101:
-            if (epoch+1) % 1 == 0:
-                print_loss = True
-        else:
-            if (epoch+1) % 100 == 0:
-                print_loss = True
+        print_loss = True
+        # if epoch<101:
+        #     if (epoch+1) % 1 == 0:
+        #         print_loss = True
+        # else:
+        #     if (epoch+1) % 100 == 0:
+        #         print_loss = True
         if print_loss:
             print(f'Epoch [{epoch+1}/{num_epochs}], Loss: {loss.item():.4f}, Test Loss: {test_loss.item():.4f}')
             print(f'Train error: mean={np.mean(p_error_norm_all):.4f}, max={np.max(p_error_norm_all):.4f}')
@@ -232,6 +234,11 @@ def train(training_q, training_T_data, testing_q, testing_T_data,robot,param_nom
         np.save(folder_path+'training_max_error_all.npy',np.array(training_max_error_all))
         np.save(folder_path+'testing_max_error_all.npy',np.array(testing_max_error_all))
         np.save(folder_path+'data_sample_epoches.npy',np.array(data_sample_epoches))
+
+        # training time for each epoch
+        epoch_end_time = time.time()
+        training_t_epoch.append(epoch_end_time-epoch_start_time)
+        print(f'Mean epoch time: {np.mean(training_t_epoch):.2f}, Total time: {epoch_end_time-training_start_time:.2f}')
             
     print('Training time:',time.time()-training_start_time)            
 
@@ -309,10 +316,10 @@ train_robot_q = np.loadtxt(PH_data_dir+'robot_q_align.csv',delimiter=',')
 train_mocap_T = np.loadtxt(PH_data_dir+'mocap_T_align.csv',delimiter=',')
 
 # randomly choose half of test data as training data
-# np.random.seed(0)
-# rand_index = np.random.permutation(len(test_robot_q))
-# train_robot_q = np.vstack((train_robot_q,test_robot_q[rand_index[:int(len(rand_index)/2)]]))
-# train_mocap_T = np.vstack((train_mocap_T,test_mocap_T[rand_index[:int(len(rand_index)/2)]]))
+np.random.seed(0)
+rand_index = np.random.permutation(len(test_robot_q))
+train_robot_q = np.vstack((train_robot_q,test_robot_q[rand_index[:int(len(rand_index)/2)]]))
+train_mocap_T = np.vstack((train_mocap_T,test_mocap_T[rand_index[:int(len(rand_index)/2)]]))
 # test_robot_q = test_robot_q[rand_index[int(len(rand_index)/2):]]
 # test_mocap_T = test_mocap_T[rand_index[int(len(rand_index)/2):]]
 
