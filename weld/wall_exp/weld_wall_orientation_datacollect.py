@@ -23,39 +23,7 @@ import matplotlib.pyplot as plt
 import time
 import datetime
 import numpy as np
-
-def robot_weld_path_gen(all_layer_z,forward_flag,base_layer):
-    R=np.array([[-0.7071, 0.7071, -0.    ],
-            [ 0.7071, 0.7071,  0.    ],
-            [0.,      0.,     -1.    ]])
-    x0 =  1684	# Origin x coordinate
-    y0 = -1179 + 428	# Origin y coordinate
-    z0 = -260   # 10 mm distance to base
-
-    weld_p=[]
-    if base_layer: # base layer
-        weld_p.append([x0 - 33, y0 - 20, z0+10])
-        weld_p.append([x0 - 33, y0 - 20, z0])
-        weld_p.append([x0 - 33, y0 - 105 , z0])
-        weld_p.append([x0 - 33, y0 - 105 , z0+10])
-    else: # top layer
-        weld_p.append([x0 - 33, y0 - 30, z0+10])
-        weld_p.append([x0 - 33, y0 - 30, z0])
-        weld_p.append([x0 - 33, y0 - 95 , z0])
-        weld_p.append([x0 - 33, y0 - 95 , z0+10])
-
-    if not forward_flag:
-        weld_p = weld_p[::-1]
-
-    all_path_T=[]
-    for layer_z in all_layer_z:
-        path_T=[]
-        for p in weld_p:
-            path_T.append(Transform(R,p+np.array([0,0,layer_z])))
-
-        all_path_T.append(path_T)
-    
-    return all_path_T
+import yaml
 
 zero_config=np.zeros(6)
 # 0. robots. Note use "(robot)_pose_mocapcalib.csv"
@@ -71,7 +39,7 @@ positioner=positioner_obj('D500B',def_path=config_dir+'D500B_robot_default_confi
     base_transformation_file=config_dir+'D500B_pose.csv',pulse2deg_file_path=config_dir+'D500B_pulse2deg_real.csv',\
     base_marker_config_file=config_dir+'D500B_marker_config/D500B_marker_config.yaml',tool_marker_config_file=config_dir+'positioner_tcp_marker_config/positioner_tcp_marker_config.yaml')
 
-positioner_js = np.radians([-15,180])
+positioner_weld_js = np.radians([-15,180])
 Table_home_T = positioner.fwd(np.radians([-15,180]))
 S1_base_T = Transform(positioner.base_H[:3,:3],positioner.base_H[:3,-1])
 T_S1TCP_R1Base = S1_base_T*Table_home_T
@@ -103,7 +71,7 @@ weld_arcon=False
 nominal_base_height = 3
 nominal_weld_height = 1.2
 
-torch_angle = 0 # 0, 40,-40
+torch_angle = 40 # 0, 40,-40
 ############################
 
 #######################################ER4043########################################################
@@ -135,9 +103,14 @@ waypoint_distance=5
 save_weld_record=True
 test_sensor_only=False
 
+test_meta = {'total_base_layer':total_base_layer,'total_weld_layer':total_weld_layer,'base_vd_relative':base_vd_relative,'vd_relative':vd_relative,\
+             'base_feedrate_cmd':base_feedrate_cmd,'feedrate_cmd':feedrate_cmd,'nominal_base_height':nominal_base_height,'nominal_weld_height':nominal_weld_height,\
+             'torch_angle':torch_angle}
+
 current_time = datetime.datetime.now()
 formatted_time = current_time.strftime('%Y_%m_%d_%H_%M_%S.%f')[:-7]
-data_dir='../data/wall_weld_test/weld_scan_'+formatted_time+'/'
+data_dir='../../data/wall_weld_test/torch_ori'+str(int(np.degrees(torch_angle)))+'_'+formatted_time+'/'
+print(data_dir)
 ###############################
 
 print('Total base layer:',total_base_layer)
@@ -147,6 +120,7 @@ print('Velocity:',vd_relative)
 print('Base feedrate:',base_feedrate_cmd)
 print('Feedrate:',feedrate_cmd)
 print("Moving start/home speed:",to_start_speed,to_home_speed)
+print('Torch angle:',torch_angle)
 
 ## rr drivers and all other drivers
 # robot_client=MotionProgramExecClient()
@@ -156,13 +130,13 @@ print("Moving start/home speed:",to_start_speed,to_home_speed)
 # cam_ser=RRN.ConnectService('rr+tcp://192.168.55.10:60827/?service=camera')
 # ## RR sensor objects
 # rr_sensors = WeldRRSensor(weld_service=weld_ser,cam_service=cam_ser)
-fujicam_url = 'rr+tcp://localhost:12181/?service=fujicam'
-def connect_failed(s, client_id, url, err):
-    print ("Client connect failed: " + str(client_id.NodeID) + " url: " + str(url) + " error: " + str(err))
-sub=RRN.SubscribeService(fujicam_url)
-obj = sub.GetDefaultClientWait(2)		#connect, timeout=2s
-scan_change=sub.SubscribeWire("lineProfile")
-sub.ClientConnectFailed += connect_failed
+# fujicam_url = 'rr+tcp://localhost:12181/?service=fujicam'
+# def connect_failed(s, client_id, url, err):
+#     print ("Client connect failed: " + str(client_id.NodeID) + " url: " + str(url) + " error: " + str(err))
+# sub=RRN.SubscribeService(fujicam_url)
+# obj = sub.GetDefaultClientWait(2)		#connect, timeout=2s
+# scan_change=sub.SubscribeWire("lineProfile")
+# sub.ClientConnectFailed += connect_failed
 
 ### test sensor (camera, microphone)
 if test_sensor_only:
@@ -172,9 +146,9 @@ if test_sensor_only:
     exit()
 ###############
 
-mp=MotionProgram(ROBOT_CHOICE='RB1',ROBOT_CHOICE2='ST1',pulse2deg=robot_weld.pulse2deg,pulse2deg_2=positioner.pulse2deg, tool_num = 12)
-client=MotionProgramExecClient()
-ws=WeldSend(client)
+# mp=MotionProgram(ROBOT_CHOICE='RB1',ROBOT_CHOICE2='ST1',pulse2deg=robot_weld.pulse2deg,pulse2deg_2=positioner.pulse2deg, tool_num = 12)
+# client=MotionProgramExecClient()
+# ws=WeldSend(client)
 
 ## pre-generate robot joint path
 curve_RWeld_js_layers = []
@@ -266,7 +240,7 @@ for weld_i in range(total_weld_layer):
         this_q = robot_weld.inv(Target_R1Base.p,Target_R1Base.R,curve_js[-1])[0]
         curve_js.append(this_q)
         curve_slice_relative.append(np.append(Target_R1Base.p,R2q(Target_R1Base.R)))
-    
+    # scanning path
     for i,curve_p in enumerate(curve_scan_relative_p):
         if weld_i%2==1:
             if i<slice_scan_N-laser_lagging_N:
@@ -283,7 +257,7 @@ for weld_i in range(total_weld_layer):
         Ry = Ry - np.dot(Ry,Rz)*Rz
         Ry = Ry/np.linalg.norm(Ry)
         Rx = np.cross(Ry,Rz)
-        R_S1TCP = (np.array([Rx,Ry,Rz]).T)@rot([1,0,0],torch_angle)
+        R_S1TCP = np.array([Rx,Ry,Rz]).T
         Target_R1Base = Transform(T_S1TCP_R1Base.R@R_S1TCP,T_S1TCP_R1Base.R@curve_p+T_S1TCP_R1Base.p)
         try:
             this_q = robot_weld.inv(Target_R1Base.p,Target_R1Base.R,curve_js[-1])[0]
@@ -303,13 +277,16 @@ for weld_i in range(total_weld_layer):
     curve_scan_js_layers.append(curve_scan_js)
     curve_scan_relative_layers.append(curve_scan_relative)
 #############
+exit()
 
-# start welding and scanning
+input("Press Enter to start welding...")
+ws.jog_dual(robot_flir,positioner,[r2_mid,r2_ir_q],positioner_weld_js,to_start_speed)
+########### start welding and scanning
 for layer_i in range(len(curve_js)):
 
     ########### welding
     lam1=calc_lam_js(curve_RWeld_js_layers[layer_i],robot_weld)
-    positioner_js_layer = np.repeat(positioner_js[np.newaxis, :], len(curve_RWeld_js_layers[layer_i]), axis=0)
+    positioner_js_layer = np.repeat(positioner_weld_js[np.newaxis, :], len(curve_RWeld_js_layers[layer_i]), axis=0)
     lam2=calc_lam_js(positioner_js_layer,positioner)
     lam_relative=calc_lam_cs(curve_slice_relative_layers[layer_i])
 
@@ -328,13 +305,17 @@ for layer_i in range(len(curve_js)):
         cond_all = [0]+[int(feedrate_cmd/10+job_offset)]*(num_points_layer-1)
     primitives = ['movej']+['movel']*(num_points_layer-1)
 
+    # start weld!
+    rr_sensors.start_all_sensors()
     ws.weld_segment_dual(primitives,robot_weld,positioner,q1_all,positioner_all,v1_all,10*np.ones(len(v1_all)),cond_all,arc=weld_arcon,blocking=False)
+    rr_sensors.stop_all_sensors()
 
     ### welding execution and recording
     ###Get robot joint data
     robWeld_js_exe = []
     positioner_js_exe = []
     scan_weld_exe = []
+    timestamps_exe = []
 
     counts=0
     while True:
@@ -351,6 +332,7 @@ for layer_i in range(len(curve_js)):
             valid_indices=np.intersect1d(valid_indices,np.where(np.abs(wire_packet[1].Z_data)>50)[0])
             line_profile=np.hstack((wire_packet[1].Y_data[valid_indices].reshape(-1,1),wire_packet[1].Z_data[valid_indices].reshape(-1,1)))
 
+            timestamps_exe.append(time.perf_counter())
             robWeld_js_exe.append(q1_cur)
             positioner_js_exe.append(positioner_cur)
             scan_weld_exe.append(line_profile)
@@ -363,10 +345,14 @@ for layer_i in range(len(curve_js)):
         else:
             layer_dir = data_dir+'weldlayer_'+str(layer_i-total_base_layer)+'/'
         Path(layer_dir).mkdir(parents=True, exist_ok=True)
-        np.savetxt(layer_dir+'robot_weld_js_'+str(layer_i)+'.csv',np.array(robWeld_js_exe),delimiter=',')
-        np.savetxt(layer_dir+'positioner_js_'+str(layer_i)+'.csv',np.array(positioner_js_exe),delimiter=',')
-        with open(layer_dir+'scan_'+str(layer_i)+'.pkl','wb') as f:
+        np.savetxt(layer_dir+'timestamps_weld.csv',np.array(timestamps_exe),delimiter=',')
+        np.savetxt(layer_dir+'robot_weld_js.csv',np.array(robWeld_js_exe),delimiter=',')
+        np.savetxt(layer_dir+'positioner_js.csv',np.array(positioner_js_exe),delimiter=',')
+        with open(layer_dir+'scan.pkl','wb') as f:
             pickle.dump(scan_weld_exe,f)
+        rr_sensors.save_all_sensors(layer_dir)
+        # save meta
+        yaml.safe_dump(test_meta,open(data_dir+'meta.yaml','w'))
     ########################
 
     
@@ -394,6 +380,7 @@ for layer_i in range(len(curve_js)):
 
     ### scanning execution and recording
     ###Get robot joint data
+    timestamps_exe = []
     robScan_js_exe = []
     positioner_js_exe = []
     scan_scan_exe = []
@@ -413,6 +400,7 @@ for layer_i in range(len(curve_js)):
             valid_indices=np.intersect1d(valid_indices,np.where(np.abs(wire_packet[1].Z_data)>50)[0])
             line_profile=np.hstack((wire_packet[1].Y_data[valid_indices].reshape(-1,1),wire_packet[1].Z_data[valid_indices].reshape(-1,1)))
 
+            timestamps_exe.append(time.perf_counter())
             robScan_js_exe.append(q1_cur)
             positioner_js_exe.append(positioner_cur)
             scan_scan_exe.append(line_profile)
@@ -422,9 +410,10 @@ for layer_i in range(len(curve_js)):
         Path(data_dir).mkdir(parents=True, exist_ok=True)
         layer_dir = data_dir+'weldlayer_'+str(layer_i-total_base_layer)+'/'
         Path(layer_dir).mkdir(parents=True, exist_ok=True)
-        np.savetxt(layer_dir+'robot_scan_js_'+str(layer_i)+'.csv',np.array(robScan_js_exe),delimiter=',')
-        np.savetxt(layer_dir+'positioner_js_'+str(layer_i)+'.csv',np.array(positioner_js_exe),delimiter=',')
-        with open(layer_dir+'scan_'+str(layer_i)+'.pkl','wb') as f:
+        np.savetxt(layer_dir+'timestamps_scan.csv',np.array(timestamps_exe),delimiter=',')
+        np.savetxt(layer_dir+'robot_scan_js.csv',np.array(robScan_js_exe),delimiter=',')
+        np.savetxt(layer_dir+'positioner_js.csv',np.array(positioner_js_exe),delimiter=',')
+        with open(layer_dir+'scan.pkl','wb') as f:
             pickle.dump(scan_scan_exe,f)
 
 print("Welding End!!")
