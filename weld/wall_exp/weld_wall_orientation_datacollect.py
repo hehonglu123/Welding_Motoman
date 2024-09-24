@@ -2,12 +2,14 @@ from copy import deepcopy
 from pathlib import Path
 import pickle
 import sys
+
 sys.path.append('../')
-sys.path.append('../../toolbox/')
+# sys.path.append('../../toolbox/')
 sys.path.append('../../scan/scan_tools/')
 sys.path.append('../../scan/scan_plan/')
 sys.path.append('../../scan/scan_process/')
-from robot_def import *
+# from robot_def import *
+from motoman_def import *
 from scan_utils import *
 from scan_continuous import *
 # from scanPathGen import *
@@ -15,6 +17,8 @@ from scanProcess import *
 from weldCorrectionStrategy import *
 from weldRRSensor import *
 from WeldSend import *
+from lambda_calc import *
+from dual_robot import *
 from dx200_motion_program_exec_client import *
 
 from general_robotics_toolbox import *
@@ -86,7 +90,7 @@ base_feedrate_cmd=300
 to_start_speed=4
 to_home_speed=5
 # ir pose
-r2_ir_q = np.radians([43.3469,36.0996,-63.0900,142.5838,-83.0429,-96.0737])
+r2_ir_q = np.radians([42.5408,35.4021,-63.2228,138.4764,-82.3411,-96.1772])
 r2_mid = np.radians([43.7851,20,-10,0,0,0])
 # weld bead location
 shift_y = 15
@@ -123,20 +127,22 @@ print("Moving start/home speed:",to_start_speed,to_home_speed)
 print('Torch angle:',torch_angle)
 
 ## rr drivers and all other drivers
-# robot_client=MotionProgramExecClient()
-# ws=WeldSend(robot_client)
-# # weld state logging
+robot_client=MotionProgramExecClient()
+ws=WeldSend(robot_client)
+# weld state logging
 # weld_ser = RRN.SubscribeService('rr+tcp://192.168.55.10:60823?service=welder')
-# cam_ser=RRN.ConnectService('rr+tcp://192.168.55.10:60827/?service=camera')
-# ## RR sensor objects
-# rr_sensors = WeldRRSensor(weld_service=weld_ser,cam_service=cam_ser)
-# fujicam_url = 'rr+tcp://localhost:12181/?service=fujicam'
-# def connect_failed(s, client_id, url, err):
-#     print ("Client connect failed: " + str(client_id.NodeID) + " url: " + str(url) + " error: " + str(err))
-# sub=RRN.SubscribeService(fujicam_url)
-# obj = sub.GetDefaultClientWait(2)		#connect, timeout=2s
-# scan_change=sub.SubscribeWire("lineProfile")
-# sub.ClientConnectFailed += connect_failed
+weld_ser = None
+cam_ser=RRN.ConnectService('rr+tcp://localhost:60827/?service=camera')
+# cam_ser=None
+## RR sensor objects
+rr_sensors = WeldRRSensor(weld_service=weld_ser,cam_service=cam_ser)
+fujicam_url = 'rr+tcp://localhost:12181/?service=fujicam'
+def connect_failed(s, client_id, url, err):
+    print ("Client connect failed: " + str(client_id.NodeID) + " url: " + str(url) + " error: " + str(err))
+sub=RRN.SubscribeService(fujicam_url)
+obj = sub.GetDefaultClientWait(2)		#connect, timeout=2s
+scan_change=sub.SubscribeWire("lineProfile")
+sub.ClientConnectFailed += connect_failed
 
 ### test sensor (camera, microphone)
 if test_sensor_only:
@@ -146,9 +152,9 @@ if test_sensor_only:
     exit()
 ###############
 
-# mp=MotionProgram(ROBOT_CHOICE='RB1',ROBOT_CHOICE2='ST1',pulse2deg=robot_weld.pulse2deg,pulse2deg_2=positioner.pulse2deg, tool_num = 12)
-# client=MotionProgramExecClient()
-# ws=WeldSend(client)
+mp=MotionProgram(ROBOT_CHOICE='RB1',ROBOT_CHOICE2='ST1',pulse2deg=robot_weld.pulse2deg,pulse2deg_2=positioner.pulse2deg, tool_num = 12)
+client=MotionProgramExecClient()
+ws=WeldSend(client)
 
 ## pre-generate robot joint path
 curve_RWeld_js_layers = []
@@ -170,28 +176,28 @@ for base_i in range(total_base_layer):
     for i,curve_p in enumerate(curve_slice_relative_p):
         if base_i%2==1:
             if i<=laser_lagging_N:
-                Ry = curve_slice_relative_p[0]-curve_slice_relative_p[laser_lagging_N]
+                RyAxis = curve_slice_relative_p[0]-curve_slice_relative_p[laser_lagging_N]
             else:
-                Ry = curve_slice_relative_p[i-laser_lagging_N]-curve_slice_relative_p[i]
+                RyAxis = curve_slice_relative_p[i-laser_lagging_N]-curve_slice_relative_p[i]
         else:
             if i<slice_N-laser_lagging_N:
-                Ry = curve_slice_relative_p[i+laser_lagging_N]-curve_slice_relative_p[i]
+                RyAxis = curve_slice_relative_p[i+laser_lagging_N]-curve_slice_relative_p[i]
             else:
-                Ry = curve_slice_relative_p[-1]-curve_slice_relative_p[-1-laser_lagging_N]
-        Ry = Ry/np.linalg.norm(Ry)
-        Rz = np.array([0,0,-1])
-        Ry = Ry - np.dot(Ry,Rz)*Rz
-        Ry = Ry/np.linalg.norm(Ry)
-        Rx = np.cross(Ry,Rz)
-        # R_S1TCP = (np.array([Rx,Ry,Rz]).T)@rot([1,0,0],torch_angle)
-        R_S1TCP = np.array([Rx,Ry,Rz]).T
+                RyAxis = curve_slice_relative_p[-1]-curve_slice_relative_p[-1-laser_lagging_N]
+        RyAxis = RyAxis/np.linalg.norm(RyAxis)
+        RzAxis = np.array([0,0,-1])
+        RyAxis = RyAxis - np.dot(RyAxis,RzAxis)*RzAxis
+        RyAxis = RyAxis/np.linalg.norm(RyAxis)
+        RxAxis = np.cross(RyAxis,RzAxis)
+        # R_S1TCP = (np.array([RxAxis,RyAxis,RzAxis]).T)@rot([1,0,0],torch_angle)
+        R_S1TCP = np.array([RxAxis,RyAxis,RzAxis]).T
         Target_R1Base = Transform(T_S1TCP_R1Base.R@R_S1TCP,T_S1TCP_R1Base.R@curve_p+T_S1TCP_R1Base.p)
         this_q = robot_weld.inv(Target_R1Base.p,Target_R1Base.R,curve_js[-1])[0]
         curve_js.append(this_q)
         curve_slice_relative.append(np.append(Target_R1Base.p,R2q(Target_R1Base.R)))
     curve_js = curve_js[1:]
-    curve_RWeld_js_layers.append(curve_js)
-    curve_slice_relative_layers.append(curve_slice_relative)
+    curve_RWeld_js_layers.append(np.array(curve_js))
+    curve_slice_relative_layers.append(np.array(curve_slice_relative))
     curve_scan_relative_layers.append(None)
     curve_scan_js_layers.append(None)
 
@@ -221,21 +227,21 @@ for weld_i in range(total_weld_layer):
     for i,curve_p in enumerate(curve_slice_relative_p):
         if weld_i%2==1:
             if i<=laser_lagging_N:
-                Ry = curve_slice_relative_p[0]-curve_slice_relative_p[laser_lagging_N]
+                RyAxis = curve_slice_relative_p[0]-curve_slice_relative_p[laser_lagging_N]
             else:
-                Ry = curve_slice_relative_p[i-laser_lagging_N]-curve_slice_relative_p[i]
+                RyAxis = curve_slice_relative_p[i-laser_lagging_N]-curve_slice_relative_p[i]
         else:
             if i<slice_N-laser_lagging_N:
-                Ry = curve_slice_relative_p[i+laser_lagging_N]-curve_slice_relative_p[i]
+                RyAxis = curve_slice_relative_p[i+laser_lagging_N]-curve_slice_relative_p[i]
             else:
-                Ry = curve_slice_relative_p[-1]-curve_slice_relative_p[-1-laser_lagging_N]
+                RyAxis = curve_slice_relative_p[-1]-curve_slice_relative_p[-1-laser_lagging_N]
 
-        Ry = Ry/np.linalg.norm(Ry)
-        Rz = np.array([0,0,-1])
-        Ry = Ry - np.dot(Ry,Rz)*Rz
-        Ry = Ry/np.linalg.norm(Ry)
-        Rx = np.cross(Ry,Rz)
-        R_S1TCP = (np.array([Rx,Ry,Rz]).T)@rot([1,0,0],torch_angle)
+        RyAxis = RyAxis/np.linalg.norm(RyAxis)
+        RzAxis = np.array([0,0,-1])
+        RyAxis = RyAxis - np.dot(RyAxis,RzAxis)*RzAxis
+        RyAxis = RyAxis/np.linalg.norm(RyAxis)
+        RxAxis = np.cross(RyAxis,RzAxis)
+        R_S1TCP = (np.array([RxAxis,RyAxis,RzAxis]).T)@rot([1,0,0],torch_angle)
         Target_R1Base = Transform(T_S1TCP_R1Base.R@R_S1TCP,T_S1TCP_R1Base.R@curve_p+T_S1TCP_R1Base.p)
         this_q = robot_weld.inv(Target_R1Base.p,Target_R1Base.R,curve_js[-1])[0]
         curve_js.append(this_q)
@@ -244,20 +250,20 @@ for weld_i in range(total_weld_layer):
     for i,curve_p in enumerate(curve_scan_relative_p):
         if weld_i%2==1:
             if i<slice_scan_N-laser_lagging_N:
-                Ry = curve_scan_relative_p[i+laser_lagging_N]-curve_scan_relative_p[i]
+                RyAxis = curve_scan_relative_p[i+laser_lagging_N]-curve_scan_relative_p[i]
             else:
-                Ry = curve_scan_relative_p[-1]-curve_scan_relative_p[-1-laser_lagging_N]
+                RyAxis = curve_scan_relative_p[-1]-curve_scan_relative_p[-1-laser_lagging_N]
         else:
             if i<=laser_lagging_N:
-                Ry = curve_scan_relative_p[0]-curve_scan_relative_p[laser_lagging_N]
+                RyAxis = curve_scan_relative_p[0]-curve_scan_relative_p[laser_lagging_N]
             else:
-                Ry = curve_scan_relative_p[i-laser_lagging_N]-curve_scan_relative_p[i]
-        Ry = Ry/np.linalg.norm(Ry)
-        Rz = np.array([0,0,-1])
-        Ry = Ry - np.dot(Ry,Rz)*Rz
-        Ry = Ry/np.linalg.norm(Ry)
-        Rx = np.cross(Ry,Rz)
-        R_S1TCP = np.array([Rx,Ry,Rz]).T
+                RyAxis = curve_scan_relative_p[i-laser_lagging_N]-curve_scan_relative_p[i]
+        RyAxis = RyAxis/np.linalg.norm(RyAxis)
+        RzAxis = np.array([0,0,-1])
+        RyAxis = RyAxis - np.dot(RyAxis,RzAxis)*RzAxis
+        RyAxis = RyAxis/np.linalg.norm(RyAxis)
+        RxAxis = np.cross(RyAxis,RzAxis)
+        R_S1TCP = np.array([RxAxis,RyAxis,RzAxis]).T
         Target_R1Base = Transform(T_S1TCP_R1Base.R@R_S1TCP,T_S1TCP_R1Base.R@curve_p+T_S1TCP_R1Base.p)
         try:
             this_q = robot_weld.inv(Target_R1Base.p,Target_R1Base.R,curve_js[-1])[0]
@@ -271,16 +277,18 @@ for weld_i in range(total_weld_layer):
         curve_scan_relative.append(np.append(Target_R1Base.p,R2q(Target_R1Base.R)))
 
     curve_js = curve_js[1:]
-    curve_RWeld_js_layers.append(curve_js)
-    curve_slice_relative_layers.append(curve_slice_relative)
+    curve_RWeld_js_layers.append(np.array(curve_js))
+    curve_slice_relative_layers.append(np.array(curve_slice_relative))
     curve_scan_js = curve_scan_js[1:]
-    curve_scan_js_layers.append(curve_scan_js)
-    curve_scan_relative_layers.append(curve_scan_relative)
+    curve_scan_js_layers.append(np.array(curve_scan_js))
+    curve_scan_relative_layers.append(np.array(curve_scan_relative))
 #############
-exit()
+# exit()
 
 input("Press Enter to start welding...")
-ws.jog_dual(robot_flir,positioner,[r2_mid,r2_ir_q],positioner_weld_js,to_start_speed)
+# ws.jog_dual(robot_flir,positioner,r2_mid,positioner_weld_js,to_start_speed)
+# ws.jog_dual(robot_flir,positioner,r2_ir_q,positioner_weld_js,to_start_speed)
+
 ########### start welding and scanning
 for layer_i in range(len(curve_js)):
 
@@ -292,11 +300,10 @@ for layer_i in range(len(curve_js)):
 
     num_points_layer=max(2,int(lam_relative[-1]/waypoint_distance))
     breakpoints=np.linspace(0,len(curve_RWeld_js_layers[layer_i])-1,num=num_points_layer).astype(int)
-
-    s1_all,_=calc_individual_speed(vd_relative,lam1,lam2,lam_relative,breakpoints)
-    print(s1_all)
+    print(breakpoints)
     
-    q1_all = curve_RWeld_js_layers[breakpoints].tolist()
+    s1_all,_=calc_individual_speed(vd_relative,lam1,lam2,lam_relative,breakpoints)
+    q1_all = curve_RWeld_js_layers[layer_i][breakpoints].tolist()
     positioner_all = positioner_js_layer[breakpoints].tolist()
     v1_all = [8]+s1_all
     if layer_i<total_base_layer:
@@ -308,7 +315,6 @@ for layer_i in range(len(curve_js)):
     # start weld!
     rr_sensors.start_all_sensors()
     ws.weld_segment_dual(primitives,robot_weld,positioner,q1_all,positioner_all,v1_all,10*np.ones(len(v1_all)),cond_all,arc=weld_arcon,blocking=False)
-    rr_sensors.stop_all_sensors()
 
     ### welding execution and recording
     ###Get robot joint data
@@ -336,6 +342,8 @@ for layer_i in range(len(curve_js)):
             robWeld_js_exe.append(q1_cur)
             positioner_js_exe.append(positioner_cur)
             scan_weld_exe.append(line_profile)
+    
+    rr_sensors.stop_all_sensors()
     
     # save scan data to file
     if save_weld_record:
@@ -370,13 +378,13 @@ for layer_i in range(len(curve_js)):
     s1_all,_=calc_individual_speed(vd_relative,lam1,lam2,lam_relative,breakpoints)
     print(s1_all)
 
-    q1_all = curve_scan_js_layers[breakpoints].tolist()
+    q1_all = curve_scan_js_layers[layer_i][breakpoints].tolist()
     positioner_all = positioner_js_layer[breakpoints].tolist()
     v1_all = [8]+s1_all
     cond_all = [0]*num_points_layer
     primitives = ['movej']+['movel']*(num_points_layer-1)
 
-    ws.weld_segment_dual(primitives,robot_scan,positioner,q1_all,positioner_all,v1_all,10*np.ones(len(v1_all)),cond_all,arc=False)
+    ws.weld_segment_dual(primitives,robot_scan,positioner,q1_all,positioner_all,v1_all,10*np.ones(len(v1_all)),cond_all,arc=False,blocking=False)
 
     ### scanning execution and recording
     ###Get robot joint data
