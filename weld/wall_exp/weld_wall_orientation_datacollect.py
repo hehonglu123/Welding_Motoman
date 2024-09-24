@@ -342,6 +342,8 @@ for layer_i in range(len(curve_js)):
             robWeld_js_exe.append(q1_cur)
             positioner_js_exe.append(positioner_cur)
             scan_weld_exe.append(line_profile)
+
+            counts+=1
     
     rr_sensors.stop_all_sensors()
     
@@ -412,6 +414,8 @@ for layer_i in range(len(curve_js)):
             robScan_js_exe.append(q1_cur)
             positioner_js_exe.append(positioner_cur)
             scan_scan_exe.append(line_profile)
+
+            counts+=1
     
     # save scan data to file
     if save_weld_record:
