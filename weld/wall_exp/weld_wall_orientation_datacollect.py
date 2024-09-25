@@ -69,13 +69,13 @@ T_R1Base_S1TCP = T_S1TCP_R1Base.inv()
 
 #### Welding Parameters ####
 total_base_layer = 2
-total_weld_layer = 20
-weld_arcon=False
+total_weld_layer = 10
+weld_arcon=True
 
 nominal_base_height = 3
 nominal_weld_height = 1.2
 
-torch_angle = 10 # 0, 10,-10
+torch_angle = 0 # 0, 10,-10
 ############################
 
 #######################################ER4043########################################################
@@ -113,7 +113,7 @@ test_meta = {'total_base_layer':total_base_layer,'total_weld_layer':total_weld_l
 
 current_time = datetime.datetime.now()
 formatted_time = current_time.strftime('%Y_%m_%d_%H_%M_%S.%f')[:-7]
-data_dir='../../data/wall_weld_test/torch_ori'+str(int(np.degrees(torch_angle)))+'_'+formatted_time+'/'
+data_dir='../../data/wall_weld_test/torch_ori'+str(int(torch_angle))+'_'+formatted_time+'/'
 print(data_dir)
 ###############################
 
@@ -247,7 +247,10 @@ for weld_i in range(total_weld_layer):
         RxAxis = np.cross(RyAxis,RzAxis)
         R_S1TCP = (np.array([RxAxis,RyAxis,RzAxis]).T)
         Target_R1Base = Transform(T_S1TCP_R1Base.R@R_S1TCP,T_S1TCP_R1Base.R@curve_p+T_S1TCP_R1Base.p)
-        Target_R1Base.R = Target_R1Base.R@rot([1,0,0],np.radians(torch_angle))
+        if weld_i % 2 == 0:
+            Target_R1Base.R = Target_R1Base.R@rot([1,0,0],np.radians(torch_angle))
+        else:
+            Target_R1Base.R = Target_R1Base.R@rot([1,0,0],np.radians(-torch_angle))
         # print(Target_R1Base.p)
         # input(Target_R1Base.R)
         this_q = robot_weld.inv(Target_R1Base.p,Target_R1Base.R,curve_js[-1])[0]
@@ -272,6 +275,7 @@ for weld_i in range(total_weld_layer):
         RxAxis = np.cross(RyAxis,RzAxis)
         R_S1TCP = np.array([RxAxis,RyAxis,RzAxis]).T
         Target_R1Base = Transform(T_S1TCP_R1Base.R@R_S1TCP,T_S1TCP_R1Base.R@curve_p+T_S1TCP_R1Base.p)
+        Target_R1Base.R = Target_R1Base.R@rot([1,0,0],np.radians(-20))
         try:
             this_q = robot_weld.inv(Target_R1Base.p,Target_R1Base.R,curve_js[-1])[0]
         except:
@@ -312,16 +316,24 @@ for layer_i in range(len(curve_js)):
         s1_all,_=calc_individual_speed(base_vd_relative,lam1,lam2,lam_relative,breakpoints)
     else:
         s1_all,_=calc_individual_speed(vd_relative,lam1,lam2,lam_relative,breakpoints)
+
     q1_all = curve_RWeld_js_layers[layer_i][breakpoints].tolist()
     positioner_all = positioner_js_layer[breakpoints].tolist()
-    v1_all = [1]+s1_all
+    v1_all = [3]+s1_all
     if layer_i<total_base_layer:
         cond_all = [0]+[int(base_feedrate_cmd/10+job_offset)]*(num_points_layer-1)
     else:
         cond_all = [0]+[int(feedrate_cmd/10+job_offset)]*(num_points_layer-1)
     primitives = ['movej']+['movel']*(num_points_layer-1)
 
-    input(np.degrees(q1_all))
+    Tstart_hoffset = robot_weld.fwd(curve_RWeld_js_layers[layer_i][breakpoints[0]])
+    qstart_hoffset = robot_weld.inv(Tstart_hoffset.p+np.array([0,0,10]),Tstart_hoffset.R,curve_RWeld_js_layers[layer_i][breakpoints[0]])[0]
+
+    q1_all.insert(0,qstart_hoffset) # add start point
+    positioner_all.insert(0,positioner_weld_js)
+    v1_all.insert(0,15)
+    cond_all.insert(0,0)
+    primitives.insert(0,'movel')
 
     # start weld!
     rr_sensors.start_all_sensors()
@@ -390,13 +402,12 @@ for layer_i in range(len(curve_js)):
     breakpoints=np.linspace(0,len(curve_scan_js_layers[layer_i])-1,num=num_points_layer).astype(int)
 
     s1_all,_=calc_individual_speed(vd_relative,lam1,lam2,lam_relative,breakpoints)
-    print(s1_all)
 
     q1_all = curve_scan_js_layers[layer_i][breakpoints].tolist()
     positioner_all = positioner_js_layer[breakpoints].tolist()
-    v1_all = [8]+s1_all
+    v1_all = [15]+s1_all
     cond_all = [0]*num_points_layer
-    primitives = ['movej']+['movel']*(num_points_layer-1)
+    primitives = ['movel']+['movel']*(num_points_layer-1)
 
     ws.weld_segment_dual(primitives,robot_weld,positioner,q1_all,positioner_all,v1_all,10*np.ones(len(v1_all)),cond_all,arc=False,blocking=False)
 
