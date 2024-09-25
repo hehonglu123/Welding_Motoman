@@ -24,6 +24,7 @@ import time
 import datetime
 import numpy as np
 import yaml
+import open3d as o3d
 
 zero_config=np.zeros(6)
 # 0. robots. Note use "(robot)_pose_mocapcalib.csv"
@@ -39,7 +40,7 @@ positioner=positioner_obj('D500B',def_path=config_dir+'D500B_robot_default_confi
     base_transformation_file=config_dir+'D500B_pose.csv',pulse2deg_file_path=config_dir+'D500B_pulse2deg_real.csv',\
     base_marker_config_file=config_dir+'D500B_marker_config/D500B_marker_config.yaml',tool_marker_config_file=config_dir+'positioner_tcp_marker_config/positioner_tcp_marker_config.yaml')
 
-data_dir='../../data/wall_weld_test/torch_ori0_/'
+data_dir='../../data/wall_weld_test/torch_ori0_2024_09_24_15_46_20/'
 
 # 1. read meta file
 meta_file=data_dir+'meta.yaml'
@@ -56,3 +57,8 @@ for layer_i in range(meta_info['total_weld_layer']):
     positioner_js = np.loadtxt(layer_dir + 'positioner_js.csv', delimiter=',')
     with open(layer_dir + 'scan.pkl', 'rb') as f:
         scan = pickle.load(f)
+
+    print(scan[0])
+    print(len(scan))
+    print(len(robot_scan_js))
+    input('')
