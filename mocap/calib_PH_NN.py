@@ -50,6 +50,42 @@ class NeuralNetwork(nn.Module):
         x = self.output(x)
         return x
 
+class NeuralFourierNetwork(nn.Module):
+    def __init__(self, input_size, output_size, hidden_sizes=[20,20]):
+        super(NeuralFourierNetwork, self).__init__()
+
+        self.hiddenLayers = nn.ModuleList()
+        self.relus = nn.ModuleList()
+        for k in range(len(hidden_sizes)):
+            if k == 0:
+                self.hiddenLayers.append(nn.Linear(input_size, hidden_sizes[k]))
+            else:
+                self.hiddenLayers.append(nn.Linear(hidden_sizes[k-1], hidden_sizes[k]))
+            self.relus.append(nn.ReLU())
+        self.output = nn.Linear(hidden_sizes[-1]+12, output_size)
+        # define a fourier layer
+        
+
+    def forward(self, x):
+
+        if len(x.shape) == 2:
+            sum_input = torch.sum(x,dim=1,keepdim=True)
+            fourier_x = torch.cat((torch.sin(x),torch.cos(x),torch.sin(sum_input),torch.cos(sum_input),\
+                               torch.sin(2*x),torch.cos(2*x),torch.sin(2*sum_input),torch.cos(2*sum_input)),dim=1)
+        else:
+            sum_input = torch.Tensor([torch.sum(x)])
+            fourier_x = torch.cat((torch.sin(x),torch.cos(x),torch.sin(sum_input),torch.cos(sum_input),\
+                                torch.sin(2*x),torch.cos(2*x),torch.sin(2*sum_input),torch.cos(2*sum_input)))
+        for k in range(len(self.hiddenLayers)):
+            x = self.hiddenLayers[k](x)
+            x = self.relus[k](x)
+        if len(x.shape) == 2:
+            x = torch.cat((x,fourier_x),dim=1)
+        else:
+            x = torch.cat((x,fourier_x))
+        x = self.output(x)
+        return x
+
 def test_fwd_accuracy(model, data_q, data_T,robot,param_nominal):
     
     p_error_all = []
@@ -76,11 +112,17 @@ def train(inputs_q2q3, targets_PH, training_q, training_T, testing_q, testing_T,
 
     # Define the input size, hidden size, and output size
     input_size = 2
-    hidden_sizes = [400,400]
+    hidden_sizes = [200,200,200]
     output_size = 33
 
+    # use fourier basis or not
+    use_Fourier = True
+
     # Create an instance of the neural network
-    model = NeuralNetwork(input_size, output_size, hidden_sizes=hidden_sizes)
+    if not use_Fourier:
+        model = NeuralNetwork(input_size, output_size, hidden_sizes=hidden_sizes)
+    else:
+        model = NeuralFourierNetwork(input_size, output_size, hidden_sizes=hidden_sizes)
 
     # Print the model architecture
     print(model)
@@ -94,7 +136,7 @@ def train(inputs_q2q3, targets_PH, training_q, training_T, testing_q, testing_T,
         weights_H = 180/np.pi
         weights = torch.tensor(np.append(np.ones(21)*weights_P,np.ones(12)*weights_H), dtype=torch.float32)
     # Define the learning rate
-    learning_rate = 0.00001
+    learning_rate = 0.001
     # Define the number of epochs
     num_epochs = 100000
     # Define the optimizer
@@ -109,6 +151,8 @@ def train(inputs_q2q3, targets_PH, training_q, training_T, testing_q, testing_T,
     folder_path += robot_type+'_'
     for h in hidden_sizes:
         folder_path += str(h)+'_'
+    if use_Fourier:
+        folder_path += 'Fourier_'
     folder_path += 'lr'+str(learning_rate)+'_'
     if weighted:
         folder_path += 'weighted_'
@@ -122,6 +166,7 @@ def train(inputs_q2q3, targets_PH, training_q, training_T, testing_q, testing_T,
     if weighted:
         meta_data['weights_P'] = weights_P
         meta_data['weights_H'] = weights_H
+    meta_data['use_Fourier'] = use_Fourier
     with open(folder_path+'meta_data.yaml', 'w') as file:
         documents = yaml.dump(meta_data, file)
 
@@ -205,7 +250,7 @@ def train(inputs_q2q3, targets_PH, training_q, training_T, testing_q, testing_T,
         # training time for each epoch
         epoch_end_time = time.time()
         training_t_epoch.append(epoch_end_time-epoch_start_time)
-        print(f'Mean epoch time: {np.mean(training_t_epoch):.5f}, Total time: {epoch_end_time-training_start_time:.2f}')
+        # print(f'Mean epoch time: {np.mean(training_t_epoch):.5f}, Total time: {epoch_end_time-training_start_time:.2f}')
 
     print('Training time:',time.time()-training_start_time)            
 
@@ -213,11 +258,11 @@ Rx=np.array([1,0,0])
 Ry=np.array([0,1,0])
 Rz=np.array([0,0,1])
 
-ph_dataset_date='0804'
-test_dataset_date='0804'
+ph_dataset_date='0801'
+test_dataset_date='0801'
 config_dir='../config/'
 
-robot_type = 'R2'
+robot_type = 'R1'
 
 if robot_type == 'R1':
     robot_marker_dir=config_dir+'MA2010_marker_config/'
