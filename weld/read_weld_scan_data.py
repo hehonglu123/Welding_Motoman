@@ -10,7 +10,7 @@ from utils import *
 from robot_def import *
 from scan_utils import *
 from scan_continuous import *
-from scanPathGen import *
+# from scanPathGen import *
 from scanProcess import *
 from weld_dh2v import *
 
@@ -112,8 +112,8 @@ x_upper = 999999
 start_id=75
 end_id=-75
 
-datasets=['baseline','correction']
-# datasets=['correction']
+# datasets=['baseline','correction']
+datasets=['correction']
 
 # datasets=['correction','repeat 1','repeat 2']
 # datasets=['baseline','correction','repeat 1','repeat 2']
@@ -149,6 +149,9 @@ for dataset in datasets:
             robot_stamps=np.loadtxt(scan_dir+'scan_robot_stamps.csv',delimiter=',')
             with open(scan_dir+'mti_scans.pickle', 'rb') as file:
                 mti_recording=pickle.load(file)
+
+            # print(mti_recording[0].shape)
+            # exit()
             
             # q_out_exe=np.loadtxt(data_dir +'scan_js_exe.csv',delimiter=',')
             # robot_stamps=np.loadtxt(data_dir +'robot_stamps.csv',delimiter=',')

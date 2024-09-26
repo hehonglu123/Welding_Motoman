@@ -381,7 +381,7 @@ for layer_i in range(len(curve_js)):
         np.savetxt(layer_dir+'timestamps_weld.csv',np.array(timestamps_exe),delimiter=',')
         np.savetxt(layer_dir+'robot_weld_js.csv',np.array(robWeld_js_exe),delimiter=',')
         np.savetxt(layer_dir+'positioner_js.csv',np.array(positioner_js_exe),delimiter=',')
-        with open(layer_dir+'scan.pkl','wb') as f:
+        with open(layer_dir+'scan_weld.pkl','wb') as f:
             pickle.dump(scan_weld_exe,f)
         rr_sensors.save_all_sensors(layer_dir)
         # save meta
@@ -448,7 +448,7 @@ for layer_i in range(len(curve_js)):
         np.savetxt(layer_dir+'timestamps_scan.csv',np.array(timestamps_exe),delimiter=',')
         np.savetxt(layer_dir+'robot_scan_js.csv',np.array(robScan_js_exe),delimiter=',')
         np.savetxt(layer_dir+'positioner_js.csv',np.array(positioner_js_exe),delimiter=',')
-        with open(layer_dir+'scan.pkl','wb') as f:
+        with open(layer_dir+'scan_scan.pkl','wb') as f:
             pickle.dump(scan_scan_exe,f)
 
 print("Welding End!!")

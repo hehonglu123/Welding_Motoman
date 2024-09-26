@@ -142,7 +142,7 @@ class ScanProcess():
         
         return pcd_combined
     
-    def pcd_register_mti(self,all_scan_points,rob_js_exe,rob_stamps,voxel_size=0.05,static_positioner_q=np.radians([-60,180]),use_calib=False,ph_param=None):
+    def pcd_register_mti(self,all_scan_points,rob_js_exe,rob_stamps,voxel_size=0.05,static_positioner_q=np.radians([-60,180]),flip=False,scanner='mti',use_calib=False,ph_param=None):
 
         pcd_combined = None
         scan_N = len(rob_js_exe) ## total scans
@@ -173,9 +173,17 @@ class ScanProcess():
                 T_origin = self.positioner.fwd(rob_js_exe[scan_i][6:],world=True).inv() # T_tabletool^world
             T_rob_positioner_top = T_origin*robt_T
 
-            scan_points=deepcopy(all_scan_points[scan_i])
-            scan_points = np.insert(scan_points,1,np.zeros(len(scan_points[0])),axis=0)
-            scan_points[0]=scan_points[0]*-1 # reversed x-axis
+            if flip:
+                scan_points=deepcopy(all_scan_points[scan_i].T)
+            else:
+                scan_points=deepcopy(all_scan_points[scan_i])
+            if scanner=='mti':
+                scan_points = np.insert(scan_points,1,np.zeros(len(scan_points[0])),axis=0)
+                scan_points[0]=scan_points[0]*-1 # reversed x-axis
+            else:
+                scan_points = np.insert(scan_points,0,np.zeros(len(scan_points[0])),axis=0)
+            
+            
             scan_points = scan_points.T
             ## get the points closed to origin
             scan_points = np.transpose(np.matmul(T_rob_positioner_top.R,np.transpose(scan_points)))+T_rob_positioner_top.p
