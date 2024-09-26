@@ -136,7 +136,7 @@ def train(inputs_q2q3, targets_PH, training_q, training_T, testing_q, testing_T,
         weights_H = 180/np.pi
         weights = torch.tensor(np.append(np.ones(21)*weights_P,np.ones(12)*weights_H), dtype=torch.float32)
     # Define the learning rate
-    learning_rate = 0.001
+    learning_rate = 0.02
     # Define the number of epochs
     num_epochs = 100000
     # Define the optimizer

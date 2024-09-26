@@ -65,7 +65,7 @@ class NeuralFourierNetwork(nn.Module):
 # Define the input size, hidden size, and output size
 
 # model_name = 'train_200_200_200_lr0.02_2409171041'
-model_name = 'train_R1_200_200_200_Fourier_lr0.001_2409241428'
+model_name = 'train_R1_200_200_200_Fourier_lr0.02_2409260929'
 
 # read meta data
 with open('PH_NN_results/'+model_name+'/meta_data.yaml') as file:
