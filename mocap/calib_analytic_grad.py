@@ -164,6 +164,16 @@ def get_PH_from_param(param,robot,unit='radians'):
     robot.robot.H=H.T
     return robot
 
+def get_param_from_PH(robot,this_P,this_H,nom_H):
+
+    param_H = []
+    for i,h in enumerate(this_H.T):
+        theta_sol = subproblem2(nom_H[:,i], h, robot.param_k2[i], robot.param_k1[i])
+        theta_sol = theta_sol[0] if theta_sol[0][0]<np.pi/2 and theta_sol[0][0]>-np.pi/2 else theta_sol[1]
+        param_H.extend(theta_sol[::-1])
+
+    return np.reshape(this_P.T,-1),np.array(param_H)
+
 def jacobian_param(param,robot,theta,unit='radians',minimal=True):
     
     jN=len(theta)
@@ -236,6 +246,7 @@ def jacobian_param(param,robot,theta,unit='radians',minimal=True):
         # J[3:,:] = J[3:,:]*(np.pi/180)
     
     return J
+
 
 def main():
     

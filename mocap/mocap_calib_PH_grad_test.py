@@ -7,6 +7,7 @@ import sys
 sys.path.append('../toolbox/')
 from robot_def import *
 from matplotlib import pyplot as plt
+from calib_analytic_grad import *
 from PH_interp import *
 
 from numpy.random import default_rng
@@ -16,11 +17,11 @@ Rx=np.array([1,0,0])
 Ry=np.array([0,1,0])
 Rz=np.array([0,0,1])
 
-ph_dataset_date='0804'
-test_dataset_date='0804'
+ph_dataset_date='0801'
+test_dataset_date='0801'
 config_dir='../config/'
 
-robot_type = 'R2'
+robot_type = 'R1'
 
 if robot_type == 'R1':
     robot_marker_dir=config_dir+'MA2010_marker_config/'
@@ -50,6 +51,12 @@ elif robot_type == 'R2':
 
 # T_base_basemarker = robot.T_base_basemarker
 # T_basemarker_base = T_base_basemarker.inv()
+robot.P_nominal=deepcopy(robot.robot.P)
+robot.H_nominal=deepcopy(robot.robot.H)
+robot.P_nominal=robot.P_nominal.T
+robot.H_nominal=robot.H_nominal.T
+robot = get_H_param_axis(robot) # get the axis to parametrize H
+param_nominal = np.array(np.reshape(robot.robot.P.T,-1).tolist()+[0]*12)
 
 #### using rigid body
 use_toolmaker=True
@@ -142,6 +149,14 @@ print(calib_file_name)
 with open(PH_data_dir+calib_file_name,'rb') as file:
     PH_q=pickle.load(file)
 
+useHRotation = True
+
+if useHRotation:
+    PH_q_HRotation = deepcopy(PH_q)
+    for qkey in PH_q_HRotation.keys():
+        this_P,this_H = get_param_from_PH(robot,PH_q_HRotation[qkey]['P'],PH_q_HRotation[qkey]['H'],nom_H)
+        PH_q_HRotation[qkey]['H'] = this_H
+
 #### all train data q
 train_q = []
 training_error=[]
@@ -209,6 +224,16 @@ ph_param_rbf=PH_Param(nom_P,nom_H)
 ph_param_rbf.fit(PH_q,method='RBF')
 ph_param_fbf=PH_Param(nom_P,nom_H)
 ph_param_fbf.fit(PH_q,method='FBF')
+ph_param_fbf_Hori=PH_Param(nom_P,nom_H)
+ph_param_fbf_Hori.fit(PH_q_HRotation,method='FBF',useHRotation=True)
+# p_coeff,h_coeff = ph_param_fbf_Hori.get_basis_weights()
+# p_coeff_rearange = []
+# for j in range(7):
+#     for i in range(3):
+#         p_coeff_rearange.append(p_coeff[i*7+j])
+# p_coeff = p_coeff_rearange
+# ph_coeff = np.vstack((p_coeff,h_coeff))
+# np.save('PH_NN_results/FBF_Basis_Coeff.npy',ph_coeff)
 # exit()
 
 #### Gradient
@@ -223,6 +248,8 @@ error_pos_rbf = []
 error_ori_rbf = []
 error_pos_fbf = []
 error_ori_fbf = []
+error_pos_fbf_hori = []
+error_ori_fbf_hori = []
 error_pos_baseline = []
 error_ori_baseline = []
 error_pos_PHZero = []
@@ -296,11 +323,27 @@ for N in range(total_test_N):
         print(np.degrees(test_q))
     robot.robot.P=deepcopy(opt_P)
     robot.robot.H=deepcopy(opt_H)
+    # print(robot.robot.P)
+    # print(robot.robot.H)
+    # print('====')
     robot_T = robot.fwd(test_q)
     k,theta = R2rot(robot_T.R.T@T_tool_base.R)
     k=np.array(k)
     error_pos_fbf.append(T_tool_base.p-robot_T.p)
     error_ori_fbf.append(k*np.degrees(theta))
+
+    #### get error (fbf HRotation)
+    opt_P,opt_H = ph_param_fbf_Hori.predict(test_q[1:3])
+
+    robot = get_PH_from_param(np.append(np.reshape(opt_P.T,-1),opt_H),robot,unit='radians')
+    # print(robot.robot.P)
+    # print(robot.robot.H)
+    robot_T = robot.fwd(test_q)
+    k,theta = R2rot(robot_T.R.T@T_tool_base.R)
+    k=np.array(k)
+    error_pos_fbf_hori.append(T_tool_base.p-robot_T.p)
+    error_ori_fbf_hori.append(k*np.degrees(theta))
+    # input("Press Enter to continue...")
 
     #### get error (zero)
     robot.robot.P=deepcopy(qzero_P)
@@ -355,6 +398,7 @@ error_pos_lin_norm=np.linalg.norm(error_pos_lin,ord=2,axis=1).flatten()
 error_pos_cub_norm=np.linalg.norm(error_pos_cub,ord=2,axis=1).flatten()
 error_pos_rbf_norm=np.linalg.norm(error_pos_rbf,ord=2,axis=1).flatten()
 error_pos_fbf_norm=np.linalg.norm(error_pos_fbf,ord=2,axis=1).flatten()
+error_pos_fbf_hori_norm=np.linalg.norm(error_pos_fbf_hori,ord=2,axis=1).flatten()
 error_pos_PHZero_norm=np.linalg.norm(error_pos_PHZero,ord=2,axis=1).flatten()
 error_pos_onePH_norm=np.linalg.norm(error_pos_onePH,ord=2,axis=1).flatten()
 error_pos_baseline_norm=np.linalg.norm(error_pos_baseline,ord=2,axis=1).flatten()
@@ -365,6 +409,7 @@ train_error_pos_lin_norm=error_pos_lin_norm[:split_index]
 train_error_pos_cub_norm=error_pos_cub_norm[:split_index]
 train_error_pos_rbf_norm=error_pos_rbf_norm[:split_index]
 train_error_pos_fbf_norm=error_pos_fbf_norm[:split_index]
+train_error_pos_fbf_hori_norm=error_pos_fbf_hori_norm[:split_index]
 train_error_pos_PHZero_norm=error_pos_PHZero_norm[:split_index]
 train_error_pos_onePH_norm=error_pos_onePH_norm[:split_index]
 train_error_pos_baseline_norm=error_pos_baseline_norm[:split_index]
@@ -375,6 +420,7 @@ error_pos_lin_norm=error_pos_lin_norm[split_index:]
 error_pos_cub_norm=error_pos_cub_norm[split_index:]
 error_pos_rbf_norm=error_pos_rbf_norm[split_index:]
 error_pos_fbf_norm=error_pos_fbf_norm[split_index:]
+error_pos_fbf_hori_norm=error_pos_fbf_hori_norm[split_index:]
 error_pos_PHZero_norm=error_pos_PHZero_norm[split_index:]
 error_pos_onePH_norm=error_pos_onePH_norm[split_index:]
 error_pos_baseline_norm=error_pos_baseline_norm[split_index:]
@@ -385,6 +431,7 @@ error_ori_lin_norm=np.linalg.norm(error_ori_lin,ord=2,axis=1).flatten()
 error_ori_cub_norm=np.linalg.norm(error_ori_cub,ord=2,axis=1).flatten()
 error_ori_rbf_norm=np.linalg.norm(error_ori_rbf,ord=2,axis=1).flatten()
 error_ori_fbf_norm=np.linalg.norm(error_ori_fbf,ord=2,axis=1).flatten()
+error_ori_fbf_hori_norm=np.linalg.norm(error_ori_fbf_hori,ord=2,axis=1).flatten()
 error_ori_PHZero_norm=np.linalg.norm(error_ori_PHZero,ord=2,axis=1).flatten()
 error_ori_onePH_norm=np.linalg.norm(error_ori_onePH,ord=2,axis=1).flatten()
 error_ori_baseline_norm=np.linalg.norm(error_ori_baseline,ord=2,axis=1).flatten()
@@ -435,6 +482,7 @@ plt.plot(error_pos_lin_norm,'-o',markersize=1,label='Linear Interp PH')
 # plt.plot(error_pos_cub_norm,'-o',markersize=1,label='Cubic Interp PH')
 # plt.plot(error_pos_rbf_norm,'-o',markersize=1,label='RBF Interp PH')
 plt.plot(error_pos_fbf_norm,'-o',markersize=1,label='Fourier Basis PH')
+plt.plot(error_pos_fbf_hori_norm,'-o',markersize=1,label='Fourier Basis PH (Hori)')
 plt.legend(loc=1,fontsize=18)
 plt.title(robot_type+" Position Testing Error using Optimized PH",fontsize=32)
 # plt.xticks(np.arange(0,total_test_N,100),np.round(q1_all[::100]))
@@ -512,6 +560,8 @@ markdown_str+='|RBF Interp PH|'+format(round(np.mean(error_pos_rbf_norm),4),'.4f
     format(round(np.std(error_pos_rbf_norm),4),'.4f')+'|'+format(round(np.max(error_pos_rbf_norm),4),'.4f')+'|\n'
 markdown_str+='|FBF Interp PH|'+format(round(np.mean(error_pos_fbf_norm),4),'.4f')+'|'+\
     format(round(np.std(error_pos_fbf_norm),4),'.4f')+'|'+format(round(np.max(error_pos_fbf_norm),4),'.4f')+'|\n'
+markdown_str+='|FBF Interp PH (Hori)|'+format(round(np.mean(error_pos_fbf_hori_norm),4),'.4f')+'|'+\
+    format(round(np.std(error_pos_fbf_hori_norm),4),'.4f')+'|'+format(round(np.max(error_pos_fbf_hori_norm),4),'.4f')+'|\n'
 print(markdown_str)
 
 print("Testing Data (Orientation)")

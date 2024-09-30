@@ -137,7 +137,7 @@ for dataset in datasets:
     all_correction_layer=[]
     all_h_mean=[]
     all_h_std=[]
-    for i in range(0,9999999):
+    for i in range(10,9999999):
         try:
             weld_dir=data_dir+'layer_'+str(i)+'/'
             weld_q=np.loadtxt(weld_dir+'weld_js_exe.csv',delimiter=',')
@@ -149,6 +149,13 @@ for dataset in datasets:
             robot_stamps=np.loadtxt(scan_dir+'scan_robot_stamps.csv',delimiter=',')
             with open(scan_dir+'mti_scans.pickle', 'rb') as file:
                 mti_recording=pickle.load(file)
+            
+            # for scan_step in mti_recording[len(mti_recording)//2:]:
+            #     plt.scatter(scan_step[0],-1*scan_step[1]+100)
+            #     plt.show()
+            # exit()
+            
+            visualize_pcd([pcd])
 
             # print(mti_recording[0].shape)
             # exit()

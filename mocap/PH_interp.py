@@ -37,7 +37,6 @@ class RBFFourierInterpolator(object):
         
         # if test_x not in self.train_x:
         #     return np.nan
-        
         return self.coeff_A@basis_func_q2q3
     
     def build_basis(self,q):
@@ -45,8 +44,8 @@ class RBFFourierInterpolator(object):
         ###### define basis function ######
         basis_func=[]
         basis_func.append(lambda q2,q3,a: np.sin(a*q2))
-        basis_func.append(lambda q2,q3,a: np.cos(a*q2))
         basis_func.append(lambda q2,q3,a: np.sin(a*q3))
+        basis_func.append(lambda q2,q3,a: np.cos(a*q2))
         basis_func.append(lambda q2,q3,a: np.cos(a*q3))
         basis_func.append(lambda q2,q3,a: np.sin(a*(q2+q3)))
         basis_func.append(lambda q2,q3,a: np.cos(a*(q2+q3)))
@@ -70,7 +69,7 @@ class PH_Param(object):
         self.nom_P = deepcopy(nom_P)
         self.nom_H = deepcopy(nom_H)
 
-    def fit(self,data,method='nearest'):
+    def fit(self,data,method='nearest',useHRotation=False):
 
         train_q = []
         for qkey in data.keys():
@@ -79,6 +78,7 @@ class PH_Param(object):
         self.train_q=train_q
         self.method=method
         self.data=data
+        self.useHRotation=useHRotation
 
         if method=='nearest':
             self.predict_func=self._predict_nearest
@@ -108,8 +108,12 @@ class PH_Param(object):
         value_H=[]
         for i in range(7*3):
             value_P.append([])
-        for i in range(6*3):
-            value_H.append([])
+        if self.useHRotation:
+            for i in range(6*2):
+                value_H.append([])
+        else:
+            for i in range(6*3):
+                value_H.append([])
 
         for q in self.train_q:
             i=0
@@ -119,11 +123,16 @@ class PH_Param(object):
                     value_P[i].append(qi)
                     i+=1
             i=0
-            for H in self.data[tuple(q)]['H']:
-                diff_H = H-self.nom_H[round(i/7.)]
-                for qi in diff_H:
-                    value_H[i].append(qi)
+            if self.useHRotation:
+                for H in self.data[tuple(q)]['H']:
+                    value_H[i].append(H)
                     i+=1
+            else:
+                for H in self.data[tuple(q)]['H']:
+                    diff_H = H-self.nom_H[round(i/7.)]
+                    for qi in diff_H:
+                        value_H[i].append(qi)
+                        i+=1
         ## fitting function
         fit_P=[]
         fit_H=[]
@@ -139,17 +148,24 @@ class PH_Param(object):
         q2q3=np.array(q2q3)
         P,H = self.predict_func(q2q3)
         opt_P=P+self.nom_P
-        opt_H=H+self.nom_H
-        for j in range(len(opt_H[0])):
-            opt_H[:,j]=opt_H[:,j]/np.linalg.norm(opt_H[:,j])
+
+        if not self.useHRotation:
+            opt_H=H+self.nom_H
+            for j in range(len(opt_H[0])):
+                opt_H[:,j]=opt_H[:,j]/np.linalg.norm(opt_H[:,j])
+        else:
+            opt_H=H
 
         return opt_P,opt_H
 
     def _predict_interp(self,q2q3):
 
-        opt_P,opt_H = deepcopy(self._predict_nearest(q2q3))
-        # print("P",opt_P.T)
-        # print("H",opt_H.T)
+        if self.useHRotation:
+            opt_P = np.zeros_like(self.nom_P,dtype=float)
+            opt_H = np.zeros(6*2,dtype=float)
+        else:
+            opt_P,opt_H = deepcopy(self._predict_nearest(q2q3))
+        
         if np.isnan(self.fit_P[0]([[q2q3[0],q2q3[1]]])):
             # if outside training data, use nearest neighbor
             pass
@@ -157,9 +173,14 @@ class PH_Param(object):
             for i in range(len(opt_P)):
                 for j in range(len(opt_P[i])):
                     opt_P[i][j]=self.fit_P[i*len(opt_P[i])+j]([[q2q3[0],q2q3[1]]])
-            for i in range(len(opt_H)):
-                for j in range(len(opt_H[i])):
-                    opt_H[i][j]=self.fit_H[i*len(opt_H[i])+j]([[q2q3[0],q2q3[1]]])
+            if self.useHRotation:
+                opt_H = np.zeros(6*2)
+                for i in range(len(opt_H)):
+                    opt_H[i]=self.fit_H[i]([[q2q3[0],q2q3[1]]])
+            else:
+                for i in range(len(opt_H)):
+                    for j in range(len(opt_H[i])):
+                        opt_H[i][j]=self.fit_H[i*len(opt_H[i])+j]([[q2q3[0],q2q3[1]]])
             # for j in range(len(opt_H[0])):
             #     opt_H[:,j]=opt_H[:,j]/np.linalg.norm(opt_H[:,j])
             # print("P",opt_P.T)
@@ -174,6 +195,18 @@ class PH_Param(object):
         train_q_key = tuple(self.train_q[train_q_index])
 
         return self.data[train_q_key]['P']-self.nom_P,self.data[train_q_key]['H']-self.nom_H
+    
+    def get_basis_weights(self):
+        if self.method=='FBF':
+            P_coeff=[]
+            for fit_p in self.fit_P:
+                P_coeff.append(fit_p.coeff_A)
+            H_coeff=[]
+            for fit_h in self.fit_H:
+                H_coeff.append(fit_h.coeff_A)
+            return P_coeff,H_coeff
+        else:
+            return None, None
 
     def compare_nominal(self,nom_P,nom_H):
 

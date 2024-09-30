@@ -36,7 +36,7 @@ positioner=positioner_obj('D500B',def_path=config_dir+'D500B_robot_default_confi
     base_transformation_file=config_dir+'D500B_pose.csv',pulse2deg_file_path=config_dir+'D500B_pulse2deg_real.csv',\
     base_marker_config_file=config_dir+'D500B_marker_config/D500B_marker_config.yaml',tool_marker_config_file=config_dir+'positioner_tcp_marker_config/positioner_tcp_marker_config.yaml')
 
-build_pcd = True
+build_pcd = False
 get_height_profile = True
 viz_height_profile = True
 viz_pcd = True
@@ -58,7 +58,7 @@ for dataset in datasets:
     scan_process = ScanProcess(robot_scan,positioner)
     all_height_profile = []
     all_pcd = []
-    for layer_i in range(meta_info['total_weld_layer']):
+    for layer_i in range(1,meta_info['total_weld_layer']):
 
         # get layer data dir
         layer_dir = data_dir + 'weldlayer_' + str(layer_i) + '/'
@@ -70,6 +70,11 @@ for dataset in datasets:
             positioner_js = np.loadtxt(layer_dir + 'positioner_js.csv', delimiter=',')
             with open(layer_dir + 'scan.pkl', 'rb') as f:
                 scan = pickle.load(f)
+            
+            # for scan_step in scan[len(scan)//2:]:
+            #     plt.scatter(scan_step[:,0],scan_step[:,1])
+            #     plt.show()
+            # exit()
 
             z_height_start = meta_info['nominal_weld_height']*layer_i + meta_info['total_base_layer']*meta_info['nominal_base_height']
             crop_min=(-42.5-10,-30,-10)
@@ -90,7 +95,7 @@ for dataset in datasets:
         pcd = pcd.paint_uniform_color(cmap(layer_i/(meta_info['total_weld_layer']-1))[:3])
         all_pcd.append(pcd)
 
-        visualize_pcd([pcd])
+        # visualize_pcd([pcd])
 
         if get_height_profile:
             profile_height,_ = scan_process.pcd2height(deepcopy(pcd),-1,windows_x=0.4)
@@ -99,7 +104,7 @@ for dataset in datasets:
             profile_height = np.loadtxt(layer_dir+'profile_height.csv',delimiter=',')
         all_height_profile.append(profile_height)
             
-
+    visualize_pcd([pcd])
     if viz_pcd:
         visualize_pcd(all_pcd)
     if viz_height_profile:
