@@ -83,6 +83,24 @@ class NeuralNetwork(nn.Module):
         x = self.output(x)
         return x
 
+class FourierNetwork(nn.Module):
+
+    def __init__(self, input_size, output_size):
+        super(FourierNetwork, self).__init__()
+
+        self.output = nn.Linear(12, output_size)
+    
+    def forward(self,x):
+        if len(x.shape) == 2:
+            sum_input = torch.sum(x,dim=1,keepdim=True)
+            x = torch.cat((torch.sin(x),torch.cos(x),torch.sin(sum_input),torch.cos(sum_input),\
+                               torch.sin(2*x),torch.cos(2*x),torch.sin(2*sum_input),torch.cos(2*sum_input)),dim=1)
+        else:
+            sum_input = torch.Tensor([torch.sum(x)])
+            x = torch.cat((torch.sin(x),torch.cos(x),torch.sin(sum_input),torch.cos(sum_input),\
+                                torch.sin(2*x),torch.cos(2*x),torch.sin(2*sum_input),torch.cos(2*sum_input)))
+        x = self.output(x)
+        return x
 
 def train(training_q, training_T_data, testing_q, testing_T_data,robot,param_nominal):
 
@@ -113,26 +131,55 @@ def train(training_q, training_T_data, testing_q, testing_T_data,robot,param_nom
     hidden_sizes = [200,200,200]
     output_size = 33
 
+    # model type
+    modelType = 'NN' # 'Fourier' or 'NN' or 'FourierNN'
+
     # Create an instance of the neural network
     model = NeuralNetwork(input_size, output_size, hidden_sizes=hidden_sizes)
+
+    # Create an instance of the neural network
+    if modelType == 'NN':
+        model = NeuralNetwork(input_size, output_size, hidden_sizes=hidden_sizes)
+    elif modelType == 'Fourier':
+        model = FourierNetwork(input_size, output_size)
+        # load the weights from the inverse model
+        weights_from_inv = np.load('PH_NN_results/FBF_Basis_Coeff.npy')
+        model.output.weight.data = torch.tensor(weights_from_inv[:,:-1], dtype=torch.float32)
+        model.output.bias.data = torch.tensor(weights_from_inv[:,-1], dtype=torch.float32)
+        print('Loaded weights from the inverse model')
+    elif modelType == 'FourierNN':
+        model = NeuralFourierNetwork(input_size, output_size, hidden_sizes=hidden_sizes)
+    else:
+        print('Invalid model type')
+        exit()
+
     # read model from previous trained
     # print("Load model from previous trained")
     model.load_state_dict(torch.load('PH_NN_results/train_200_200_200_lr0.02_2409171041/best_testing_model.pt',weights_only=True))
     
-
     # Print the model architecture
     print(model)
+
     # Define the loss function
     loss_fn = TransformationLoss()
+
     # weights = torch.tensor([1]*33, dtype=torch.float32)
     weights_pos = 1
     weights_ori = 180/np.pi 
     # weights_ori = 1
+
+    # statistics before training
+    model.eval()
+    test_outputs = model(test_inputs_q2q3)
+    test_loss, test_p_error_all, test_ori_error_all = loss_fn(test_outputs, testing_T, testing_q, robot, param_nominal, weights_pos, weights_ori)
+    test_p_error_norm_all = np.linalg.norm(test_p_error_all,axis=1)
+    print('Before training:')
+    print(f'Testing error: mean={np.mean(test_p_error_norm_all):.4f}, max={np.max(test_p_error_norm_all):.4f}')
     
     # Define the learning rate
     learning_rate = 0.0001
     # Define the number of epochs
-    num_epochs = 100000
+    num_epochs = 1005
     # Define the optimizer
     # optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate)
     # or
@@ -142,8 +189,10 @@ def train(training_q, training_T_data, testing_q, testing_T_data,robot,param_nom
     formatted_string = datetime.datetime.now().strftime("%Y%m%d%H%M")
     formatted_string = formatted_string[2:]
     folder_path = 'PH_NN_results/trainDirect_'
-    for h in hidden_sizes:
-        folder_path += str(h)+'_'
+    if modelType != 'Fourier':
+        for h in hidden_sizes:
+            folder_path += str(h)+'_'
+    folder_path += modelType+'_'
     folder_path += 'lr'+str(learning_rate)+'_'
     folder_path += 'wp'+str(round(weights_pos,2))+'_'
     folder_path += 'wo'+str(round(weights_ori,2))+'_'
@@ -152,6 +201,7 @@ def train(training_q, training_T_data, testing_q, testing_T_data,robot,param_nom
 
     # save a training parameters meta yaml file to folder_path
     meta_data = {'input_size': input_size, 'hidden_sizes': hidden_sizes, 'output_size': output_size, 'learning_rate': learning_rate, 'num_epochs': num_epochs}
+    meta_data['modelType'] = modelType
     meta_data['weighted'] = True
     meta_data['weights_pos'] = weights_pos
     meta_data['weights_ori'] = weights_ori
@@ -176,13 +226,6 @@ def train(training_q, training_T_data, testing_q, testing_T_data,robot,param_nom
     for epoch in range(num_epochs):
         epoch_start_time = time.time()
 
-        # get testing data loss
-        model.eval()
-        with torch.no_grad():
-            test_outputs = model(test_inputs_q2q3)
-            test_loss, test_p_error_all, test_ori_error_all = loss_fn(test_outputs, testing_T, testing_q, robot, param_nominal, weights_pos, weights_ori)
-            test_p_error_norm_all = np.linalg.norm(test_p_error_all,axis=1)
-
         # Forward pass
         model.train()
         optimizer.zero_grad() # set the gradients to zero
@@ -194,6 +237,13 @@ def train(training_q, training_T_data, testing_q, testing_T_data,robot,param_nom
         # Backward pass and optimization
         loss.backward() # compute the gradients
         optimizer.step() # update the weights
+
+        # get testing data loss
+        model.eval()
+        with torch.no_grad():
+            test_outputs = model(test_inputs_q2q3)
+            test_loss, test_p_error_all, test_ori_error_all = loss_fn(test_outputs, testing_T, testing_q, robot, param_nominal, weights_pos, weights_ori)
+            test_p_error_norm_all = np.linalg.norm(test_p_error_all,axis=1)
 
         # Print the loss for every N epochs
         print_loss = True

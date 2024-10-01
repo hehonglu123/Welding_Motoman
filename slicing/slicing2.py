@@ -375,7 +375,7 @@ def split_slices(curve,stl_pc,closed=False):
 def slice_stl(bottom_curve,stl_pc,direction,slice_height,point_distance=1,closed=False):
     slice_all=[[bottom_curve]]
     layer_num=0
-    while layer_num<1:
+    while layer_num<100:
         print(layer_num, 'th layer')
         if len(slice_all[-1])==0:
             slice_all=slice_all[:-1]
@@ -388,7 +388,7 @@ def slice_stl(bottom_curve,stl_pc,direction,slice_height,point_distance=1,closed
             except:
                 print('USING SURF NORM @ %ith layer'%layer_num)
                 curve_normal=get_curve_normal(slice_all[-1][x],stl_pc,direction,smooth=True)
-                print(curve_normal)
+                # print(curve_normal)
 
             curve_next=slice_next_layer(slice_all[-1][x],stl_pc,curve_normal,slice_height)
 

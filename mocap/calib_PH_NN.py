@@ -154,7 +154,7 @@ def train(inputs_q2q3, targets_delta_PH, training_q, training_T, testing_q, test
     print(np.degrees(inputs_q2q3).shape)
     print(targets_delta_PH.shape)
 
-    test_only = False
+    test_only = True
 
     # data preprocessing
     inputs_q2q3 = torch.tensor(inputs_q2q3, dtype=torch.float32)
@@ -166,7 +166,7 @@ def train(inputs_q2q3, targets_delta_PH, training_q, training_T, testing_q, test
     output_size = 33
 
     # use fourier basis or not
-    modelType = 'Fourier' # 'Fourier' or 'NN' or 'FourierNN'
+    modelType = 'NN' # 'Fourier' or 'NN' or 'FourierNN'
 
     # Create an instance of the neural network
     if modelType == 'NN':
@@ -175,13 +175,9 @@ def train(inputs_q2q3, targets_delta_PH, training_q, training_T, testing_q, test
         model = FourierNetwork(input_size, output_size)
         # load the weights from the inverse model
         weights_from_inv = np.load('PH_NN_results/FBF_Basis_Coeff.npy')
-        print(weights_from_inv.shape)
-        print(model.output.weight.shape)
-        print(model.output.bias.shape)
         model.output.weight.data = torch.tensor(weights_from_inv[:,:-1], dtype=torch.float32)
         model.output.bias.data = torch.tensor(weights_from_inv[:,-1], dtype=torch.float32)
         print('Loaded weights from the inverse model')
-        
     elif modelType == 'FourierNN':
         model = NeuralFourierNetwork(input_size, output_size, hidden_sizes=hidden_sizes)
     else:
@@ -191,6 +187,8 @@ def train(inputs_q2q3, targets_delta_PH, training_q, training_T, testing_q, test
     # load pre-trained model
     # model.load_state_dict(torch.load('PH_NN_results/train_200_200_200_lr0.02_2409171041/best_testing_model.pt',weights_only=True))
     # model.load_state_dict(torch.load('PH_NN_results/trainDirect_200_200_200_lr0.0001_wp1_wo57.3_2409191033/best_testing_model.pt',weights_only=True))
+    # model.load_state_dict(torch.load('PH_NN_results/trainDirect_Fourier_lr0.0001_wp1_wo57.3_2409301609/best_training_model.pt',weights_only=True))
+    model.load_state_dict(torch.load('PH_NN_results/trainDirect_200_200_200_NN_lr0.0001_wp1_wo57.3_2409301814/best_testing_model.pt',weights_only=True))
 
     # statistics before training
     training_T_error = test_fwd_accuracy(model, training_q, training_T,robot,param_nominal)

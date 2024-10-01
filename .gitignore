@@ -397,3 +397,6 @@ weld/ILC/data/weld_scan*
 *.cache
 
 mocap/PH_NN_results/*
+
+slicing/slicing_result/*
+data/blade0.1/auto_slice/curve*

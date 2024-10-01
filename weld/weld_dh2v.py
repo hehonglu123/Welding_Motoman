@@ -135,8 +135,15 @@ if __name__=='__main__':
     # print(v2dh_loglog(8,210))
     # print(dh2v_loglog(2.5,210))
     # print(dh2v_loglog(3.5,210))
-    print(v2dh_loglog(8,110))
     # print(v2dh_loglog(6,100))
     # print(v2dh_loglog(10,100))
     # print(dh2v_loglog(5,100))
     # print(v2dh_quadratic(5,100))
+
+    
+    v_list = np.arange(5,12,0.2)
+    ipm_list = [100,110,120,130,140,150,160,170,180]
+    
+    for ipm in ipm_list:
+        for v in v_list:
+            print(ipm,round(v,1),v2dh_loglog(v,ipm))
