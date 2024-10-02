@@ -375,7 +375,7 @@ def split_slices(curve,stl_pc,closed=False):
 def slice_stl(bottom_curve,stl_pc,direction,slice_height,point_distance=1,closed=False):
     slice_all=[[bottom_curve]]
     layer_num=0
-    while layer_num<100:
+    while layer_num<800:
         print(layer_num, 'th layer')
         if len(slice_all[-1])==0:
             slice_all=slice_all[:-1]
@@ -390,7 +390,9 @@ def slice_stl(bottom_curve,stl_pc,direction,slice_height,point_distance=1,closed
                 curve_normal=get_curve_normal(slice_all[-1][x],stl_pc,direction,smooth=True)
                 # print(curve_normal)
 
+            print(len(slice_all[-1][x]))
             curve_next=slice_next_layer(slice_all[-1][x],stl_pc,curve_normal,slice_height)
+            print(len(curve_next))
 
             # if x==0 or x==len(slice_all[-1])-1: ###only extend or shrink if first or last section for now
             #     curve_next=fit_to_length(curve_next,stl_pc,closed=closed)
@@ -402,11 +404,15 @@ def slice_stl(bottom_curve,stl_pc,direction,slice_height,point_distance=1,closed
 
             ###split the curve based on projection error
             sub_curves_next,closed=split_slices(curve_next,stl_pc,closed)
+            print(len(sub_curves_next))
+            for j in range(len(sub_curves_next)):
+                print(len(sub_curves_next[j]))
             if len(sub_curves_next)==0:
                 return slice_all
 
             for j in range(len(sub_curves_next)):
                 sub_curves_next[j]=smooth_curve(sub_curves_next[j],point_distance)
+                print(len(sub_curves_next[j]))
             
             slice_ith_layer.extend(sub_curves_next)
 

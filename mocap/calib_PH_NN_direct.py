@@ -132,7 +132,7 @@ def train(training_q, training_T_data, testing_q, testing_T_data,robot,param_nom
     output_size = 33
 
     # model type
-    modelType = 'NN' # 'Fourier' or 'NN' or 'FourierNN'
+    modelType = 'Fourier' # 'Fourier' or 'NN' or 'FourierNN'
 
     # Create an instance of the neural network
     model = NeuralNetwork(input_size, output_size, hidden_sizes=hidden_sizes)
@@ -155,7 +155,7 @@ def train(training_q, training_T_data, testing_q, testing_T_data,robot,param_nom
 
     # read model from previous trained
     # print("Load model from previous trained")
-    model.load_state_dict(torch.load('PH_NN_results/train_200_200_200_lr0.02_2409171041/best_testing_model.pt',weights_only=True))
+    # model.load_state_dict(torch.load('PH_NN_results/train_200_200_200_lr0.02_2409171041/best_testing_model.pt',weights_only=True))
     
     # Print the model architecture
     print(model)
