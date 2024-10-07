@@ -32,7 +32,7 @@ with open(data_dir+'slicing.yml', 'r') as file:
 waypoint_distance=5 	###waypoint separation
 layer_width_num=int(4/slicing_meta['line_resolution'])
 
-weld_arcon=True
+weld_arcon=False
 # #######################################ER4043########################################################
 job_offset=200
 vd_relative=8
