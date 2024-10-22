@@ -74,55 +74,16 @@ robot_q_sample = deepcopy(robot_q[0:-1:N_per_pose])
 train_N = total_pose
 train_set=np.arange(train_N).astype(int)
 print(data_dir)
-# print(train_set)
-
-## get initial param from CPA
-# param_init = np.zeros(3*(jN+1)+2*jN)
-# param_init[:3*(jN+1)] = np.reshape(robot.calib_P.T,(3*(jN+1),))
-# for j in range(jN):
-#     sol = subproblem2(robot.H_nominal[j],robot.calib_H[:,j],robot.param_k2[j],robot.param_k1[j])
-#     sol_id = np.argmin(np.linalg.norm(sol,axis=1))
-#     sol_b = sol[sol_id][0]
-#     sol_a = sol[sol_id][1]
-#     param_init[3*(jN+1)+2*j] = sol_a
-#     param_init[3*(jN+1)+2*j+1] = sol_b
-#     if H_unit == 'degrees':
-#         param_init[3*(jN+1)+2*j] = np.degrees(sol_a)
-#         param_init[3*(jN+1)+2*j+1] = np.degrees(sol_b)
-# ## remove redundancy
-# robot = get_PH_from_param(param_init, robot,unit=H_unit)
-# param_init_remove = deepcopy(param_init)
-# for i in range(jN):
-#     h_nom = robot.H_nominal[i]
-#     h_act = robot.robot.H[:,i]
-#     p_i_i1 = param_init_remove[i*3:(i+1)*3]
-#     alpha_i = -np.dot(p_i_i1,h_nom)/np.dot(h_act,h_nom)
-#     p_i_i1_remove = p_i_i1+alpha_i*h_act
-#     param_init_remove[i*3:(i+1)*3] = p_i_i1_remove
-#     param_init_remove[(i+1)*3:(i+2)*3] = param_init_remove[(i+1)*3:(i+2)*3]-alpha_i*h_act
-# # test redundancy removal
-# for i in range(100):
-#     q1 = rng.uniform(low=robot.lower_limit, high=robot.upper_limit)
-#     # q1=np.radians([0,0,0,40,0,0])
-#     # if i==0:
-#     #     q1 = np.zeros(6)
-#     robot = get_PH_from_param(param_init, robot,unit=H_unit)
-#     T_redundant = robot.fwd(q1)
-#     robot = get_PH_from_param(param_init_remove, robot,unit=H_unit)
-#     T_remove = robot.fwd(q1)
-#     TT_inv = T_redundant*(T_remove.inv())
-#     if np.linalg.norm(H_from_RT(TT_inv.R,TT_inv.p)-np.eye(4),'fro')>1e-3:
-#         print("redundancy removal failed")
-#         exit()
-# param_init=param_init_remove
 
 #### parametrization
 minimal=True
 
+## get initial param from CPA
 if minimal:
     param_init = get_param_from_PH_minimal(robot,robot.calib_P,robot.calib_H,robot.P_nominal.T,robot.H_nominal.T)
 else:
     param_init = get_param_from_PH(robot,robot.calib_P,robot.calib_H,robot.H_nominal.T)
+print("Initial Param:",param_init)
 
 #### Gradient
 plot_grad=False
@@ -138,13 +99,20 @@ max_iteration = 200
 terminate_eps = 0.0002
 terminate_ori_error=999
 # terminate_ori_error=0.05
-P_size = jN+1
-H_size = jN
+
+if minimal:
+    total_P = jN*2+3
+    total_H = jN*2
+else:
+    total_P = (jN+1)*3
+    total_H = jN*2
+assert total_P+total_H==len(param_init), "Total P and H not match with param_init"
+
 alpha=0.1
 # weight_ori = 1
 # weight_pos = 1
 weight_ori = 1
-weight_pos = 1
+weight_pos = 1*np.pi/180
 weight_P = 1
 # weight_H = np.pi/180
 weight_H = 1
@@ -188,8 +156,8 @@ for N in train_set:
             else:
                 J_ana_part = jacobian_param(param,robot,robot_q[pose_ind],unit=H_unit)
             # weighting
-            J_ana_part[:,:P_size*3] *= weight_P
-            J_ana_part[3:,P_size*3:] *= weight_H
+            J_ana_part[:,:total_P] *= weight_P
+            J_ana_part[3:,total_P:] *= weight_H
             J_ana.extend(J_ana_part)
             # get error
             robot_init_T = robot.fwd(robot_q[pose_ind])
@@ -212,7 +180,7 @@ for N in train_set:
         
         # update PH
         G = J_ana
-        Kq = np.diag(np.append(np.ones(P_size*3)*lambda_P,np.ones(H_size*2)*lambda_H)) ## TODO: tune lambda!!
+        Kq = np.diag(np.append(np.ones(total_P)*lambda_P,np.ones(total_H)*lambda_H)) ## TODO: tune lambda!!
         H=np.matmul(G.T,G)+Kq
         H=(H+np.transpose(H))/2
         f=-np.matmul(G.T,error_pos_ori)
@@ -285,9 +253,9 @@ for N in train_set:
             plt.show()
     # update robot PH
     if minimal:
-        robot = get_PH_from_param_minimal(param,robot,unit='degrees')
+        robot = get_PH_from_param_minimal(param,robot,unit=H_unit)
     else:
-        robot = get_PH_from_param(param,robot,unit='degrees')
+        robot = get_PH_from_param(param,robot,unit=H_unit)
     if save_PH:
         q_key = tuple(robot_q_sample[N,1:3])
         PH_q[q_key]={}
@@ -295,7 +263,11 @@ for N in train_set:
         PH_q[q_key]['H']=robot.robot.H
         PH_q[q_key]['train_pos_error']=pos_error_norm_progress
         PH_q[q_key]['train_ori_error']=ori_error_norm_progress
-        with open(data_dir+'calib_PH_q_ana_minimal.pickle','wb') as file:
+        if minimal:
+            save_filename = data_dir+'calib_PH_q_ana_minimal.pickle'
+        else:
+            save_filename = data_dir+'calib_PH_q_ana.pickle'
+        with open(save_filename,'wb') as file:
             pickle.dump(PH_q, file)
 
     print("================")
@@ -362,7 +334,7 @@ for iter_N in range(max_iteration):
 
     # update PH
     G = J_ana
-    Kq = np.diag(np.append(np.ones(P_size*3)*lambda_P,np.ones(H_size*2))*lambda_H)
+    Kq = np.diag(np.append(np.ones(total_P)*lambda_P,np.ones(total_H))*lambda_H)
     H=np.matmul(G.T,G)+Kq
     H=(H+np.transpose(H))/2
     f=-np.matmul(G.T,error_pos_ori)
@@ -372,9 +344,9 @@ for iter_N in range(max_iteration):
     param = param+d_pH_update
 
 if minimal:
-    robot = get_PH_from_param_minimal(param,robot,unit='degrees')
+    robot = get_PH_from_param_minimal(param,robot,unit=H_unit)
 else:
-    robot = get_PH_from_param(param,robot,unit='degrees')
+    robot = get_PH_from_param(param,robot,unit=H_unit)
 print("Start/Final Mean Position Error:",round(np.mean(pos_error_norm_progress[0]),5),round(np.mean(pos_error_norm_progress[-1]),5))
 print("Start/Final Mean Orientation Error:",round(np.mean(ori_error_norm_progress[0]),5),round(np.mean(ori_error_norm_progress[-1]),5))
 print('P:',np.round(robot.robot.P,3).T)
@@ -386,7 +358,11 @@ if save_PH:
     PH_q['H']=robot.robot.H
     PH_q['train_pos_error']=pos_error_norm_progress
     PH_q['train_ori_error']=ori_error_norm_progress
-    with open(data_dir+'calib_one_PH_ana_minimal.pickle','wb') as file:
+    if minimal:
+        save_filename = data_dir+'calib_one_PH_ana_minimal.pickle'
+    else:
+        save_filename = data_dir+'calib_one_PH_ana.pickle'
+    with open(save_filename,'wb') as file:
         pickle.dump(PH_q, file)
 
 if plot_error:

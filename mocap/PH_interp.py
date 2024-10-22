@@ -69,7 +69,7 @@ class PH_Param(object):
         self.nom_P = deepcopy(nom_P)
         self.nom_H = deepcopy(nom_H)
 
-    def fit(self,data,method='nearest',useHRotation=False):
+    def fit(self,data,method='nearest',useHRotation=False,useMinimal=False):
 
         train_q = []
         for qkey in data.keys():
@@ -78,7 +78,8 @@ class PH_Param(object):
         self.train_q=train_q
         self.method=method
         self.data=data
-        self.useHRotation=useHRotation
+        self.useHRotation=(useHRotation or useMinimal)
+        self.useMinimal=useMinimal
 
         if method=='nearest':
             self.predict_func=self._predict_nearest
@@ -106,8 +107,12 @@ class PH_Param(object):
         
         value_P=[]
         value_H=[]
-        for i in range(7*3):
-            value_P.append([])
+        if self.useMinimal:
+            for i in range(6*2+3):
+                value_P.append([])
+        else:
+            for i in range(7*3):
+                value_P.append([])
         if self.useHRotation:
             for i in range(6*2):
                 value_H.append([])
@@ -117,11 +122,16 @@ class PH_Param(object):
 
         for q in self.train_q:
             i=0
-            for P in self.data[tuple(q)]['P']:
-                diff_P = P-self.nom_P[round(i/7.)]
-                for qi in diff_P:
-                    value_P[i].append(qi)
+            if self.useMinimal:
+                for P in self.data[tuple(q)]['P']:
+                    value_P[i].append(P)
                     i+=1
+            else:
+                for P in self.data[tuple(q)]['P']:
+                    diff_P = P-self.nom_P[round(i/7.)]
+                    for qi in diff_P:
+                        value_P[i].append(qi)
+                        i+=1
             i=0
             if self.useHRotation:
                 for H in self.data[tuple(q)]['H']:
@@ -147,7 +157,11 @@ class PH_Param(object):
         
         q2q3=np.array(q2q3)
         P,H = self.predict_func(q2q3)
-        opt_P=P+self.nom_P
+
+        if not self.useMinimal:
+            opt_P=P+self.nom_P
+        else:
+            opt_P=P
 
         if not self.useHRotation:
             opt_H=H+self.nom_H
@@ -160,21 +174,27 @@ class PH_Param(object):
 
     def _predict_interp(self,q2q3):
 
-        if self.useHRotation:
+        if self.useMinimal:
+            opt_P = np.zeros(6*2+3,dtype=float)
+            opt_H = np.zeros(6*2,dtype=float)
+        elif self.useHRotation:
             opt_P = np.zeros_like(self.nom_P,dtype=float)
             opt_H = np.zeros(6*2,dtype=float)
-        else:
+        if not self.useHRotation:
             opt_P,opt_H = deepcopy(self._predict_nearest(q2q3))
         
         if np.isnan(self.fit_P[0]([[q2q3[0],q2q3[1]]])):
             # if outside training data, use nearest neighbor
             pass
         else:
-            for i in range(len(opt_P)):
-                for j in range(len(opt_P[i])):
-                    opt_P[i][j]=self.fit_P[i*len(opt_P[i])+j]([[q2q3[0],q2q3[1]]])
+            if self.useMinimal:
+                for i in range(len(opt_P)):
+                    opt_P[i]=self.fit_P[i]([[q2q3[0],q2q3[1]]])
+            else:
+                for i in range(len(opt_P)):
+                    for j in range(len(opt_P[i])):
+                        opt_P[i][j]=self.fit_P[i*len(opt_P[i])+j]([[q2q3[0],q2q3[1]]])
             if self.useHRotation:
-                opt_H = np.zeros(6*2)
                 for i in range(len(opt_H)):
                     opt_H[i]=self.fit_H[i]([[q2q3[0],q2q3[1]]])
             else:

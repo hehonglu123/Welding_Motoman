@@ -172,7 +172,7 @@ def get_param_from_PH(robot,this_P,this_H,nom_H):
         theta_sol = theta_sol[0] if theta_sol[0][0]<np.pi/2 and theta_sol[0][0]>-np.pi/2 else theta_sol[1]
         param_H.extend(theta_sol[::-1])
 
-    return np.reshape(this_P.T,-1),np.array(param_H)
+    return np.append(np.reshape(this_P.T,-1),np.array(param_H))
 
 def jacobian_param(param,robot,theta,unit='radians',minimal=False):
     
@@ -311,7 +311,7 @@ def get_param_from_PH_minimal(robot,this_P,this_H,nom_P,nom_H):
         theta_sol = theta_sol[0] if theta_sol[0][0]<np.pi/2 and theta_sol[0][0]>-np.pi/2 else theta_sol[1]
         param_H.extend(theta_sol[::-1])
     
-    return param_P,np.array(param_H)
+    return np.append(param_P,np.array(param_H))
 
 def jacobian_param_minimal(param,robot,theta,unit='radians'):
 
@@ -396,8 +396,7 @@ def minimal_test(robot):
     # get orthogonal axis of each joint
     robot = get_H_param_axis(robot)
 
-    param_p,param_H = get_param_from_PH_minimal(robot,robot.calib_P,robot.calib_H,robot.P_nominal.T,robot.H_nominal.T)
-    param_min = np.append(param_p,param_H)
+    param_min = get_param_from_PH_minimal(robot,robot.calib_P,robot.calib_H,robot.P_nominal.T,robot.H_nominal.T)
 
     from numpy.random import default_rng
     rng = default_rng()
