@@ -18,11 +18,11 @@ Rx=np.array([1,0,0])
 Ry=np.array([0,1,0])
 Rz=np.array([0,0,1])
 
-dataset_date='0804'
+dataset_date='0801'
 
 config_dir='../config/'
 
-robot_type = 'R2'
+robot_type = 'R1'
 
 if robot_type == 'R1':
     robot_marker_dir=config_dir+'MA2010_marker_config/'
@@ -77,44 +77,52 @@ print(data_dir)
 # print(train_set)
 
 ## get initial param from CPA
-param_init = np.zeros(3*(jN+1)+2*jN)
-param_init[:3*(jN+1)] = np.reshape(robot.calib_P.T,(3*(jN+1),))
-for j in range(jN):
-    sol = subproblem2(robot.H_nominal[j],robot.calib_H[:,j],robot.param_k2[j],robot.param_k1[j])
-    sol_id = np.argmin(np.linalg.norm(sol,axis=1))
-    sol_b = sol[sol_id][0]
-    sol_a = sol[sol_id][1]
-    param_init[3*(jN+1)+2*j] = sol_a
-    param_init[3*(jN+1)+2*j+1] = sol_b
-    if H_unit == 'degrees':
-        param_init[3*(jN+1)+2*j] = np.degrees(sol_a)
-        param_init[3*(jN+1)+2*j+1] = np.degrees(sol_b)
-## remove redundancy
-robot = get_PH_from_param(param_init, robot,unit=H_unit)
-param_init_remove = deepcopy(param_init)
-for i in range(jN):
-    h_nom = robot.H_nominal[i]
-    h_act = robot.robot.H[:,i]
-    p_i_i1 = param_init_remove[i*3:(i+1)*3]
-    alpha_i = -np.dot(p_i_i1,h_nom)/np.dot(h_act,h_nom)
-    p_i_i1_remove = p_i_i1+alpha_i*h_act
-    param_init_remove[i*3:(i+1)*3] = p_i_i1_remove
-    param_init_remove[(i+1)*3:(i+2)*3] = param_init_remove[(i+1)*3:(i+2)*3]-alpha_i*h_act
-# test redundancy removal
-for i in range(100):
-    q1 = rng.uniform(low=robot.lower_limit, high=robot.upper_limit)
-    # q1=np.radians([0,0,0,40,0,0])
-    # if i==0:
-    #     q1 = np.zeros(6)
-    robot = get_PH_from_param(param_init, robot,unit=H_unit)
-    T_redundant = robot.fwd(q1)
-    robot = get_PH_from_param(param_init_remove, robot,unit=H_unit)
-    T_remove = robot.fwd(q1)
-    TT_inv = T_redundant*(T_remove.inv())
-    if np.linalg.norm(H_from_RT(TT_inv.R,TT_inv.p)-np.eye(4),'fro')>1e-3:
-        print("redundancy removal failed")
-        exit()
-param_init=param_init_remove
+# param_init = np.zeros(3*(jN+1)+2*jN)
+# param_init[:3*(jN+1)] = np.reshape(robot.calib_P.T,(3*(jN+1),))
+# for j in range(jN):
+#     sol = subproblem2(robot.H_nominal[j],robot.calib_H[:,j],robot.param_k2[j],robot.param_k1[j])
+#     sol_id = np.argmin(np.linalg.norm(sol,axis=1))
+#     sol_b = sol[sol_id][0]
+#     sol_a = sol[sol_id][1]
+#     param_init[3*(jN+1)+2*j] = sol_a
+#     param_init[3*(jN+1)+2*j+1] = sol_b
+#     if H_unit == 'degrees':
+#         param_init[3*(jN+1)+2*j] = np.degrees(sol_a)
+#         param_init[3*(jN+1)+2*j+1] = np.degrees(sol_b)
+# ## remove redundancy
+# robot = get_PH_from_param(param_init, robot,unit=H_unit)
+# param_init_remove = deepcopy(param_init)
+# for i in range(jN):
+#     h_nom = robot.H_nominal[i]
+#     h_act = robot.robot.H[:,i]
+#     p_i_i1 = param_init_remove[i*3:(i+1)*3]
+#     alpha_i = -np.dot(p_i_i1,h_nom)/np.dot(h_act,h_nom)
+#     p_i_i1_remove = p_i_i1+alpha_i*h_act
+#     param_init_remove[i*3:(i+1)*3] = p_i_i1_remove
+#     param_init_remove[(i+1)*3:(i+2)*3] = param_init_remove[(i+1)*3:(i+2)*3]-alpha_i*h_act
+# # test redundancy removal
+# for i in range(100):
+#     q1 = rng.uniform(low=robot.lower_limit, high=robot.upper_limit)
+#     # q1=np.radians([0,0,0,40,0,0])
+#     # if i==0:
+#     #     q1 = np.zeros(6)
+#     robot = get_PH_from_param(param_init, robot,unit=H_unit)
+#     T_redundant = robot.fwd(q1)
+#     robot = get_PH_from_param(param_init_remove, robot,unit=H_unit)
+#     T_remove = robot.fwd(q1)
+#     TT_inv = T_redundant*(T_remove.inv())
+#     if np.linalg.norm(H_from_RT(TT_inv.R,TT_inv.p)-np.eye(4),'fro')>1e-3:
+#         print("redundancy removal failed")
+#         exit()
+# param_init=param_init_remove
+
+#### parametrization
+minimal=True
+
+if minimal:
+    param_init = get_param_from_PH_minimal(robot,robot.calib_P,robot.calib_H,robot.P_nominal.T,robot.H_nominal.T)
+else:
+    param_init = get_param_from_PH(robot,robot.calib_P,robot.calib_H,robot.H_nominal.T)
 
 #### Gradient
 plot_grad=False
@@ -164,7 +172,10 @@ for N in train_set:
     ori_error_norm_progress = []
     for iter_N in range(max_iteration):
         # update robot PH
-        robot = get_PH_from_param(param,robot,unit=H_unit)
+        if minimal:
+            robot = get_PH_from_param_minimal(param,robot,unit=H_unit)
+        else:
+            robot = get_PH_from_param(param,robot,unit=H_unit)
         
         J_ana=[]
         error_pos_ori = []
@@ -172,7 +183,10 @@ for N in train_set:
         error_ori = []
         for testing_pose in all_testing_pose:
             pose_ind=N*N_per_pose+testing_pose
-            J_ana_part = jacobian_param(param,robot,robot_q[pose_ind],unit=H_unit)
+            if minimal:
+                J_ana_part = jacobian_param_minimal(param,robot,robot_q[pose_ind],unit=H_unit)
+            else:
+                J_ana_part = jacobian_param(param,robot,robot_q[pose_ind],unit=H_unit)
             # weighting
             J_ana_part[:,:P_size*3] *= weight_P
             J_ana_part[3:,P_size*3:] *= weight_H
@@ -270,8 +284,10 @@ for N in train_set:
             plt.title("Mean/Std of Orientation Error Norm of Poses",fontsize=18)
             plt.show()
     # update robot PH
-    robot = get_PH_from_param(param,robot,unit='degrees')
-    print(robot.robot.P.T)
+    if minimal:
+        robot = get_PH_from_param_minimal(param,robot,unit='degrees')
+    else:
+        robot = get_PH_from_param(param,robot,unit='degrees')
     if save_PH:
         q_key = tuple(robot_q_sample[N,1:3])
         PH_q[q_key]={}
@@ -309,14 +325,20 @@ for iter_N in range(max_iteration):
             print("Orientation error:",np.mean(ori_error_norm_progress[-1]))
 
     # update robot PH
-    robot = get_PH_from_param(param,robot,unit=H_unit)
+    if minimal:
+        robot = get_PH_from_param_minimal(param,robot,unit=H_unit)
+    else:
+        robot = get_PH_from_param(param,robot,unit=H_unit)
     
     J_ana=[]
     error_pos_ori = []
     error_pos = []
     error_ori = []
     for pose_ind in range(len(robot_q)):
-        J_ana_part = jacobian_param(param,robot,robot_q[pose_ind])
+        if minimal:
+            J_ana_part = jacobian_param_minimal(param,robot,robot_q[pose_ind],unit=H_unit)
+        else:
+            J_ana_part = jacobian_param(param,robot,robot_q[pose_ind],unit=H_unit)
         J_ana.extend(J_ana_part)
         
         # get error
@@ -349,7 +371,10 @@ for iter_N in range(max_iteration):
     d_pH_update = -1*alpha*dph
     param = param+d_pH_update
 
-robot = get_PH_from_param(param,robot,unit=H_unit)
+if minimal:
+    robot = get_PH_from_param_minimal(param,robot,unit='degrees')
+else:
+    robot = get_PH_from_param(param,robot,unit='degrees')
 print("Start/Final Mean Position Error:",round(np.mean(pos_error_norm_progress[0]),5),round(np.mean(pos_error_norm_progress[-1]),5))
 print("Start/Final Mean Orientation Error:",round(np.mean(ori_error_norm_progress[0]),5),round(np.mean(ori_error_norm_progress[-1]),5))
 print('P:',np.round(robot.robot.P,3).T)
