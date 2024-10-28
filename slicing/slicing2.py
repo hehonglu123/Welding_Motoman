@@ -465,7 +465,8 @@ def post_process(slice_all,point_distance=0.5):       ###postprocess the sliced 
 
 def main_blade():
     # Load the STL file
-    filename = '../data/blade0.1/surface.stl'
+    # filename = '../data/blade0.1/surface.stl'
+    filename = "../data/eric_mesh/mesh_transformed.stl"
     your_mesh = mesh.Mesh.from_file(filename)
     # Get the number of facets in the STL file
     num_facets = len(your_mesh)
@@ -498,7 +499,7 @@ def main_blade():
 
             ax.plot3D(slice_all[i][x][::vis_step,0],slice_all[i][x][::vis_step,1],slice_all[i][x][::vis_step,2],'r.-')
             # np.savetxt('slicing_result/slice%i_%i.csv'%(i,x),slice_all[i][x],delimiter=',')
-            np.savetxt('slicing_result/slice%i_%i.csv'%(i,x),np.hstack((slice_all[i][x],curve_normal_all[i][x])),delimiter=',')
+            # np.savetxt('slicing_result/slice%i_%i.csv'%(i,x),np.hstack((slice_all[i][x],curve_normal_all[i][x])),delimiter=',')
 
     ax.set_xlabel('X')
     ax.set_ylabel('Y')
