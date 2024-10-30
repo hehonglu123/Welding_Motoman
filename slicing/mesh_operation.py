@@ -1,6 +1,9 @@
 import numpy as np
 import open3d as o3d
+from matplotlib import pyplot as plt
 from general_robotics_toolbox import *
+
+from slicing2 import slicing_uniform
 
 def visualize_meshes(mesh):
     # Create a coordinate frame at the origin
@@ -85,26 +88,72 @@ mesh = mesh.subdivide_midpoint(number_of_iterations=1)
 triangles = np.asarray(mesh.triangles)
 vertices = np.asarray(mesh.vertices)
 
+# Get the mask of vertices that have z <= threshold
+mask =  np.logical_and(vertices[:, 2] <= 5,vertices[:, 2] >= -5)
+
+# Filter vertices based on the mask
+new_vertices = vertices[mask]
+
+# Create a mapping from old vertex index to new vertex index
+old_to_new_indices = -1 * np.ones(len(vertices), dtype=int)
+old_to_new_indices[mask] = np.arange(len(new_vertices))
+
+# Filter out triangles that have all vertices retained
+new_triangles = []
 for triangle in triangles:
-    z_values = vertices[triangle, 2]
-    if (z_values <= 0).any() and (z_values >= 0).any():
-        # find the vertices of the triangle <= 0
-        z_values_0 = z_values <= 0
-        triangle_index = triangle[z_values_0]
-        vertices[triangle_index, 2] = 0
-mesh.vertices = o3d.utility.Vector3dVector(vertices)
+    if mask[triangle[0]] and mask[triangle[1]] and mask[triangle[2]]:
+        new_triangles.append([old_to_new_indices[i] for i in triangle])
+new_triangles = np.asarray(new_triangles)
 
-# Remove triangles where all 3 vertices have z < 0
-triangles_to_remove = []
-for i, triangle in enumerate(triangles):
-    z_values = vertices[triangle, 2]
-    if (z_values < 0).all():
-        triangles_to_remove.append(i)
+# Create a new mesh with the filtered vertices and triangles
+mesh_removed = o3d.geometry.TriangleMesh(
+    vertices=o3d.utility.Vector3dVector(new_vertices),
+    triangles=o3d.utility.Vector3iVector(new_triangles),
+)
 
-# Create a new mesh without the unwanted triangles
-mesh.remove_triangles_by_index(triangles_to_remove)
+pcd = mesh_removed.sample_points_uniformly(number_of_points=50000)
+# pcd = mesh.sample_points_poisson_disk(number_of_points=500, pcl=pcd)
+pcd_arr = np.asarray(pcd.points)
+
+bottom_edge = slicing_uniform(pcd_arr,0,threshold=0.01)
+x_sort = np.argsort(bottom_edge[:,0])
+bottom_edge = bottom_edge[x_sort]
+
+# Plot the bottom edge with color mapping
+fig = plt.figure()
+ax = fig.add_subplot(111)
+# Create a color map
+cmap = plt.get_cmap('viridis')
+norm = plt.Normalize(vmin=0, vmax=len(bottom_edge))
+# Plot each point with a color corresponding to its index
+for i in range(len(bottom_edge)):
+    ax.scatter(bottom_edge[i, 0], bottom_edge[i, 1], color=cmap(norm(i)), s=10)
+ax.set_xlabel('X')
+ax.set_ylabel('Y')
+plt.title('Bottom Edge with Color Mapping')
+plt.show()
+
+# for triangle in triangles:
+#     z_values = vertices[triangle, 2]
+#     if (z_values <= 0).any() and (z_values > 0).any():
+#         # find the vertices of the triangle <= 0
+#         z_values_0 = z_values <= 0
+#         triangle_index = triangle[z_values_0]
+#         vertices[triangle_index, 2] = 0
+# mesh.vertices = o3d.utility.Vector3dVector(vertices)
+# # Remove triangles where all 3 vertices have z < 0
+# triangles_to_remove = []
+# for i, triangle in enumerate(triangles):
+#     z_values = vertices[triangle, 2]
+#     if (z_values < 0).all():
+#         triangles_to_remove.append(i)
+# # Create a new mesh without the unwanted triangles
+# mesh.remove_triangles_by_index(triangles_to_remove)
 
 # Add the plane to the visualization
-visualize_meshes([mesh])
+visualize_meshes([mesh,pcd])
 # save mesh
 o3d.io.write_triangle_mesh(data_dir+"mesh_transformed.stl", mesh)
+
+# save the bottom edge path
+np.savetxt(data_dir+"bottom_edge_raw.csv", bottom_edge, delimiter=",")

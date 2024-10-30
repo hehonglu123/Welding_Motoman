@@ -1,17 +1,67 @@
 from stl import mesh
 import numpy as np
+import os
+import time
 import matplotlib.pyplot as plt
 from matplotlib.path import Path
 from mpl_toolkits.mplot3d import Axes3D
-import sys, copy, traceback, warnings
+import sys, copy, traceback, warnings, glob
 from scipy.spatial import ConvexHull
 import open3d as o3d
+import threading
 
 sys.path.append('../toolbox')
 from utils import *
 from lambda_calc import *
 from error_check import *
 from toolbox_circular_fit import *
+
+def cut_mesh_z_axis(mesh,max_z,min_z):
+
+    triangles = np.asarray(mesh.triangles)
+    vertices = np.asarray(mesh.vertices)
+
+    # Get the mask of vertices that have z <= threshold
+    mask =  np.logical_and(vertices[:, 2] <= max_z,vertices[:, 2] >= min_z)
+
+    # Filter vertices based on the mask
+    new_vertices = vertices[mask]
+
+    # Create a mapping from old vertex index to new vertex index
+    old_to_new_indices = -1 * np.ones(len(vertices), dtype=int)
+    old_to_new_indices[mask] = np.arange(len(new_vertices))
+
+    # Filter out triangles that have all vertices retained
+    new_triangles = []
+    for triangle in triangles:
+        if mask[triangle[0]] and mask[triangle[1]] and mask[triangle[2]]:
+            new_triangles.append([old_to_new_indices[i] for i in triangle])
+    new_triangles = np.asarray(new_triangles)
+
+    # Create a new mesh with the filtered vertices and triangles
+    mesh_removed = o3d.geometry.TriangleMesh(
+        vertices=o3d.utility.Vector3dVector(new_vertices),
+        triangles=o3d.utility.Vector3iVector(new_triangles),
+    )
+
+    return mesh_removed
+
+def visualize_objects(mesh,coordinate_size=100):
+    # Create a coordinate frame at the origin
+    coordinate_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=coordinate_size, origin=[0, 0, 0])
+
+    # visualize the mesh
+    vis = o3d.visualization.Visualizer()
+    vis.create_window(width=1200, height=900)
+    # Visualize the mesh along with the coordinate frame
+    if type(mesh) == list:
+        for m in mesh:
+            vis.add_geometry(m)
+    else:
+        vis.add_geometry(mesh)
+    vis.add_geometry(coordinate_frame)
+    vis.run()
+    vis.destroy_window()
 
 warnings.filterwarnings("ignore")
 
@@ -138,7 +188,7 @@ def slicing_uniform(stl_pc,z,threshold = 1e-6):
 
 def smooth_curve(curve,point_distance):
     lam=calc_lam_cs(curve)
-    polyfit=np.polyfit(lam,curve,deg=20)
+    polyfit=np.polyfit(lam,curve,deg=100)
     lam=np.linspace(0,lam[-1],num=int(lam[-1]/point_distance))
     curve_new=np.vstack((np.poly1d(polyfit[:,0])(lam), np.poly1d(polyfit[:,1])(lam), np.poly1d(polyfit[:,2])(lam))).T
     
@@ -375,7 +425,7 @@ def split_slices(curve,stl_pc,closed=False):
 def slice_stl(bottom_curve,stl_pc,direction,slice_height,point_distance=1,closed=False):
     slice_all=[[bottom_curve]]
     layer_num=0
-    while layer_num<800:
+    while layer_num<10:
         print(layer_num, 'th layer')
         if len(slice_all[-1])==0:
             slice_all=slice_all[:-1]
@@ -390,9 +440,9 @@ def slice_stl(bottom_curve,stl_pc,direction,slice_height,point_distance=1,closed
                 curve_normal=get_curve_normal(slice_all[-1][x],stl_pc,direction,smooth=True)
                 # print(curve_normal)
 
-            print(len(slice_all[-1][x]))
+            print("Previous layer length:",len(slice_all[-1][x]))
             curve_next=slice_next_layer(slice_all[-1][x],stl_pc,curve_normal,slice_height)
-            print(len(curve_next))
+            print("Next layer length from pervious layer:",len(curve_next))
 
             # if x==0 or x==len(slice_all[-1])-1: ###only extend or shrink if first or last section for now
             #     curve_next=fit_to_length(curve_next,stl_pc,closed=closed)
@@ -404,21 +454,161 @@ def slice_stl(bottom_curve,stl_pc,direction,slice_height,point_distance=1,closed
 
             ###split the curve based on projection error
             sub_curves_next,closed=split_slices(curve_next,stl_pc,closed)
-            print(len(sub_curves_next))
-            for j in range(len(sub_curves_next)):
-                print(len(sub_curves_next[j]))
+            print("# of segments:",len(sub_curves_next))
+                
             if len(sub_curves_next)==0:
                 return slice_all
 
             for j in range(len(sub_curves_next)):
+                print("Before smooth length:",len(sub_curves_next[j]))
                 sub_curves_next[j]=smooth_curve(sub_curves_next[j],point_distance)
-                print(len(sub_curves_next[j]))
+                print("After smooth length:",len(sub_curves_next[j]))
             
             slice_ith_layer.extend(sub_curves_next)
 
         layer_num+=1
         slice_all.append(slice_ith_layer)
 
+    
+    return slice_all
+
+def slice_mesh(bottom_curve,mesh,direction,slice_height,point_distance=1,closed=False,data_dir=''):
+    
+    global visualize_flag
+    visualize_flag = False
+    def get_input():
+        global visualize_flag
+        user_input = input("You have 10 seconds to provide input: ").strip()
+        visualize_flag = user_input
+    # Start a thread to get user input
+    input_thread = threading.Thread(target=get_input,daemon=True)
+    input_thread.start()
+    # # Wait for 10 seconds
+    # input_thread.join(timeout=0.1)
+
+    temp_dir = data_dir + 'temp_curve/'
+    if not os.path.exists(temp_dir):
+        slice_all=[[bottom_curve]]
+        layer_num=0
+        os.makedirs(temp_dir)
+    else:
+        slice_all = []
+        layer_num=0
+        for layer_i in glob.glob(temp_dir + 'slice*_0.csv'):
+            slice_all.append([])
+            layer_num+=1
+            for seg_j in glob.glob(temp_dir + 'slice'+str(layer_num)+'_*'):
+                slice_all[-1].append(np.loadtxt(seg_j, delimiter=','))
+        pcd_list = []
+        cmap = plt.get_cmap('tab10')
+        for i in range(len(slice_all)):
+            pcd = o3d.geometry.PointCloud()
+            layer_pts = np.concatenate(slice_all[i],axis=0)
+            pcd.points = o3d.utility.Vector3dVector(layer_pts)
+            color = list(cmap(i/len(slice_all))[:3])
+            pcd.paint_uniform_color(color)
+            pcd_list.append(pcd)
+        pcd_list.append(mesh)
+        visualize_objects(pcd_list)
+
+    layers_time_elapsed = []
+    while layer_num<5000:
+        layer_st = time.time()
+        print(layer_num, 'th layer')
+        if len(slice_all[-1])==0:
+            slice_all=slice_all[:-1]
+            break
+        slice_ith_layer=[]
+
+        cut_st = time.time()
+        last_layer_pts = np.concatenate(slice_all[-1],axis=0)
+        mesh_cut = cut_mesh_z_axis(mesh,np.max(last_layer_pts[:,2])+5,np.min(last_layer_pts[:,2])-5)
+        pcd = mesh_cut.sample_points_uniformly(number_of_points=30000)
+        # visualize_objects([mesh,pcd])
+        stl_pc = np.asarray(pcd.points)
+        print("Time for cutting mesh:", time.time()-cut_st)
+        
+        for x in range(len(slice_all[-1])):
+            ###push curve 1 layer up
+            # try:
+            #     curve_normal=get_curve_normal_from_curves(slice_all[-1][x],np.concatenate(slice_all[-2],axis=0))
+            # except:
+            #     print('USING SURF NORM @ %ith layer'%layer_num)
+            # print('USING SURF NORM @ %ith layer'%layer_num)
+
+            last_curve = slice_all[-1][x]
+            # if len(slice_all[-1][x])%2==0:
+            #     last_curve = np.vstack((last_curve,slice_all[-1][x][-1]))
+            # if layer_num==0:
+            #     last_curve = slice_all[-1][x][::2]
+            #     if len(slice_all[-1][x])%2==0:
+            #         last_curve = np.vstack((last_curve,slice_all[-1][x][-1]))
+            # else:
+            #     last_curve = slice_all[-1][x]
+
+            st = time.time()
+            curve_normal=get_curve_normal(last_curve,stl_pc,direction,smooth=True)
+            print("Time for getting curve normal:", time.time()-st)
+
+            # input(curve_normal)
+
+            # print("Previous layer length:",len(slice_all[-1][x]))
+            st = time.time()
+            curve_next=slice_next_layer(last_curve,stl_pc,curve_normal,slice_height)
+            print("Time for slicing next layer:", time.time()-st)
+            # print("Next layer length from pervious layer:",len(curve_next))
+
+            # if x==0 or x==len(slice_all[-1])-1: ###only extend or shrink if first or last section for now
+            #     curve_next=fit_to_length(curve_next,stl_pc,closed=closed)
+
+            if len(curve_next)==0:   
+                if len(slice_all[-1])<=1:   ###end condition
+                    return slice_all
+                continue
+
+            ###split the curve based on projection error
+            st = time.time()
+            sub_curves_next,closed=split_slices(curve_next,stl_pc,closed)
+            print("Time for splitting slices:", time.time()-st)
+            # print("# of segments:",len(sub_curves_next))
+                
+            if len(sub_curves_next)==0:
+                return slice_all
+
+            st = time.time()
+            for j in range(len(sub_curves_next)):
+                # print("Before smooth length:",len(sub_curves_next[j]))
+                sub_curves_next[j]=smooth_curve(sub_curves_next[j],point_distance)
+                # print("After smooth length:",len(sub_curves_next[j]))
+            print("Time for smoothing curves:", time.time()-st)
+            
+            slice_ith_layer.extend(sub_curves_next)
+
+        layer_num+=1
+        slice_all.append(slice_ith_layer)
+
+        if layer_num%2==0:
+            if visualize_flag:
+                slice_all_pt = []
+                for i in range(len(slice_all)):
+                    for x in range(len(slice_all[i])):
+                        slice_all_pt.extend(slice_all[i][x])
+                slice_all_pt = np.array(slice_all_pt)
+                pcd = o3d.geometry.PointCloud()
+                pcd.points = o3d.utility.Vector3dVector(slice_all_pt)
+                visualize_objects([mesh,pcd])
+                visualize_flag=False
+                input_thread = threading.Thread(target=get_input,daemon=True)
+                input_thread.start()
+        
+        current_layer_num = len(slice_all)-1
+        for x in range(len(slice_all[-1])):
+            if len(slice_all[current_layer_num][x])==0:
+                break
+            np.savetxt(temp_dir+'slice%i_%i.csv'%(current_layer_num,x),slice_all[current_layer_num][x],delimiter=',')
+
+        layers_time_elapsed.append(time.time()-layer_st)
+        print("Average time elapsed for each layer:", np.mean(layers_time_elapsed[-10:]))
     
     return slice_all
 
@@ -463,10 +653,94 @@ def post_process(slice_all,point_distance=0.5):       ###postprocess the sliced 
     return slice_all_new, curve_normal_all
 
 
+def main_face():
+
+    # Load the STL file
+    data_dir = '../data/eric_mesh/'
+    filename = data_dir+"mesh_transformed.stl"
+    # your_mesh = mesh.Mesh.from_file(filename)
+    scale_factor=0.5
+    mesh_o3d = o3d.io.read_triangle_mesh(filename)
+    vertices = np.asarray(mesh_o3d.vertices) * scale_factor
+    mesh_o3d.vertices = o3d.utility.Vector3dVector(vertices)
+    mesh_o3d.compute_vertex_normals()
+    # Get the number of facets in the STL file
+    # num_facets = len(your_mesh)
+
+    slice_height=0.5
+    point_distance=0.5
+
+    # # Extract all vertices
+    # vertices = np.zeros((num_facets, 3, 3))
+    # for i, facet in enumerate(your_mesh.vectors):
+    #     vertices[i] = facet
+    # # Flatten the vertices array and remove duplicates
+    # stl_pc = np.unique(vertices.reshape(-1, 3), axis=0)
+    # print(len(stl_pc))
+    # stl_pc *= 25.4      ##convert to mm
+
+    if os.path.exists(data_dir+'bottom_edge_raw.csv')==False:
+        # bottom_edge = slicing_uniform(stl_pc,z = np.max(stl_pc[:,2]))
+        bottom_edge = slicing_uniform(stl_pc,z = 0)
+    else:
+        bottom_edge=np.loadtxt(data_dir+'bottom_edge_raw.csv',delimiter=',')
+        bottom_edge = smooth_curve(bottom_edge,point_distance=point_distance)
+    
+    
+    bottom_edge = bottom_edge*scale_factor
+
+    # Plot the bottom edge with color mapping
+    # fig = plt.figure()
+    # ax = fig.add_subplot(111)
+    # # Create a color map
+    # cmap = plt.get_cmap('viridis')
+    # norm = plt.Normalize(vmin=0, vmax=len(bottom_edge))
+    # # Plot each point with a color corresponding to its index
+    # for i in range(len(bottom_edge)):
+    #     ax.scatter(bottom_edge[i, 0], bottom_edge[i, 1], color=cmap(norm(i)), s=10)
+    # ax.set_xlabel('X')
+    # ax.set_ylabel('Y')
+    # plt.title('Bottom Edge with Color Mapping')
+    # plt.show()
+
+    # slice_all=slice_stl(bottom_edge,stl_pc,np.array([0,0,1]),slice_height=slice_height)
+    slice_all=slice_mesh(bottom_edge,mesh_o3d,np.array([0,0,1]),slice_height=slice_height,point_distance=point_distance,data_dir=data_dir)
+    slice_all,curve_normal_all=post_process(slice_all,point_distance=0.5)
+   
+
+    # Plot the original points and the fitted curved plane
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    vis_step=1
+
+    for i in range(len(slice_all)):
+        for x in range(len(slice_all[i])):
+            if len(slice_all[i][x])==0:
+                break
+
+            ax.plot3D(slice_all[i][x][::vis_step,0],slice_all[i][x][::vis_step,1],slice_all[i][x][::vis_step,2],'r.-')
+            # np.savetxt('slicing_result/slice%i_%i.csv'%(i,x),slice_all[i][x],delimiter=',')
+            np.savetxt('slicing_result/slice%i_%i.csv'%(i,x),np.hstack((slice_all[i][x],curve_normal_all[i][x])),delimiter=',')
+
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
+    plt.title('STL %fmm Slicing'%slice_height)
+    plt.show()
+
+    slice_all_pt = []
+    for i in range(len(slice_all)):
+        for x in range(len(slice_all[i])):
+            slice_all_pt.extend(slice_all[i][x])
+    slice_all_pt = np.array(slice_all_pt)
+    pcd = o3d.geometry.PointCloud()
+    pcd.points = o3d.utility.Vector3dVector(slice_all_pt)
+    visualize_objects([mesh_o3d,pcd])
+
+
 def main_blade():
     # Load the STL file
-    # filename = '../data/blade0.1/surface.stl'
-    filename = "../data/eric_mesh/mesh_transformed.stl"
+    filename = '../data/blade0.1/surface.stl'
     your_mesh = mesh.Mesh.from_file(filename)
     # Get the number of facets in the STL file
     num_facets = len(your_mesh)
@@ -485,7 +759,6 @@ def main_blade():
 
     slice_all=slice_stl(bottom_edge,stl_pc,np.array([0,0,-1]),slice_height=slice_height)
     slice_all,curve_normal_all=post_process(slice_all,point_distance=1)
-   
 
     # Plot the original points and the fitted curved plane
     fig = plt.figure()
@@ -499,7 +772,7 @@ def main_blade():
 
             ax.plot3D(slice_all[i][x][::vis_step,0],slice_all[i][x][::vis_step,1],slice_all[i][x][::vis_step,2],'r.-')
             # np.savetxt('slicing_result/slice%i_%i.csv'%(i,x),slice_all[i][x],delimiter=',')
-            # np.savetxt('slicing_result/slice%i_%i.csv'%(i,x),np.hstack((slice_all[i][x],curve_normal_all[i][x])),delimiter=',')
+            np.savetxt('slicing_result/slice%i_%i.csv'%(i,x),np.hstack((slice_all[i][x],curve_normal_all[i][x])),delimiter=',')
 
     ax.set_xlabel('X')
     ax.set_ylabel('Y')
@@ -566,7 +839,7 @@ def main_tube():
     plt.show()
 
 
-def main_face():
+def main_face_old():
     sys.path.append('../../face_cad')
     from ellipsoid_fit import find_intersection_point2ellipsoid
     # Load the STL file
@@ -733,4 +1006,5 @@ def main_nose():
 if __name__ == "__main__":
     # main_face()
     # main_nose()
-    main_blade()
+    # main_blade()
+    main_face()
