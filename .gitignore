@@ -402,3 +402,4 @@ slicing/slicing_result/*
 data/blade0.1/auto_slice/curve*
 
 data/eric_mesh
+data/face_mesh*

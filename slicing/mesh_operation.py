@@ -3,7 +3,7 @@ import open3d as o3d
 from matplotlib import pyplot as plt
 from general_robotics_toolbox import *
 
-from slicing2 import slicing_uniform
+from slicing2 import slicing_uniform,cut_mesh_z_axis
 
 def visualize_meshes(mesh):
     # Create a coordinate frame at the origin
@@ -22,11 +22,13 @@ def visualize_meshes(mesh):
     vis.run()
     vis.destroy_window()
 
-data_dir = "../data/eric_mesh/"
+# data_dir = "../data/eric_mesh/"
+data_dir = "../data/face_mesh_tanja/"
 
 # Read the STL file
 # mesh = o3d.io.read_triangle_mesh(data_dir+"eric_mesh.stl")
-mesh = o3d.io.read_triangle_mesh(data_dir+"mesh_cut.stl")
+# mesh = o3d.io.read_triangle_mesh(data_dir+"mesh_cut.stl")
+mesh = o3d.io.read_triangle_mesh(data_dir+"mesh.stl")
 # Compute the vertex normals of the mesh
 mesh.compute_vertex_normals()
 
@@ -60,18 +62,28 @@ if hand_tune_location:
     # save the mesh
     o3d.io.write_triangle_mesh(data_dir+"mesh_transformed.stl", mesh)
 
+mesh = o3d.io.read_triangle_mesh(data_dir+"mesh_transformed.stl")
+# Compute the vertex normals of the mesh
+mesh.compute_vertex_normals()
+
 # move the lowset vertex to the origin
 vertices = np.asarray(mesh.vertices)
 lowest_vertex = np.argmin(vertices[:,2])
 translation = -vertices[lowest_vertex]
 mesh.translate(translation)
 
+visualize_meshes(mesh)
+
 # rotate the mesh around the x axis
-mesh.rotate(mesh.get_rotation_matrix_from_xyz([np.radians(30), 0, np.radians(10)]), center=(0, 0, 0))
+# mesh.rotate(mesh.get_rotation_matrix_from_xyz([np.radians(30), 0, np.radians(10)]), center=(0, 0, 0))
 
 # # move in z direction
-translation = [25, 0, -25]
+translation = [10, 0, -15]
 mesh.translate(translation)
+
+mesh.rotate(mesh.get_rotation_matrix_from_xyz([0,0,np.radians(90)]), center=(0, 0, 0))
+
+visualize_meshes(mesh)
 
 # draw a plane and visualize it in open3d
 # Define the plane parameters
@@ -152,8 +164,16 @@ plt.show()
 
 # Add the plane to the visualization
 visualize_meshes([mesh,pcd])
+
+
+# for z in range(0,100,5):
+#     mesh_cut = cut_mesh_z_axis(mesh, z+5,z-5)
+#     pcd = mesh_cut.sample_points_uniformly(number_of_points=30000)
+#     visualize_meshes([mesh,pcd])
+
+
 # save mesh
-o3d.io.write_triangle_mesh(data_dir+"mesh_transformed.stl", mesh)
+o3d.io.write_triangle_mesh(data_dir+"mesh_final.stl", mesh)
 
 # save the bottom edge path
 np.savetxt(data_dir+"bottom_edge_raw.csv", bottom_edge, delimiter=",")

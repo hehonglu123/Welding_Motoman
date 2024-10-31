@@ -203,6 +203,25 @@ def smooth_curve(curve,point_distance):
 
     return curve_new
 
+def smooth_curve_lin(curve,point_distance):
+    lam=calc_lam_cs(curve)
+    polyfit=np.polyfit(lam,curve,deg=100)
+    lam_sample=np.linspace(0,lam[-1],num=int(lam[-1]/point_distance))
+    # curve_new=np.vstack((np.poly1d(polyfit[:,0])(lam), np.poly1d(polyfit[:,1])(lam), np.poly1d(polyfit[:,2])(lam))).T
+    
+    curve_new=np.vstack((np.interp(lam_sample,lam,curve[:,0]),np.interp(lam_sample,lam,curve[:,1]),np.interp(lam_sample,lam,curve[:,2]))).T
+
+    if len(curve_new)>10:
+        for i in range(1,len(curve_new)-9):
+            distance=np.linalg.norm(curve_new[i+1:]-curve_new[i],axis=1)
+            closest_indices=np.argsort(distance)+i+1
+            if closest_indices[0] not in [i+1,i+2,len(curve_new)-1]: ###knot detected
+                print('SOLVING KNOT',i,closest_indices[0],closest_indices[1])
+                curve_new=np.vstack((curve_new[:i],curve_new[closest_indices[0]:]))
+                break
+
+    return curve_new
+
 def get_curve_normal(curve,stl_pc,direction, smooth=False):
     ###provide the curve and complete stl point cloud, a rough normal direction
     curve_normal=[] 
@@ -578,7 +597,8 @@ def slice_mesh(bottom_curve,mesh,direction,slice_height,point_distance=1,closed=
             st = time.time()
             for j in range(len(sub_curves_next)):
                 # print("Before smooth length:",len(sub_curves_next[j]))
-                sub_curves_next[j]=smooth_curve(sub_curves_next[j],point_distance)
+                # sub_curves_next[j]=smooth_curve(sub_curves_next[j],point_distance)
+                sub_curves_next[j]=smooth_curve_lin(sub_curves_next[j],point_distance)
                 # print("After smooth length:",len(sub_curves_next[j]))
             print("Time for smoothing curves:", time.time()-st)
             
@@ -589,14 +609,24 @@ def slice_mesh(bottom_curve,mesh,direction,slice_height,point_distance=1,closed=
 
         if layer_num%2==0:
             if visualize_flag:
-                slice_all_pt = []
+                # slice_all_pt = []
+                # for i in range(len(slice_all)):
+                #     for x in range(len(slice_all[i])):
+                #         slice_all_pt.extend(slice_all[i][x])
+                # slice_all_pt = np.array(slice_all_pt)
+                # pcd = o3d.geometry.PointCloud()
+                # pcd.points = o3d.utility.Vector3dVector(slice_all_pt)
+                pcd_list = []
+                cmap = plt.get_cmap('tab10')
                 for i in range(len(slice_all)):
-                    for x in range(len(slice_all[i])):
-                        slice_all_pt.extend(slice_all[i][x])
-                slice_all_pt = np.array(slice_all_pt)
-                pcd = o3d.geometry.PointCloud()
-                pcd.points = o3d.utility.Vector3dVector(slice_all_pt)
-                visualize_objects([mesh,pcd])
+                    pcd = o3d.geometry.PointCloud()
+                    layer_pts = np.concatenate(slice_all[i],axis=0)
+                    pcd.points = o3d.utility.Vector3dVector(layer_pts)
+                    color = list(cmap(i/len(slice_all))[:3])
+                    pcd.paint_uniform_color(color)
+                    pcd_list.append(pcd)
+                pcd_list.append(mesh)
+                visualize_objects(pcd_list)
                 visualize_flag=False
                 input_thread = threading.Thread(target=get_input,daemon=True)
                 input_thread.start()
@@ -656,10 +686,11 @@ def post_process(slice_all,point_distance=0.5):       ###postprocess the sliced 
 def main_face():
 
     # Load the STL file
-    data_dir = '../data/eric_mesh/'
-    filename = data_dir+"mesh_transformed.stl"
+    # data_dir = '../data/eric_mesh/'
+    data_dir = '../data/face_mesh_tanja/'
+    filename = data_dir+"mesh_final.stl"
     # your_mesh = mesh.Mesh.from_file(filename)
-    scale_factor=0.5
+    scale_factor=1
     mesh_o3d = o3d.io.read_triangle_mesh(filename)
     vertices = np.asarray(mesh_o3d.vertices) * scale_factor
     mesh_o3d.vertices = o3d.utility.Vector3dVector(vertices)
