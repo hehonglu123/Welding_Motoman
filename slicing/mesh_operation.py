@@ -23,7 +23,8 @@ def visualize_meshes(mesh):
     vis.destroy_window()
 
 # data_dir = "../data/eric_mesh/"
-data_dir = "../data/face_mesh_tanja/"
+# data_dir = "../data/face_mesh_tanja/"
+data_dir = "../data/face_mesh_tanja_straight/"
 
 # Read the STL file
 # mesh = o3d.io.read_triangle_mesh(data_dir+"eric_mesh.stl")
@@ -78,10 +79,10 @@ visualize_meshes(mesh)
 # mesh.rotate(mesh.get_rotation_matrix_from_xyz([np.radians(30), 0, np.radians(10)]), center=(0, 0, 0))
 
 # # move in z direction
-translation = [10, 0, -15]
+translation = [0, -5, -15]
 mesh.translate(translation)
 
-mesh.rotate(mesh.get_rotation_matrix_from_xyz([0,0,np.radians(90)]), center=(0, 0, 0))
+mesh.rotate(mesh.get_rotation_matrix_from_xyz([np.radians(-10),0,np.radians(90)]), center=(0, 0, 0))
 
 visualize_meshes(mesh)
 
@@ -128,8 +129,25 @@ pcd = mesh_removed.sample_points_uniformly(number_of_points=50000)
 pcd_arr = np.asarray(pcd.points)
 
 bottom_edge = slicing_uniform(pcd_arr,0,threshold=0.01)
-x_sort = np.argsort(bottom_edge[:,0])
-bottom_edge = bottom_edge[x_sort]
+
+# find the sequence of the bottom edge
+y_sort = np.argsort(bottom_edge[:,1])[::-1]
+for i in y_sort:
+    if bottom_edge[i,0]<0:
+        bottom_edge_start = np.copy(bottom_edge[i])
+        break
+
+bottom_edge_sort = [bottom_edge_start]
+dist_sort_arg = np.argsort(np.linalg.norm(bottom_edge - bottom_edge_sort[-1], axis=1))
+bottom_edge = np.delete(bottom_edge, dist_sort_arg[0], axis=0)
+# iterative find the next closest point
+for i in range(len(bottom_edge)-1):
+    dist_sort_arg = np.argsort(np.linalg.norm(bottom_edge - bottom_edge_sort[-1], axis=1))
+    next_point = bottom_edge[dist_sort_arg[0]]
+    bottom_edge_sort.append(next_point)
+    # remove the point from the list
+    bottom_edge = np.delete(bottom_edge, dist_sort_arg[0], axis=0)
+bottom_edge = np.array(bottom_edge_sort)
 
 # Plot the bottom edge with color mapping
 fig = plt.figure()

@@ -265,12 +265,20 @@ def get_curve_normal_from_curves(curve,curve_prev,smooth=False):
     return np.array(curve_normal)
 
 
-def slice_next_layer(curve,stl_pc,curve_normal,slice_height):
+def slice_next_layer(curve,stl_pc,curve_normal,slice_height,extension_angle=None):
     slice_next=[]
     for i in range(len(curve)):
         p_plus=project_point_on_stl(curve[i]+slice_height*curve_normal[i],stl_pc)
         slice_next.append(p_plus)
     slice_next=np.array(slice_next)
+
+    if extension_angle is not None:
+        extension_length=np.tan(extension_angle)*slice_height
+        start_extend_vec = (slice_next[0]-slice_next[1])/np.linalg.norm(slice_next[0]-slice_next[1])
+        p_start = project_point_on_stl(slice_next[0]+extension_length*start_extend_vec,stl_pc)
+        end_extend_vec = (slice_next[-1]-slice_next[-2])/np.linalg.norm(slice_next[-1]-slice_next[-2])
+        p_end = project_point_on_stl(slice_next[-1]+extension_length*end_extend_vec,stl_pc)
+        slice_next=np.vstack((p_start,slice_next,p_end))
 
     # fig = plt.figure()
     # ax = fig.add_subplot(111, projection='3d')
@@ -491,7 +499,7 @@ def slice_stl(bottom_curve,stl_pc,direction,slice_height,point_distance=1,closed
     
     return slice_all
 
-def slice_mesh(bottom_curve,mesh,direction,slice_height,point_distance=1,closed=False,data_dir=''):
+def slice_mesh(bottom_curve,mesh,direction,slice_height,point_distance=1,extension_angle=None,closed=False,data_dir=''):
     
     global visualize_flag
     visualize_flag = False
@@ -541,31 +549,23 @@ def slice_mesh(bottom_curve,mesh,direction,slice_height,point_distance=1,closed=
 
         cut_st = time.time()
         last_layer_pts = np.concatenate(slice_all[-1],axis=0)
+        
         mesh_cut = cut_mesh_z_axis(mesh,np.max(last_layer_pts[:,2])+5,np.min(last_layer_pts[:,2])-5)
         pcd = mesh_cut.sample_points_uniformly(number_of_points=30000)
+
         # visualize_objects([mesh,pcd])
         stl_pc = np.asarray(pcd.points)
         print("Time for cutting mesh:", time.time()-cut_st)
         
         for x in range(len(slice_all[-1])):
+            last_curve = slice_all[-1][x]
+
             ###push curve 1 layer up
+            st = time.time()
             # try:
             #     curve_normal=get_curve_normal_from_curves(slice_all[-1][x],np.concatenate(slice_all[-2],axis=0))
             # except:
-            #     print('USING SURF NORM @ %ith layer'%layer_num)
-            # print('USING SURF NORM @ %ith layer'%layer_num)
-
-            last_curve = slice_all[-1][x]
-            # if len(slice_all[-1][x])%2==0:
-            #     last_curve = np.vstack((last_curve,slice_all[-1][x][-1]))
-            # if layer_num==0:
-            #     last_curve = slice_all[-1][x][::2]
-            #     if len(slice_all[-1][x])%2==0:
-            #         last_curve = np.vstack((last_curve,slice_all[-1][x][-1]))
-            # else:
-            #     last_curve = slice_all[-1][x]
-
-            st = time.time()
+            #     curve_normal=get_curve_normal(last_curve,stl_pc,direction,smooth=True)
             curve_normal=get_curve_normal(last_curve,stl_pc,direction,smooth=True)
             print("Time for getting curve normal:", time.time()-st)
 
@@ -573,7 +573,7 @@ def slice_mesh(bottom_curve,mesh,direction,slice_height,point_distance=1,closed=
 
             # print("Previous layer length:",len(slice_all[-1][x]))
             st = time.time()
-            curve_next=slice_next_layer(last_curve,stl_pc,curve_normal,slice_height)
+            curve_next=slice_next_layer(last_curve,stl_pc,curve_normal,slice_height,extension_angle=extension_angle)
             print("Time for slicing next layer:", time.time()-st)
             # print("Next layer length from pervious layer:",len(curve_next))
 
@@ -599,7 +599,7 @@ def slice_mesh(bottom_curve,mesh,direction,slice_height,point_distance=1,closed=
                 # print("Before smooth length:",len(sub_curves_next[j]))
                 # sub_curves_next[j]=smooth_curve(sub_curves_next[j],point_distance)
                 sub_curves_next[j]=smooth_curve_lin(sub_curves_next[j],point_distance)
-                # print("After smooth length:",len(sub_curves_next[j]))
+                print("After smooth length:",len(sub_curves_next[j]))
             print("Time for smoothing curves:", time.time()-st)
             
             slice_ith_layer.extend(sub_curves_next)
@@ -687,7 +687,8 @@ def main_face():
 
     # Load the STL file
     # data_dir = '../data/eric_mesh/'
-    data_dir = '../data/face_mesh_tanja/'
+    # data_dir = '../data/face_mesh_tanja/'
+    data_dir = '../data/face_mesh_tanja_straight/'
     filename = data_dir+"mesh_final.stl"
     # your_mesh = mesh.Mesh.from_file(filename)
     scale_factor=1
@@ -700,6 +701,7 @@ def main_face():
 
     slice_height=0.5
     point_distance=0.5
+    extension_angle=np.radians(30)
 
     # # Extract all vertices
     # vertices = np.zeros((num_facets, 3, 3))
@@ -735,7 +737,7 @@ def main_face():
     # plt.show()
 
     # slice_all=slice_stl(bottom_edge,stl_pc,np.array([0,0,1]),slice_height=slice_height)
-    slice_all=slice_mesh(bottom_edge,mesh_o3d,np.array([0,0,1]),slice_height=slice_height,point_distance=point_distance,data_dir=data_dir)
+    slice_all=slice_mesh(bottom_edge,mesh_o3d,np.array([0,0,1]),slice_height=slice_height,point_distance=point_distance,extension_angle=extension_angle,data_dir=data_dir)
     slice_all,curve_normal_all=post_process(slice_all,point_distance=0.5)
    
 
