@@ -701,7 +701,7 @@ def main_face():
 
     slice_height=0.5
     point_distance=0.5
-    extension_angle=np.radians(30)
+    extension_angle=np.radians(10)
 
     # # Extract all vertices
     # vertices = np.zeros((num_facets, 3, 3))

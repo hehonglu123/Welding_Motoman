@@ -5,7 +5,8 @@ from general_robotics_toolbox import *
 
 from slicing2 import slicing_uniform,cut_mesh_z_axis,visualize_objects
 
-data_dir = "../data/face_mesh_tanja_straight/"
+# data_dir = "../data/face_mesh_tanja_straight/"
+data_dir = "../data/eric_mesh/"
 
 mesh = o3d.io.read_triangle_mesh(data_dir+"mesh_final.stl")
 # Compute the vertex normals of the mesh
@@ -20,11 +21,12 @@ visualize_objects([mesh])
 print("Define parameters used for hidden_point_removal")
 
 pt_map_all=[]
-for x in np.linspace(-300,300,10):
-    for z in np.linspace(-100,300,10):
+for x in np.linspace(-300,300,4):
+    for z in np.linspace(-100,300,4):
         camera = [x, -50, z]
         radius = 13500
 
+        print("Get all points that are visible from given view point")
         _, pt_map = pcd.hidden_point_removal(camera, radius)
         pt_map_all.extend(pt_map)
 
