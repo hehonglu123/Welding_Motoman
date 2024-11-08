@@ -1,14 +1,20 @@
 import numpy as np
-import sys, traceback, time, copy, glob
+import sys, traceback, time, copy, glob, pathlib
 from general_robotics_toolbox import *
 from redundancy_resolution import *
 from motoman_def import *
 
 
 def main():
-	dataset='blade0.1/'
-	sliced_alg='dense_slice/'
-	data_dir='../../geometry_data/'+dataset+sliced_alg
+	# dataset='blade0.1/'
+	# sliced_alg='dense_slice/'
+	# data_dir='../../geometry_data/'+dataset+sliced_alg
+
+	dataset='face_mesh_tanja_straight/'
+	sliced_alg='slicing_result_10/'
+	data_dir='../data/'+dataset+sliced_alg
+
+
 	with open(data_dir+'slicing.yml', 'r') as file:
 		slicing_meta = yaml.safe_load(file)
 
@@ -27,11 +33,6 @@ def main():
 		pulse2deg_file_path='../config/MA2010_A0_pulse2deg_real.csv',d=15)
 	positioner=positioner_obj('D500B',def_path='../config/D500B_robot_default_config.yml',tool_file_path='../config/positioner_tcp.csv',\
 		pulse2deg_file_path='../config/D500B_pulse2deg_real.csv',base_transformation_file='../config/D500B_pose.csv')
-
-	R_torch=np.array([[-0.7071, 0.7071, -0.    ],
-			[ 0.7071, 0.7071,  0.    ],
-			[0.,      0.,     -1.    ]])
-	q_seed=np.radians([-35.4291,56.6333,40.5194,4.5177,-52.2505,-11.6546])
 
 	rr=redundancy_resolution(robot,positioner,curve_sliced)
 	# H=rr.baseline_pose(vec=np.array([-0.95,0.31224989992]))
@@ -53,7 +54,9 @@ def main():
 	vis_step=5
 	fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
 	
+	pathlib.Path(data_dir+'curve_sliced_relative').mkdir(parents=True, exist_ok=True)
 
+	draw_every_ith = 10
 
 	curve_sliced_relative=copy.deepcopy(rr.curve_sliced)
 	for i in range(len(rr.curve_sliced)):
@@ -70,10 +73,9 @@ def main():
 			# elif i==1:
 			# 	ax.plot3D(curve_sliced_relative[i][x][::vis_step,0],curve_sliced_relative[i][x][::vis_step,1],curve_sliced_relative[i][x][::vis_step,2],'g.-')
 			# else:
-			ax.plot3D(curve_sliced_relative[i][x][::vis_step,0],curve_sliced_relative[i][x][::vis_step,1],curve_sliced_relative[i][x][::vis_step,2],'b.-')
-
-			ax.quiver(curve_sliced_relative[i][x][::vis_step,0],curve_sliced_relative[i][x][::vis_step,1],curve_sliced_relative[i][x][::vis_step,2],curve_sliced_relative[i][x][::vis_step,3],curve_sliced_relative[i][x][::vis_step,4],curve_sliced_relative[i][x][::vis_step,5],length=0.3, normalize=True)
-		
+			if i%draw_every_ith==0:
+				ax.plot3D(curve_sliced_relative[i][x][::vis_step,0],curve_sliced_relative[i][x][::vis_step,1],curve_sliced_relative[i][x][::vis_step,2],'b.-')
+				ax.quiver(curve_sliced_relative[i][x][::vis_step,0],curve_sliced_relative[i][x][::vis_step,1],curve_sliced_relative[i][x][::vis_step,2],curve_sliced_relative[i][x][::vis_step,3],curve_sliced_relative[i][x][::vis_step,4],curve_sliced_relative[i][x][::vis_step,5],length=0.3, normalize=True)
 			np.savetxt(data_dir+'curve_sliced_relative/slice'+str(i)+'_'+str(x)+'.csv',curve_sliced_relative[i][x],delimiter=',')
 	
 

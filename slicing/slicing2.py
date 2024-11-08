@@ -10,11 +10,9 @@ from scipy.spatial import ConvexHull
 import open3d as o3d
 import threading
 
-sys.path.append('../toolbox')
-from utils import *
+
+from robotics_utils import *
 from lambda_calc import *
-from error_check import *
-from toolbox_circular_fit import *
 
 def cut_mesh_z_axis(mesh,max_z,min_z):
 
