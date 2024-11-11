@@ -2,9 +2,8 @@ import numpy as np
 from matplotlib import pyplot as plt
 from copy import deepcopy
 from general_robotics_toolbox import *
-import sys
-sys.path.append('../toolbox/')
-from robot_def import *
+
+from motoman_def import *
 
 Rx=np.array([1,0,0])
 Ry=np.array([0,1,0])

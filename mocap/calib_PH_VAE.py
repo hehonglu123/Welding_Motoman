@@ -7,6 +7,7 @@ from PH_interp import *
 from calib_analytic_grad import *
 import datetime
 import time
+import os, pathlib
 
 from motoman_def import *
 from Models import *
@@ -55,105 +56,75 @@ def test_fwd_accuracy(model, data_q, data_T,robot,param_nominal):
     return p_error_all
 
 
-def train(inputs_q2q3, targets_delta_PH, training_q, training_T, testing_q, testing_T,robot,param_nominal,robot_type):
-
-    print(np.degrees(inputs_q2q3).shape)
-    print(targets_delta_PH.shape)
+def train(inputs_q2q3, data_delta_PH, training_q, training_T, testing_q, testing_T,robot,param_nominal,robot_type):
 
     test_only = True
 
     # data preprocessing
+    data_delta_PH = torch.tensor(data_delta_PH, dtype=torch.float32)
     inputs_q2q3 = torch.tensor(inputs_q2q3, dtype=torch.float32)
-    targets_delta_PH = torch.tensor(targets_delta_PH, dtype=torch.float32)
+    
 
     # Define the input size, hidden size, and output size
-    input_size = 2
-    hidden_sizes = [400,400]
-    output_size = 33
-
-    # use fourier basis or not
-    modelType = 'NN' # 'Fourier' or 'NN' or 'FourierNN'
+    latent_size = 2
+    hidden_sizes = [200,200,200]
+    data_size = 33
+    mu = 0
+    sigma = 1
+    loss_kl_weight = 0.3
+    Variational = False
 
     # Create an instance of the neural network
-    if modelType == 'NN':
-        model = NeuralNetwork(input_size, output_size, hidden_sizes=hidden_sizes)
-    elif modelType == 'Fourier':
-        model = FourierNetwork(input_size, output_size)
-        # load the weights from the inverse model
-        weights_from_inv = np.load('PH_NN_results/FBF_Basis_Coeff.npy')
-        model.output.weight.data = torch.tensor(weights_from_inv[:,:-1], dtype=torch.float32)
-        model.output.bias.data = torch.tensor(weights_from_inv[:,-1], dtype=torch.float32)
-        print('Loaded weights from the inverse model')
-    elif modelType == 'FourierNN':
-        model = NeuralFourierNetwork(input_size, output_size, hidden_sizes=hidden_sizes)
+    if Variational:
+        model = VariationalAutoEncoder(data_size, latent_size, hidden_sizes, mu=mu, sigma=sigma)
     else:
-        print('Invalid model type')
-        exit()
-
-    # load pre-trained model
-    # model.load_state_dict(torch.load('PH_NN_results/train_200_200_200_lr0.02_2409171041/best_testing_model.pt',weights_only=True))
-    # model.load_state_dict(torch.load('PH_NN_results/trainDirect_200_200_200_lr0.0001_wp1_wo57.3_2409191033/best_testing_model.pt',weights_only=True))
-    # model.load_state_dict(torch.load('PH_NN_results/trainDirect_Fourier_lr0.0001_wp1_wo57.3_2409301609/best_training_model.pt',weights_only=True))
-    model.load_state_dict(torch.load('PH_NN_results/trainDirect_200_200_200_NN_lr0.0001_wp1_wo57.3_2409301814/best_testing_model.pt',weights_only=True))
-    # model.load_state_dict(torch.load('PH_NN_results/train_R2_400_400_lr0.02_weighted_2409181201/best_testing_model.pt',weights_only=True))
-
-    # statistics before training
-    training_T_error = test_fwd_accuracy(model, training_q, training_T,robot,param_nominal)
-    testing_T_error = test_fwd_accuracy(model, testing_q, testing_T,robot,param_nominal)
-    print('Before training:')
-    print(f'Training error: mean={np.mean(training_T_error):.4f}, max={np.max(training_T_error):.4f}')
-    print(f'Testing error: mean={np.mean(testing_T_error):.4f}, max={np.max(testing_T_error):.4f}')
-
-    if test_only:
-        model.eval()
-        testing_T_error = test_fwd_accuracy(model, testing_q, testing_T,robot,param_nominal)
-        print(f'Max testing error: {np.max(testing_T_error):.2f}')
-        print(f'Mean testing error: {np.mean(testing_T_error):.2f}')
-        print(f'Std testing error: {np.std(testing_T_error):.2f}')
-        exit()
+        model = AutoEncoder(data_size, latent_size, hidden_sizes)
 
     # Print the model architecture
-    print(model)
+    print("Encoder:", model.encoder)
+    print("Decoder:", model.decoder)
     # Define the loss function
-    loss_fn = nn.MSELoss()
+    loss_mse_fn = nn.MSELoss()
     weighted = False
     if weighted:
-        loss_fn = WeightedMSELoss()
+        loss_mse_fn = WeightedMSELoss()
         # weights = torch.tensor([1]*33, dtype=torch.float32)
         weights_P = 1
         weights_H = 180/np.pi
         weights = torch.tensor(np.append(np.ones(21)*weights_P,np.ones(12)*weights_H), dtype=torch.float32)
     # Define the learning rate
-    learning_rate = 0.02
+    learning_rate = 0.003
     # Define the number of epochs
-    num_epochs = 100000
+    num_epochs = 50000
     # Define the optimizer
-    # optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate)
-    # or
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
     # get save folder path
     formatted_string = datetime.datetime.now().strftime("%Y%m%d%H%M")
     formatted_string = formatted_string[2:]
-    folder_path = 'PH_NN_results/train_'
+    if Variational:
+        folder_path = 'PH_NN_results/trainLATENT_VAE_'
+    else:
+        folder_path = 'PH_NN_results/trainLATENT_AE_'
     folder_path += robot_type+'_'
-    for h in hidden_sizes:
-        folder_path += str(h)+'_'
-    folder_path += modelType+'_'
-    folder_path += 'lr'+str(learning_rate)+'_'
+    folder_path += 'latent'+str(latent_size)+'_'
     if weighted:
         folder_path += 'weighted_'
     folder_path += formatted_string+'/'
-    # Path(folder_path).mkdir(parents=True, exist_ok=True)
 
     # save a training parameters meta yaml file to folder_path
-    meta_data = {'input_size': input_size, 'hidden_sizes': hidden_sizes, 'output_size': output_size, 'learning_rate': learning_rate, 'num_epochs': num_epochs}
+    meta_data = {'data_size': data_size, 'latent_size': latent_size, 'hidden_sizes': hidden_sizes, 'learning_rate': learning_rate, 'num_epochs': num_epochs}
+    meta_data['mu'] = mu
+    meta_data['sigma'] = sigma
+    meta_data['loss_kl_weight'] = loss_kl_weight
+    meta_data['Variational'] = Variational
     meta_data['robot_type'] = robot_type
     meta_data['weighted'] = weighted
     if weighted:
         meta_data['weights_P'] = weights_P
         meta_data['weights_H'] = weights_H
-    meta_data['modelType'] = modelType
+    if not os.path.exists(folder_path):
+        pathlib.Path(folder_path).mkdir(parents=True, exist_ok=True)
     with open(folder_path+'meta_data.yaml', 'w') as file:
         documents = yaml.dump(meta_data, file)
 
@@ -175,11 +146,13 @@ def train(inputs_q2q3, targets_delta_PH, training_q, training_T, testing_q, test
 
         # Forward pass
         model.train()
-        outputs = model(inputs_q2q3)
+        outputs = model(data_delta_PH)
         if weighted:
-            loss = loss_fn(outputs, targets_delta_PH, weights)
+            loss = loss_mse_fn(outputs, data_delta_PH, weights)
         else:
-            loss = loss_fn(outputs, targets_delta_PH)
+            loss = loss_mse_fn(outputs, data_delta_PH)
+        if Variational:
+            loss = loss*(1-loss_kl_weight) + model.encoder.kl*loss_kl_weight
 
         # Backward pass and optimization
         optimizer.zero_grad()
@@ -210,34 +183,35 @@ def train(inputs_q2q3, targets_delta_PH, training_q, training_T, testing_q, test
         model.eval()
         if best_loss > loss.item():
             best_loss = loss.item()
-            torch.save(model.state_dict(), folder_path+'best_lost_model.pt')
+            torch.save(model.encoder.state_dict(), folder_path+'best_lost_encoder_model.pt')
+            torch.save(model.decoder.state_dict(), folder_path+'best_lost_decoder_model.pt')
         loss_all.append(loss.item())
         np.save(folder_path+'loss_all.npy',np.array(loss_all)) # save the loss
         if print_loss:
             print(f'Epoch [{epoch+1}/{num_epochs}], Loss: {loss.item():.4f}')
-        if print_error:
-            training_T_error = test_fwd_accuracy(model, training_q, training_T,robot,param_nominal)
-            testing_T_error = test_fwd_accuracy(model, testing_q, testing_T,robot,param_nominal)
-            # print training and testing error, mean, max
-            print(f'Training error: mean={np.mean(training_T_error):.4f}, max={np.max(training_T_error):.4f}')
-            print(f'Testing error: mean={np.mean(testing_T_error):.4f}, max={np.max(testing_T_error):.4f}')
-            training_mean_error_all.append(np.mean(training_T_error))
-            testing_mean_error_all.append(np.mean(testing_T_error))
-            training_max_error_all.append(np.max(training_T_error))
-            testing_max_error_all.append(np.max(testing_T_error))
-            data_sample_epoches.append(epoch)
-            # save the model
-            if best_training_error > np.max(training_T_error):
-                best_training_error = np.max(training_T_error)
-                torch.save(model.state_dict(), folder_path+'best_training_model.pt')
-            if best_testing_error > np.max(testing_T_error):
-                best_testing_error = np.max(testing_T_error)
-                torch.save(model.state_dict(), folder_path+'best_testing_model.pt')
-            np.save(folder_path+'training_mean_error_all.npy',np.array(training_mean_error_all))
-            np.save(folder_path+'testing_mean_error_all.npy',np.array(testing_mean_error_all))
-            np.save(folder_path+'training_max_error_all.npy',np.array(training_max_error_all))
-            np.save(folder_path+'testing_max_error_all.npy',np.array(testing_max_error_all))
-            np.save(folder_path+'data_sample_epoches.npy',np.array(data_sample_epoches))
+        # if print_error:
+        #     training_T_error = test_fwd_accuracy(model, training_q, training_T,robot,param_nominal)
+        #     testing_T_error = test_fwd_accuracy(model, testing_q, testing_T,robot,param_nominal)
+        #     # print training and testing error, mean, max
+        #     print(f'Training error: mean={np.mean(training_T_error):.4f}, max={np.max(training_T_error):.4f}')
+        #     print(f'Testing error: mean={np.mean(testing_T_error):.4f}, max={np.max(testing_T_error):.4f}')
+        #     training_mean_error_all.append(np.mean(training_T_error))
+        #     testing_mean_error_all.append(np.mean(testing_T_error))
+        #     training_max_error_all.append(np.max(training_T_error))
+        #     testing_max_error_all.append(np.max(testing_T_error))
+        #     data_sample_epoches.append(epoch)
+        #     # save the model
+        #     if best_training_error > np.max(training_T_error):
+        #         best_training_error = np.max(training_T_error)
+        #         torch.save(model.state_dict(), folder_path+'best_training_model.pt')
+        #     if best_testing_error > np.max(testing_T_error):
+        #         best_testing_error = np.max(testing_T_error)
+        #         torch.save(model.state_dict(), folder_path+'best_testing_model.pt')
+        #     np.save(folder_path+'training_mean_error_all.npy',np.array(training_mean_error_all))
+        #     np.save(folder_path+'testing_mean_error_all.npy',np.array(testing_mean_error_all))
+        #     np.save(folder_path+'training_max_error_all.npy',np.array(training_max_error_all))
+        #     np.save(folder_path+'testing_max_error_all.npy',np.array(testing_max_error_all))
+        #     np.save(folder_path+'data_sample_epoches.npy',np.array(data_sample_epoches))
 
         # training time for each epoch
         epoch_end_time = time.time()

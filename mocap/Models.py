@@ -39,6 +39,60 @@ class NeuralNetwork(nn.Module):
             x = self.relus[k](x)
         x = self.output(x)
         return x
+
+class NNVariationalEncoder(nn.Module):
+    def __init__(self, data_size, latent_size, hidden_sizes=[20,20], mu=0, sigma=1):
+        super(NNVariationalEncoder, self).__init__()
+
+        self.hiddenLayers = nn.ModuleList()
+        self.relus = nn.ModuleList()
+        for k in range(len(hidden_sizes)):
+            if k == 0:
+                self.hiddenLayers.append(nn.Linear(data_size, hidden_sizes[k]))
+            else:
+                self.hiddenLayers.append(nn.Linear(hidden_sizes[k-1], hidden_sizes[k]))
+            self.relus.append(nn.ReLU())
+        self.output_mu = nn.Linear(hidden_sizes[-1], latent_size)
+        self.output_sigma = nn.Linear(hidden_sizes[-1], latent_size)
+
+        self.latent_mu = torch.tensor(mu)
+        self.latent_sigma = torch.tensor(sigma)
+        self.N = torch.distributions.Normal(mu, sigma)
+        self.kl = 0
+
+    def forward(self, x):
+        for k in range(len(self.hiddenLayers)):
+            x = self.hiddenLayers[k](x)
+            x = self.relus[k](x)
+        mu = self.output_mu(x)
+        sigma = torch.exp(self.output_sigma(x))
+        z = mu + sigma*self.N.sample(mu.shape)
+        self.kl = ((sigma**2 + (mu-self.latent_mu)**2)/(2*self.latent_sigma**2) + torch.log(self.latent_sigma/sigma) - 1/2).sum()
+        return z
+
+class VariationalAutoEncoder(nn.Module):
+    def __init__(self, data_size, latent_size, hidden_sizes=[20,20], mu=0, sigma=1):
+        super(VariationalAutoEncoder, self).__init__()
+
+        self.encoder = NNVariationalEncoder(data_size, latent_size, hidden_sizes, mu, sigma)
+        self.decoder = NeuralNetwork(latent_size, data_size, hidden_sizes[::-1])
+    
+    def forward(self, x):
+        z = self.encoder(x)
+        x_hat = self.decoder(z)
+        return x_hat
+    
+class AutoEncoder(nn.Module):
+    def __init__(self, data_size, latent_size, hidden_sizes=[20,20]):
+        super(AutoEncoder, self).__init__()
+
+        self.encoder = NeuralNetwork(data_size, latent_size, hidden_sizes)
+        self.decoder = NeuralNetwork(latent_size, data_size, hidden_sizes[::-1])
+    
+    def forward(self, x):
+        z = self.encoder(x)
+        x_hat = self.decoder(z)
+        return x_hat
     
 class FourierNetwork(nn.Module):
 
