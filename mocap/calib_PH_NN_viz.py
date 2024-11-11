@@ -1,66 +1,9 @@
 import torch
-import torch.nn as nn
 import numpy as np
 import yaml
 
 import matplotlib.pyplot as plt
-
-class NeuralNetwork(nn.Module):
-    def __init__(self, input_size, output_size, hidden_sizes=[20,20]):
-        super(NeuralNetwork, self).__init__()
-
-        self.hiddenLayers = nn.ModuleList()
-        self.relus = nn.ModuleList()
-        for k in range(len(hidden_sizes)):
-            if k == 0:
-                self.hiddenLayers.append(nn.Linear(input_size, hidden_sizes[k]))
-            else:
-                self.hiddenLayers.append(nn.Linear(hidden_sizes[k-1], hidden_sizes[k]))
-            self.relus.append(nn.ReLU())
-        self.output = nn.Linear(hidden_sizes[-1], output_size)
-
-    def forward(self, x):
-        for k in range(len(self.hiddenLayers)):
-            x = self.hiddenLayers[k](x)
-            x = self.relus[k](x)
-        x = self.output(x)
-        return x
-
-class NeuralFourierNetwork(nn.Module):
-    def __init__(self, input_size, output_size, hidden_sizes=[20,20]):
-        super(NeuralFourierNetwork, self).__init__()
-
-        self.hiddenLayers = nn.ModuleList()
-        self.relus = nn.ModuleList()
-        for k in range(len(hidden_sizes)):
-            if k == 0:
-                self.hiddenLayers.append(nn.Linear(input_size, hidden_sizes[k]))
-            else:
-                self.hiddenLayers.append(nn.Linear(hidden_sizes[k-1], hidden_sizes[k]))
-            self.relus.append(nn.ReLU())
-        self.output = nn.Linear(hidden_sizes[-1]+12, output_size)
-        # define a fourier layer
-        
-
-    def forward(self, x):
-
-        if len(x.shape) == 2:
-            sum_input = torch.sum(x,dim=1,keepdim=True)
-            fourier_x = torch.cat((torch.sin(x),torch.cos(x),torch.sin(sum_input),torch.cos(sum_input),\
-                               torch.sin(2*x),torch.cos(2*x),torch.sin(2*sum_input),torch.cos(2*sum_input)),dim=1)
-        else:
-            sum_input = torch.Tensor([torch.sum(x)])
-            fourier_x = torch.cat((torch.sin(x),torch.cos(x),torch.sin(sum_input),torch.cos(sum_input),\
-                                torch.sin(2*x),torch.cos(2*x),torch.sin(2*sum_input),torch.cos(2*sum_input)))
-        for k in range(len(self.hiddenLayers)):
-            x = self.hiddenLayers[k](x)
-            x = self.relus[k](x)
-        if len(x.shape) == 2:
-            x = torch.cat((x,fourier_x),dim=1)
-        else:
-            x = torch.cat((x,fourier_x))
-        x = self.output(x)
-        return x
+from Models import *
     
 # Define the input size, hidden size, and output size
 
