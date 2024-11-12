@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 import torch.nn as nn
+from scipy.interpolate import LinearNDInterpolator
 import pickle
 from general_robotics_toolbox import *
 from PH_interp import *
@@ -11,6 +12,24 @@ import os, pathlib
 
 from motoman_def import *
 from Models import *
+
+def LinearNDInterpNearestExtrap(points, values):
+    q2 = points[:, 0]
+    q3 = points[:, 1]
+    f = LinearNDInterpolator(points, values)
+
+    # this inner function will be returned to a user
+    def new_f(q2q3):
+        # evaluate the Linear interpolator. Out-of-bounds values are nan.
+        zz = f(q2q3)
+        if np.isnan(zz).any():
+            # for each nan point, find its nearest neighbor
+            inds = np.argmin(np.linalg.norm(points - q2q3, ord=2, axis=1))
+            # ... and use its value
+            zz= np.array([values[inds]])
+        return zz
+
+    return new_f
 
 def test_fourier_accuracy(weights, data_q, data_T,robot,param_nominal):
 
@@ -41,14 +60,38 @@ def test_fourier_accuracy(weights, data_q, data_T,robot,param_nominal):
         p_error_all.append(p_error)
     return p_error_all
 
-def test_fwd_accuracy(model, data_q, data_T,robot,param_nominal):
+def test_fwd_interp_accuracy(model, vae_model, train_q, data_q, data_T,robot,param_nominal):
     
     p_error_all = []
     for i,q in enumerate(data_q):
+        # first, interpolate q2q3 to get latent vector
         q2q3 = np.array([q[1],q[2]])
-        q2q3 = torch.tensor(q2q3, dtype=torch.float32)
-        pred_PH = model(q2q3)
+        latent_vec_hat = model(torch.tensor(q2q3, dtype=torch.float32))
+        # then, predict delta PH using the latent vector and the decoder  
+        pred_PH = vae_model.decoder(latent_vec_hat)
         pred_PH = pred_PH.detach().numpy() + param_nominal
+        # get the robot position error
+        robot = get_PH_from_param(pred_PH,robot,unit='radians')
+        T_pred = robot.fwd(q)
+        p_error = np.linalg.norm(T_pred.p - data_T[i][:3])
+        p_error_all.append(p_error)
+    return p_error_all
+
+def test_fwd_accuracy(model, interp_funcs, train_q, data_q, data_T,robot,param_nominal):
+    
+    p_error_all = []
+    for i,q in enumerate(data_q):
+        # first, interpolate q2q3 to get latent vector
+        q2q3 = np.array([q[1],q[2]])
+        latent_vec_pred = np.array([interp_func(q2q3) for interp_func in interp_funcs]).T
+        if np.isnan(latent_vec_pred).any():
+            raise ValueError('Interpolation failed')
+            
+        latent_vec_pred = torch.tensor(latent_vec_pred[0], dtype=torch.float32)
+        # then, predict delta PH using the latent vector and the decoder  
+        pred_PH = model.decoder(latent_vec_pred)
+        pred_PH = pred_PH.detach().numpy() + param_nominal
+        # get the robot position error
         robot = get_PH_from_param(pred_PH,robot,unit='radians')
         T_pred = robot.fwd(q)
         p_error = np.linalg.norm(T_pred.p - data_T[i][:3])
@@ -56,23 +99,173 @@ def test_fwd_accuracy(model, data_q, data_T,robot,param_nominal):
     return p_error_all
 
 
-def train(inputs_q2q3, data_delta_PH, training_q, training_T, testing_q, testing_T,robot,param_nominal,robot_type):
+def train_interp(inputs_q2q3, data_delta_PH, training_q, training_T, testing_q, testing_T,robot,param_nominal,robot_type):
 
-    test_only = True
+    print("Train interpolation model")
 
     # data preprocessing
     data_delta_PH = torch.tensor(data_delta_PH, dtype=torch.float32)
-    inputs_q2q3 = torch.tensor(inputs_q2q3, dtype=torch.float32)
+    inputs_q2q3_tensor = torch.tensor(inputs_q2q3, dtype=torch.float32)
+
+    # AE_model_dir = "trainLATENT_AE_R1_latent12_2411121110/"
+    AE_model_dir = "trainLATENT_VAE_R1_latent6_2411121154/"
+    data_dir = 'PH_NN_results/'+AE_model_dir
+    # read meta data
+    with open(data_dir+'meta_data.yaml') as file:
+        vae_meta_data = yaml.full_load(file)
+    # read vae model
+    # Create an instance of the neural network
+    if vae_meta_data['Variational']:
+        vae_model = VariationalAutoEncoder(vae_meta_data['data_size'], vae_meta_data['latent_size'], vae_meta_data['hidden_sizes'], mu=vae_meta_data['mu'], sigma=vae_meta_data['sigma'])
+    else:
+        vae_model = AutoEncoder(vae_meta_data['data_size'], vae_meta_data['latent_size'], vae_meta_data['hidden_sizes'])
+    vae_model.load_state_dict(torch.load(data_dir+'best_testing_model.pt',weights_only=True))
+    vae_model.eval()
+
+
+    input_size = inputs_q2q3.shape[1]
+    latent_size = vae_meta_data['latent_size']
+    # model parameters
+    hidden_sizes = [200,200,200]
+    # model
+    model = NeuralNetwork(input_size, latent_size, hidden_sizes)
+    # print the model architecture
+    print("Interpolator:", model)
+
+    # loss function
+    loss_fn = nn.MSELoss()
+    # Define the learning rate
+    learning_rate = 0.003
+    # Define the number of epochs
+    num_epochs = 50000
+    # Define the optimizer
+    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+
+    # get save folder path
+    formatted_string = datetime.datetime.now().strftime("%Y%m%d%H%M")
+    formatted_string = formatted_string[2:]
+    folder_path = 'PH_NN_results/trainINTERP_'
+    folder_path += robot_type+'_'
+    folder_path += formatted_string+'/'
+
+    # save a training parameters meta yaml file to folder_path
+    meta_data = {'AE_data': AE_model_dir, 'hidden_sizes': hidden_sizes, 'learning_rate': learning_rate, 'num_epochs': num_epochs}
+    meta_data['robot_type'] = robot_type
+    if not os.path.exists(folder_path):
+        pathlib.Path(folder_path).mkdir(parents=True, exist_ok=True)
+    with open(folder_path+'meta_data.yaml', 'w') as file:
+        documents = yaml.dump(meta_data, file)
+
+    # Training loop
+    loss_all = []
+    training_mean_error_all = []
+    testing_mean_error_all = []
+    training_max_error_all = []
+    testing_max_error_all = []
+    training_std_error_all = []
+    testing_std_error_all = []
+    data_sample_epoches = []
+    best_loss = 1e10
+    best_training_error = 1e10
+    best_testing_error = 1e10
+
+    training_start_time = time.time()
+    training_t_epoch = []
+    for epoch in range(num_epochs):
+        epoch_start_time = time.time()
+
+        # get ground truth from ae
+        latent_vec = vae_model.encoder(data_delta_PH)
+
+        # Forward pass
+        model.train()
+        latent_vec_hat = model(inputs_q2q3_tensor)
+        loss = loss_fn(latent_vec_hat, latent_vec)
+
+        # Backward pass and optimization
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+        # get testing data loss
+        # test_outputs = model(test_inputs_q2q3)
+        # test_loss = loss_fn(test_outputs, test_targets_delta_PH)
+
+        # Print the loss for every 10 epochs
+        print_loss = False
+        print_error = False
+        if epoch==0:
+            print_loss = True
+            print_error = True
+        elif epoch<1001:
+            if (epoch+1) % 10 == 0:
+                print_loss = True
+            if (epoch+1) % 100 == 0:
+                print_error = True
+        else:
+            if (epoch+1) % 100 == 0:
+                print_loss = True
+            if (epoch+1) % 500 == 0:
+                print_error = True
+
+        model.eval()
+        if best_loss > loss.item():
+            best_loss = loss.item()
+            torch.save(model.state_dict(), folder_path+'best_lost_model.pt')
+        loss_all.append(loss.item())
+        np.save(folder_path+'loss_all.npy',np.array(loss_all)) # save the loss
+        if print_loss:
+            print(f'Epoch [{epoch+1}/{num_epochs}], Loss: {loss.item():.4f}')
+        if print_error:
+            training_T_error = test_fwd_interp_accuracy(model, vae_model, inputs_q2q3, training_q, training_T,robot,param_nominal)
+            testing_T_error = test_fwd_interp_accuracy(model, vae_model, inputs_q2q3, testing_q, testing_T,robot,param_nominal)
+            # print training and testing error, mean, max
+            print(f'Training error: mean={np.mean(training_T_error):.4f}, max={np.max(training_T_error):.4f}')
+            print(f'Testing error: mean={np.mean(testing_T_error):.4f}, max={np.max(testing_T_error):.4f}')
+            training_mean_error_all.append(np.mean(training_T_error))
+            testing_mean_error_all.append(np.mean(testing_T_error))
+            training_max_error_all.append(np.max(training_T_error))
+            testing_max_error_all.append(np.max(testing_T_error))
+            training_std_error_all.append(np.std(training_T_error))
+            testing_std_error_all.append(np.std(testing_T_error))
+            data_sample_epoches.append(epoch)
+            # save the model
+            if best_training_error > np.max(training_T_error):
+                best_training_error = np.max(training_T_error)
+                torch.save(model.state_dict(), folder_path+'best_training_model.pt')
+            if best_testing_error > np.max(testing_T_error):
+                best_testing_error = np.max(testing_T_error)
+                torch.save(model.state_dict(), folder_path+'best_testing_model.pt')
+            np.save(folder_path+'training_mean_error_all.npy',np.array(training_mean_error_all))
+            np.save(folder_path+'testing_mean_error_all.npy',np.array(testing_mean_error_all))
+            np.save(folder_path+'training_max_error_all.npy',np.array(training_max_error_all))
+            np.save(folder_path+'testing_max_error_all.npy',np.array(testing_max_error_all))
+            np.save(folder_path+'training_std_error_all.npy',np.array(training_std_error_all))
+            np.save(folder_path+'testing_std_error_all.npy',np.array(testing_std_error_all))
+            np.save(folder_path+'data_sample_epoches.npy',np.array(data_sample_epoches))
+
+        # training time for each epoch
+        epoch_end_time = time.time()
+        training_t_epoch.append(epoch_end_time-epoch_start_time)
+        # print(f'Mean epoch time: {np.mean(training_t_epoch):.5f}, Total time: {epoch_end_time-training_start_time:.2f}')
+
+    print('Training time:',time.time()-training_start_time)  
+
+def train(inputs_q2q3, data_delta_PH, training_q, training_T, testing_q, testing_T,robot,param_nominal,robot_type):
+
+    # data preprocessing
+    data_delta_PH = torch.tensor(data_delta_PH, dtype=torch.float32)
+    inputs_q2q3_tensor = torch.tensor(inputs_q2q3, dtype=torch.float32)
     
 
     # Define the input size, hidden size, and output size
-    latent_size = 2
+    latent_size = 12 # 2 6 12
     hidden_sizes = [200,200,200]
     data_size = 33
     mu = 0
-    sigma = 1
-    loss_kl_weight = 0.3
-    Variational = False
+    sigma = 0.001
+    loss_kl_weight = 0.1
+    Variational = True
 
     # Create an instance of the neural network
     if Variational:
@@ -134,6 +327,8 @@ def train(inputs_q2q3, data_delta_PH, training_q, training_T, testing_q, testing
     testing_mean_error_all = []
     training_max_error_all = []
     testing_max_error_all = []
+    training_std_error_all = []
+    testing_std_error_all = []
     data_sample_epoches = []
     best_loss = 1e10
     best_training_error = 1e10
@@ -183,35 +378,43 @@ def train(inputs_q2q3, data_delta_PH, training_q, training_T, testing_q, testing
         model.eval()
         if best_loss > loss.item():
             best_loss = loss.item()
-            torch.save(model.encoder.state_dict(), folder_path+'best_lost_encoder_model.pt')
-            torch.save(model.decoder.state_dict(), folder_path+'best_lost_decoder_model.pt')
+            torch.save(model.state_dict(), folder_path+'best_lost_model.pt')
         loss_all.append(loss.item())
         np.save(folder_path+'loss_all.npy',np.array(loss_all)) # save the loss
         if print_loss:
             print(f'Epoch [{epoch+1}/{num_epochs}], Loss: {loss.item():.4f}')
-        # if print_error:
-        #     training_T_error = test_fwd_accuracy(model, training_q, training_T,robot,param_nominal)
-        #     testing_T_error = test_fwd_accuracy(model, testing_q, testing_T,robot,param_nominal)
-        #     # print training and testing error, mean, max
-        #     print(f'Training error: mean={np.mean(training_T_error):.4f}, max={np.max(training_T_error):.4f}')
-        #     print(f'Testing error: mean={np.mean(testing_T_error):.4f}, max={np.max(testing_T_error):.4f}')
-        #     training_mean_error_all.append(np.mean(training_T_error))
-        #     testing_mean_error_all.append(np.mean(testing_T_error))
-        #     training_max_error_all.append(np.max(training_T_error))
-        #     testing_max_error_all.append(np.max(testing_T_error))
-        #     data_sample_epoches.append(epoch)
-        #     # save the model
-        #     if best_training_error > np.max(training_T_error):
-        #         best_training_error = np.max(training_T_error)
-        #         torch.save(model.state_dict(), folder_path+'best_training_model.pt')
-        #     if best_testing_error > np.max(testing_T_error):
-        #         best_testing_error = np.max(testing_T_error)
-        #         torch.save(model.state_dict(), folder_path+'best_testing_model.pt')
-        #     np.save(folder_path+'training_mean_error_all.npy',np.array(training_mean_error_all))
-        #     np.save(folder_path+'testing_mean_error_all.npy',np.array(testing_mean_error_all))
-        #     np.save(folder_path+'training_max_error_all.npy',np.array(training_max_error_all))
-        #     np.save(folder_path+'testing_max_error_all.npy',np.array(testing_max_error_all))
-        #     np.save(folder_path+'data_sample_epoches.npy',np.array(data_sample_epoches))
+        if print_error:
+            latent_vec = model.encoder(data_delta_PH)
+            latent_vec_cpu = latent_vec.detach().numpy()
+            interp_funcs = []
+            for latent_i in range(latent_size):
+                interp_funcs.append(LinearNDInterpNearestExtrap(inputs_q2q3, latent_vec_cpu[:,latent_i]))
+            training_T_error = test_fwd_accuracy(model, interp_funcs, inputs_q2q3, training_q, training_T,robot,param_nominal)
+            testing_T_error = test_fwd_accuracy(model, interp_funcs, inputs_q2q3, testing_q, testing_T,robot,param_nominal)
+            # print training and testing error, mean, max
+            print(f'Training error: mean={np.mean(training_T_error):.4f}, max={np.max(training_T_error):.4f}')
+            print(f'Testing error: mean={np.mean(testing_T_error):.4f}, max={np.max(testing_T_error):.4f}')
+            training_mean_error_all.append(np.mean(training_T_error))
+            testing_mean_error_all.append(np.mean(testing_T_error))
+            training_max_error_all.append(np.max(training_T_error))
+            testing_max_error_all.append(np.max(testing_T_error))
+            training_std_error_all.append(np.std(training_T_error))
+            testing_std_error_all.append(np.std(testing_T_error))
+            data_sample_epoches.append(epoch)
+            # save the model
+            if best_training_error > np.max(training_T_error):
+                best_training_error = np.max(training_T_error)
+                torch.save(model.state_dict(), folder_path+'best_training_model.pt')
+            if best_testing_error > np.max(testing_T_error):
+                best_testing_error = np.max(testing_T_error)
+                torch.save(model.state_dict(), folder_path+'best_testing_model.pt')
+            np.save(folder_path+'training_mean_error_all.npy',np.array(training_mean_error_all))
+            np.save(folder_path+'testing_mean_error_all.npy',np.array(testing_mean_error_all))
+            np.save(folder_path+'training_max_error_all.npy',np.array(training_max_error_all))
+            np.save(folder_path+'testing_max_error_all.npy',np.array(testing_max_error_all))
+            np.save(folder_path+'training_std_error_all.npy',np.array(training_std_error_all))
+            np.save(folder_path+'testing_std_error_all.npy',np.array(testing_std_error_all))
+            np.save(folder_path+'data_sample_epoches.npy',np.array(data_sample_epoches))
 
         # training time for each epoch
         epoch_end_time = time.time()
@@ -323,7 +526,7 @@ for qkey in PH_q.keys():
 ## NN input: training q, 2x1
 ## NN output: training param_PH, 33x1
 ## train the NN
-train(np.array(train_q),np.array(param_PH_q),train_robot_q,train_mocap_T,test_robot_q,test_mocap_T,robot,param_nominal,robot_type)
-
+# train(np.array(train_q),np.array(param_PH_q),train_robot_q,train_mocap_T,test_robot_q,test_mocap_T,robot,param_nominal,robot_type)
+train_interp(np.array(train_q),np.array(param_PH_q),train_robot_q,train_mocap_T,test_robot_q,test_mocap_T,robot,param_nominal,robot_type)
 
         
