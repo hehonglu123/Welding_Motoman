@@ -29,21 +29,25 @@ with open(data_dir+'slicing.yml', 'r') as file:
 
 #######################################ER5356########################################################
 job_offset=100
-vd_relative=8
-feedrate_cmd=120
-base_vd_relative=5
+vd_relative=3 # 9 mm/s
+feedrate_cmd=150
+base_vd_relative=5 # 5 mm/s
 base_feedrate_cmd=250
 layer_height_num=int(1.5/slicing_meta['line_resolution'])
+
+jog_speed=1
 
 waypoint_distance=5 	###waypoint separation
 
 arc_on = False
 
+q_mid = np.radians([0, 20, 20, 0 ,0 ,0])
+
 
 robot=robot_obj('MA2010_A0',def_path='../config/MA2010_A0_robot_default_config.yml',tool_file_path='../config/torch.csv',\
 	pulse2deg_file_path='../config/MA2010_A0_pulse2deg_real.csv',d=15)
 positioner=positioner_obj('D500B',def_path='../config/D500B_robot_default_config.yml',tool_file_path='../config/positioner_tcp.csv',\
-	pulse2deg_file_path='../config/D500B_pulse2deg_real.csv',base_transformation_file='../config/D500B_pose_mocap.csv')
+	pulse2deg_file_path='../config/D500B_pulse2deg_real.csv',base_transformation_file='../config/D500B_pose.csv')
 
 mp=MotionProgram(ROBOT_CHOICE='RB1',ROBOT_CHOICE2='ST1',pulse2deg=robot.pulse2deg,pulse2deg_2=positioner.pulse2deg, tool_num = 12)
 client=MotionProgramExecClient()
@@ -54,49 +58,71 @@ v1_all=[]
 cond_all=[]
 primitives=[]
 ###########################################base layer welding############################################
-num_baselayer=slicing_meta['num_baselayers']
-q_prev=np.array([-3.873884042181341414e-01,7.020742044743379928e-01,2.673201703360967851e-01,2.058051060719867931e-01,-7.901821395898829259e-01,-5.175773297348927882e-01])
-mp=MotionProgram(ROBOT_CHOICE='RB1',ROBOT_CHOICE2='ST1',pulse2deg=robot.pulse2deg,pulse2deg_2=positioner.pulse2deg, tool_num = 12)
-for base_layer in range(num_baselayer):
-	num_sections=len(glob.glob(data_dir+'curve_sliced_relative/baselayer'+str(base_layer)+'_*.csv'))
-	for x in range(num_sections):
-		curve_sliced_js=np.loadtxt(data_dir+'curve_sliced_js/MA2010_base_js'+str(base_layer)+'_'+str(x)+'.csv',delimiter=',')
-		positioner_js=np.loadtxt(data_dir+'curve_sliced_js/D500B_base_js'+str(base_layer)+'_'+str(x)+'.csv',delimiter=',')
-		curve_sliced_relative=np.loadtxt(data_dir+'curve_sliced_relative/baselayer'+str(base_layer)+'_'+str(x)+'.csv',delimiter=',')
+# num_baselayer=slicing_meta['num_baselayers']
+# q_prev=np.array([-3.873884042181341414e-01,7.020742044743379928e-01,2.673201703360967851e-01,2.058051060719867931e-01,-7.901821395898829259e-01,-5.175773297348927882e-01])
+# mp=MotionProgram(ROBOT_CHOICE='RB1',ROBOT_CHOICE2='ST1',pulse2deg=robot.pulse2deg,pulse2deg_2=positioner.pulse2deg, tool_num = 12)
+# for base_layer in range(num_baselayer):
+# 	num_sections=len(glob.glob(data_dir+'curve_sliced_relative/baselayer'+str(base_layer)+'_*.csv'))
+# 	for x in range(num_sections):
+# 		curve_sliced_js=np.loadtxt(data_dir+'curve_sliced_js/MA2010_base_js'+str(base_layer)+'_'+str(x)+'.csv',delimiter=',')
+# 		positioner_js=np.loadtxt(data_dir+'curve_sliced_js/D500B_base_js'+str(base_layer)+'_'+str(x)+'.csv',delimiter=',')
+# 		curve_sliced_relative=np.loadtxt(data_dir+'curve_sliced_relative/baselayer'+str(base_layer)+'_'+str(x)+'.csv',delimiter=',')
 
-		lam1=calc_lam_js(curve_sliced_js,robot)
-		lam2=calc_lam_js(positioner_js,positioner)
-		lam_relative=calc_lam_cs(curve_sliced_relative)
+# 		lam1=calc_lam_js(curve_sliced_js,robot)
+# 		lam2=calc_lam_js(positioner_js,positioner)
+# 		lam_relative=calc_lam_cs(curve_sliced_relative)
 
-		q_start,q_end=extend_simple(curve_sliced_js,positioner_js,curve_sliced_relative,lam_relative,d=10)
+# 		q_start,q_end=extend_simple(curve_sliced_js,positioner_js,curve_sliced_relative,lam_relative,d=10)
 
-		num_points_layer=max(2,int(lam_relative[-1]/waypoint_distance))
-		###find which end to start
-		if np.linalg.norm(q_prev-curve_sliced_js[0])<np.linalg.norm(q_prev-curve_sliced_js[-1]):
-			breakpoints=np.linspace(0,len(curve_sliced_js)-1,num=num_points_layer).astype(int)
-		else:
-			temp=copy.deepcopy(q_start)
-			q_start=copy.deepcopy(q_end)
-			q_end=temp
-			breakpoints=np.linspace(len(curve_sliced_js)-1,0,num=num_points_layer).astype(int)
+# 		num_points_layer=max(2,int(lam_relative[-1]/waypoint_distance))
+# 		###find which end to start
+# 		if np.linalg.norm(q_prev-curve_sliced_js[0])<np.linalg.norm(q_prev-curve_sliced_js[-1]):
+# 			breakpoints=np.linspace(0,len(curve_sliced_js)-1,num=num_points_layer).astype(int)
+# 		else:
+# 			temp=copy.deepcopy(q_start)
+# 			q_start=copy.deepcopy(q_end)
+# 			q_end=temp
+# 			breakpoints=np.linspace(len(curve_sliced_js)-1,0,num=num_points_layer).astype(int)
 
-		s1_all,_=calc_individual_speed(base_vd_relative,lam1,lam2,lam_relative,breakpoints)
+# 		s1_all,_=calc_individual_speed(base_vd_relative,lam1,lam2,lam_relative,breakpoints)
 
-		primitives.extend(['movej']+['movel']*(num_points_layer+1))
-		q1_all.extend([q_start]+curve_sliced_js[breakpoints].tolist()+[q_end])
-		q2_all.extend([positioner_js[breakpoints[0]]]+positioner_js[breakpoints].tolist()+[positioner_js[breakpoints[-1]]])
-		v1_all.extend([1]+[s1_all[0]]+s1_all+[s1_all[-1]])
-		cond_all.extend([0]+[int(base_feedrate_cmd/10+job_offset)]*(num_points_layer+1))					###extended baselayer welding
+# 		primitives.extend(['movej']+['movel']*(num_points_layer+1))
+# 		q1_all.extend([q_start]+curve_sliced_js[breakpoints].tolist()+[q_end])
+# 		q2_all.extend([positioner_js[breakpoints[0]]]+positioner_js[breakpoints].tolist()+[positioner_js[breakpoints[-1]]])
+# 		v1_all.extend([1]+[s1_all[0]]+s1_all+[s1_all[-1]])
+# 		cond_all.extend([0]+[int(base_feedrate_cmd/10+job_offset)]*(num_points_layer+1))					###extended baselayer welding
+
+# 		# jog to starting point with z offset +10 mm
+# 		T_start = robot.fwd(q_start)
+# 		T_start.p[-1] += 10
+# 		q_start_offset = robot.inv(T_start.p, T_start.R, q_start)[0]
+
+# 		# jog to the starting point
+# 		input("Press Enter to jog to start of the base layer "+str(base_layer)+" section "+str(x))
+# 		ws.jog_dual(robot, positioner, q_start_offset, positioner_js[breakpoints[0]], v=jog_speed)
+# 		input("Press Enter to weld")
+# 		global_ts,robot_ts,joint_recording,job_line,_=ws.weld_segment_dual(primitives,robot,positioner,q1_all,q2_all,v1_all,10*np.ones(len(v1_all)),cond_all,arc=arc_on)
+
+# 		q1_all=[]
+# 		q2_all=[]
+# 		v1_all=[]
+# 		cond_all=[]
+# 		primitives=[]
 		
-
-		q_prev=curve_sliced_js[breakpoints[-1]]
+# 		q_prev=curve_sliced_js[breakpoints[-1]]
 
 ###########################################layer welding############################################
 # q_prev=np.array([-3.791544713877046391e-01,7.156749523014762637e-01,2.756772964158371586e-01,2.106493295914119712e-01,-7.865937103692784982e-01,-5.293956242391706368e-01])
+
+print("Start layer welding")
+input("Press Enter to start layer welding")
+
 q_prev=client.getJointAnglesMH(robot.pulse2deg)
 
-num_layer_start=int(1*layer_height_num)
-num_layer_end=int(150*layer_height_num)
+# num_layer_start=int(0*layer_height_num)
+# num_layer_end=int(150*layer_height_num)
+num_layer_start=3
+num_layer_end=150
 num_sections=1
 for layer in range(num_layer_start,num_layer_end,layer_height_num):
 	num_sections_prev=num_sections
@@ -155,9 +181,26 @@ for layer in range(num_layer_start,num_layer_end,layer_height_num):
 		cond_all.extend([0]+[int(feedrate_cmd/10+job_offset)]*(num_points_layer-1))
 		primitives.extend(['movej']+['movel']*(num_points_layer-1))
 
+		q_start = np.array(q1_all[0])
+		# jog to starting point with z offset +10 mm
+		T_start = robot.fwd(q_start)
+		T_start.p[-1] += 10
+		q_start_offset = robot.inv(T_start.p, T_start.R, q_start)[0]
+
+		# jog to the starting point
+		input("Press Enter to jog to start of the layer "+str(layer)+" section "+str(x))
+		# ws.jog_dual(robot, positioner, q_start_offset, positioner_js[breakpoints[0]], v=jog_speed)
+		ws.jog_single(positioner, q2_all[0], v=jog_speed)
+		ws.jog_single(robot, q1_all[0], v=jog_speed)
+		input("Press Enter to weld")
+		global_ts,robot_ts,joint_recording,job_line,_=ws.weld_segment_dual(primitives,robot,positioner,q1_all,q2_all,v1_all,10*np.ones(len(v1_all)),cond_all,arc=arc_on)
+
+		q1_all=[]
+		q2_all=[]
+		v1_all=[]
+		cond_all=[]
+		primitives=[]
 
 		q_prev=curve_sliced_js[breakpoints[-1]]
 	
-
-
-timestamp_robot,joint_recording,job_line,_=ws.weld_segment_dual(primitives,robot,positioner,q1_all,q2_all,v1_all,10*np.ones(len(v1_all)),cond_all,arc=arc_on)
+# timestamp_robot,joint_recording,job_line,_=ws.weld_segment_dual(primitives,robot,positioner,q1_all,q2_all,v1_all,10*np.ones(len(v1_all)),cond_all,arc=arc_on)

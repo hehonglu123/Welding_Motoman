@@ -47,6 +47,8 @@ def main():
 
 	
 	H[2,-1]+=slicing_meta['num_baselayers']*slicing_meta['baselayer_thickness']+slicing_meta['num_supportlayers']*slicing_meta['supportlayer_thickness']
+	H[1,-1]+=20
+	
 
 	np.savetxt(data_dir+'curve_pose.csv',H,delimiter=',')
 
@@ -123,7 +125,7 @@ def main():
 			curve_sliced_relative_base[-1][x][:,2]-=((slicing_meta['num_baselayers']-i)*base_thickness+slicing_meta['num_supportlayers']*slicing_meta['supportlayer_thickness'])
 			ax.plot3D(curve_sliced_relative_base[i][x][::vis_step,0],curve_sliced_relative_base[i][x][::vis_step,1],curve_sliced_relative_base[i][x][::vis_step,2],'r.-')
 			ax.quiver(curve_sliced_relative_base[i][x][::vis_step,0],curve_sliced_relative_base[i][x][::vis_step,1],curve_sliced_relative_base[i][x][::vis_step,2],curve_sliced_relative_base[i][x][::vis_step,3],curve_sliced_relative_base[i][x][::vis_step,4],curve_sliced_relative_base[i][x][::vis_step,5],length=0.3, normalize=True)
-			np.savetxt(data_dir+'curve_sliced_relative/base_slice'+str(i)+'_'+str(x)+'.csv',curve_sliced_relative_base[i][x],delimiter=',')
+			np.savetxt(data_dir+'curve_sliced_relative/baselayer'+str(i)+'_'+str(x)+'.csv',curve_sliced_relative_base[i][x],delimiter=',')
 
 	
 	set_axes_equal(ax)

@@ -28,10 +28,10 @@ def main():
 	curve_sliced_relative=[]
 	curve_sliced=[]
 	for i in range(slicing_meta['num_baselayers']):
-		num_sections=len(glob.glob(data_dir+'curve_sliced_relative/base_slice'+str(i)+'_*.csv'))
+		num_sections=len(glob.glob(data_dir+'curve_sliced_relative/baselayer'+str(i)+'_*.csv'))
 		curve_sliced_relative_base_ith_layer=[]
 		for x in range(num_sections):
-			curve_sliced_relative_base_ith_layer.append(np.loadtxt(data_dir+'curve_sliced_relative/base_slice'+str(i)+'_'+str(x)+'.csv',delimiter=',').reshape((-1,6)))
+			curve_sliced_relative_base_ith_layer.append(np.loadtxt(data_dir+'curve_sliced_relative/baselayer'+str(i)+'_'+str(x)+'.csv',delimiter=',').reshape((-1,6)))
 		curve_sliced_relative_base.append(curve_sliced_relative_base_ith_layer)
 	
 	for i in range(slicing_meta['num_supportlayers']):
@@ -51,12 +51,10 @@ def main():
 		curve_sliced_relative.append(curve_sliced_relative_ith_layer)
 		curve_sliced.append(curve_sliced_ith_layer)
 
-	
-
-
-	R_torch=np.array([[-0.7071, 0.7071, -0.    ],
-			[ 0.7071, 0.7071,  0.    ],
-			[0.,      0.,     -1.    ]])
+	# R_torch=np.array([[-0.7071, 0.7071, -0.    ],
+	# 		[ 0.7071, 0.7071,  0.    ],
+	# 		[0.,      0.,     -1.    ]])
+	R_torch = Ry(np.radians(180))@Rz(np.radians(70))
 	q_seed=np.radians([-35.4291,56.6333,40.5194,4.5177,-52.2505,-11.6546])
 
 	rr=redundancy_resolution(robot,positioner,curve_sliced)
