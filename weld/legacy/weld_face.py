@@ -1,7 +1,8 @@
 import sys, glob
-from motoman_def import *
+sys.path.append('../toolbox/')
+from robot_def import *
 from lambda_calc import *
-from dual_robot import *
+from multi_robot import *
 from dx200_motion_program_exec_client import *
 from WeldSend import *
 
@@ -21,8 +22,8 @@ def extend_simple(curve_sliced_js,positioner_js,curve_sliced_relative,lam_relati
 	return q_start, q_end
 
 
-dataset='face_mesh_tanja_straight/'
-sliced_alg='slicing_result_10/'
+dataset='face/'
+sliced_alg='auto_slice/'
 data_dir='../data/'+dataset+sliced_alg
 with open(data_dir+'slicing.yml', 'r') as file:
 	slicing_meta = yaml.safe_load(file)
@@ -36,8 +37,6 @@ base_feedrate_cmd=250
 layer_height_num=int(1.5/slicing_meta['line_resolution'])
 
 waypoint_distance=5 	###waypoint separation
-
-arc_on = False
 
 
 robot=robot_obj('MA2010_A0',def_path='../config/MA2010_A0_robot_default_config.yml',tool_file_path='../config/torch.csv',\
@@ -54,42 +53,42 @@ v1_all=[]
 cond_all=[]
 primitives=[]
 ###########################################base layer welding############################################
-num_baselayer=slicing_meta['num_baselayers']
-q_prev=np.array([-3.873884042181341414e-01,7.020742044743379928e-01,2.673201703360967851e-01,2.058051060719867931e-01,-7.901821395898829259e-01,-5.175773297348927882e-01])
-mp=MotionProgram(ROBOT_CHOICE='RB1',ROBOT_CHOICE2='ST1',pulse2deg=robot.pulse2deg,pulse2deg_2=positioner.pulse2deg, tool_num = 12)
-for base_layer in range(num_baselayer):
-	num_sections=len(glob.glob(data_dir+'curve_sliced_relative/baselayer'+str(base_layer)+'_*.csv'))
-	for x in range(num_sections):
-		curve_sliced_js=np.loadtxt(data_dir+'curve_sliced_js/MA2010_base_js'+str(base_layer)+'_'+str(x)+'.csv',delimiter=',')
-		positioner_js=np.loadtxt(data_dir+'curve_sliced_js/D500B_base_js'+str(base_layer)+'_'+str(x)+'.csv',delimiter=',')
-		curve_sliced_relative=np.loadtxt(data_dir+'curve_sliced_relative/baselayer'+str(base_layer)+'_'+str(x)+'.csv',delimiter=',')
+# num_baselayer=2
+# q_prev=np.array([-3.791547245558870571e-01,7.167996965635117235e-01,2.745092098742105691e-01,2.111291009755724701e-01,-7.843516348888318612e-01,-5.300740197588397207e-01])
+# mp=MotionProgram(ROBOT_CHOICE='RB1',ROBOT_CHOICE2='ST1',pulse2deg=robot.pulse2deg,pulse2deg_2=positioner.pulse2deg, tool_num = 12)
+# for base_layer in range(num_baselayer):
+# 	num_sections=len(glob.glob(data_dir+'curve_sliced_relative/baselayer'+str(base_layer)+'_*.csv'))
+# 	for x in range(num_sections):
+# 		curve_sliced_js=np.loadtxt(data_dir+'curve_sliced_js/MA2010_base_js'+str(base_layer)+'_'+str(x)+'.csv',delimiter=',')
+# 		positioner_js=np.loadtxt(data_dir+'curve_sliced_js/D500B_base_js'+str(base_layer)+'_'+str(x)+'.csv',delimiter=',')
+# 		curve_sliced_relative=np.loadtxt(data_dir+'curve_sliced_relative/baselayer'+str(base_layer)+'_'+str(x)+'.csv',delimiter=',')
 
-		lam1=calc_lam_js(curve_sliced_js,robot)
-		lam2=calc_lam_js(positioner_js,positioner)
-		lam_relative=calc_lam_cs(curve_sliced_relative)
+# 		lam1=calc_lam_js(curve_sliced_js,robot)
+# 		lam2=calc_lam_js(positioner_js,positioner)
+# 		lam_relative=calc_lam_cs(curve_sliced_relative)
 
-		q_start,q_end=extend_simple(curve_sliced_js,positioner_js,curve_sliced_relative,lam_relative,d=10)
+# 		q_start,q_end=extend_simple(curve_sliced_js,positioner_js,curve_sliced_relative,lam_relative,d=10)
 
-		num_points_layer=max(2,int(lam_relative[-1]/waypoint_distance))
-		###find which end to start
-		if np.linalg.norm(q_prev-curve_sliced_js[0])<np.linalg.norm(q_prev-curve_sliced_js[-1]):
-			breakpoints=np.linspace(0,len(curve_sliced_js)-1,num=num_points_layer).astype(int)
-		else:
-			temp=copy.deepcopy(q_start)
-			q_start=copy.deepcopy(q_end)
-			q_end=temp
-			breakpoints=np.linspace(len(curve_sliced_js)-1,0,num=num_points_layer).astype(int)
+# 		num_points_layer=max(2,int(lam_relative[-1]/waypoint_distance))
+# 		###find which end to start
+# 		if np.linalg.norm(q_prev-curve_sliced_js[0])<np.linalg.norm(q_prev-curve_sliced_js[-1]):
+# 			breakpoints=np.linspace(0,len(curve_sliced_js)-1,num=num_points_layer).astype(int)
+# 		else:
+# 			temp=copy.deepcopy(q_start)
+# 			q_start=copy.deepcopy(q_end)
+# 			q_end=temp
+# 			breakpoints=np.linspace(len(curve_sliced_js)-1,0,num=num_points_layer).astype(int)
 
-		s1_all,_=calc_individual_speed(base_vd_relative,lam1,lam2,lam_relative,breakpoints)
+# 		s1_all,_=calc_individual_speed(base_vd_relative,lam1,lam2,lam_relative,breakpoints)
 
-		primitives.extend(['movej']+['movel']*(num_points_layer+1))
-		q1_all.extend([q_start]+curve_sliced_js[breakpoints].tolist()+[q_end])
-		q2_all.extend([positioner_js[breakpoints[0]]]+positioner_js[breakpoints].tolist()+[positioner_js[breakpoints[-1]]])
-		v1_all.extend([1]+[s1_all[0]]+s1_all+[s1_all[-1]])
-		cond_all.extend([0]+[int(base_feedrate_cmd/10+job_offset)]*(num_points_layer+1))					###extended baselayer welding
+# 		primitives.extend(['movej']+['movel']*(num_points_layer+1))
+# 		q1_all.extend([q_start]+curve_sliced_js[breakpoints].tolist()+[q_end])
+# 		q2_all.extend([positioner_js[breakpoints[0]]]+positioner_js[breakpoints].tolist()+[positioner_js[breakpoints[-1]]])
+# 		v1_all.extend([1]+[s1_all[0]]+s1_all+[s1_all[-1]])
+# 		cond_all.extend([0]+[int(base_feedrate_cmd/10+job_offset)]*(num_points_layer+1))					###extended baselayer welding
 		
 
-		q_prev=curve_sliced_js[breakpoints[-1]]
+# 		q_prev=curve_sliced_js[breakpoints[-1]]
 
 ###########################################layer welding############################################
 # q_prev=np.array([-3.791544713877046391e-01,7.156749523014762637e-01,2.756772964158371586e-01,2.106493295914119712e-01,-7.865937103692784982e-01,-5.293956242391706368e-01])
@@ -160,4 +159,4 @@ for layer in range(num_layer_start,num_layer_end,layer_height_num):
 	
 
 
-timestamp_robot,joint_recording,job_line,_=ws.weld_segment_dual(primitives,robot,positioner,q1_all,q2_all,v1_all,10*np.ones(len(v1_all)),cond_all,arc=arc_on)
+timestamp_robot,joint_recording,job_line,_=ws.weld_segment_dual(primitives,robot,positioner,q1_all,q2_all,v1_all,10*np.ones(len(v1_all)),cond_all,arc=True)

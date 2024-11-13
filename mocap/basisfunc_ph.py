@@ -52,8 +52,8 @@ for j in range(6):
 ###### define basis function ######
 basis_func=[]
 basis_func.append(lambda q2,q3,a: np.sin(a*q2))
-basis_func.append(lambda q2,q3,a: np.cos(a*q2))
 basis_func.append(lambda q2,q3,a: np.sin(a*q3))
+basis_func.append(lambda q2,q3,a: np.cos(a*q2))
 basis_func.append(lambda q2,q3,a: np.cos(a*q3))
 basis_func.append(lambda q2,q3,a: np.sin(a*(q2+q3)))
 basis_func.append(lambda q2,q3,a: np.cos(a*(q2+q3)))

@@ -10,7 +10,7 @@ from utils import *
 from robot_def import *
 from scan_utils import *
 from scan_continuous import *
-from scanPathGen import *
+# from scanPathGen import *
 from scanProcess import *
 from weld_dh2v import *
 
@@ -112,8 +112,8 @@ x_upper = 999999
 start_id=75
 end_id=-75
 
-datasets=['baseline','correction']
-# datasets=['correction']
+# datasets=['baseline','correction']
+datasets=['correction']
 
 # datasets=['correction','repeat 1','repeat 2']
 # datasets=['baseline','correction','repeat 1','repeat 2']
@@ -137,7 +137,7 @@ for dataset in datasets:
     all_correction_layer=[]
     all_h_mean=[]
     all_h_std=[]
-    for i in range(0,9999999):
+    for i in range(10,9999999):
         try:
             weld_dir=data_dir+'layer_'+str(i)+'/'
             weld_q=np.loadtxt(weld_dir+'weld_js_exe.csv',delimiter=',')
@@ -149,6 +149,16 @@ for dataset in datasets:
             robot_stamps=np.loadtxt(scan_dir+'scan_robot_stamps.csv',delimiter=',')
             with open(scan_dir+'mti_scans.pickle', 'rb') as file:
                 mti_recording=pickle.load(file)
+            
+            # for scan_step in mti_recording[len(mti_recording)//2:]:
+            #     plt.scatter(scan_step[0],-1*scan_step[1]+100)
+            #     plt.show()
+            # exit()
+            
+            visualize_pcd([pcd])
+
+            # print(mti_recording[0].shape)
+            # exit()
             
             # q_out_exe=np.loadtxt(data_dir +'scan_js_exe.csv',delimiter=',')
             # robot_stamps=np.loadtxt(data_dir +'robot_stamps.csv',delimiter=',')

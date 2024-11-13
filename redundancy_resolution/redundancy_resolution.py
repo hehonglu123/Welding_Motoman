@@ -128,15 +128,37 @@ class redundancy_resolution(object):
 
 				if start_idx==0 and (end_idx>start_idx):
 					positioner_js[i][x][start_idx:end_idx]=positioner_js[i][x][end_idx]
+				
+				# plt.plot(np.degrees(positioner_js[i][x][:,0]),'-o')
+				# plt.show()
 
+		return positioner_js
+	
+	def positioner_joint_limit_interpolation(self,positioner_js):
+		###interpolate to the nearest joint limit
+		for i in range(len(positioner_js)):
+			for x in range(len(positioner_js[i])):
+				for j in range(len(positioner_js[i][x])):
+					if np.any(positioner_js[i][x][j]>self.positioner.upper_limit) or np.any(positioner_js[i][x][j]<self.positioner.lower_limit):
+						print("layer:",i,"section:",x,"joint:",j)
+						for k in range(j+1,len(positioner_js[i][x])):
+							if np.all(positioner_js[i][x][k]<=self.positioner.upper_limit) and np.all(positioner_js[i][x][k]>=self.positioner.lower_limit):
+								print("interpolating from",j,"to",k)
+								positioner_js[i][x][j-1:k+1] = np.linspace(positioner_js[i][x][j-1],positioner_js[i][x][k],k-j+2)
+								break
 		return positioner_js
 
 
 
 	def baseline_joint(self,R_torch,curve_sliced_relative,curve_sliced_relative_support,curve_sliced_relative_base,q_init=np.zeros(6),q_positioner_seed=[0,-2],smooth_filter=True):
+		
+		print("Solve positioner js first")
 		####baseline redundancy resolution, with fixed orientation
 		positioner_js=self.positioner_resolution(curve_sliced_relative,q_seed=q_positioner_seed,smooth_filter=smooth_filter)		#solve for positioner first
 		
+		### if exceed joint limit, interpolate to the nearest joint limit
+		positioner_js = self.positioner_joint_limit_interpolation(positioner_js)
+
 		###singularity js smoothing
 		positioner_js=self.introducing_tolerance2(positioner_js)
 		positioner_js=self.conditional_rolling_average(positioner_js)
@@ -144,7 +166,7 @@ class redundancy_resolution(object):
 			positioner_js=self.rolling_average(positioner_js)
 		positioner_js[0][0][:,1]=positioner_js[1][0][0,1]
 
-		
+		print("Solve robot js at baselayers")
 		###append base layers positioner
 		positioner_js_base_value=positioner_js[0][0][0]
 		positioner_js_base=[]
@@ -169,6 +191,7 @@ class redundancy_resolution(object):
 			curve_sliced_js_base.append(curve_sliced_js_base_ith_layer)
 			positioner_js_base.append(positioner_js_base_ith_layer)
 
+		print("Solve robot js at support layers")
 		positioner_js_support=None
 		curve_sliced_js_support=None
 		if len(curve_sliced_relative_support)>0:
@@ -196,6 +219,7 @@ class redundancy_resolution(object):
 				curve_sliced_js_support.append(curve_sliced_js_support_ith_layer)
 				positioner_js_support.append(positioner_js_support_ith_layer)
 
+		print("Solve robot js at curve layers")
 		curve_sliced_js=[]
 		for i in range(len(curve_sliced_relative)):			#solve for robot invkin
 			curve_sliced_js_ith_layer=[]
