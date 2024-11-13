@@ -70,19 +70,22 @@ T_R1Base_S1TCP = T_S1TCP_R1Base.inv()
 #### Welding Parameters ####
 total_base_layer = 2
 total_weld_layer = 10
-weld_arcon=True
+weld_arcon=False
 
 nominal_base_height = 3
 nominal_weld_height = 1.2
 
-torch_angle = 0 # 0, 10,-10
+torch_angle = 0 # 0, 15,-15
 ############################
 
 #######################################ER4043########################################################
 job_offset=200
 vd_relative=8
 feedrate_cmd=110
-base_vd_relative=3
+if weld_arcon:
+    base_vd_relative=3
+else:
+    base_vd_relative=10
 base_feedrate_cmd=300
 ####################################################################################################
 
