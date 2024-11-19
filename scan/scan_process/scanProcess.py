@@ -1,10 +1,9 @@
 import sys
 import matplotlib
-sys.path.append('../../toolbox/')
 sys.path.append('../scan_tools/')
-from robot_def import *
+from motoman_def import *
 from scan_utils import *
-from utils import *
+from robotics_utils import *
 from lambda_calc import *
 from general_robotics_toolbox import *
 import open3d as o3d
@@ -319,9 +318,9 @@ class ScanProcess():
         z_height=[]
         for curve_wp in curve_relative:
             if np.all(curve_wp==curve_relative[-1]):
-                wp_R = direction2R(-1*curve_wp[3:],curve_wp[:3]-curve_relative[curve_i-1][:3])
+                wp_R = direction2R_x(-1*curve_wp[3:],curve_wp[:3]-curve_relative[curve_i-1][:3])
             else:
-                wp_R = direction2R(-1*curve_wp[3:],curve_relative[curve_i+1][:3]-curve_wp[:3])
+                wp_R = direction2R_x(-1*curve_wp[3:],curve_relative[curve_i+1][:3]-curve_wp[:3])
 
             sp_lamx=deepcopy(scanned_points)
             ## transform the scanned points to waypoints
@@ -501,9 +500,9 @@ class ScanProcess():
         dh=[]
         for curve_wp in curve_relative:
             if np.all(curve_wp==curve_relative[-1]):
-                wp_R = direction2R(-1*curve_wp[3:],curve_wp[:3]-curve_relative[curve_i-1][:3])
+                wp_R = direction2R_x(-1*curve_wp[3:],curve_wp[:3]-curve_relative[curve_i-1][:3])
             else:
-                wp_R = direction2R(-1*curve_wp[3:],curve_relative[curve_i+1][:3]-curve_wp[:3])
+                wp_R = direction2R_x(-1*curve_wp[3:],curve_relative[curve_i+1][:3]-curve_wp[:3])
 
             sp_lamx=deepcopy(scanned_points)
             ## transform the scanned points to waypoints

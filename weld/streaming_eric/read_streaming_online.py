@@ -3,17 +3,14 @@ from copy import deepcopy
 from pathlib import Path
 import pickle
 import sys
-sys.path.append('../../toolbox/')
 sys.path.append('../../scan/scan_tools/')
 sys.path.append('../../scan/scan_plan/')
 sys.path.append('../../scan/scan_process/')
 sys.path.append('../../mocap/')
 sys.path.append('../')
-from robot_def import *
+from motoman_def import *
 from traj_manipulation import *
 from scan_utils import *
-from scan_continuous import *
-from scanPathGen import *
 from scanProcess import *
 from PH_interp import *
 from weldCorrectionStrategy import *
@@ -39,6 +36,19 @@ S1_ph_dataset_date='0926'
 def get_slope(p1,p2):
     
     return (p2[1]-p1[1])/(p2[0]-p1[0])
+
+def get_breakpoints(lam, vd, streaming_rate=125):
+    lam_diff = np.diff(lam)
+    displacement = vd / streaming_rate
+    cumulative_lam_diff = np.cumsum(lam_diff)
+
+    # The mask gives True wherever the cumulative sum exceeds a multiple of displacement
+    mask = np.diff(np.floor(cumulative_lam_diff / displacement))
+
+    # Getting the indices where mask is True
+    breakpoints = np.insert(np.where(mask)[0] + 1, 0, 0)
+
+    return breakpoints
 
 zero_config=np.zeros(6)
 # 0. robots.
@@ -131,7 +141,6 @@ scanner_lag=slicing_meta['scanner_lag']
 end_layer_count = 10
 offset_z=0
 weld_feedback_gain_K=1
-SS=StreamingSend(None,None,None,streaming_rate)
 scan_process = ScanProcess(robot_scan,positioner)
 
 regen_pcd=False
@@ -260,9 +269,9 @@ for layer_count in range(end_layer_count):
         ### get breakpoints for vd
         bp_start = segment_bp[seg_i]
         bp_end = segment_bp[seg_i+1]
-        breakpoints=SS.get_breakpoints(lam_relative_dense[bp_start:bp_end],vd_relative)
+        breakpoints=get_breakpoints(lam_relative_dense[bp_start:bp_end],vd_relative)
         breakpoints=breakpoints+bp_start
-        print("delta h:",np.mean(x_state_dh[0]),", vd:",vd_relative)
+        # print("delta h:",np.mean(x_state_dh[0]),", vd:",vd_relative)
         # exit()
         
         ###start logging
@@ -336,23 +345,23 @@ for layer_count in range(end_layer_count):
             error_lambda.append(np.mean(h_arr)-delta_h_star)
         for h_arr in height_layer:
             height_lambda.append(np.mean(h_arr))
-        fig, ax1 = plt.subplots()
-        ax2 = ax1.twinx()
-        ax1.scatter(lam_layer, dh_lambda, label='delta h')
-        # if layer_count>1:
-        ax2.plot(lam_layer, r1v_planned_layer, 'tab:orange',label='Lambda dot Planned')
-        ax2.plot(lam_layer, r1v_layer, 'g-',label='Lambda dot Execute')
-        ax1.set_ylabel("delta h (mm)")
-        ax2.set_ylabel("R1 Lambda dot (mm/sec)")
-        ax2.axis(ymin=0,ymax=15)
-        ax1.legend(loc=2)
-        ax2.legend(loc=1)
-        
-        # plt.scatter(lam_layer,dh_lambda)
-        plt.title("Delta h and Speed of Layer "+str(layer_count))
-        plt.xlabel("Lambda (mm)")
-        
-        plt.show()
+
+        # fig, ax1 = plt.subplots()
+        # ax2 = ax1.twinx()
+        # ax1.scatter(lam_layer, dh_lambda, label='delta h')
+        # # if layer_count>1:
+        # ax2.plot(lam_layer, r1v_planned_layer, 'tab:orange',label='Lambda dot Planned')
+        # ax2.plot(lam_layer, r1v_layer, 'g-',label='Lambda dot Execute')
+        # ax1.set_ylabel("delta h (mm)")
+        # ax2.set_ylabel("R1 Lambda dot (mm/sec)")
+        # ax2.axis(ymin=0,ymax=15)
+        # ax1.legend(loc=2)
+        # ax2.legend(loc=1)
+        # # plt.scatter(lam_layer,dh_lambda)
+        # plt.title("Delta h and Speed of Layer "+str(layer_count))
+        # plt.xlabel("Lambda (mm)")
+        # plt.show()
+
         lam_all.append(lam_layer)
         dh_all.append(dh_lambda)
         error_all.append(error_lambda)
@@ -377,7 +386,7 @@ vd_relative=nominal_vd_relative
 # point_stream_start_time=time.time()
 lag_scan_bp=np.argmin(lam_relative_dense<scanner_lag)
 lag_scan_bp = int(lag_scan_bp)
-breakpoints=SS.get_breakpoints(lam_relative_dense[:lag_scan_bp],vd_relative)
+breakpoints=get_breakpoints(lam_relative_dense[:lag_scan_bp],vd_relative)
 read_recording_cnt=0
 ###start logging
 for bp_idx in range(len(breakpoints)):
@@ -447,6 +456,17 @@ plt.ylabel("Error norm (mm)",fontsize=15)
 plt.xticks(fontsize=15)
 plt.yticks(fontsize=15)
 plt.title("Error 2-Norm",fontsize=20)
+plt.show()
+
+rmse_all = []
+for error in error_all:
+    rmse_all.append(np.sqrt(np.mean(np.square(error))))
+plt.plot(range(1,end_layer_count+1),rmse_all,'-o')
+plt.xlabel("Layer #",fontsize=15)
+plt.ylabel("RMSE (mm)",fontsize=15)
+plt.xticks(fontsize=15)
+plt.yticks(fontsize=15)
+plt.title("Height RMSE",fontsize=20)
 plt.show()
 
 exit()

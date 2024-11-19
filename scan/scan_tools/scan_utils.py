@@ -3,8 +3,8 @@ import sys
 import matplotlib
 
 sys.path.append('../../toolbox/')
-from robot_def import *
-from utils import *
+from motoman_def import *
+from robotics_utils import *
 from general_robotics_toolbox import *
 import open3d as o3d
 

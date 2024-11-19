@@ -2,15 +2,12 @@ from copy import deepcopy
 from pathlib import Path
 import pickle
 import sys
-sys.path.append('../toolbox/')
 sys.path.append('../scan/scan_tools/')
 sys.path.append('../scan/scan_plan/')
 sys.path.append('../scan/scan_process/')
-from utils import *
-from robot_def import *
+from robotics_utils import *
+from motoman_def import *
 from scan_utils import *
-from scan_continuous import *
-# from scanPathGen import *
 from scanProcess import *
 from weld_dh2v import *
 
@@ -100,8 +97,9 @@ R_S1TCP = np.matmul(T_S1TCP_R1Base[:3,:3],path_R)
 
 build_height_profile=False
 plot_correction=False
-show_layer = []
-# show_layer = [12]
+plot_pcd = False
+# show_layer = []
+show_layer = [12]
 
 x_lower = -99999
 x_upper = 999999
@@ -112,8 +110,8 @@ x_upper = 999999
 start_id=75
 end_id=-75
 
-# datasets=['baseline','correction']
-datasets=['correction']
+datasets=['baseline','correction']
+# datasets=['correction']
 
 # datasets=['correction','repeat 1','repeat 2']
 # datasets=['baseline','correction','repeat 1','repeat 2']
@@ -137,7 +135,8 @@ for dataset in datasets:
     all_correction_layer=[]
     all_h_mean=[]
     all_h_std=[]
-    for i in range(10,9999999):
+    pcd_wall = None
+    for i in range(0,9999999):
         try:
             weld_dir=data_dir+'layer_'+str(i)+'/'
             weld_q=np.loadtxt(weld_dir+'weld_js_exe.csv',delimiter=',')
@@ -149,13 +148,22 @@ for dataset in datasets:
             robot_stamps=np.loadtxt(scan_dir+'scan_robot_stamps.csv',delimiter=',')
             with open(scan_dir+'mti_scans.pickle', 'rb') as file:
                 mti_recording=pickle.load(file)
+
+            print("Layer",i)
+            print("Forward:",not forward_flag)
+
+            if pcd_wall is None:
+                pcd_wall = deepcopy(pcd)
+            else:
+                pcd_wall = pcd_wall + pcd
             
             # for scan_step in mti_recording[len(mti_recording)//2:]:
             #     plt.scatter(scan_step[0],-1*scan_step[1]+100)
             #     plt.show()
             # exit()
             
-            visualize_pcd([pcd])
+            if plot_pcd:
+                visualize_pcd([pcd])
 
             # print(mti_recording[0].shape)
             # exit()
@@ -166,8 +174,6 @@ for dataset in datasets:
             #     mti_recording=pickle.load(file)
         except:
             break
-        print("Layer",i)
-        print("Forward:",not forward_flag)
 
         if build_height_profile and (i in show_layer):
             curve_x_start=43
@@ -185,7 +191,15 @@ for dataset in datasets:
             pcd = scan_process.pcd_noise_remove(pcd,nb_neighbors=40,std_ratio=1.5,\
                                                 min_bound=crop_min,max_bound=crop_max,cluster_based_outlier_remove=True,cluster_neighbor=1,min_points=100)
             visualize_pcd([pcd])
+
+            # pcd_arr = np.asarray(pcd.points)
+            # # filter out points with z smaller than z_height_start
+            # pcd_arr = pcd_arr[np.where(pcd_arr[:,2]>28)[0]]
+            # plt.scatter(pcd_arr[:,0],pcd_arr[:,1])
+            # plt.grid()
+            # plt.show()
             profile_height = scan_process.pcd2height(deepcopy(pcd),-1)
+            profile_height = np.array(profile_height)
 
         ### ignore x smaller and larger
         # profile_height=np.delete(profile_height,np.where(profile_height[:,0]>x_upper),axis=0)
@@ -193,8 +207,8 @@ for dataset in datasets:
 
         all_profile_height.append(profile_height)
 
-        # h_std_thres=0.48
-        h_std_thres=0
+        h_std_thres=0.48
+        # h_std_thres=0
         h_std = np.std(profile_height[:,1])
         if i>2 and h_std>h_std_thres and dataset != "baseline":
             all_correction_layer.append(i)
@@ -305,30 +319,45 @@ for dataset in datasets:
                 # print("v:",this_weld_v)
                 
                 plt.scatter(profile_height[:,0],profile_height[:,1])
-                plt.xlabel('X-axis (Lambda) (mm)',fontsize=26)
+                plt.xlabel('x-axis (mm)',fontsize=26)
                 plt.xticks(fontsize=26)
                 plt.ylabel("Depoted Height (mm)",fontsize=26)
                 plt.yticks(fontsize=26)
                 plt.title('Deposition Height (mm)',fontsize=32)
+                plt.grid(True, linestyle='--', alpha=0.7)  # Optional grid for better readability
                 plt.show()
                 
-                fig, ax1 = plt.subplots()
+                # Create the figure and twin axes
+                fig, ax1 = plt.subplots(figsize=(10, 6))
                 ax2 = ax1.twinx()
+                # Plot the data
                 for v_id in range(len(this_weld_v)):
-                    ax1.scatter(all_profile[v_id][:,0],h_target-all_profile[v_id][:,1])
-                    if v_id==0:
-                        ax2.plot(all_profile[v_id][:,0],np.ones(len(all_profile[v_id][:,0]))*this_weld_v[v_id])
+                    
+                    if v_id == 0:
+                        ax1.scatter(all_profile[v_id][:, 0], h_target - all_profile[v_id][:, 1], label=r'$\Delta h_d$ (dots)', s=100)  # Increase marker size
+                        ax2.plot(all_profile[v_id][:, 0], np.ones(len(all_profile[v_id][:, 0])) * this_weld_v[v_id],
+                                linewidth=2, label=f'Updated torch speed (lines)')  # Thicker line
                     else:
-                        plot_vx = np.append(all_profile[v_id-1][-1,0],all_profile[v_id][:,0])
-                        plot_vy = np.append(this_weld_v[v_id-1],np.ones(len(all_profile[v_id][:,0]))*this_weld_v[v_id])
-                        ax2.plot(plot_vx,plot_vy)
-                ax1.set_xlabel('X-axis (Lambda) (mm)',fontsize=26)
-                ax1.tick_params(axis='x', labelsize=26)
-                ax1.set_ylabel('dh to target (mm)', color='g',fontsize=26)
-                ax1.tick_params(axis='y', labelsize=26)
-                ax2.set_ylabel('Speed (mm/sec)', color='b',fontsize=26)
-                ax2.tick_params(axis='y', labelsize=26)
-                plt.title("Height and Speed, 40 MoveL",fontsize=32)
+                        ax1.scatter(all_profile[v_id][:, 0], h_target - all_profile[v_id][:, 1], s=100)  # Increase marker size
+                        plot_vx = np.append(all_profile[v_id - 1][-1, 0], all_profile[v_id][:, 0])
+                        plot_vy = np.append(this_weld_v[v_id - 1], np.ones(len(all_profile[v_id][:, 0])) * this_weld_v[v_id])
+                        ax2.plot(plot_vx, plot_vy, linewidth=2)  # Thicker line
+                # Customize the axes
+                ax1.set_xlabel('x-axis (mm)', fontsize=26, weight='bold')
+                ax1.tick_params(axis='x', labelsize=22)
+                ax1.set_ylabel(r'Deposition height $\Delta h_d$ (mm)', color='g', fontsize=26, weight='bold')
+                ax1.tick_params(axis='y', labelsize=22, colors='g')
+                ax2.set_ylabel('Torch speed (mm/sec)', color='b', fontsize=26, weight='bold')
+                ax2.tick_params(axis='y', labelsize=22, colors='b')
+                # Add a title
+                plt.title(r'Desired Deposition Height $\Delta h_d$ vs Torch Speed, 40 MoveL', fontsize=32, weight='bold')
+                # Add a legend
+                lines_1, labels_1 = ax1.get_legend_handles_labels()
+                lines_2, labels_2 = ax2.get_legend_handles_labels()
+                ax1.legend(lines_1 + lines_2, labels_1 + labels_2, loc='upper center', fontsize=22)
+                # Show the plot
+                plt.grid(True, linestyle='--', alpha=0.7)  # Optional grid for better readability
+                plt.tight_layout()
                 plt.show()
                 
             ### plot velocity and actual velocity
@@ -466,6 +495,20 @@ for dataset in datasets:
     plt.title("Height Profile")
     plt.tight_layout()
     plt.show()
+
+    # keep the pcd_wall with points within +- y=10
+    # pcd_wall_arr = np.asarray(pcd_wall.points)
+    # pcd_wall_arr = pcd_wall_arr[np.where(pcd_wall_arr[:,1]>-10)[0]]
+    # pcd_wall_arr = pcd_wall_arr[np.where(pcd_wall_arr[:,1]<10)[0]]
+    # pcd_wall = o3d.geometry.PointCloud()
+    # pcd_wall.points = o3d.utility.Vector3dVector(pcd_wall_arr)
+    # # visualize the wall
+    # with o3d.utility.VerbosityContextManager(o3d.utility.VerbosityLevel.Debug) as cm:
+    #     pcd_wall.estimate_normals()
+    #     mesh, densities = o3d.geometry.TriangleMesh.create_from_point_cloud_poisson(
+    #         pcd_wall, depth=9)
+    #     mesh.compute_vertex_normals()
+    # visualize_pcd([pcd_wall,mesh])
 
     datasets_h_mean[dataset]=np.array(all_h_mean)
     datasets_h_std[dataset]=np.array(all_h_std)
