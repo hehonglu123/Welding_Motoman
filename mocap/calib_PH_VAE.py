@@ -28,7 +28,8 @@ def LinearNDInterpNearestExtrap(points, values):
             # ... and use its value
             zz= np.array([values[inds]])
         return zz
-
+    
+    print("Init interpolation done")
     return new_f
 
 def test_fourier_accuracy(weights, data_q, data_T,robot,param_nominal):
@@ -77,13 +78,14 @@ def test_fwd_interp_accuracy(model, vae_model, train_q, data_q, data_T,robot,par
         p_error_all.append(p_error)
     return p_error_all
 
-def test_fwd_accuracy(model, interp_funcs, train_q, data_q, data_T,robot,param_nominal):
+def test_fwd_accuracy(model, interp_funcs, train_q, data_q, data_T,robot,param_nominal,q_index=np.array([1,2])):
     
     p_error_all = []
     for i,q in enumerate(data_q):
         # first, interpolate q2q3 to get latent vector
-        q2q3 = np.array([q[1],q[2]])
-        latent_vec_pred = np.array([interp_func(q2q3) for interp_func in interp_funcs]).T
+        # q2q3 = np.array([q[1],q[2]])
+        q_input = np.array(q[q_index])
+        latent_vec_pred = np.array([interp_func(q_input) for interp_func in interp_funcs]).T
         if np.isnan(latent_vec_pred).any():
             raise ValueError('Interpolation failed')
             
@@ -98,6 +100,142 @@ def test_fwd_accuracy(model, interp_funcs, train_q, data_q, data_T,robot,param_n
         p_error_all.append(p_error)
     return p_error_all
 
+def latent_space_analysis(inputs_q2q3, data_delta_PH, training_q, training_T, testing_q, testing_T,robot,param_nominal,robot_type):
+
+    # vae_model_dir = 'trainLATENT_AE_R1_latent6_2411121051/'
+    vae_model_name = 'trainLATENT_AE_R1_latent12_2411121110/'
+    vae_model_dir = 'PH_NN_results/'+vae_model_name
+
+    # tensorize the data
+    data_delta_PH = torch.tensor(data_delta_PH, dtype=torch.float32)
+    inputs_q2q3_tensor = torch.tensor(inputs_q2q3, dtype=torch.float32)
+
+    # read meta data
+    with open(vae_model_dir+'meta_data.yaml') as file:
+        vae_meta_data = yaml.full_load(file)
+    # read vae model
+    # Create an instance of the neural network
+    if vae_meta_data['Variational']:
+        vae_model = VariationalAutoEncoder(vae_meta_data['data_size'], vae_meta_data['latent_size'], vae_meta_data['hidden_sizes'], mu=vae_meta_data['mu'], sigma=vae_meta_data['sigma'])
+    else:
+        vae_model = AutoEncoder(vae_meta_data['data_size'], vae_meta_data['latent_size'], vae_meta_data['hidden_sizes'])
+    vae_model.load_state_dict(torch.load(vae_model_dir+'best_testing_model.pt',weights_only=True))
+    vae_model.eval()
+
+    # fourier model
+    fourier_model = FourierNetwork(2, 33)
+    fourier_model.eval()
+
+    # NN model
+    nn_model_name = 'train_200_200_200_lr0.02_2409171041/'
+    nn_model_dir = 'PH_NN_results/'+nn_model_name
+    # read meta data
+    with open(nn_model_dir+'meta_data.yaml') as file:
+        nn_meta_data = yaml.full_load(file)
+    nn_model = NeuralNetwork(nn_meta_data['input_size'], nn_meta_data['output_size'], nn_meta_data['hidden_sizes'])
+    nn_model.load_state_dict(torch.load(nn_model_dir+'best_testing_model.pt',weights_only=True))
+    nn_model.eval()
+    
+    input_size = inputs_q2q3.shape[1]
+    latent_size = vae_meta_data['latent_size']
+
+    # forward pass
+    vae_model.eval()
+    latent_vec = vae_model.encoder(data_delta_PH)
+    latent_vec_cpu = latent_vec.detach().numpy()
+    print(latent_vec_cpu.shape)
+
+    # fourier latent vectors
+    fourier_latent_vec = fourier_model.forward_features(inputs_q2q3_tensor)
+    fourier_latent_vec_cpu = fourier_latent_vec.detach().numpy()
+    # stack 1 at every latent vectors
+    # fourier_latent_vec_cpu = np.hstack((fourier_latent_vec_cpu,np.ones((fourier_latent_vec_cpu.shape[0],1))))
+    print(fourier_latent_vec_cpu.shape)
+    # NN latent vectors
+    nn_latent_vec = nn_model.forward_features(inputs_q2q3_tensor)
+    nn_latent_vec_cpu = nn_latent_vec.detach().numpy()
+
+    # svd analysis of the latent space
+    _, s_vae_latent, _ = np.linalg.svd(latent_vec_cpu.T, full_matrices=True)
+    latent_combine = np.hstack((latent_vec_cpu,fourier_latent_vec_cpu))
+    _, s_fourier_latent, _ = np.linalg.svd(fourier_latent_vec_cpu.T, full_matrices=True)
+    _, s_combine, _ = np.linalg.svd(latent_combine.T, full_matrices=True)
+    plt.plot(np.log10(s_vae_latent), '-o', label='VAE latent')
+    plt.plot(np.log10(s_fourier_latent), '-o', label='Fourier latent')
+    plt.plot(np.log10(s_combine), '-o', label='Combined latent')
+    _, s_nn_latent, _ = np.linalg.svd(nn_latent_vec_cpu.T, full_matrices=True)
+    plt.plot(np.log10(s_nn_latent), '-o', label='NN latent')
+    plt.legend()
+    plt.xlabel('Singular value index')
+    plt.ylabel('Singular value (log10 scale)')
+    plt.xlim([-1,25])
+    plt.ylim([-2,1.5])
+    plt.show()
+
+    # plot the latent space w.r.t q2q3
+    fig, axs = plt.subplots(3, 4)
+    for i in range(latent_size):
+        axs[i//4,i%4].scatter(inputs_q2q3[:,0],inputs_q2q3[:,1],c=latent_vec_cpu[:,i])
+        axs[i//4,i%4].set_title('Latent '+str(i))
+        if i>=8:
+            axs[i//4,i%4].set_xlabel('q2')
+        if i%4==0:
+            axs[i//4,i%4].set_ylabel('q3')
+    # figure title
+    fig.suptitle('Latent space vs q2 q3')
+    plt.show()
+
+def trained_model_test(inputs_q2q3, data_delta_PH, training_q, training_T, testing_q, testing_T,robot,param_nominal,robot_type):
+
+    # data preprocessing
+    N_per_cluster = 7
+    q_index = np.arange(0,4)
+    data_delta_PH = torch.tensor(data_delta_PH, dtype=torch.float32)
+    inputs_q2q3_tensor = torch.tensor(inputs_q2q3, dtype=torch.float32)
+    # augmented inputs
+    inputs_qall = []
+    data_delta_PH_qall = []
+    for i,q2q3 in enumerate(inputs_q2q3):
+        nearest_q_index = np.argsort(np.linalg.norm(training_q[:,1:3] - q2q3, ord=2, axis=1))
+        inputs_qall.extend(training_q[nearest_q_index[:N_per_cluster]][:,q_index])
+        data_delta_PH_qall.extend(np.tile(data_delta_PH[i],(N_per_cluster,1)))
+    inputs_qall = np.array(inputs_qall)
+    data_delta_PH_qall = np.array(data_delta_PH_qall)
+    inputs_qall_tensor = torch.tensor(inputs_qall, dtype=torch.float32)
+    data_delta_PH_qall_tensor = torch.tensor(data_delta_PH_qall, dtype=torch.float32)
+
+    # AE_model_dir = "trainLATENT_VAE_R1_latent6_2411121154/"
+    AE_model_dir = 'trainLATENT_AE_R1_latent6_2411121051/'
+
+    data_dir = 'PH_NN_results/'+AE_model_dir
+    # read meta data
+    with open(data_dir+'meta_data.yaml') as file:
+        vae_meta_data = yaml.full_load(file)
+    # read vae model
+    # Create an instance of the neural network
+    if vae_meta_data['Variational']:
+        vae_model = VariationalAutoEncoder(vae_meta_data['data_size'], vae_meta_data['latent_size'], vae_meta_data['hidden_sizes'], mu=vae_meta_data['mu'], sigma=vae_meta_data['sigma'])
+    else:
+        vae_model = AutoEncoder(vae_meta_data['data_size'], vae_meta_data['latent_size'], vae_meta_data['hidden_sizes'])
+    vae_model.load_state_dict(torch.load(data_dir+'best_testing_model.pt',weights_only=True))
+    vae_model.eval()
+
+    latent_size = vae_meta_data['latent_size']
+
+    # get linear interpolation functions
+    latent_vec = vae_model.encoder(data_delta_PH_qall_tensor)
+    latent_vec_cpu = latent_vec.detach().numpy()
+    interp_funcs = []
+    print("Get linear interpolation functions")
+    for latent_i in range(latent_size):
+        interp_funcs.append(LinearNDInterpNearestExtrap(inputs_qall, latent_vec_cpu[:,latent_i]))
+    print("Interpolation functions done")
+    # get data accuracy
+    training_T_error = test_fwd_accuracy(vae_model, interp_funcs, inputs_qall, training_q, training_T,robot,param_nominal,q_index)
+    testing_T_error = test_fwd_accuracy(vae_model, interp_funcs, inputs_qall, testing_q, testing_T,robot,param_nominal,q_index)
+    # print training and testing error, mean, max
+    print(f'Training error: mean={np.mean(training_T_error):.4f}, max={np.max(training_T_error):.4f}')
+    print(f'Testing error: mean={np.mean(testing_T_error):.4f}, max={np.max(testing_T_error):.4f}')
 
 def train_interp(inputs_q2q3, data_delta_PH, training_q, training_T, testing_q, testing_T,robot,param_nominal,robot_type):
 
@@ -523,10 +661,22 @@ for qkey in PH_q.keys():
     param_PH = np.array(np.reshape(PH_q[qkey]['P'].T,-1).tolist()+param_H)
     param_PH_q.append(param_PH-param_nominal) # relative to nominal, predict the difference
 
+train_q = np.array(train_q)
+param_PH_q = np.array(param_PH_q)
+
+# draw the data q (6 of them) vs index 
+# in a subplot
+# fig, axs = plt.subplots(2, 3)
+# for i in range(6):
+#     axs[i//3,i%3].plot(np.degrees(train_robot_q[:,i]))
+#     axs[i//3,i%3].plot(np.degrees(test_robot_q[:,i]))
+#     axs[i//3,i%3].set_title('q'+str(i+1))
+# plt.show()
+
 ## NN input: training q, 2x1
 ## NN output: training param_PH, 33x1
 ## train the NN
 # train(np.array(train_q),np.array(param_PH_q),train_robot_q,train_mocap_T,test_robot_q,test_mocap_T,robot,param_nominal,robot_type)
-train_interp(np.array(train_q),np.array(param_PH_q),train_robot_q,train_mocap_T,test_robot_q,test_mocap_T,robot,param_nominal,robot_type)
-
-        
+# train_interp(np.array(train_q),np.array(param_PH_q),train_robot_q,train_mocap_T,test_robot_q,test_mocap_T,robot,param_nominal,robot_type)
+latent_space_analysis(np.array(train_q),np.array(param_PH_q),train_robot_q,train_mocap_T,test_robot_q,test_mocap_T,robot,param_nominal,robot_type)
+# trained_model_test(np.array(train_q),np.array(param_PH_q),train_robot_q,train_mocap_T,test_robot_q,test_mocap_T,robot,param_nominal,robot_type)

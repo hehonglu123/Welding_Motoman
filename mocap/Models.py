@@ -40,6 +40,12 @@ class NeuralNetwork(nn.Module):
         x = self.output(x)
         return x
 
+    def forward_features(self, x):
+        for k in range(len(self.hiddenLayers)):
+            x = self.hiddenLayers[k](x)
+            x = self.relus[k](x)
+        return x
+
 class NNVariationalEncoder(nn.Module):
     def __init__(self, data_size, latent_size, hidden_sizes=[20,20], mu=0, sigma=1):
         super(NNVariationalEncoder, self).__init__()
@@ -112,6 +118,18 @@ class FourierNetwork(nn.Module):
                                 torch.sin(2*x),torch.cos(2*x),torch.sin(2*sum_input),torch.cos(2*sum_input)))
         x = self.output(x)
         return x
+    
+    def forward_features(self,x):
+        if len(x.shape) == 2:
+            sum_input = torch.sum(x,dim=1,keepdim=True)
+            x = torch.cat((torch.sin(x),torch.cos(x),torch.sin(sum_input),torch.cos(sum_input),\
+                               torch.sin(2*x),torch.cos(2*x),torch.sin(2*sum_input),torch.cos(2*sum_input)),dim=1)
+        else:
+            sum_input = torch.Tensor([torch.sum(x)])
+            x = torch.cat((torch.sin(x),torch.cos(x),torch.sin(sum_input),torch.cos(sum_input),\
+                                torch.sin(2*x),torch.cos(2*x),torch.sin(2*sum_input),torch.cos(2*sum_input)))
+        return x
+
 
 class NeuralFourierNetwork(nn.Module):
     def __init__(self, input_size, output_size, hidden_sizes=[20,20]):
