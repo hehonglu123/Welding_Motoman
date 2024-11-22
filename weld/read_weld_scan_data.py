@@ -98,8 +98,8 @@ R_S1TCP = np.matmul(T_S1TCP_R1Base[:3,:3],path_R)
 build_height_profile=False
 plot_correction=False
 plot_pcd = False
-# show_layer = []
-show_layer = [12]
+show_layer = []
+# show_layer = [12]
 
 x_lower = -99999
 x_upper = 999999
@@ -508,7 +508,9 @@ for dataset in datasets:
     #     mesh, densities = o3d.geometry.TriangleMesh.create_from_point_cloud_poisson(
     #         pcd_wall, depth=9)
     #     mesh.compute_vertex_normals()
-    # visualize_pcd([pcd_wall,mesh])
+    visualize_pcd([pcd_wall])
+    # save pcd to data directory
+    o3d.io.write_point_cloud(data_dir+'pcd_wall.pcd', pcd_wall)
 
     datasets_h_mean[dataset]=np.array(all_h_mean)
     datasets_h_std[dataset]=np.array(all_h_std)

@@ -8,9 +8,9 @@ from scipy.spatial import ConvexHull
 import open3d as o3d
 
 sys.path.append('../toolbox')
-from utils import *
+from robotics_utils import *
 from lambda_calc import *
-from error_check import *
+from result_analysis import *
 from toolbox_circular_fit import *
 
 def sort_points(xy: np.ndarray) -> np.ndarray:

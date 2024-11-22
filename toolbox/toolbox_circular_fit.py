@@ -1,8 +1,7 @@
 import numpy as np
 import traceback, sys
 from scipy.optimize import minimize
-sys.path.append('../toolbox')
-from utils import *
+from robotics_utils import *
 
 def circle_from_3point(p_start,p_end,p_mid):
     v1=np.cross(p_mid-p_start,p_end-p_mid)

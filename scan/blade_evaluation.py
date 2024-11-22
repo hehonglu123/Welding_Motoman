@@ -3,10 +3,10 @@ import open3d as o3d
 from matplotlib import cm
 import matplotlib.pyplot as plt
 import cv2
+import numpy as np
 
-sys.path.append('../toolbox/')
-from utils import *
-from pointcloud_toolbox import *
+from robotics_utils import *
+from result_analysis import *
 sys.path.append('../slicing/')
 from slicing import check_boundary
 
@@ -122,10 +122,13 @@ def visualize_pcd(show_pcd_list,point_show_normal=False):
 
     
 data_dir='../data/blade0.1/'
-scanned_dir='../../evaluation/Blade_ER4043/'
+# scanned_dir='../../evaluation/Blade_ER4043/'
+scanned_dir='../data/blade0.1/auto_slice/'
 ######## read the scanned stl
 target_mesh = o3d.io.read_triangle_mesh(data_dir+'surface.stl')
-scanned_mesh = o3d.io.read_triangle_mesh(scanned_dir+'ER4043_blade_optimized.stl')
+# scanned_mesh = o3d.io.read_triangle_mesh(scanned_dir+'ER4043_blade_optimized.stl')
+# scanned_mesh = o3d.io.read_triangle_mesh(scanned_dir+'ER4043_blade_baseline_nobase.stl')
+scanned_mesh = o3d.io.read_triangle_mesh(scanned_dir+'ER4043_blade_correction_noblob_nobase.stl')
 target_mesh.compute_vertex_normals()
 scanned_mesh.compute_vertex_normals()
 
@@ -141,7 +144,7 @@ R_guess,p_guess=global_alignment(scanned_points.points,target_points.points)
 
 ## sample as sparser pointclouds
 target_points = target_mesh.sample_points_uniformly(number_of_points=10000)
-scanned_points = scanned_mesh.sample_points_uniformly(number_of_points=10000)
+scanned_points = scanned_mesh.sample_points_uniformly(number_of_points=20000)
 target_points = target_points.paint_uniform_color([0, 0.8, 0.0])
 scanned_points = scanned_points.paint_uniform_color([0.8, 0, 0.0])
 
@@ -170,7 +173,11 @@ right_pc.points = o3d.utility.Vector3dVector(scanned_points_tranform[right_indic
 right_pc.paint_uniform_color([0.7, 0.7, 0.0])
 
 # Visualize the point cloud
-o3d.visualization.draw_geometries([target_mesh,left_pc,right_pc])
+target_mesh_pcd_viz = target_mesh.sample_points_uniformly(number_of_points=50000)
+target_mesh_pcd_viz.paint_uniform_color([0.2, 0.2, 1])
+o3d.visualization.draw_geometries([target_mesh_pcd_viz,left_pc,right_pc])
+
+exit()
 
 width,collapsed_surface=collapse(np.array(left_pc.points),np.array(right_pc.points),target_points_transform)
 collapsed_surface_pc=o3d.geometry.PointCloud()
@@ -181,6 +188,18 @@ collapsed_surface_pc.paint_uniform_color([0.7, 0.7, 0.0])
 print('\sigma(w): ',np.std(width),'\mu(w): ',np.average(width))
 
 error=calc_error_projected(target_points_transform,collapsed_surface)
+
+def closest_point_error(target_points_transform,collapsed_surface):
+    error=[]
+    for point in target_points_transform:
+        possible_error = np.linalg.norm(collapsed_surface-point,axis=1)
+        error.append(np.min(possible_error))
+    # np.array(error)
+    # np.nan_to_num(error, copy=False, nan=np.nanmin(error))
+    return np.array(error)
+closest_error_cad=closest_point_error(target_points_transform,collapsed_surface)
+
+print("cad to scan error. Mean:",np.mean(closest_error_cad), "Max:",np.max(closest_error_cad))
 
 highlight_pc=o3d.geometry.PointCloud()
 highlight_pc.points=o3d.utility.Vector3dVector([collapsed_surface[error.argmax()]])

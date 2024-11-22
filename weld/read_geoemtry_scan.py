@@ -2,20 +2,20 @@ from copy import deepcopy
 from pathlib import Path
 import pickle
 import sys
-sys.path.append('../toolbox/')
 sys.path.append('../scan/scan_tools/')
 sys.path.append('../scan/scan_plan/')
 sys.path.append('../scan/scan_process/')
 sys.path.append('../mocap/')
-from robot_def import *
+from motoman_def import *
 from scan_utils import *
 from scan_continuous import *
-from scanPathGen import *
+
 from scanProcess import *
 from PH_interp import *
-from utils import *
+from robotics_utils import *
 from weldCorrectionStrategy import *
 from weld_dh2v import *
+import open3d as o3d
 
 from general_robotics_toolbox import *
 import matplotlib.pyplot as plt
@@ -102,8 +102,8 @@ regen_pcd = False
 dataset='blade0.1/'
 sliced_alg='auto_slice/'
 curve_data_dir = '../data/'+dataset+sliced_alg
-data_dir=curve_data_dir+'weld_scan_baseline_2023_10_09_16_01_52'+'/'
-# data_dir=curve_data_dir+'weld_scan_correction_2023_10_10_16_56_32'+'/'
+# data_dir=curve_data_dir+'weld_scan_baseline_2023_10_09_16_01_52'+'/'
+data_dir=curve_data_dir+'weld_scan_correction_2023_10_10_16_56_32'+'/'
 
 #### welding spec, goal
 with open(curve_data_dir+'slicing.yml', 'r') as file:
@@ -178,14 +178,14 @@ for layer_count in range(0,total_count):
             read_layer=layer
         if not baselayer:
             curve_sliced_relative=np.loadtxt(curve_data_dir+'curve_sliced_relative/slice'+str(read_layer)+'_'+str(x)+'.csv',delimiter=',')
-            curve_sliced_js=np.loadtxt(curve_data_dir+'curve_sliced_js/MA2010_js'+str(read_layer)+'_'+str(x)+'.csv',delimiter=',').reshape((-1,6))
-            positioner_js=np.loadtxt(curve_data_dir+'curve_sliced_js/D500B_js'+str(read_layer)+'_'+str(x)+'.csv',delimiter=',')
+            # curve_sliced_js=np.loadtxt(curve_data_dir+'curve_sliced_js/MA2010_js'+str(read_layer)+'_'+str(x)+'.csv',delimiter=',').reshape((-1,6))
+            # positioner_js=np.loadtxt(curve_data_dir+'curve_sliced_js/D500B_js'+str(read_layer)+'_'+str(x)+'.csv',delimiter=',')
         else:
             curve_sliced_relative=np.loadtxt(curve_data_dir+'curve_sliced_relative/baselayer'+str(read_layer)+'_'+str(x)+'.csv',delimiter=',')
-            curve_sliced_js=np.loadtxt(curve_data_dir+'curve_sliced_js/MA2010_base_js'+str(read_layer)+'_'+str(x)+'.csv',delimiter=',').reshape((-1,6))
-            positioner_js=np.loadtxt(curve_data_dir+'curve_sliced_js/D500B_base_js'+str(read_layer)+'_'+str(x)+'.csv',delimiter=',')
+            # curve_sliced_js=np.loadtxt(curve_data_dir+'curve_sliced_js/MA2010_base_js'+str(read_layer)+'_'+str(x)+'.csv',delimiter=',').reshape((-1,6))
+            # positioner_js=np.loadtxt(curve_data_dir+'curve_sliced_js/D500B_base_js'+str(read_layer)+'_'+str(x)+'.csv',delimiter=',')
         
-        rob_js_plan = np.hstack((curve_sliced_js,positioner_js))
+        # rob_js_plan = np.hstack((curve_sliced_js,positioner_js))
         
         with open(out_scan_dir+'mti_scans.pickle', 'rb') as file:
             mti_recording=pickle.load(file)
@@ -222,6 +222,8 @@ for layer_count in range(0,total_count):
             pcd,Transz0_H = scan_process.pcd_calib_z(pcd,Transz0_H=Transz0_H)
         else:
             pcd=o3d.io.read_point_cloud(out_scan_dir+'processed_pcd.pcd')
+        pcd_layer+=pcd
+        continue
         
         # dh plot
         if layer!=-1:
@@ -244,7 +246,7 @@ for layer_count in range(0,total_count):
             layer_curve_dh.extend(profile_height)
         layer_curve_relative.extend(curve_sliced_relative)
 
-        pcd_layer+=pcd
+        
         
         ## load weld js exe
         weld_js_exe = np.loadtxt(layer_sec_data_dir+'weld_js_exe.csv',delimiter=',')
@@ -295,6 +297,7 @@ for layer_count in range(0,total_count):
     # last_curve_relative=layer_curve_relative
     
     all_pcd=all_pcd+last_pcd
+    continue
     
     layer_curve_relative=np.array(layer_curve_relative)
     last_curve_relative=deepcopy(layer_curve_relative)
@@ -357,6 +360,11 @@ for layer_count in range(0,total_count):
         rmse = np.sqrt(np.sum(layer_curve_deviation[:,1]**2)/len(layer_curve_deviation[:,1]))
         dh_rmse.append(rmse)
 
+viz_obj.append(all_pcd)
+visualize_pcd(viz_obj)
+# save pcd 
+o3d.io.write_point_cloud(data_dir+'pcd_blade.pcd',all_pcd)
+
 draw_l_count=0
 for lh in all_layer_dh:
     draw_color='tab:blue' if draw_l_count%2==0 else 'tab:orange'
@@ -386,5 +394,3 @@ np.save(data_dir+'height_std.npy',dh_std)
 np.save(data_dir+'height_error_norm.npy',dh_norm)
 np.save(data_dir+'height_rmse.npy',dh_rmse)
 
-viz_obj.append(all_pcd)
-visualize_pcd(viz_obj)

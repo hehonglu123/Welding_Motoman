@@ -189,7 +189,7 @@ def trained_model_test(inputs_q2q3, data_delta_PH, training_q, training_T, testi
 
     # data preprocessing
     N_per_cluster = 7
-    q_index = np.arange(0,4)
+    q_index = np.arange(1,6)
     data_delta_PH = torch.tensor(data_delta_PH, dtype=torch.float32)
     inputs_q2q3_tensor = torch.tensor(inputs_q2q3, dtype=torch.float32)
     # augmented inputs
@@ -397,13 +397,13 @@ def train(inputs_q2q3, data_delta_PH, training_q, training_T, testing_q, testing
     
 
     # Define the input size, hidden size, and output size
-    latent_size = 12 # 2 6 12
+    latent_size = 6 # 2 6 12
     hidden_sizes = [200,200,200]
     data_size = 33
     mu = 0
     sigma = 0.001
     loss_kl_weight = 0.1
-    Variational = True
+    Variational = False
 
     # Create an instance of the neural network
     if Variational:
@@ -565,11 +565,16 @@ Rx=np.array([1,0,0])
 Ry=np.array([0,1,0])
 Rz=np.array([0,0,1])
 
+
+config_dir='../config/'
+\
 ph_dataset_date='0801'
 test_dataset_date='0801'
-config_dir='../config/'
-
 robot_type = 'R1'
+####
+# ph_dataset_date='0804'
+# test_dataset_date='0804'
+# robot_type = 'R2'
 
 if robot_type == 'R1':
     robot_marker_dir=config_dir+'MA2010_marker_config/'
@@ -678,5 +683,5 @@ param_PH_q = np.array(param_PH_q)
 ## train the NN
 # train(np.array(train_q),np.array(param_PH_q),train_robot_q,train_mocap_T,test_robot_q,test_mocap_T,robot,param_nominal,robot_type)
 # train_interp(np.array(train_q),np.array(param_PH_q),train_robot_q,train_mocap_T,test_robot_q,test_mocap_T,robot,param_nominal,robot_type)
-latent_space_analysis(np.array(train_q),np.array(param_PH_q),train_robot_q,train_mocap_T,test_robot_q,test_mocap_T,robot,param_nominal,robot_type)
-# trained_model_test(np.array(train_q),np.array(param_PH_q),train_robot_q,train_mocap_T,test_robot_q,test_mocap_T,robot,param_nominal,robot_type)
+# latent_space_analysis(np.array(train_q),np.array(param_PH_q),train_robot_q,train_mocap_T,test_robot_q,test_mocap_T,robot,param_nominal,robot_type)
+trained_model_test(np.array(train_q),np.array(param_PH_q),train_robot_q,train_mocap_T,test_robot_q,test_mocap_T,robot,param_nominal,robot_type)
