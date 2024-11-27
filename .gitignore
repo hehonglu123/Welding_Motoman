@@ -407,3 +407,5 @@ data/blade0.1/surface.stl
 
 geometry_data/*
 recorded_data/*
+
+data/blade0.1/auto_slice/*
