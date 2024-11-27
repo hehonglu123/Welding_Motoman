@@ -4,9 +4,8 @@ import sys
 sys.path.append('../../redundancy_resolution/')
 sys.path.append('../redundancy_resolution/')
 sys.path.append('../scan_tools/')
-# from motoman_def import *
-from robot_def import *
-# from dual_robot import *
+from motoman_def import *
+from dual_robot import *
 from lambda_calc import *
 from scan_utils import *
 from scan_continuous import *
@@ -282,11 +281,11 @@ class ScanPathGen():
 
 
             ###plot in 3d scan_p
-            fig = plt.figure()
-            ax = fig.add_subplot(111, projection='3d')
-            ax.plot(scan_p[:,0],scan_p[:,1],scan_p[:,2])
-            # ax.quiver(scan_p[:,0],scan_p[:,1],scan_p[:,2],scan_R[:,0,-1],scan_R[:,1,-1],scan_R[:,2,-1],color='r')
-            plt.show()
+            # fig = plt.figure()
+            # ax = fig.add_subplot(111, projection='3d')
+            # ax.plot(scan_p[:,0],scan_p[:,1],scan_p[:,2])
+            # # ax.quiver(scan_p[:,0],scan_p[:,1],scan_p[:,2],scan_R[:,0,-1],scan_R[:,1,-1],scan_R[:,2,-1],color='r')
+            # plt.show()
             
             
             T_S1TCP_S1Base = self.positioner.fwd(q_init_table)

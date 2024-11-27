@@ -2,11 +2,10 @@ from copy import deepcopy
 from pathlib import Path
 import pickle
 import sys
-sys.path.append('../toolbox/')
 sys.path.append('../scan/scan_tools/')
 sys.path.append('../scan/scan_plan/')
 sys.path.append('../scan/scan_process/')
-from robot_def import *
+from motoman_def import *
 from scan_utils import *
 from scan_continuous import *
 from scanPathGen import *
@@ -49,10 +48,10 @@ T_S1TCP_R1Base = np.linalg.inv(np.matmul(positioner.base_H,H_from_RT(Table_home_
 T_R1Base_S1TCP = np.linalg.inv(T_S1TCP_R1Base)
 
 #### change base H to calibrated ones ####
-robot_scan.base_H = H_from_RT(robot_scan.T_base_basemarker.R,robot_scan.T_base_basemarker.p)
-positioner.base_H = H_from_RT(positioner.T_base_basemarker.R,positioner.T_base_basemarker.p)
-T_to_base = Transform(np.eye(3),[0,0,-380])
-positioner.base_H = np.matmul(positioner.base_H,H_from_RT(T_to_base.R,T_to_base.p))
+# robot_scan.base_H = H_from_RT(robot_scan.T_base_basemarker.R,robot_scan.T_base_basemarker.p)
+# positioner.base_H = H_from_RT(positioner.T_base_basemarker.R,positioner.T_base_basemarker.p)
+# T_to_base = Transform(np.eye(3),[0,0,-380])
+# positioner.base_H = np.matmul(positioner.base_H,H_from_RT(T_to_base.R,T_to_base.p))
 # robot_weld.robot.P=deepcopy(robot_weld.calib_P)
 # robot_weld.robot.H=deepcopy(robot_weld.calib_H)
 # robot_scan.robot.P=deepcopy(robot_scan.calib_P)

@@ -57,7 +57,7 @@ positioner.robot.joint_lower_limit[4]=np.radians(-15-0.1)
 #### data directory
 # dataset='cup/'
 # sliced_alg='circular_slice_shifted/'
-dataset='sine_wave/'
+dataset='blade0.1/'
 sliced_alg='auto_slice/'
 curve_data_dir = '../data/'+dataset+sliced_alg
 scan_data_dir = '../data/'+dataset+sliced_alg+'curve_scan_js/'

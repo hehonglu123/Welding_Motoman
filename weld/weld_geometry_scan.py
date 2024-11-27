@@ -7,7 +7,8 @@ sys.path.append('../scan/scan_tools/')
 sys.path.append('../scan/scan_plan/')
 sys.path.append('../scan/scan_process/')
 sys.path.append('../mocap/')
-from robot_def import *
+from motoman_def import *
+from lambda_calc import *
 from scan_utils import *
 from scan_continuous import *
 from scanPathGen import *
@@ -17,6 +18,7 @@ from weldCorrectionStrategy import *
 from WeldSend import *
 from weldRRSensor import *
 from dx200_motion_program_exec_client import *
+import open3d as o3d
 
 from general_robotics_toolbox import *
 from RobotRaconteur.Client import *
@@ -69,12 +71,12 @@ positioner=positioner_obj('D500B',def_path=config_dir+'D500B_robot_default_confi
     base_marker_config_file=S1_marker_dir+'D500B_'+S1_ph_dataset_date+'_marker_config.yaml',tool_marker_config_file=S1_tcp_marker_dir+'positioner_tcp_marker_config.yaml')
 
 #### change base H to calibrated ones ####
-robot_scan_base = robot_weld.T_base_basemarker.inv()*robot_scan.T_base_basemarker
-robot_scan.base_H = H_from_RT(robot_scan_base.R,robot_scan_base.p)
-positioner_base = robot_weld.T_base_basemarker.inv()*positioner.T_base_basemarker
-positioner.base_H = H_from_RT(positioner_base.R,positioner_base.p)
-T_to_base = Transform(np.eye(3),[0,0,-380])
-positioner.base_H = np.matmul(positioner.base_H,H_from_RT(T_to_base.R,T_to_base.p))
+# robot_scan_base = robot_weld.T_base_basemarker.inv()*robot_scan.T_base_basemarker
+# robot_scan.base_H = H_from_RT(robot_scan_base.R,robot_scan_base.p)
+# positioner_base = robot_weld.T_base_basemarker.inv()*positioner.T_base_basemarker
+# positioner.base_H = H_from_RT(positioner_base.R,positioner_base.p)
+# T_to_base = Transform(np.eye(3),[0,0,-380])
+# positioner.base_H = np.matmul(positioner.base_H,H_from_RT(T_to_base.R,T_to_base.p))
 # exit()
 
 r1_nom_P=np.array([[0,0,0],[150,0,0],[0,0,760],\
@@ -176,8 +178,8 @@ mti_Rpath = np.array([[ -1.,0.,0.],
                         [0.,0.,-1.]])
 
 # 3. Motion Parameters
-to_start_speed=7
-to_home_speed=10
+to_start_speed=2
+to_home_speed=2
 # R1_home = np.radians([10,0,0,0,0,0])
 # R2_mid = np.radians([6,20,-10,0,0,0])
 # R2_home = np.radians([70,10,-5,0,0,0])
@@ -192,9 +194,11 @@ scan_process = ScanProcess(robot_scan,positioner)
 robot_client=MotionProgramExecClient()
 ws=WeldSend(robot_client)
 # weld state logging
-weld_ser = RRN.SubscribeService('rr+tcp://192.168.55.10:60823?service=welder')
-cam_ser=RRN.ConnectService('rr+tcp://192.168.55.10:60827/?service=camera')
+# weld_ser = RRN.SubscribeService('rr+tcp://192.168.55.10:60823?service=welder')
+# cam_ser=RRN.ConnectService('rr+tcp://192.168.55.10:60827/?service=camera')
 # mic_ser = RRN.ConnectService('rr+tcp://192.168.55.10:60828?service=microphone')
+weld_ser=None
+cam_ser=None
 ## RR sensor objects
 rr_sensors = WeldRRSensor(weld_service=weld_ser,cam_service=cam_ser)
 # MTI connect to RR
@@ -216,9 +220,9 @@ planned_job=planned_job.astype(int)
 
 print_min_dh = 0.5 # mm
 
-arc_on=True
+arc_on=False
 
-tri_robot=True
+tri_robot=False
 save_weld_record=True
 save_output_points=True
 
@@ -235,11 +239,11 @@ start_weld_layer=0
 # layer_count=2
 # start_weld_layer=0
 
-# Transz0_H=None
-Transz0_H=np.array([[ 9.99977849e-01, -4.63425601e-05, -6.65580373e-03,  5.00206395e-03],
- [-4.63425601e-05,  9.99903047e-01, -1.39246294e-02,  1.04648348e-02],
- [ 6.65580373e-03,  1.39246294e-02,  9.99880895e-01, -7.51444661e-01],
- [ 0.00000000e+00,  0.00000000e+00,  0.00000000e+00,  1.00000000e+00]])
+Transz0_H=None
+# Transz0_H=np.array([[ 9.99977849e-01, -4.63425601e-05, -6.65580373e-03,  5.00206395e-03],
+#  [-4.63425601e-05,  9.99903047e-01, -1.39246294e-02,  1.04648348e-02],
+#  [ 6.65580373e-03,  1.39246294e-02,  9.99880895e-01, -7.51444661e-01],
+#  [ 0.00000000e+00,  0.00000000e+00,  0.00000000e+00,  1.00000000e+00]])
 
 # try:
 #     layer_count=len(glob.glob(data_dir+'layer_*_0'))+1
@@ -247,7 +251,7 @@ Transz0_H=np.array([[ 9.99977849e-01, -4.63425601e-05, -6.65580373e-03,  5.00206
 #     pass
 
 manual_dh=False
-correction=True
+correction=False
 recal_dh=False
 
 start_shift=False # if true then always add odd layers
@@ -484,9 +488,9 @@ while True:
             R1_mid[0]=deepcopy(q1[0])
             if go_weld:
                 if tri_robot:
-                    ws.jog_tri(robot_weld,positioner,robot_scan,[R1_mid,q1],q2,ir_js[breakpoints[0]],v=to_start_speed)
+                    ws.jog_tri(robot_weld,positioner,robot_scan,[R1_mid,q1],[q2]*2,[ir_js[breakpoints[0]]]*2,v=to_start_speed)
                 else:
-                    ws.jog_dual(robot_weld,positioner,[R1_mid,q1],q2,v=to_start_speed)
+                    ws.jog_dual(robot_weld,positioner,[R1_mid,q1],[q2]*2,v=to_start_speed)
 
             ######################################################
             ########### Do welding #############
@@ -549,6 +553,7 @@ while True:
         pcd_layer=o3d.geometry.PointCloud()
         layer_curve_relative=[]
         layer_curve_dh=[]
+        print("num_sections",num_sections)
         for x in range(0,num_sections): 
             ### scanning path module
             spg = ScanPathGen(robot_scan,positioner,scan_stand_off_d,Rz_angle,Ry_angle,bounds_theta)
@@ -581,12 +586,6 @@ while True:
             # scan_waypoint_distance=10 ## mm
             scan_waypoint_distance=waypoint_distance ## mm
             num_points_layer=max(2,int(lam_relative[-1]/scan_waypoint_distance))
-            
-            ## using forward/backward technique
-            # if forward:
-            #     breakpoints=np.linspace(0,len(lam_relative)-1,num=num_points_layer).astype(int)
-            # else:
-            #     breakpoints=np.linspace(len(lam_relative)-1,0,num=num_points_layer).astype(int)
 
             while True:
                 ###find which end to start depending on how close to the current positioner pose
@@ -626,7 +625,7 @@ while True:
                 
                 q2=q_bp2[0][0]
                 if x==0:
-                    ws.jog_dual(robot_scan,positioner,[R2_mid,q1],q2,v=to_start_speed)
+                    ws.jog_dual(robot_scan,positioner,[R2_mid,q1],[q2]*2,v=to_start_speed)
                 else:
                     ws.jog_dual(robot_scan,positioner,q1,q2,v=to_start_speed)
                 
