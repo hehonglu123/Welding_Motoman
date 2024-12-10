@@ -5,7 +5,7 @@ import numpy as np
 from robotics_utils import *
 from result_analysis import *
 from scipy.spatial import ConvexHull, Delaunay
-
+from animation_3d import animation_mesh
     
 dataset='wall/'
 sliced_alg='dense_slice/'
@@ -19,7 +19,7 @@ target_points_pc=[]
 target_points_pc_temp=[]
 for i in range(1,slicing_meta['num_layers']-70,5):
 # for i in range(0,slicing_meta['num_layers']):
-    target_points_pc_temp.append(np.loadtxt(data_dir+'curve_sliced/slice'+str(i)+'_0.csv',delimiter=',')[:,:3])
+    target_points_pc_temp.append(np.loadtxt(data_dir+'curve_sliced/slice'+str(i)+'_0.csv',delimiter=',')[:,:3]-np.array([32.5,0,0]))
 target_points_pc=copy.deepcopy(target_points_pc_temp)
 
 target_points_pc_temp=np.concatenate(target_points_pc_temp,axis=0)
@@ -49,6 +49,7 @@ try:
     scanned_mesh_points_pcd.points = o3d.utility.Vector3dVector(scanned_mesh_points)
     R_guess,p_guess=global_alignment(scanned_mesh_points,target_points_pc_temp)
     print(R_guess,p_guess)
+
     threshold=5
     max_iteration=1000
     reg_p2p = o3d.pipelines.registration.registration_icp(
@@ -63,6 +64,10 @@ try:
     scanned_points_tranform=np.array(scanned_mesh_pcd.points)
     left_indices,right_indices=separate_by_y(scanned_points_tranform,target_points_transform)
     print(len(left_indices),len(right_indices))
+
+    # o3d.visualization.draw_geometries([scanned_mesh])
+    animation_mesh(scanned_mesh,rotation_angle=np.radians(1),steps=7200,sleep_time=0.01)
+    exit()
 
     left_pc = o3d.geometry.PointCloud()
     left_pc.points = o3d.utility.Vector3dVector(scanned_points_tranform[left_indices])

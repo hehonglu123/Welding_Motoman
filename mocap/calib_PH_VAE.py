@@ -158,7 +158,7 @@ def latent_space_analysis(inputs_q2q3, data_delta_PH, training_q, training_T, te
     # svd analysis of the latent space
     _, s_vae_latent, _ = np.linalg.svd(latent_vec_cpu.T, full_matrices=True)
     _, s_fourier_latent, _ = np.linalg.svd(fourier_latent_vec_cpu.T, full_matrices=True)
-    plt.plot(np.log10(s_vae_latent/np.max(s_vae_latent)), '-o', label='VAE latent')
+    plt.plot(np.log10(s_vae_latent/np.max(s_vae_latent)), '-o', label='AE latent')
     plt.plot(np.log10(s_fourier_latent/np.max(s_fourier_latent)), '-o', label='Fourier latent')
     latent_combine = np.hstack((latent_vec_cpu/np.max(s_vae_latent),fourier_latent_vec_cpu/np.max(s_fourier_latent)))
     _, s_combine, _ = np.linalg.svd(latent_combine.T, full_matrices=True)
@@ -175,16 +175,28 @@ def latent_space_analysis(inputs_q2q3, data_delta_PH, training_q, training_T, te
     plt.show()
 
     # plot the latent space w.r.t q2q3
-    fig, axs = plt.subplots(3, 4)
-    for i in range(latent_size):
-        axs[i//4,i%4].scatter(inputs_q2q3[:,0],inputs_q2q3[:,1],c=latent_vec_cpu[:,i])
-        axs[i//4,i%4].set_title('Latent '+str(i))
-        if i>=8:
-            axs[i//4,i%4].set_xlabel('q2')
-        if i%4==0:
-            axs[i//4,i%4].set_ylabel('q3')
+    plot_row = 2
+    plot_col = 6
+    fig, axs = plt.subplots(plot_row, plot_col)
+    # set figure size
+    # fig.set_size_inches(18.5, 10.5)
+    for i in range(plot_row*plot_col):
+        axs[i//plot_col,i%plot_col].scatter(np.degrees(inputs_q2q3[:,0]),np.degrees(inputs_q2q3[:,1]),c=latent_vec_cpu[:,i])
+        axs[i//plot_col,i%plot_col].tick_params(axis='both', which='major', labelsize=12)
+        axs[i//plot_col,i%plot_col].set_title('Latent '+str(i+1),fontsize=13, fontweight='bold')
+        if i>=(plot_row-1)*plot_col:
+            axs[i//plot_col,i%plot_col].set_xlabel('q2',fontsize=12, fontweight='bold')
+        else:
+            # remove xticks
+            axs[i//plot_col,i%plot_col].set_xticks([])
+        if i%plot_col==0:
+            axs[i//plot_col,i%plot_col].set_ylabel('q3',fontsize=12, fontweight='bold')
+    # show the color bar and adjust the color bar size and position
+    cbar = fig.colorbar(axs[0,0].collections[0], ax=axs, orientation='horizontal', anchor=(0.5, 2), fraction=0.1, shrink=0.5)
+    cbar.ax.tick_params(labelsize=12)
+    cbar.set_label('Latent value', fontsize=14, fontweight='bold')
     # figure title
-    fig.suptitle('Latent space vs q2 q3')
+    fig.suptitle('Autoencoder latent space vs q2,q3',fontsize=20, fontweight='bold')
     plt.show()
 
 def trained_model_test(inputs_q2q3, data_delta_PH, training_q, training_T, testing_q, testing_T,robot,param_nominal,robot_type):
