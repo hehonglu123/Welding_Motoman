@@ -354,7 +354,7 @@ motion_primitive.egg-info/
 generated_src/
 generated_src
 {"mode":"full","isActive":false}
-data/wall_weld_test/
+# data/wall_weld_test/
 
 *.JBI
 
@@ -383,6 +383,9 @@ data/wall_weld_test/weld_scan*
 data/wall_weld_test/scan_cont_newdx*
 data/wall_weld_test/full_test_mti*
 data/wall_weld_test/top_layer_test*
+data/wall_weld_test/curve*
+data/wall_weld_test/torch*
+
 data/cup/circular_slice_shifted/weld_scan*
 data/circle_large/static_spiral/weld_scan*
 data/blade0.1/auto_slice/weld_scan*
