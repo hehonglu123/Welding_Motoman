@@ -132,16 +132,16 @@ for n, layer in enumerate(baselayers):
     R_x = np.cross(R_y, R_z) # Rx
     weldgun_R = np.array([R_x, R_y, R_z]).T
     starting_id = dist_weld_scan_index if lead_lag == 0 else -dist_weld_scan_index-1
-    ending_id = 0 if lead_lag == 0 else -1
+    ending_id = -1 if lead_lag == 0 else 0
     step_direction = -1 if lead_lag == 0 else 1
     curve_js = [curve_js[0]] if lead_lag == 0 else [curve_js[-1]]
     for i in range(starting_id, ending_id, step_direction):
-        weld_scan_vec_base = weldgun_R@weld_scan_vec
+        weld_scan_vec_base = weldgun_R@T_weld_scan.p
         weldgun_p = positioner_tcp.R@layer[i, :3] + positioner_tcp.p
         weldgun_p = weldgun_p - weld_scan_vec_base
         curve_js.append(robot_weld.inv(weldgun_p, weldgun_R, curve_js[-1])[0])
-    curve_js = np.array(curve_js)
-    np.savetxt(data_dir+f"MA2010_base_js{n}_scanOnly.csv", curve_js, delimiter="")
+    curve_js = np.array(curve_js[1:])
+    np.savetxt(data_dir+f"MA2010_base_js{n}_scanOnly.csv", curve_js, delimiter=",")
 
 ## layers
 for n, layer in enumerate(curve_layers):
@@ -219,5 +219,5 @@ for n, layer in enumerate(curve_layers):
         weldgun_p = positioner_tcp.R@layer[i, :3] + positioner_tcp.p
         weldgun_p = weldgun_p - weld_scan_vec_base
         curve_js.append(robot_weld.inv(weldgun_p, weldgun_R, curve_js[-1])[0])
-    curve_js = np.array(curve_js)
-    np.savetxt(data_dir+f"MA2010_js{n}_scanOnly.csv", curve_js, delimiter="")
+    curve_js = np.array(curve_js[1:])
+    np.savetxt(data_dir+f"MA2010_js{n}_scanOnly.csv", curve_js, delimiter=",")
