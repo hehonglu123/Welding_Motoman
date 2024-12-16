@@ -1,6 +1,5 @@
 import sys
-sys.path.append('toolbox/')
-from robot_def import *
+from motoman_def import *
 from dx200_motion_program_exec_client import *
 
 config_dir='config/'
@@ -20,7 +19,7 @@ q2=np.array([90,0,0,0,0,0])
 
 # q1=np.array([-60,0,0,0,0,0])
 # q2=np.array([-30,20,-10,0,0,0])
-q3=[-15,0]
+q3=[-15,180]
 
 robot_client=MotionProgramExecClient()
 

@@ -1,0 +1,7 @@
+baselayer_length: 80
+baselayer_resolution: 3.5
+baselayernum: 2
+layer_length: 80
+layer_num: 44
+layer_resolution: 0.1
+path_dl: 0.025

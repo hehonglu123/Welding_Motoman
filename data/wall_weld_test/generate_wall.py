@@ -1,4 +1,5 @@
 import numpy as np
+import yaml
 from pathlib import Path
 from motoman_def import *
 
@@ -9,6 +10,21 @@ baselayer_resolution = 3.5
 layer_resolution = 0.1
 layer_num = 44
 path_dl = 0.025
+
+positioner_joints = np.radians([-15,180])
+
+##### save meta data #####
+with open('sliced_meta.yml', 'w') as file:
+    meta = {
+        'baselayer_length': baselayer_length,
+        'layer_length': layer_length,
+        'baselayernum': baselayernum,
+        'baselayer_resolution': baselayer_resolution,
+        'layer_resolution': layer_resolution,
+        'layer_num': layer_num,
+        'path_dl': path_dl
+    }
+    yaml.dump(meta, file)
 
 ##### generate wall in positioner tcp frame #####
 
@@ -61,8 +77,6 @@ weld_scan_vec = T_weld_scan.p/np.linalg.norm(T_weld_scan.p)
 rotate_y_direction = subproblem1(weld_scan_vec, np.array([0,1,0]), np.array([0,0,1]))
 dist_weld_scan = np.linalg.norm(T_weld_scan.p)
 dist_weld_scan_index = np.round(dist_weld_scan/path_dl).astype(int)
-
-positioner_joints = np.radians([-15,180])
 
 ## baselayers
 for n, layer in enumerate(baselayers):
@@ -118,6 +132,7 @@ for n, layer in enumerate(baselayers):
 
     ##### solve ik for the extra scanning motion
     positioner_tcp = positioner.fwd(positioner_joints, world=True)
+    positioner_tcp_inv = positioner_tcp.inv()
     R_z = positioner_tcp.R@layer[i, 3:] # Rz
     # get Ry
     if lead_lag == 0:
@@ -135,13 +150,18 @@ for n, layer in enumerate(baselayers):
     ending_id = -1 if lead_lag == 0 else 0
     step_direction = -1 if lead_lag == 0 else 1
     curve_js = [curve_js[0]] if lead_lag == 0 else [curve_js[-1]]
+    baselayer_scan = []
     for i in range(starting_id, ending_id, step_direction):
         weld_scan_vec_base = weldgun_R@T_weld_scan.p
         weldgun_p = positioner_tcp.R@layer[i, :3] + positioner_tcp.p
         weldgun_p = weldgun_p - weld_scan_vec_base
         curve_js.append(robot_weld.inv(weldgun_p, weldgun_R, curve_js[-1])[0])
+        weldgun_p_relative = positioner_tcp_inv.R@weldgun_p + positioner_tcp_inv.p
+        weldgun_R_relative = positioner_tcp_inv.R@weldgun_R
+        baselayer_scan.append(np.append(weldgun_p_relative, weldgun_R_relative[:,-1]))
     curve_js = np.array(curve_js[1:])
     np.savetxt(data_dir+f"MA2010_base_js{n}_scanOnly.csv", curve_js, delimiter=",")
+    np.savetxt('curve_sliced_relative/'+f"baselayer{n}_scanOnly.csv", np.array(baselayer_scan), delimiter=",")
 
 ## layers
 for n, layer in enumerate(curve_layers):
@@ -197,6 +217,7 @@ for n, layer in enumerate(curve_layers):
 
     ##### solve ik for the extra scanning motion
     positioner_tcp = positioner.fwd(positioner_joints, world=True)
+    positioner_tcp_inv = positioner_tcp.inv()
     R_z = positioner_tcp.R@layer[i, 3:] # Rz
     # get Ry
     if lead_lag == 0:
@@ -214,10 +235,15 @@ for n, layer in enumerate(curve_layers):
     ending_id = 0 if lead_lag == 0 else -1
     step_direction = -1 if lead_lag == 0 else 1
     curve_js = [curve_js[0]] if lead_lag == 0 else [curve_js[-1]]
+    layer_scan = []
     for i in range(starting_id, ending_id, step_direction):
         weld_scan_vec_base = weldgun_R@weld_scan_vec
         weldgun_p = positioner_tcp.R@layer[i, :3] + positioner_tcp.p
         weldgun_p = weldgun_p - weld_scan_vec_base
         curve_js.append(robot_weld.inv(weldgun_p, weldgun_R, curve_js[-1])[0])
+        weldgun_p_relative = positioner_tcp_inv.R@weldgun_p + positioner_tcp_inv.p
+        weldgun_R_relative = positioner_tcp_inv.R@weldgun_R
+        layer_scan.append(np.append(weldgun_p_relative, weldgun_R_relative[:,-1]))
     curve_js = np.array(curve_js[1:])
     np.savetxt(data_dir+f"MA2010_js{n}_scanOnly.csv", curve_js, delimiter=",")
+    np.savetxt('curve_sliced_relative/'+f'slice{n}_scanOnly.csv', np.array(layer_scan), delimiter=",")
