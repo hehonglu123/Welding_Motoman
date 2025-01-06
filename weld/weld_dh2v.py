@@ -142,6 +142,8 @@ if __name__=='__main__':
 
     print("ipm=150, dh=1.5, v=",dh2v_loglog(1.5,150))
 
+    print("ER70S6, ipm=120, v=7", v2dh_loglog(7,120,'ER_70S6'))
+
     # v_list = np.arange(5,12,0.2)
     # ipm_list = [100,110,120,130,140,150,160,170,180]
     

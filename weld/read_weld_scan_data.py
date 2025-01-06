@@ -98,8 +98,8 @@ R_S1TCP = np.matmul(T_S1TCP_R1Base[:3,:3],path_R)
 build_height_profile=False
 plot_correction=False
 plot_pcd = False
-show_layer = []
-# show_layer = [12]
+# show_layer = []
+show_layer = [12]
 
 x_lower = -99999
 x_upper = 999999
@@ -110,8 +110,8 @@ x_upper = 999999
 start_id=75
 end_id=-75
 
-datasets=['baseline','correction']
-# datasets=['correction']
+# datasets=['baseline','correction']
+datasets=['correction']
 
 # datasets=['correction','repeat 1','repeat 2']
 # datasets=['baseline','correction','repeat 1','repeat 2']
@@ -420,13 +420,49 @@ for dataset in datasets:
                 all_profile_v_plot.extend(np.array([p[:,0],np.repeat(this_weld_v[seg_i],len(p[:,0]))]).T)
             all_profile_plot=np.array(all_profile_plot)
             all_profile_v_plot=np.array(all_profile_v_plot)
+
+
+
+            # Create the figure and twin axes
+            fig, ax1 = plt.subplots(figsize=(10, 6))
+            ax2 = ax1.twinx()
+            # Plot the data
+            for v_id in range(len(this_weld_v)):
+                if v_id == 0:
+                    ax1.scatter(all_profile[v_id][:, 0], h_target - all_profile[v_id][:, 1], label=r'$\Delta h_d$ (dots)', s=100)  # Increase marker size
+                    ax2.plot(all_profile[v_id][:, 0], np.ones(len(all_profile[v_id][:, 0])) * this_weld_v[v_id],
+                            linewidth=2, label=f'Updated torch speed (lines)')  # Thicker line
+                else:
+                    ax1.scatter(all_profile[v_id][:, 0], h_target - all_profile[v_id][:, 1], s=100)  # Increase marker size
+                    plot_vx = np.append(all_profile[v_id - 1][-1, 0], all_profile[v_id][:, 0])
+                    plot_vy = np.append(this_weld_v[v_id - 1], np.ones(len(all_profile[v_id][:, 0])) * this_weld_v[v_id])
+                    ax2.plot(plot_vx, plot_vy, linewidth=2)  # Thicker line
+            robot_v_S1TCP_smooth = moving_average(robot_v_S1TCP,padding=True)
+            ax2.plot(robot_p_S1TCP[:,0]-(robot_p_S1TCP[0,0]-all_profile[0][0, 0]),robot_v_S1TCP_smooth,label='Actual Cartesian Speed')
+            # Customize the axes
+            ax1.set_xlabel('x-axis (mm)', fontsize=26, weight='bold')
+            ax1.tick_params(axis='x', labelsize=22)
+            ax1.set_ylabel(r'Deposition height $\Delta h_d$ (mm)', color='g', fontsize=26, weight='bold')
+            ax1.tick_params(axis='y', labelsize=22, colors='g')
+            ax2.set_ylabel('Torch speed (mm/sec)', color='b', fontsize=26, weight='bold')
+            ax2.tick_params(axis='y', labelsize=22, colors='b')
+            # Add a title
+            plt.title(r'Desired Deposition Height $\Delta h_d$ vs Torch Speed, 40 MoveL', fontsize=32, weight='bold')
+            # Add a legend
+            lines_1, labels_1 = ax1.get_legend_handles_labels()
+            lines_2, labels_2 = ax2.get_legend_handles_labels()
+            ax1.legend(lines_1 + lines_2, labels_1 + labels_2, loc='upper center', fontsize=22)
+            # Show the plot
+            plt.grid(True, linestyle='--', alpha=0.7)  # Optional grid for better readability
+            plt.tight_layout()
+            plt.show()
             
             # fig, ax1 = plt.subplots()
             # ax2 = ax1.twinx()
-            # ax1.scatter(profile_height[:,0],profile_height[:,1],label='Height Layer'+str(i))
+            # # ax1.scatter(profile_height[:,0],profile_height[:,1],label='Height Layer'+str(i))
             # # ax1.scatter(next_profile_height[:,0],next_profile_height[:,1],label='Height Layer'+str(i+1))
             # ax2.plot(all_profile_v_plot[:,0],all_profile_v_plot[:,1],label='Planned Corrected Speed')
-            # # ax2.plot(robot_p_S1TCP[:,0],robot_v_S1TCP,label='Actual Cartesian Speed')
+            # ax2.plot(robot_p_S1TCP[:,0],robot_v_S1TCP,label='Actual Cartesian Speed')
             # ax1.set_xlabel('X-axis (Lambda) (mm)')
             # ax1.set_ylabel('Height (mm)', color='g')
             # ax2.set_ylabel('Speed (mm/sec)', color='b')
@@ -481,6 +517,7 @@ for dataset in datasets:
                 plt.scatter(profile_height[start_id:end_id,0],profile_height[start_id:end_id,1],s=3,c='tab:green')
         else:
             if i==0:
+                # print(profile_height[:10,0])
                 plt.scatter(profile_height[start_id:end_id,0],profile_height[start_id:end_id,1],s=3,c='tab:blue',label='Forward (Right to Left)')
             elif i==1:
                 plt.scatter(profile_height[start_id:end_id,0],profile_height[start_id:end_id,1],s=3,c='tab:orange',label='Backward (Left to Right)')

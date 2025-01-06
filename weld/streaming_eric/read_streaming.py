@@ -3,13 +3,12 @@ from copy import deepcopy
 from pathlib import Path
 import pickle
 import sys
-sys.path.append('../../toolbox/')
 sys.path.append('../../scan/scan_tools/')
 sys.path.append('../../scan/scan_plan/')
 sys.path.append('../../scan/scan_process/')
 sys.path.append('../../mocap/')
 sys.path.append('../')
-from robot_def import *
+from motoman_def import *
 from traj_manipulation import *
 from scan_utils import *
 from scan_continuous import *
@@ -112,6 +111,9 @@ with open(data_dir+'mti_scans.pickle', 'rb') as file:
     mti_recording_all=pickle.load(file)
 with open(data_dir+'robot_js.pickle', 'rb') as file:
     robot_js_all=pickle.load(file)
+
+print(np.mean(np.diff(robot_js_all[-1][:,0])))
+exit()
     
 ## streaming parameters
 point_distance=0.01			###STREAMING POINT INTERPOLATED DISTANCE

@@ -82,19 +82,37 @@ T_R1Base_S1TCP = np.linalg.inv(T_S1TCP_R1Base)
 final_height=50
 # final_h_std_thres=0.48
 final_h_std_thres=999999999
-weld_z_height=[0,6,7] # two base layer height to first top layer
-weld_z_height=np.append(weld_z_height,np.arange(weld_z_height[-1],final_height,1)+1)
-# job_number=[115,115]
-job_number=[225,225]
-job_number=np.append(job_number,np.ones(len(weld_z_height)-2)*200) # 100 ipm
-# job_number=np.append(job_number,np.ones(len(weld_z_height)-2)*206) # 160 ipm
-# job_number=np.append(job_number,np.ones(len(weld_z_height)-2)*212) # 220 ipm
+
+############ Materials chosen ##################
+
+material = 'ER_70S6' # ER_4043 (Al), ER_70S6 (Steel)
+
+if material == 'ER_4043':
+    weld_z_height=[0,6,7] # two base layer height to first top layer height
+    job_offset = 200
+    base_feedrate = 250 # 250 ipm
+    ipm_mode = 100 # 100 ipm
+
+    weld_velocity=[5]*2 # two base layer velocity to first top layer velocity
+    weld_v = 5
+elif material == 'ER_70S6':
+    weld_z_height=[0,6,7] # two base layer height to first top layer height
+    job_offset = 300
+    base_feedrate = 300 # 300 ipm
+    ipm_mode = 120 # 120 ipm
+
+    weld_velocity=[5]*2 # two base layer velocity to first top layer velocity
+    weld_v = 7
+
+################################################
+
+weld_z_height=np.append(weld_z_height,np.arange(weld_z_height[-1],final_height,1)+1) # get heights for all layers
+
+job_number=[job_offset+int(base_feedrate/10)]*2 # two base layer job number
+job_number=np.append(job_number,np.ones(len(weld_z_height)-2)*int(job_offset+ipm_mode/10)) # get job number for all layers
 print(weld_z_height)
 print(job_number)
 
-ipm_mode=100
-weld_velocity=[5,5]
-weld_v=5
 print("input dh:",v2dh_loglog(weld_v,ipm_mode))
 for i in range(len(weld_z_height)-2):
     weld_velocity.append(weld_v)
@@ -102,6 +120,8 @@ for i in range(len(weld_z_height)-2):
     #     weld_v+=2
 # print(weld_velocity)
 # exit()
+
+assert len(weld_z_height)==len(job_number) and len(weld_z_height)==len(weld_velocity), "Length mismatch"
 
 to_start_speed=5
 to_home_speed=5
