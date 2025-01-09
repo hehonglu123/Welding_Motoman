@@ -104,11 +104,11 @@ show_layer = []
 x_lower = -99999
 x_upper = 999999
 
-start_id=0
-end_id=-1
+# start_id=0
+# end_id=-1
 
-# start_id=75
-# end_id=-75
+start_id=75
+end_id=-75
 
 datasets=['baseline','correction']
 # datasets=['correction']
