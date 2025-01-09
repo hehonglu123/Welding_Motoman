@@ -96,10 +96,10 @@ if material == 'ER_4043':
     weld_velocity=[5]*2 # two base layer velocity to first top layer velocity
     weld_v = 5
 elif material == 'ER_70S6':
-    weld_z_height=[0,6,7] # two base layer height to first top layer height
+    weld_z_height=[0,5,6] # two base layer height to first top layer height
     job_offset = 300
     base_feedrate = 300 # 300 ipm
-    ipm_mode = 120 # 120 ipm
+    ipm_mode = 200 # 200 ipm
 
     weld_velocity=[5]*2 # two base layer velocity to first top layer velocity
     weld_v = 7
@@ -113,7 +113,7 @@ job_number=np.append(job_number,np.ones(len(weld_z_height)-2)*int(job_offset+ipm
 print(weld_z_height)
 print(job_number)
 
-print("input dh:",v2dh_loglog(weld_v,ipm_mode))
+print("input dh:",v2dh_loglog(weld_v,ipm_mode,material=material))
 for i in range(len(weld_z_height)-2):
     weld_velocity.append(weld_v)
     # if weld_v==weld_velocity[-2]:
@@ -293,14 +293,14 @@ for i in range(0,end_layer):
             # max_v=75
             # h_std_thres=0.5
 
-            min_v=2
-            max_v=20
+            min_v=5
+            max_v=9
             h_std_thres=-1
 
             nominal_v=weld_v
             curve_sliced_relative,path_T_S1,this_weld_v,all_dh,last_mean_h=\
                 strategy_3(profile_height,input_dh,curve_sliced_relative,R_S1TCP,num_l,noise_h_thres=noise_h_thres,\
-                           min_v=min_v,max_v=max_v,h_std_thres=h_std_thres,nominal_v=nominal_v,ipm_mode=ipm_mode)
+                           min_v=min_v,max_v=max_v,h_std_thres=h_std_thres,nominal_v=nominal_v,ipm_mode=ipm_mode,material=material)
             
             h_largest = np.max(profile_height[:,1])
 
@@ -574,8 +574,8 @@ for i in range(0,end_layer):
         o3d.io.write_point_cloud(out_scan_dir+'processed_pcd.pcd',pcd)
         np.save(out_scan_dir+'height_profile.npy',profile_height)
     # visualize_pcd([pcd])
-    plt.scatter(profile_height[:,0],profile_height[:,1])
-    plt.show()
+    # plt.scatter(profile_height[:,0],profile_height[:,1])
+    # plt.show()
     # exit()
 
     if np.mean(profile_height[:,1])>final_height and np.std(profile_height[:,1])<final_h_std_thres and (not use_previous_cmd):

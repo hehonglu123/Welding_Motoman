@@ -255,6 +255,7 @@ def strategy_3(profile_height,input_dh,curve_sliced_relative,R_S1TCP,num_l,noise
     ## parameters
     # noise_h_thres = 3
     ############
+    print("Using Material:",material, "Mode:",ipm_mode)
 
     ### delete noise
     mean_h = np.mean(profile_height[:,1])
@@ -293,8 +294,8 @@ def strategy_3(profile_height,input_dh,curve_sliced_relative,R_S1TCP,num_l,noise
         this_weld_v.pop()
         all_dh.pop()
 
-        plt.scatter(profile_height[:,0],profile_height[:,1]-np.mean(profile_height[:,1]))
-        plt.show()
+        # plt.scatter(profile_height[:,0],profile_height[:,1]-np.mean(profile_height[:,1]))
+        # plt.show()
 
     else:
         # chop curve
@@ -344,10 +345,10 @@ def strategy_3(profile_height,input_dh,curve_sliced_relative,R_S1TCP,num_l,noise
         print("dh:",all_dh)
         print("v:",this_weld_v)
 
-        plt.scatter(profile_height[:,0],profile_height[:,1]-np.mean(profile_height[:,1]))
-        for p in all_profile:
-            plt.scatter(p[:,0],p[:,1]-np.mean(profile_height[:,1]))
-        plt.show()
+        # plt.scatter(profile_height[:,0],profile_height[:,1]-np.mean(profile_height[:,1]))
+        # for p in all_profile:
+        #     plt.scatter(p[:,0],p[:,1]-np.mean(profile_height[:,1]))
+        # plt.show()
     
     return curve_sliced_relative_correct,path_T_S1,this_weld_v,all_dh,mean_h
 
