@@ -287,14 +287,14 @@ for i in range(0,end_layer):
             num_l=40
             # input_dh=1.1624881529394444
             # input_dh=1.4018280504260527
-            input_dh=v2dh_loglog(weld_v,ipm_mode)
+            input_dh=v2dh_loglog(weld_v,ipm_mode,material=material)
             
             # min_v=10
             # max_v=75
             # h_std_thres=0.5
 
-            min_v=-1
-            max_v=1000
+            min_v=2
+            max_v=20
             h_std_thres=-1
 
             nominal_v=weld_v

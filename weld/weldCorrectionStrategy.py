@@ -250,7 +250,7 @@ def strategy_2(profile_height,last_mean_h,forward_flag,curve_sliced_relative,R_S
 
     return curve_sliced_relative_correct,path_T_S1,this_weld_v,all_dh,mean_h
 
-def strategy_3(profile_height,input_dh,curve_sliced_relative,R_S1TCP,num_l,noise_h_thres = 3,min_v=5,max_v=30,h_std_thres=0.48,nominal_v=18,ipm_mode=160):
+def strategy_3(profile_height,input_dh,curve_sliced_relative,R_S1TCP,num_l,noise_h_thres = 3,min_v=5,max_v=30,h_std_thres=0.48,nominal_v=18,ipm_mode=160,material='ER_4043'):
 
     ## parameters
     # noise_h_thres = 3
@@ -331,7 +331,7 @@ def strategy_3(profile_height,input_dh,curve_sliced_relative,R_S1TCP,num_l,noise
             this_dh = h_target-this_mean_h
             this_dh=max(0.01,this_dh) # to prevent inf or nan
 
-            this_v = dh2v_loglog(this_dh,mode=ipm_mode)
+            this_v = dh2v_loglog(this_dh,mode=ipm_mode,material=material)
             this_v = min(max(min_v,this_v),max_v)
 
             this_weld_v.append(this_v)
