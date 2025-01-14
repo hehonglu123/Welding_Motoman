@@ -223,7 +223,7 @@ for layer_count in range(0,total_count):
         else:
             pcd=o3d.io.read_point_cloud(out_scan_dir+'processed_pcd.pcd')
         pcd_layer+=pcd
-        continue
+        # continue
         
         # dh plot
         if layer!=-1:
@@ -297,7 +297,7 @@ for layer_count in range(0,total_count):
     # last_curve_relative=layer_curve_relative
     
     all_pcd=all_pcd+last_pcd
-    continue
+    # continue
     
     layer_curve_relative=np.array(layer_curve_relative)
     last_curve_relative=deepcopy(layer_curve_relative)
@@ -361,9 +361,9 @@ for layer_count in range(0,total_count):
         dh_rmse.append(rmse)
 
 viz_obj.append(all_pcd)
-visualize_pcd(viz_obj)
-# save pcd 
-o3d.io.write_point_cloud(data_dir+'pcd_blade.pcd',all_pcd)
+# visualize_pcd(viz_obj)
+# # save pcd 
+# o3d.io.write_point_cloud(data_dir+'pcd_blade.pcd',all_pcd)
 
 draw_l_count=0
 for lh in all_layer_dh:

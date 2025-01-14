@@ -12,6 +12,13 @@ sliced_algs = ['auto_slice','auto_slice']
 collected_data = ['weld_scan_baseline_2023_10_09_16_01_52','weld_scan_correction_2023_10_10_16_56_32']
 legends=['Baseline','Correction']
 
+legend_fontsize=16
+xlabel_fontsize=20
+xticks_fontsize=xlabel_fontsize
+yticks_fontsize=xticks_fontsize
+ylabel_fontsize=xlabel_fontsize
+title_fontsize=24
+
 print("Average/Std of height std:")
 total_datasets=len(collected_data)
 for i in range(total_datasets):
@@ -27,10 +34,21 @@ for i in range(total_datasets):
     elif i==1:
         correction_performance=np.mean(height_std)
 print("Improvements: ",round((baseline_performance-correction_performance)/baseline_performance*100),'%')
-plt.legend()
-plt.xlabel("Layer #")
-plt.ylabel("STD (mm)")
-plt.title('Height STD')
+ax = plt.gca()
+ax.xaxis.grid(True, linewidth=1)  # Increase linewidth for thicker grid lines
+ax.yaxis.grid(True, linewidth=1)  # Increase linewidth for thicker grid lines
+plt.grid(True)
+plt.legend(fontsize=legend_fontsize)
+# place legend in the upper center
+# plt.legend(loc='upper center', fontsize=legend_fontsize)
+plt.xlabel('Layer',fontsize=xlabel_fontsize)
+plt.xticks(fontsize=xticks_fontsize)
+plt.ylabel('Height STD (mm)',fontsize=ylabel_fontsize)
+# bottom, top = plt.ylim()
+# plt.ylim(bottom, 0.7)
+plt.yticks(fontsize=yticks_fontsize)
+plt.title("Height STD",fontsize=title_fontsize)
+plt.tight_layout()
 plt.show()
 print("==========================")
 
@@ -49,10 +67,21 @@ for i in range(total_datasets):
     elif i==1:
         correction_performance=np.mean(error_norm)
 print("Improvements: ",round((baseline_performance-correction_performance)/baseline_performance*100),'%')
-plt.legend()
-plt.xlabel("Layer #")
-plt.ylabel("Norm (mm)")
-plt.title('Layer Tracking Error Norm')
+ax = plt.gca()
+ax.xaxis.grid(True, linewidth=1)  # Increase linewidth for thicker grid lines
+ax.yaxis.grid(True, linewidth=1)  # Increase linewidth for thicker grid lines
+plt.grid(True)
+plt.legend(fontsize=legend_fontsize)
+# place legend in the upper center
+# plt.legend(loc='upper center', fontsize=legend_fontsize)
+plt.xlabel('Layer',fontsize=xlabel_fontsize)
+plt.xticks(fontsize=xticks_fontsize)
+plt.ylabel('Height STD (mm)',fontsize=ylabel_fontsize)
+# bottom, top = plt.ylim()
+# plt.ylim(bottom, 0.7)
+plt.yticks(fontsize=yticks_fontsize)
+plt.title("Height STD",fontsize=title_fontsize)
+plt.tight_layout()
 plt.show()
 print("==========================")
 
@@ -71,9 +100,20 @@ for i in range(total_datasets):
     elif i==1:
         correction_performance=np.mean(error_rmse)
 print("Improvements: ",round((baseline_performance-correction_performance)/baseline_performance*100),'%')
-plt.legend()
-plt.xlabel("Layer #")
-plt.ylabel("RMSE (mm)")
-plt.title('Layer Tracking RMSE')
+ax = plt.gca()
+ax.xaxis.grid(True, linewidth=1)  # Increase linewidth for thicker grid lines
+ax.yaxis.grid(True, linewidth=1)  # Increase linewidth for thicker grid lines
+plt.grid(True)
+# plt.legend(fontsize=legend_fontsize)
+plt.legend(loc='upper center', fontsize=legend_fontsize)
+# place legend in the upper center
+# plt.legend(loc='upper center', fontsize=legend_fontsize)
+plt.xlabel('Layer',fontsize=xlabel_fontsize)
+plt.xticks(fontsize=xticks_fontsize)
+plt.ylabel('RMSE (mm)',fontsize=ylabel_fontsize)
+# bottom, top = plt.ylim()
+# plt.ylim(bottom, 0.7)
+plt.yticks(fontsize=yticks_fontsize)
+plt.title("Layer Tracking RMSE",fontsize=title_fontsize)
+plt.tight_layout()
 plt.show()
-print('========================')

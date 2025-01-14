@@ -129,7 +129,7 @@ with open(data_dir+'robot_js.pickle', 'rb') as file:
 point_distance=0.01			###STREAMING POINT INTERPOLATED DISTANCE
 streaming_rate=125
 segment_distance=0.8 ## segment d, such that ||xi_{j}-xi_{j-1}||=0.8
-nominal_feedrate=160
+nominal_feedrate=140
 base_nominal_slice_increment=26
 base_layer_N=2
 delta_h_star = 1.8
@@ -145,7 +145,7 @@ scan_process = ScanProcess(robot_scan,positioner)
 
 regen_pcd=False
 regen_dh=False
-show_animation=True
+show_animation=False
 Transz0_H=None
 
 #### Planned Print layers
@@ -436,22 +436,32 @@ plt.yticks(fontsize=15)
 plt.title("Layers",fontsize=20)
 plt.show()
 
+xlabel_fontsize=20
+xticks_fontsize=xlabel_fontsize
+yticks_fontsize=xticks_fontsize
+ylabel_fontsize=xlabel_fontsize
+title_fontsize=24
+
 height_std=[]
 for h_arr in height_all:
     height_std.append(np.std(h_arr))
 plt.plot(range(1,end_layer_count+1),height_std,'-o')
-plt.xlabel("Layer #",fontsize=15)
-plt.ylabel("Height Std (mm)",fontsize=15)
-plt.xticks(fontsize=15)
-plt.yticks(fontsize=15)
-plt.title("Height Std",fontsize=20)
+plt.xlabel("Layer",fontsize=xlabel_fontsize)
+plt.ylabel("Height Std (mm)",fontsize=ylabel_fontsize)
+plt.xticks(fontsize=xticks_fontsize)
+plt.yticks(fontsize=yticks_fontsize)
+plt.title("Height Std",fontsize=title_fontsize)
+ax = plt.gca()
+ax.xaxis.grid(True, linewidth=1)  # Increase linewidth for thicker grid lines
+ax.yaxis.grid(True, linewidth=1)  # Increase linewidth for thicker grid lines
+plt.grid(True)
 plt.show()
 
 error_norm=[]
 for error in error_all:
     error_norm.append(np.linalg.norm(error))
 plt.plot(range(1,end_layer_count+1),error_norm,'-o')
-plt.xlabel("Layer #",fontsize=15)
+plt.xlabel("Layer",fontsize=15)
 plt.ylabel("Error norm (mm)",fontsize=15)
 plt.xticks(fontsize=15)
 plt.yticks(fontsize=15)
@@ -462,11 +472,15 @@ rmse_all = []
 for error in error_all:
     rmse_all.append(np.sqrt(np.mean(np.square(error))))
 plt.plot(range(1,end_layer_count+1),rmse_all,'-o')
-plt.xlabel("Layer #",fontsize=15)
-plt.ylabel("RMSE (mm)",fontsize=15)
-plt.xticks(fontsize=15)
-plt.yticks(fontsize=15)
-plt.title("Height RMSE",fontsize=20)
+plt.xlabel("Layer",fontsize=xlabel_fontsize)
+plt.ylabel("RMSE (mm)",fontsize=ylabel_fontsize)
+plt.xticks(fontsize=xticks_fontsize)
+plt.yticks(fontsize=yticks_fontsize)
+plt.title("Height RMSE",fontsize=title_fontsize)
+ax = plt.gca()
+ax.xaxis.grid(True, linewidth=1)  # Increase linewidth for thicker grid lines
+ax.yaxis.grid(True, linewidth=1)  # Increase linewidth for thicker grid lines
+plt.grid(True)
 plt.show()
 
 exit()

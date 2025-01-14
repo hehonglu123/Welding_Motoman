@@ -385,6 +385,7 @@ data/wall_weld_test/full_test_mti*
 data/wall_weld_test/top_layer_test*
 data/wall_weld_test/curve*
 data/wall_weld_test/torch*
+data/wall_weld_test/ER*
 
 data/cup/circular_slice_shifted/weld_scan*
 data/circle_large/static_spiral/weld_scan*
