@@ -96,7 +96,7 @@ path_R=np.array([[-0.7071, 0.7071, -0.    ],
 R_S1TCP = np.matmul(T_S1TCP_R1Base[:3,:3],path_R)
 
 build_height_profile=False
-plot_correction=True
+plot_correction=False
 plot_pcd = False
 # show_layer = []
 show_layer = [12]
@@ -104,14 +104,14 @@ show_layer = [12]
 x_lower = -99999
 x_upper = 999999
 
-start_id=0
-end_id=-1
+# start_id=0
+# end_id=-1
 
-# start_id=75 # 75 * 0.1 mm = 7.5 mm
-# end_id=-75
+start_id=75 # 75 * 0.1 mm = 7.5 mm
+end_id=-75
 
-# datasets=['baseline','correction']
-datasets=['correction']
+datasets=['baseline','correction']
+# datasets=['correction']
 
 # datasets=['correction','repeat 1','repeat 2']
 # datasets=['baseline','correction','repeat 1','repeat 2']
@@ -120,13 +120,13 @@ datasets_h_std={}
 for dataset in datasets:
 
     if dataset=='baseline':
-        data_dir = '../data/wall_weld_test/moveL_100_baseline_weld_scan_2023_07_07_15_20_56/'
-        # data_dir = '../data/wall_weld_test/movelL_200_steel_baseline_weld_scan_2025_01_08_22_08_57/'
+        # data_dir = '../data/wall_weld_test/moveL_100_baseline_weld_scan_2023_07_07_15_20_56/'
+        data_dir = '../data/wall_weld_test/movelL_200_steel_baseline_weld_scan_2025_01_08_22_08_57/'
     elif dataset=='correction':
         # data_dir = '../data/wall_weld_test/moveL_160_noconstraints_weld_scan_2023_07_05_18_59_53/'
-        data_dir = '../data/wall_weld_test/moveL_100_weld_scan_2023_07_24_11_19_58/'
+        # data_dir = '../data/wall_weld_test/moveL_100_weld_scan_2023_07_24_11_19_58/'
         # data_dir = '../data/wall_weld_test/moveL_100_weld_scan_2023_08_02_15_17_25/'
-        # data_dir = '../data/wall_weld_test/moveL_200_steel_weld_scan_2025_01_08_23_11_00/'
+        data_dir = '../data/wall_weld_test/moveL_200_steel_weld_scan_2025_01_08_23_11_00/'
     elif dataset=='repeat 1':
         data_dir = '../data/wall_weld_test/moveL_100_repeat_weld_scan_2023_08_02_16_03_50/'
     elif dataset=='repeat 2':
@@ -325,7 +325,7 @@ for dataset in datasets:
                 plt.xticks(fontsize=26)
                 plt.ylabel("Depoted Height (mm)",fontsize=26)
                 plt.yticks(fontsize=26)
-                plt.title('Deposition Height (mm)', fontsize=32, weight='bold')
+                plt.title('Deposition Height (mm)', fontsize=32)
                 plt.grid(True, linestyle='--', alpha=0.7)  # Optional grid for better readability
                 plt.show()
                 
@@ -352,7 +352,7 @@ for dataset in datasets:
                 ax2.set_ylabel('Torch speed (mm/sec)', color='b', fontsize=26)
                 ax2.tick_params(axis='y', labelsize=26, colors='b')
                 # Add a title
-                plt.title(r'Desired Deposition Height $\Delta h_d$ vs Torch Speed, 40 MoveL', fontsize=32, weight='bold')
+                plt.title(r'Desired Deposition Height $\Delta h_d$ vs Torch Speed, 40 MoveL', fontsize=32)
                 # Add a legend
                 lines_1, labels_1 = ax1.get_legend_handles_labels()
                 lines_2, labels_2 = ax2.get_legend_handles_labels()
@@ -558,14 +558,14 @@ for dataset in datasets:
     datasets_h_mean[dataset]=np.array(all_h_mean)
     datasets_h_std[dataset]=np.array(all_h_std)
 
-for dataset in datasets:
-    plt.plot(np.arange(len(datasets_h_mean[dataset])),datasets_h_mean[dataset],'-o',label=dataset)
-plt.legend()
-plt.xlabel('Layer')
-plt.ylabel('Mean Height (mm)')
-plt.title("Mean Height")
-plt.tight_layout()
-plt.show()
+# for dataset in datasets:
+#     plt.plot(np.arange(len(datasets_h_mean[dataset])),datasets_h_mean[dataset],'-o',label=dataset)
+# plt.legend()
+# plt.xlabel('Layer')
+# plt.ylabel('Mean Height (mm)')
+# plt.title("Mean Height")
+# plt.tight_layout()
+# plt.show()
 
 legend_fontsize=16
 xlabel_fontsize=20
@@ -574,8 +574,14 @@ yticks_fontsize=xticks_fontsize
 ylabel_fontsize=xlabel_fontsize
 title_fontsize=24
 print("Average/Std of height std")
-for dataset in datasets:
-    plt.plot(np.arange(len(datasets_h_std[dataset])),datasets_h_std[dataset],'-o',label=dataset)
+# for dataset in datasets:
+#     plt.plot(np.arange(len(datasets_h_std[dataset])),datasets_h_std[dataset],'-o',label=dataset)
+#     print(dataset,':',round(np.mean(datasets_h_std[dataset]),5),round(np.std(datasets_h_std[dataset]),5))
+# change line style and markers for different datasets
+line_styles = ['-', '--', '-.', ':']
+line_markers = ['o', 's', 'D', '^']
+for i, dataset in enumerate(datasets):
+    plt.plot(np.arange(len(datasets_h_std[dataset])),datasets_h_std[dataset],label=dataset, linestyle=line_styles[i], marker=line_markers[i])
     print(dataset,':',round(np.mean(datasets_h_std[dataset]),5),round(np.std(datasets_h_std[dataset]),5))
 # plt.axhline(y = 0.48, color = 'r', linestyle = '-')
 # Adjust grid line thickness
@@ -597,14 +603,14 @@ plt.tight_layout()
 plt.show()
 print("==================")
 
-datasets_dh_mean={}
-for dataset in datasets:
-    datasets_dh_mean[dataset] = np.diff(datasets_h_mean[dataset])
-    datasets_dh_mean[dataset] = np.append(datasets_h_mean[dataset][0],datasets_dh_mean[dataset])
-    plt.plot(np.arange(len(datasets_dh_mean[dataset])),datasets_h_std[dataset]/datasets_dh_mean[dataset]*100,'-o',label=dataset)
-plt.legend()
-plt.xlabel('Layer')
-plt.ylabel('Height STD/Mean dh (%)')
-plt.title("Height STD/Mean dh (%)")
-plt.tight_layout()
-plt.show()
+# datasets_dh_mean={}
+# for dataset in datasets:
+#     datasets_dh_mean[dataset] = np.diff(datasets_h_mean[dataset])
+#     datasets_dh_mean[dataset] = np.append(datasets_h_mean[dataset][0],datasets_dh_mean[dataset])
+#     plt.plot(np.arange(len(datasets_dh_mean[dataset])),datasets_h_std[dataset]/datasets_dh_mean[dataset]*100,'-o',label=dataset)
+# plt.legend()
+# plt.xlabel('Layer')
+# plt.ylabel('Height STD/Mean dh (%)')
+# plt.title("Height STD/Mean dh (%)")
+# plt.tight_layout()
+# plt.show()
