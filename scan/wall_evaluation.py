@@ -17,7 +17,7 @@ height_threshold=np.loadtxt(data_dir+'curve_sliced/slice%i_0.csv'%(slicing_meta[
 ###read target points
 target_points_pc=[]
 target_points_pc_temp=[]
-for i in range(1,slicing_meta['num_layers']-70,5):
+for i in range(10,slicing_meta['num_layers']-70,5):
 # for i in range(0,slicing_meta['num_layers']):
     target_points_pc_temp.append(np.loadtxt(data_dir+'curve_sliced/slice'+str(i)+'_0.csv',delimiter=',')[:,:3]-np.array([32.5,0,0]))
 target_points_pc=copy.deepcopy(target_points_pc_temp)
@@ -66,8 +66,8 @@ try:
     print(len(left_indices),len(right_indices))
 
     # o3d.visualization.draw_geometries([scanned_mesh])
-    animation_mesh(scanned_mesh,rotation_angle=np.radians(1),steps=7200,sleep_time=0.01)
-    exit()
+    # animation_mesh(scanned_mesh,rotation_angle=np.radians(1),steps=7200,sleep_time=0.01)
+    # exit()
 
     left_pc = o3d.geometry.PointCloud()
     left_pc.points = o3d.utility.Vector3dVector(scanned_points_tranform[left_indices])
@@ -87,7 +87,7 @@ try:
     o3d.visualization.draw_geometries([target_points,left_pc,right_pc])
     # visualize_pcd([target_points,left_pc,right_pc])
     # o3d.visualization.draw_geometries([scanned_mesh,target_points_transform_pcd])
-    exit()
+    # exit()
 except Exception as e:
     print(e)
 
@@ -211,7 +211,7 @@ error_display_max=3.8
 print(error)
 error_normalized=error/error_display_max
 #convert normalized error map to color heat map
-error_color=cm.jet(error_normalized)[:,:3]
+error_color=cm.plasma(error_normalized)[:,:3]
 # collapsed_surface_pc.colors=o3d.utility.Vector3dVector(error_color)
 target_points_transform_pcd = o3d.geometry.PointCloud()
 target_points_transform_pcd.points = o3d.utility.Vector3dVector(target_points_transform)
@@ -220,7 +220,7 @@ target_points_transform_pcd.colors=o3d.utility.Vector3dVector(error_color)
 
 z_rng = np.arange(error.max(), error.min(), (error.min()-error.max())/100)
 ax = plt.subplot()
-im = ax.imshow(np.vstack((z_rng, z_rng, z_rng, z_rng)).T, extent=(0,  error_display_max/20, 0,error_display_max), cmap='jet')
+im = ax.imshow(np.vstack((z_rng, z_rng, z_rng, z_rng)).T, extent=(0,  error_display_max/20, 0,error_display_max), cmap='plasma')
 plt.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)
 plt.ylabel('error [mm]')
 plt.show()

@@ -98,16 +98,16 @@ R_S1TCP = np.matmul(T_S1TCP_R1Base[:3,:3],path_R)
 build_height_profile=False
 plot_correction=False
 plot_pcd = False
-show_layer = []
-# show_layer = [12]
+# show_layer = []
+show_layer = [12]
 
 x_lower = -99999
 x_upper = 999999
 
-start_id=0
-end_id=-1
+# start_id=0
+# end_id=-1
 
-start_id=75
+start_id=75 # 75 * 0.1 mm = 7.5 mm
 end_id=-75
 
 datasets=['baseline','correction']
@@ -124,7 +124,7 @@ for dataset in datasets:
         data_dir = '../data/wall_weld_test/movelL_200_steel_baseline_weld_scan_2025_01_08_22_08_57/'
     elif dataset=='correction':
         # data_dir = '../data/wall_weld_test/moveL_160_noconstraints_weld_scan_2023_07_05_18_59_53/'
-        data_dir = '../data/wall_weld_test/moveL_100_weld_scan_2023_07_24_11_19_58/'
+        # data_dir = '../data/wall_weld_test/moveL_100_weld_scan_2023_07_24_11_19_58/'
         # data_dir = '../data/wall_weld_test/moveL_100_weld_scan_2023_08_02_15_17_25/'
         data_dir = '../data/wall_weld_test/moveL_200_steel_weld_scan_2025_01_08_23_11_00/'
     elif dataset=='repeat 1':
@@ -325,7 +325,7 @@ for dataset in datasets:
                 plt.xticks(fontsize=26)
                 plt.ylabel("Depoted Height (mm)",fontsize=26)
                 plt.yticks(fontsize=26)
-                plt.title('Deposition Height (mm)',fontsize=32)
+                plt.title('Deposition Height (mm)', fontsize=32)
                 plt.grid(True, linestyle='--', alpha=0.7)  # Optional grid for better readability
                 plt.show()
                 
@@ -345,20 +345,24 @@ for dataset in datasets:
                         plot_vy = np.append(this_weld_v[v_id - 1], np.ones(len(all_profile[v_id][:, 0])) * this_weld_v[v_id])
                         ax2.plot(plot_vx, plot_vy, linewidth=2)  # Thicker line
                 # Customize the axes
-                ax1.set_xlabel('x-axis (mm)', fontsize=26, weight='bold')
-                ax1.tick_params(axis='x', labelsize=22)
-                ax1.set_ylabel(r'Deposition height $\Delta h_d$ (mm)', color='g', fontsize=26, weight='bold')
-                ax1.tick_params(axis='y', labelsize=22, colors='g')
-                ax2.set_ylabel('Torch speed (mm/sec)', color='b', fontsize=26, weight='bold')
-                ax2.tick_params(axis='y', labelsize=22, colors='b')
+                ax1.set_xlabel('x-axis (mm)', fontsize=26)
+                ax1.tick_params(axis='x', labelsize=26)
+                ax1.set_ylabel(r'Deposition height $\Delta h_d$ (mm)', color='g', fontsize=26)
+                ax1.tick_params(axis='y', labelsize=26, colors='g')
+                ax2.set_ylabel('Torch speed (mm/sec)', color='b', fontsize=26)
+                ax2.tick_params(axis='y', labelsize=26, colors='b')
                 # Add a title
-                plt.title(r'Desired Deposition Height $\Delta h_d$ vs Torch Speed, 40 MoveL', fontsize=32, weight='bold')
+                plt.title(r'Desired Deposition Height $\Delta h_d$ vs Torch Speed, 40 MoveL', fontsize=32)
                 # Add a legend
                 lines_1, labels_1 = ax1.get_legend_handles_labels()
                 lines_2, labels_2 = ax2.get_legend_handles_labels()
                 ax1.legend(lines_1 + lines_2, labels_1 + labels_2, loc='upper center', fontsize=22)
                 # Show the plot
-                plt.grid(True, linestyle='--', alpha=0.7)  # Optional grid for better readability
+                ax1.xaxis.grid(True, linestyle='--', alpha=0.7)  # Increase linewidth for thicker grid lines
+                ax1.yaxis.grid(True, linestyle='--', alpha=0.7)  # Increase linewidth for thicker grid lines
+                ax2.xaxis.grid(True, linestyle='--', alpha=0.7)  # Increase linewidth for thicker grid lines
+                ax2.yaxis.grid(True, linestyle='--', alpha=0.7)  # Increase linewidth for thicker grid lines
+                plt.grid(True)  # Optional grid for better readability
                 plt.tight_layout()
                 plt.show()
                 
@@ -507,33 +511,33 @@ for dataset in datasets:
 
         all_h_std.append(np.std(profile_height[start_id:end_id,1]))
 
-    i=0
-    m_size=12
-    # print('all_correction_layer',all_correction_layer)
-    # print('all_profile_height',all_profile_height)
-    for profile_height in all_profile_height:
-        if i in all_correction_layer:
-            if i==all_correction_layer[0]:
-                plt.scatter(profile_height[start_id:end_id,0],profile_height[start_id:end_id,1],s=3,c='tab:green',label='Corrected Layer')
-            else:
-                plt.scatter(profile_height[start_id:end_id,0],profile_height[start_id:end_id,1],s=3,c='tab:green')
-        else:
-            if i==0:
-                # print(profile_height[:10,0])
-                plt.scatter(profile_height[start_id:end_id,0],profile_height[start_id:end_id,1],s=3,c='tab:blue',label='Forward (Right to Left)')
-            elif i==1:
-                plt.scatter(profile_height[start_id:end_id,0],profile_height[start_id:end_id,1],s=3,c='tab:orange',label='Backward (Left to Right)')
-            elif i%2==0:
-                plt.scatter(profile_height[start_id:end_id,0],profile_height[start_id:end_id,1],s=3,c='tab:blue')
-            else:
-                plt.scatter(profile_height[start_id:end_id,0],profile_height[start_id:end_id,1],s=3,c='tab:orange')
-        i+=1
-    plt.xlabel('x-axis')
-    plt.ylabel('z-axis')
-    plt.legend()
-    plt.title("Height Profile")
-    plt.tight_layout()
-    plt.show()
+    # i=0
+    # m_size=12
+    # # print('all_correction_layer',all_correction_layer)
+    # # print('all_profile_height',all_profile_height)
+    # for profile_height in all_profile_height:
+    #     if i in all_correction_layer:
+    #         if i==all_correction_layer[0]:
+    #             plt.scatter(profile_height[start_id:end_id,0],profile_height[start_id:end_id,1],s=3,c='tab:green',label='Corrected Layer')
+    #         else:
+    #             plt.scatter(profile_height[start_id:end_id,0],profile_height[start_id:end_id,1],s=3,c='tab:green')
+    #     else:
+    #         if i==0:
+    #             # print(profile_height[:10,0])
+    #             plt.scatter(profile_height[start_id:end_id,0],profile_height[start_id:end_id,1],s=3,c='tab:blue',label='Forward (Right to Left)')
+    #         elif i==1:
+    #             plt.scatter(profile_height[start_id:end_id,0],profile_height[start_id:end_id,1],s=3,c='tab:orange',label='Backward (Left to Right)')
+    #         elif i%2==0:
+    #             plt.scatter(profile_height[start_id:end_id,0],profile_height[start_id:end_id,1],s=3,c='tab:blue')
+    #         else:
+    #             plt.scatter(profile_height[start_id:end_id,0],profile_height[start_id:end_id,1],s=3,c='tab:orange')
+    #     i+=1
+    # plt.xlabel('x-axis')
+    # plt.ylabel('z-axis')
+    # plt.legend()
+    # plt.title("Height Profile")
+    # plt.tight_layout()
+    # plt.show()
 
     # keep the pcd_wall with points within +- y=10
     # pcd_wall_arr = np.asarray(pcd_wall.points)
@@ -547,45 +551,66 @@ for dataset in datasets:
     #     mesh, densities = o3d.geometry.TriangleMesh.create_from_point_cloud_poisson(
     #         pcd_wall, depth=9)
     #     mesh.compute_vertex_normals()
-    visualize_pcd([pcd_wall])
-    # save pcd to data directory
-    o3d.io.write_point_cloud(data_dir+'pcd_wall.pcd', pcd_wall)
+    # visualize_pcd([pcd_wall])
+    # # save pcd to data directory
+    # o3d.io.write_point_cloud(data_dir+'pcd_wall.pcd', pcd_wall)
 
     datasets_h_mean[dataset]=np.array(all_h_mean)
     datasets_h_std[dataset]=np.array(all_h_std)
 
-for dataset in datasets:
-    plt.plot(np.arange(len(datasets_h_mean[dataset])),datasets_h_mean[dataset],'-o',label=dataset)
-plt.legend()
-plt.xlabel('Layer')
-plt.ylabel('Mean Height (mm)')
-plt.title("Mean Height")
-plt.tight_layout()
-plt.show()
+# for dataset in datasets:
+#     plt.plot(np.arange(len(datasets_h_mean[dataset])),datasets_h_mean[dataset],'-o',label=dataset)
+# plt.legend()
+# plt.xlabel('Layer')
+# plt.ylabel('Mean Height (mm)')
+# plt.title("Mean Height")
+# plt.tight_layout()
+# plt.show()
 
+legend_fontsize=16
+xlabel_fontsize=20
+xticks_fontsize=xlabel_fontsize
+yticks_fontsize=xticks_fontsize
+ylabel_fontsize=xlabel_fontsize
+title_fontsize=24
 print("Average/Std of height std")
-for dataset in datasets:
-    plt.plot(np.arange(len(datasets_h_std[dataset])),datasets_h_std[dataset],'-o',label=dataset)
+# for dataset in datasets:
+#     plt.plot(np.arange(len(datasets_h_std[dataset])),datasets_h_std[dataset],'-o',label=dataset)
+#     print(dataset,':',round(np.mean(datasets_h_std[dataset]),5),round(np.std(datasets_h_std[dataset]),5))
+# change line style and markers for different datasets
+line_styles = ['-', '--', '-.', ':']
+line_markers = ['o', 's', 'D', '^']
+for i, dataset in enumerate(datasets):
+    plt.plot(np.arange(len(datasets_h_std[dataset])),datasets_h_std[dataset],label=dataset, linestyle=line_styles[i], marker=line_markers[i])
     print(dataset,':',round(np.mean(datasets_h_std[dataset]),5),round(np.std(datasets_h_std[dataset]),5))
 # plt.axhline(y = 0.48, color = 'r', linestyle = '-')
-plt.legend(fontsize=12)
-plt.xlabel('Layer',fontsize=15)
-plt.xticks(fontsize=15)
-plt.ylabel('Height STD (mm)',fontsize=15)
-plt.yticks(fontsize=12)
-plt.title("Height STD",fontsize=18)
+# Adjust grid line thickness
+ax = plt.gca()
+ax.xaxis.grid(True, linewidth=1)  # Increase linewidth for thicker grid lines
+ax.yaxis.grid(True, linewidth=1)  # Increase linewidth for thicker grid lines
+plt.grid(True)
+plt.legend(fontsize=legend_fontsize)
+# place legend in the upper center
+# plt.legend(loc='upper center', fontsize=legend_fontsize)
+plt.xlabel('Layer',fontsize=xlabel_fontsize)
+plt.xticks(fontsize=xticks_fontsize)
+plt.ylabel('Height STD (mm)',fontsize=ylabel_fontsize)
+# bottom, top = plt.ylim()
+# plt.ylim(bottom, 0.7)
+plt.yticks(fontsize=yticks_fontsize)
+plt.title("Height STD",fontsize=title_fontsize)
 plt.tight_layout()
 plt.show()
 print("==================")
 
-datasets_dh_mean={}
-for dataset in datasets:
-    datasets_dh_mean[dataset] = np.diff(datasets_h_mean[dataset])
-    datasets_dh_mean[dataset] = np.append(datasets_h_mean[dataset][0],datasets_dh_mean[dataset])
-    plt.plot(np.arange(len(datasets_dh_mean[dataset])),datasets_h_std[dataset]/datasets_dh_mean[dataset]*100,'-o',label=dataset)
-plt.legend()
-plt.xlabel('Layer')
-plt.ylabel('Height STD/Mean dh (%)')
-plt.title("Height STD/Mean dh (%)")
-plt.tight_layout()
-plt.show()
+# datasets_dh_mean={}
+# for dataset in datasets:
+#     datasets_dh_mean[dataset] = np.diff(datasets_h_mean[dataset])
+#     datasets_dh_mean[dataset] = np.append(datasets_h_mean[dataset][0],datasets_dh_mean[dataset])
+#     plt.plot(np.arange(len(datasets_dh_mean[dataset])),datasets_h_std[dataset]/datasets_dh_mean[dataset]*100,'-o',label=dataset)
+# plt.legend()
+# plt.xlabel('Layer')
+# plt.ylabel('Height STD/Mean dh (%)')
+# plt.title("Height STD/Mean dh (%)")
+# plt.tight_layout()
+# plt.show()
