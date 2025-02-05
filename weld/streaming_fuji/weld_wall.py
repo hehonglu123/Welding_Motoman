@@ -2,6 +2,7 @@ import time, os, copy, sys, yaml
 import traceback
 from copy import deepcopy
 import numpy as np
+import datetime
 from motoman_def import *
 from lambda_calc import *
 from RobotRaconteur.Client import *
@@ -14,6 +15,7 @@ from weld_dh2v import *
 def main():
     
     weld_arcon = False
+    fuji_scanon = True
 
     ############## Robot definition ##############
     config_dir='../../config/'
@@ -39,6 +41,16 @@ def main():
         hflags_const = RRN.GetConstants("experimental.fronius", fronius_client)["WelderStateHighFlags"]
         fronius_client.prepare_welder()
     
+    ######################################### RR Fujicam ########################################################
+    if fuji_scanon:
+        fujicam_url = 'rr+tcp://localhost:12181/?service=fujicam'
+        def connect_failed(s, client_id, url, err):
+            print ("Client connect failed: " + str(client_id.NodeID) + " url: " + str(url) + " error: " + str(err))
+        sub=RRN.SubscribeService(fujicam_url)
+        obj = sub.GetDefaultClientWait(2)		#connect, timeout=2s
+        fuji_scan_wire=sub.SubscribeWire("lineProfile")
+        sub.ClientConnectFailed += connect_failed
+    
     ################## Read geometry data ##################
     data_dir = '../../data/wall_weld_test/'
     with open(data_dir+'sliced_meta.yml', 'r') as f:
@@ -51,6 +63,7 @@ def main():
 
     # welding parameters
     base_feedrate = 250
+    base_nom_incre = 1
     base_vel = 5
     layer_feedrate = 100
     layer_nom_height = 2.4
@@ -65,6 +78,11 @@ def main():
     baselayer_end = base_layer_num
     layer_start = 0
     layer_end = layer_num
+    
+    ################## Log data dir ##################
+    current_time = datetime.datetime.now()
+    formatted_time = current_time.strftime('%Y_%m_%d_%H_%M_%S.%f')[:-7]
+    logdata_dir='../../data/wall_weld_test/weld_fujiscan_'+formatted_time+'/'
 
     # get robot 2 resting pose
     q_cur = deepcopy(SS.q_cur)
@@ -74,109 +92,159 @@ def main():
     ################## print base layer ##################
     arc_off=True
     forward = True
-    for i in range(baselayer_start,baselayer_end):
-        try:
-            # read curve joint space data
-            curve = np.loadtxt(data_dir+f'curve_sliced_relative/baselayer{i}_0.csv',delimiter=',')
-            curve_scan = np.loadtxt(data_dir+f'curve_sliced_relative/baselayer{i}_scanOnly.csv',delimiter=',')
-            curve_js = np.loadtxt(data_dir+f'curve_sliced_js/MA2010_base_js{i}_0.csv', delimiter=',')
-            curve_js_scan = np.loadtxt(data_dir+f'curve_sliced_js/MA2010_base_js{i}_scanOnly.csv', delimiter=',')
-            weld_start_js = curve_js[0]
-            weld_end_js = curve_js[-1]
-            min_index = np.argmin(np.linalg.norm(curve_js - curve_js_scan[0], axis=1))
-            if min_index == 0:
-                curve_js = np.vstack((curve_js_scan[::-1],curve_js))
-                curve = np.vstack((curve_scan[::-1],curve))
-            elif min_index == len(curve_js)-1:
-                curve_js = np.vstack((curve_js,curve_js_scan))
-                curve = np.vstack((curve,curve_scan))
-            else:
-                assert False, 'No match found'
-            
-            if not forward:
-                curve_js = curve_js[::-1]
-                curve = curve[::-1]
-                weld_start_dummy = deepcopy(weld_start_js)
-                weld_start_js = deepcopy(weld_end_js)
-                weld_end_js = deepcopy(weld_start_dummy)
-            lam_relative = calc_lam_cs(curve[:,:3])
-            weld_start_idx = np.where(curve_js==weld_start_js)[0][0]
-            weld_end_idx = np.where(curve_js==weld_end_js)[0][0]
-            print(weld_start_idx,weld_end_idx)
-            
-            if input_from_user:
-                print(f"Base layer {i} will be printed. Press enter to continue.")
-                input()
-
-            # move to start point
-            q_start = np.hstack((curve_js[0], r2_q_rest, positioner_joints))
-            SS.jog2q(q_start)
-
-            # start joints recording
-            SS.start_recording()
-            ####### welding motion ##########################
-            v_cmd = base_vel
-            lam_cur=0
-            last_update_time=time.perf_counter()+5.
-            q_cmd_all = []
-            welding_cmd_all = []
-            while lam_cur<lam_relative[-1] - v_cmd/SS.streaming_rate:
-                loop_start=time.perf_counter()
-
-                ### get the next q commands
-                lam_cur+=v_cmd/SS.streaming_rate # get the current lambda (path location)
-                lam_idx=np.where(lam_relative>=lam_cur)[0][0] #get closest two indices and interpolate the joint angle
-                ratio=(lam_cur-lam_relative[lam_idx-1])/(lam_relative[lam_idx]-lam_relative[lam_idx-1])
-                q1=curve_js[lam_idx-1]*(1-ratio)+curve_js[lam_idx]*ratio
-                q_cmd=np.hstack((q1,r2_q_rest,positioner_joints))
-
-                ### if welding start or end
-                if lam_cur >= lam_relative[weld_start_idx] and lam_cur<lam_relative[weld_end_idx] and arc_off:
-                    print("stop for welding start")
-                    time.sleep(1)
-                    if weld_arcon:
-                        print("Welding Start")
-                        fronius_client.job_number = int(layer_feedrate/10+job_offset)
-                        fronius_client.start_weld()
-                    arc_off=False
-                    print("continue welding")
-                if lam_cur >= lam_relative[weld_end_idx] and not arc_off:
-                    if weld_arcon:
-                        print("Welding End")
-                        fronius_client.stop_weld()
-                    arc_off=True
-                    time.sleep(1)
-
-                ###update welding param
-                if time.perf_counter()-last_update_time>1./feedrate_update_rate:
-                    welding_cmd_all.append(np.hstack((time.perf_counter(),i,v_cmd,layer_feedrate)))
-                    ## TODO: update welding params
-                    v_cmd = v_cmd
-                    last_update_time=time.perf_counter()
-
-                ### sent position Command to the robot
-                q_cmd_all.append(np.hstack((time.perf_counter(),i,q_cmd)))
-                if lam_cur>lam_relative[-1]-v_cmd/SS.streaming_rate:
-                    SS.position_cmd(q_cmd)
+    for weld_parts in ['base','layer']:
+    # for weld_parts in ['layer']:
+        if weld_parts == 'base':
+            weld_start = baselayer_start
+            weld_end = baselayer_end
+            nom_incre = base_nom_incre
+            this_layer_feedrate = base_feedrate
+        else:
+            weld_start = layer_start
+            weld_end = layer_end
+            nom_incre = layer_nom_incre
+            this_layer_feedrate = layer_feedrate
+        for i in range(weld_start,weld_end,nom_incre):
+            try:
+                # read curve joint space data
+                if weld_parts == 'base':
+                    curve = np.loadtxt(data_dir+f'curve_sliced_relative/baselayer{i}_0.csv',delimiter=',')
+                    curve_scan = np.loadtxt(data_dir+f'curve_sliced_relative/baselayer{i}_scanOnly.csv',delimiter=',')
+                    curve_js = np.loadtxt(data_dir+f'curve_sliced_js/MA2010_base_js{i}_0.csv', delimiter=',')
+                    curve_js_scan = np.loadtxt(data_dir+f'curve_sliced_js/MA2010_base_js{i}_scanOnly.csv', delimiter=',')
                 else:
-                    SS.position_cmd(q_cmd,loop_start)
+                    curve = np.loadtxt(data_dir+f'curve_sliced_relative/slice{i}_0.csv',delimiter=',')
+                    curve_scan = np.loadtxt(data_dir+f'curve_sliced_relative/slice{i}_scanOnly.csv',delimiter=',')
+                    curve_js = np.loadtxt(data_dir+f'curve_sliced_js/MA2010_js{i}_0.csv', delimiter=',')
+                    curve_js_scan = np.loadtxt(data_dir+f'curve_sliced_js/MA2010_js{i}_scanOnly.csv', delimiter=',')
 
-            ### welding end
-            if weld_arcon:
-                fronius_client.stop_weld()
-            arc_off=True
-            js_recording = SS.stop_recording()
-            ########################################
+                weld_start_js = curve_js[0]
+                weld_end_js = curve_js[-1]
+                min_index = np.argmin(np.linalg.norm(curve_js - curve_js_scan[0], axis=1))
+                if min_index == 0:
+                    curve_js = np.vstack((curve_js_scan[::-1],curve_js))
+                    curve = np.vstack((curve_scan[::-1],curve))
+                elif min_index == len(curve_js)-1:
+                    curve_js = np.vstack((curve_js,curve_js_scan))
+                    curve = np.vstack((curve,curve_scan))
+                else:
+                    assert False, 'No match found'
+                
+                if not forward:
+                    curve_js = curve_js[::-1]
+                    curve = curve[::-1]
+                    weld_start_dummy = deepcopy(weld_start_js)
+                    weld_start_js = deepcopy(weld_end_js)
+                    weld_end_js = deepcopy(weld_start_dummy)
+                lam_relative = calc_lam_cs(curve[:,:3])
+                weld_start_idx = np.where(curve_js==weld_start_js)[0][0]
+                weld_end_idx = np.where(curve_js==weld_end_js)[0][0]
+                print(weld_start_idx,weld_end_idx)
+                
+                if input_from_user:
+                    print(f'Welding {weld_parts} layer {i}')
+                    input()
 
-            ### layer parameters update 
-            forward = not forward
-        except:
-            traceback.print_exc()
-            if weld_arcon:
-                fronius_client.stop_weld()
-                fronius_client.release_welder()
-            SS.deinitialize_robot()
-            break
+                # move to start point
+                q_start = np.hstack((curve_js[0], r2_q_rest, positioner_joints))
+                SS.jog2q(q_start)
+
+                # start joints recording
+                SS.start_recording()
+                ####### welding motion ##########################
+                v_cmd = base_vel
+                lam_cur=0
+                last_update_time=time.perf_counter()+5.
+                q_cmd_all = []
+                welding_cmd_all = []
+                weld_js_exe = []
+                scan_exe = []
+                stamps_exe = []
+                while lam_cur<lam_relative[-1] - v_cmd/SS.streaming_rate:
+                    loop_start=time.perf_counter()
+
+                    ### get the next q commands
+                    lam_cur+=v_cmd/SS.streaming_rate # get the current lambda (path location)
+                    lam_idx=np.where(lam_relative>=lam_cur)[0][0] #get closest two indices and interpolate the joint angle
+                    ratio=(lam_cur-lam_relative[lam_idx-1])/(lam_relative[lam_idx]-lam_relative[lam_idx-1])
+                    q1=curve_js[lam_idx-1]*(1-ratio)+curve_js[lam_idx]*ratio
+                    q_cmd=np.hstack((q1,r2_q_rest,positioner_joints))
+
+                    ### if welding start or end
+                    if lam_cur >= lam_relative[weld_start_idx] and lam_cur<lam_relative[weld_end_idx] and arc_off:
+                        print("stop for welding start")
+                        time.sleep(1)
+                        if weld_arcon:
+                            print("Welding Start")
+                            fronius_client.job_number = int(this_layer_feedrate/10+job_offset)
+                            fronius_client.start_weld()
+                        arc_off=False
+                        print("continue welding")
+                    if lam_cur >= lam_relative[weld_end_idx] and not arc_off:
+                        if weld_arcon:
+                            print("Welding End")
+                            fronius_client.stop_weld()
+                        arc_off=True
+                        time.sleep(1)
+
+                    ###update welding param
+                    if time.perf_counter()-last_update_time>1./feedrate_update_rate:
+                        welding_cmd_all.append(np.hstack((time.perf_counter(),i,v_cmd,this_layer_feedrate)))
+                        ## TODO: update welding params
+                        v_cmd = v_cmd
+                        last_update_time=time.perf_counter()
+                    
+                    ### log data
+                    weld_js_exe.append(deepcopy(SS.q_cur)) # log robot joints
+                    if fuji_scanon:
+                        wire_packet=fuji_scan_wire.TryGetInValue() # log fuji cam scanner data
+                        valid_indices=np.where(wire_packet[1].I_data>1)[0]
+                        valid_indices=np.intersect1d(valid_indices,np.where(np.abs(wire_packet[1].Z_data)>50)[0])
+                        line_profile=np.hstack((wire_packet[1].Y_data[valid_indices].reshape(-1,1),wire_packet[1].Z_data[valid_indices].reshape(-1,1)))
+                        scan_exe.append(line_profile)
+                    stamps_exe.append(time.perf_counter()) # log time stamps
+
+                    ### sent position Command to the robot
+                    q_cmd_all.append(np.hstack((time.perf_counter(),i,q_cmd)))
+                    if lam_cur>lam_relative[-1]-v_cmd/SS.streaming_rate:
+                        SS.position_cmd(q_cmd)
+                    else:
+                        SS.position_cmd(q_cmd,loop_start)
+
+                ### welding end
+                if weld_arcon:
+                    fronius_client.stop_weld()
+                arc_off=True
+                js_recording = SS.stop_recording()
+                ########################################
+
+                ### save data
+                if not os.path.exists(logdata_dir):
+                    os.makedirs(logdata_dir)
+                if weld_parts == 'base':
+                    np.savetxt(logdata_dir+f'baselayer{i}_timestamps_exe.csv', stamps_exe, delimiter=',')
+                    np.savetxt(logdata_dir+f'baselayer{i}_weld_js_exe.csv', weld_js_exe, delimiter=',')
+                    np.savetxt(logdata_dir+f'baselayer{i}_weld_cmd.csv', welding_cmd_all, delimiter=',')
+                    np.savetxt(logdata_dir+f'baselayer{i}_weld_js_recording.csv', js_recording, delimiter=',')
+                    if fuji_scanon:
+                        np.savetxt(logdata_dir+f'baselayer{i}_scan_exe.csv', scan_exe, delimiter=',')
+                else:
+                    np.savetxt(logdata_dir+f'layer{i}_timestamps_exe.csv', stamps_exe, delimiter=',')
+                    np.savetxt(logdata_dir+f'layer{i}_weld_js_exe.csv', weld_js_exe, delimiter=',')
+                    np.savetxt(logdata_dir+f'layer{i}_weld_cmd.csv', welding_cmd_all, delimiter=',')
+                    np.savetxt(logdata_dir+f'layer{i}_weld_js_recording.csv', js_recording, delimiter=',')
+                    if fuji_scanon:
+                        np.savetxt(logdata_dir+f'layer{i}_scan_exe.csv', scan_exe, delimiter=',')
+
+                ### layer parameters update 
+                forward = not forward
+            except:
+                traceback.print_exc()
+                if weld_arcon:
+                    fronius_client.stop_weld()
+                    fronius_client.release_welder()
+                SS.deinitialize_robot()
+                break
     
     if weld_arcon:
         fronius_client.stop_weld()
