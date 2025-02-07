@@ -179,6 +179,8 @@ class ScanProcess():
             if scanner=='mti':
                 scan_points = np.insert(scan_points,1,np.zeros(len(scan_points[0])),axis=0)
                 scan_points[0]=scan_points[0]*-1 # reversed x-axis
+            elif scanner=='fuji':
+                scan_points = np.insert(scan_points,0,np.zeros(len(scan_points[0])),axis=0)
             else:
                 scan_points = np.insert(scan_points,0,np.zeros(len(scan_points[0])),axis=0)
             

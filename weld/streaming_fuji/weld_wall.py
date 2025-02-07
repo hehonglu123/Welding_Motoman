@@ -1,4 +1,4 @@
-import time, os, copy, sys, yaml
+import time, os, copy, sys, yaml, pathlib
 import traceback
 from copy import deepcopy
 import numpy as np
@@ -14,7 +14,7 @@ from weld_dh2v import *
 
 def main():
     
-    weld_arcon = False
+    weld_arcon = True
     fuji_scanon = True
 
     ############## Robot definition ##############
@@ -37,7 +37,13 @@ def main():
     ########################################################RR FRONIUS########################################################
     if weld_arcon:
         fronius_sub=RRN.SubscribeService('rr+tcp://192.168.55.21:60823?service=welder')
-        fronius_client = fronius_sub.GetDefaultClientWait(1)      #connect, timeout=30s
+        try:
+            fronius_client = fronius_sub.GetDefaultClientWait(1)      #connect, timeout=30s
+        except:
+            print("Fronius connection failed")
+            traceback.print_exc()
+            SS.deinitialize_robot()
+            exit()
         hflags_const = RRN.GetConstants("experimental.fronius", fronius_client)["WelderStateHighFlags"]
         fronius_client.prepare_welder()
     
@@ -61,14 +67,16 @@ def main():
     layer_num = meta_data['layer_num']
     layer_resolution = meta_data['layer_resolution']
 
-    # welding parameters
+    job_offset=200
+    # baselayer welding parameters
     base_feedrate = 250
     base_nom_incre = 1
     base_vel = 5
+    # layer welding parameters
     layer_feedrate = 100
-    layer_nom_height = 2.4
+    layer_nom_height = 2
+    layer_vel = 5
     layer_nom_incre = int(layer_nom_height/layer_resolution)
-    job_offset=200
 
     feedrate_update_rate=1.	#Hz
     input_from_user = True
@@ -98,11 +106,13 @@ def main():
             weld_start = baselayer_start
             weld_end = baselayer_end
             nom_incre = base_nom_incre
+            v_cmd = base_vel
             this_layer_feedrate = base_feedrate
         else:
             weld_start = layer_start
             weld_end = layer_end
             nom_incre = layer_nom_incre
+            v_cmd = layer_vel
             this_layer_feedrate = layer_feedrate
         for i in range(weld_start,weld_end,nom_incre):
             try:
@@ -139,11 +149,12 @@ def main():
                 lam_relative = calc_lam_cs(curve[:,:3])
                 weld_start_idx = np.where(curve_js==weld_start_js)[0][0]
                 weld_end_idx = np.where(curve_js==weld_end_js)[0][0]
-                print(weld_start_idx,weld_end_idx)
+                # print(weld_start_idx,weld_end_idx)
                 
                 if input_from_user:
                     print(f'Welding {weld_parts} layer {i}')
-                    input()
+                    time.sleep(1)
+                    # input("Press Enter to continue...")
 
                 # move to start point
                 q_start = np.hstack((curve_js[0], r2_q_rest, positioner_joints))
@@ -152,7 +163,6 @@ def main():
                 # start joints recording
                 SS.start_recording()
                 ####### welding motion ##########################
-                v_cmd = base_vel
                 lam_cur=0
                 last_update_time=time.perf_counter()+5.
                 q_cmd_all = []
@@ -181,6 +191,7 @@ def main():
                         arc_off=False
                         print("continue welding")
                     if lam_cur >= lam_relative[weld_end_idx] and not arc_off:
+                        print("stop for welding end")
                         if weld_arcon:
                             print("Welding End")
                             fronius_client.stop_weld()
@@ -222,19 +233,25 @@ def main():
                 if not os.path.exists(logdata_dir):
                     os.makedirs(logdata_dir)
                 if weld_parts == 'base':
-                    np.savetxt(logdata_dir+f'baselayer{i}_timestamps_exe.csv', stamps_exe, delimiter=',')
-                    np.savetxt(logdata_dir+f'baselayer{i}_weld_js_exe.csv', weld_js_exe, delimiter=',')
-                    np.savetxt(logdata_dir+f'baselayer{i}_weld_cmd.csv', welding_cmd_all, delimiter=',')
-                    np.savetxt(logdata_dir+f'baselayer{i}_weld_js_recording.csv', js_recording, delimiter=',')
+                    layer_name = 'baselayer'+str(i)
+                    pathlib.Path(logdata_dir+layer_name).mkdir(parents=True, exist_ok=True)
+                    np.savetxt(logdata_dir+layer_name+f'/baselayer{i}_timestamps_exe.csv', stamps_exe, delimiter=',')
+                    np.savetxt(logdata_dir+layer_name+f'/baselayer{i}_weld_js_exe.csv', weld_js_exe, delimiter=',')
+                    np.savetxt(logdata_dir+layer_name+f'/baselayer{i}_weld_cmd.csv', welding_cmd_all, delimiter=',')
+                    np.savetxt(logdata_dir+layer_name+f'/baselayer{i}_weld_js_recording.csv', js_recording, delimiter=',')
                     if fuji_scanon:
-                        np.savetxt(logdata_dir+f'baselayer{i}_scan_exe.csv', scan_exe, delimiter=',')
+                        with open(logdata_dir+layer_name+f'/baselayer{i}_scan_exe.pickle', 'wb') as file:
+                            pickle.dump(scan_exe, file)
                 else:
-                    np.savetxt(logdata_dir+f'layer{i}_timestamps_exe.csv', stamps_exe, delimiter=',')
-                    np.savetxt(logdata_dir+f'layer{i}_weld_js_exe.csv', weld_js_exe, delimiter=',')
-                    np.savetxt(logdata_dir+f'layer{i}_weld_cmd.csv', welding_cmd_all, delimiter=',')
-                    np.savetxt(logdata_dir+f'layer{i}_weld_js_recording.csv', js_recording, delimiter=',')
+                    layer_name = 'layer'+str(i)
+                    pathlib.Path(logdata_dir+layer_name).mkdir(parents=True, exist_ok=True)
+                    np.savetxt(logdata_dir+layer_name+f'/layer{i}_timestamps_exe.csv', stamps_exe, delimiter=',')
+                    np.savetxt(logdata_dir+layer_name+f'/layer{i}_weld_js_exe.csv', weld_js_exe, delimiter=',')
+                    np.savetxt(logdata_dir+layer_name+f'/layer{i}_weld_cmd.csv', welding_cmd_all, delimiter=',')
+                    np.savetxt(logdata_dir+layer_name+f'/layer{i}_weld_js_recording.csv', js_recording, delimiter=',')
                     if fuji_scanon:
-                        np.savetxt(logdata_dir+f'layer{i}_scan_exe.csv', scan_exe, delimiter=',')
+                        with open(logdata_dir+layer_name+f'/layer{i}_scan_exe.pickle', 'wb') as file:
+                            pickle.dump(scan_exe, file)
 
                 ### layer parameters update 
                 forward = not forward
