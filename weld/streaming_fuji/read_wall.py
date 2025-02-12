@@ -36,7 +36,7 @@ def main():
 
     logdata_dir = data_dir+'weld_fujiscan_2025_02_07_13_43_40/'
 
-    for weld_parts in ['base','layer']:
+    for weld_parts in ['layer']:
         if weld_parts == 'base':
             total_layers_name = glob.glob(logdata_dir+'baselayer*')
         else:
@@ -46,7 +46,9 @@ def main():
         for layer_name in total_layers_name:
             this_layer = layer_name.split('\\')[-1]
             this_layer = this_layer.split('r')[-1]
-            layer_nums.append(int(this_layer[-1]))
+            layer_nums.append(int(this_layer))
+
+        print('Layer numbers:',layer_nums)
 
         # build layers from bottom to top by layers
         Transz0_H = None
@@ -87,9 +89,9 @@ def main():
             print(z_height_start)
             crop_extend=10
             crop_min=(curve_x_end-crop_extend,-30,-30)
-            crop_max=(curve_x_start+crop_extend,30,z_height_start+5)
+            crop_max=(curve_x_start+crop_extend,30,z_height_start+8)
             crop_h_min=(curve_x_end-crop_extend,-20,-30)
-            crop_h_max=(curve_x_start+crop_extend,20,z_height_start+5)
+            crop_h_max=(curve_x_start+crop_extend,20,z_height_start+8)
             pcd = scan_process.pcd_noise_remove(pcd,nb_neighbors=40,std_ratio=1.5,\
                                                 min_bound=crop_min,max_bound=crop_max,cluster_based_outlier_remove=True,cluster_neighbor=1,min_points=100)
             profile_height,Transz0_H = scan_process.pcd2height(deepcopy(pcd),z_height_start,bbox_min=crop_h_min,bbox_max=crop_h_max,Transz0_H=Transz0_H)
