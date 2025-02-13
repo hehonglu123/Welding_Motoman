@@ -16,6 +16,7 @@ def main():
     
     weld_arcon = True
     fuji_scanon = True
+    input_from_user = False
 
     ############## Robot definition ##############
     config_dir='../../config/'
@@ -79,7 +80,6 @@ def main():
     layer_nom_incre = int(layer_nom_height/layer_resolution)
 
     feedrate_update_rate=1.	#Hz
-    input_from_user = True
 
     # start-end layers
     baselayer_start = 0
@@ -91,6 +91,11 @@ def main():
     current_time = datetime.datetime.now()
     formatted_time = current_time.strftime('%Y_%m_%d_%H_%M_%S.%f')[:-7]
     logdata_dir='../../data/wall_weld_test/weld_fujiscan_'+formatted_time+'/'
+
+    weld_meta_data = {'well_arcon':weld_arcon, 'fuji_scanon':fuji_scanon, 'data_dir':data_dir, 'logdata_dir':logdata_dir\
+        ,'base_layer_num':base_layer_num, 'baselayer_resolution':baselayer_resolution, 'layer_num':layer_num, 'layer_resolution':layer_resolution\
+        ,'base_feedrate':base_feedrate, 'base_nom_incre':base_nom_incre, 'base_vel':base_vel\
+        , 'layer_feedrate':layer_feedrate, 'layer_nom_incre':layer_nom_incre, 'layer_vel':layer_vel}
 
     # get robot 2 resting pose
     q_cur = deepcopy(SS.q_cur)
@@ -151,14 +156,24 @@ def main():
                 weld_end_idx = np.where(curve_js==weld_end_js)[0][0]
                 # print(weld_start_idx,weld_end_idx)
                 
+                print(f'Welding {weld_parts} layer {i}')
                 if input_from_user:
-                    print(f'Welding {weld_parts} layer {i}')
+                    input("Press Enter to continue...")
+                else:
                     time.sleep(1)
-                    # input("Press Enter to continue...")
 
+                # move to start point with z +50
+                z_offset = 35 # mm
+                for z in np.arange(z_offset,0,-5): # a linear movement
+                    T_start = robot.fwd(curve_js[0])
+                    T_start.p[2] += z
+                    curve_js_start_offset = robot.inv(T_start.p, T_start.R, last_joints=curve_js[0])[0]
+                    q_start_offset = np.hstack((curve_js_start_offset, r2_q_rest, positioner_joints))
+                    SS.jog2q(q_start_offset)
                 # move to start point
                 q_start = np.hstack((curve_js[0], r2_q_rest, positioner_joints))
                 SS.jog2q(q_start)
+                time.sleep(0.3)
 
                 # start joints recording
                 SS.start_recording()
@@ -229,9 +244,22 @@ def main():
                 js_recording = SS.stop_recording()
                 ########################################
 
+                # move to end point with z +50
+                time.sleep(0.3)
+                z_offset = 35 # mm
+                for z in np.arange(0,z_offset+1,5): # a linear movement
+                    T_end = robot.fwd(curve_js[-1])
+                    T_end.p[2] += z
+                    curve_js_end_offset = robot.inv(T_end.p, T_end.R, last_joints=curve_js[-1])[0]
+                    q_end_offset = np.hstack((curve_js_end_offset, r2_q_rest, positioner_joints))
+                    SS.jog2q(q_end_offset)
+
                 ### save data
                 if not os.path.exists(logdata_dir):
                     os.makedirs(logdata_dir)
+                # save meta data
+                with open(logdata_dir+'weld_meta_data.yml', 'w') as f:
+                    yaml.dump(weld_meta_data, f)
                 if weld_parts == 'base':
                     layer_name = 'baselayer'+str(i)
                     pathlib.Path(logdata_dir+layer_name).mkdir(parents=True, exist_ok=True)

@@ -17,7 +17,7 @@ def main():
     config_dir='../../config/'
     robot=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path=config_dir+'torch.csv',\
 		pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',d=15)
-    robot_scan=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path=config_dir+'fujicam.csv',\
+    robot_scan=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path=config_dir+'fujicam_old.csv',\
     pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv')
     positioner=positioner_obj('D500B',def_path=config_dir+'D500B_robot_extended_config.yml',tool_file_path=config_dir+'positioner_tcp.csv',\
 		pulse2deg_file_path=config_dir+'D500B_pulse2deg_real.csv',base_transformation_file=config_dir+'D500B_pose.csv')
@@ -36,7 +36,7 @@ def main():
 
     logdata_dir = data_dir+'weld_fujiscan_2025_02_07_13_43_40/'
 
-    for weld_parts in ['layer']:
+    for weld_parts in ['base','layer']:
         if weld_parts == 'base':
             total_layers_name = glob.glob(logdata_dir+'baselayer*')
         else:
