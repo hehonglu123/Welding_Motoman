@@ -766,4 +766,4 @@ class ScanProcess():
         # plt.ylim((0,120))
         # plt.show()
 
-        return delta_h,point_location
+        return delta_h,point_location,mti_pcd_noise_remove
