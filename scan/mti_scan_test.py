@@ -6,9 +6,7 @@ from motoman_def import *
 from WeldSend import *
 import open3d as o3d
 
-## rr drivers and all other drivers
-robot_client=MotionProgramExecClient()
-ws=WeldSend(robot_client)
+############## Single scan test ################
 
 # MTI connect to RR
 mti_client = RRN.ConnectService("rr+tcp://192.168.55.10:60830/?service=MTI2D")
@@ -23,6 +21,12 @@ plt.plot(line_scan[0],line_scan[1])
 plt.xlabel('X (mm)')
 plt.ylabel('Z (mm)')
 plt.show()
+
+############## Continuous scan test using robot motion ################
+
+## rr drivers and all other drivers
+robot_client=MotionProgramExecClient()
+ws=WeldSend(robot_client)
 
 config_dir='../config/'
 robot_scan=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.yml',tool_file_path=config_dir+'mti_tuned0719.csv',\
@@ -39,11 +43,13 @@ mp = MotionProgram(ROBOT_CHOICE='RB2',ROBOT_CHOICE2='ST1',pulse2deg=robot_scan.p
 # calibration motion
 target2=['MOVJ',np.array([-15,0]),10]
 
+# motion program
 starting_q = np.radians([24.9,33.8,-22,0,-34.8,3])
 ending_q = np.radians([25.0,37.45,-16,0,-37.2,3])
 mp.MoveL(np.degrees(starting_q), 50, 0, target2=target2)
 mp.MoveL(np.degrees(ending_q), scan_speed, 0, target2=target2)
 
+# execute motion program
 ws.client.execute_motion_program_nonblocking(mp)
 ###streaming
 ws.client.StartStreaming()

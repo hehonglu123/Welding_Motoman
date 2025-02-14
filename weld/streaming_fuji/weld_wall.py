@@ -14,9 +14,9 @@ from weld_dh2v import *
 
 def main():
     
-    weld_arcon = True
+    weld_arcon = False
     fuji_scanon = True
-    input_from_user = False
+    input_from_user = True
 
     ############## Robot definition ##############
     config_dir='../../config/'
@@ -102,11 +102,11 @@ def main():
     r2_q_rest = q_cur[6:12]
     print("Robot 2 resting pose: ", np.degrees(r2_q_rest))
 
-    ################## print base layer ##################
+    ################## print layers ##################
     arc_off=True
     forward = True
-    for weld_parts in ['base','layer']:
-    # for weld_parts in ['layer']:
+    # for weld_parts in ['base','layer']:
+    for weld_parts in ['layer']:
         if weld_parts == 'base':
             weld_start = baselayer_start
             weld_end = baselayer_end
@@ -114,7 +114,7 @@ def main():
             v_cmd = base_vel
             this_layer_feedrate = base_feedrate
         else:
-            weld_start = layer_start
+            weld_start = 20
             weld_end = layer_end
             nom_incre = layer_nom_incre
             v_cmd = layer_vel
