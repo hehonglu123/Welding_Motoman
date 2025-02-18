@@ -22,7 +22,7 @@ def main():
     positioner=positioner_obj('D500B',def_path=config_dir+'D500B_robot_extended_config.yml',tool_file_path=config_dir+'positioner_tcp.csv',\
 		pulse2deg_file_path=config_dir+'D500B_pulse2deg_real.csv',base_transformation_file=config_dir+'D500B_pose.csv')
 
-    positioner_joints = np.radians([-15,180])
+    # positioner_joints = np.radians([-15,180])
 
     ################## Read geometry data ##################
     data_dir = '../../data/wall_weld_test/'

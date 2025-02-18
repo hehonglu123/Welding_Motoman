@@ -7,8 +7,8 @@ baselayer_length = 120
 layer_length = 110
 baselayernum = 2
 baselayer_resolution = 2.75
-layer_resolution = 1
-layer_num = 44
+layer_resolution = 0.1
+layer_num = 440
 path_dl = 0.025
 
 positioner_joints = np.radians([-15,180])
@@ -18,7 +18,7 @@ with open('sliced_meta.yml', 'w') as file:
     meta = {
         'baselayer_length': baselayer_length,
         'layer_length': layer_length,
-        'baselayernum': baselayernum,
+        'baselayer_num': baselayernum,
         'baselayer_resolution': baselayer_resolution,
         'layer_resolution': layer_resolution,
         'layer_num': layer_num,
@@ -52,6 +52,8 @@ for n in range(layer_num):
     layer[:, 3:] = np.array([0, 0, -1])
     np.savetxt(data_dir+f"slice{n}_0.csv", layer, delimiter=",")
     curve_layers.append(layer)
+
+exit()
 
 ##### generate robot js ######
 Path('curve_sliced_js').mkdir(parents=True, exist_ok=True)
