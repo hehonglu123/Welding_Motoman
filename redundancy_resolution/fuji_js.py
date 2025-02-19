@@ -2,16 +2,33 @@ from copy import deepcopy
 import numpy as np
 import yaml
 from pathlib import Path
+from matplotlib import pyplot as plt
 from motoman_def import *
 from redundancy_resolution_dual import *
 
+def get_scanner_ori(Rz_vec, Rx_vec):
+    Rz_vec = Rz_vec/np.linalg.norm(Rz_vec)
+    Rx_vec = Rx_vec/np.linalg.norm(Rx_vec)
+    Rx_vec = Rx_vec - np.dot(Rx_vec,Rz_vec)*Rz_vec
+    Rx_vec = Rx_vec/np.linalg.norm(Rx_vec)
+    Ry_vec = np.cross(Rz_vec,Rx_vec) # right hand rule
+    return np.array([Rx_vec,Ry_vec,Rz_vec]).T
+
 def get_torch_scanner_ori(Rz_vec, layer_weld_scan_vec, rotate_y_direction):
-    Ry_vec = rot(Rz_vec, rotate_y_direction)@layer_weld_scan_vec
+    Rz_vec = Rz_vec/np.linalg.norm(Rz_vec)
+    Ry_vec = -rot(Rz_vec, rotate_y_direction)@layer_weld_scan_vec
     Ry_vec = Ry_vec/np.linalg.norm(Ry_vec)
     Ry_vec = Ry_vec - np.dot(Ry_vec,Rz_vec)*Rz_vec
     Ry_vec = Ry_vec/np.linalg.norm(Ry_vec)
     Rx_vec = np.cross(Ry_vec,Rz_vec) # right hand rule
     return np.array([Rx_vec,Ry_vec,Rz_vec]).T
+
+def get_robot_init_from_positioner(robot,positioner,q_positioner,position,orientation,zero_config=np.zeros(6)):
+    T_start = Transform(orientation,position) # starting transfomation in the positioner tip frame
+    T_positioner_start = positioner.fwd(q_positioner,world=True) # positioner starting transformation in the world frame
+    T_start_robot = T_positioner_start*T_start # starting transformation in the robot base frame
+    q_init=robot.inv(T_start_robot.p,T_start_robot.R,zero_config)[0]
+    return q_init
 
 def main():
 
@@ -41,6 +58,7 @@ def main():
     weld_scan_vec = T_weld_scan.p/np.linalg.norm(T_weld_scan.p)
     rotate_y_direction = subproblem1(weld_scan_vec, np.array([0,1,0]), np.array([0,0,1]))
     dist_weld_scan = np.linalg.norm(T_weld_scan.p)
+    torch_z_shift = np.dot(T_weld_scan.p,T_weld_scan.R[:3,2])
 
     ## planning parameters
     R1_w = 0.01
@@ -54,6 +72,7 @@ def main():
     with open(data_dir+'sliced_meta.yml', 'r') as f:
         meta_data = yaml.safe_load(f)
     path_dl = meta_data['path_dl']
+    dist_weld_scan_index = np.round(dist_weld_scan/path_dl).astype(int)
 
     layers_name = ['baselayer','layer']
     for layer_name in layers_name:
@@ -72,73 +91,84 @@ def main():
             # positioner is always at [-15, *]
             po_lower_limit = deepcopy(positioner.lower_limit)
             po_upper_limit = deepcopy(positioner.upper_limit)
-            po_lower_limit[0] = np.radians(-15-0.001)
-            po_upper_limit[0] = np.radians(-15+0.001)
+            po_lower_limit = np.radians([-15-0.01,-180])
+            po_upper_limit = np.radians([-15+0.01,0])
             positioner.lower_limit = po_lower_limit
             positioner.robot.joint_lower_limit = po_lower_limit
             positioner.upper_limit = po_upper_limit
             positioner.robot.joint_upper_limit = po_upper_limit
             
             ##### generate robot js ######
-            ### forward case (+x direction)
-            ## get the first point where both the torch and scanner are on the layer
-            layer_weld_scan_vec = curve[dist_weld_scan_index,:3]-curve[0,:3]
-            orientation_start = get_torch_scanner_ori(curve[dist_weld_scan_index,3:], layer_weld_scan_vec, rotate_y_direction)
-            positioner_j2_start = -1*(np.radians(180)-np.arctan2(curve[dist_weld_scan_index,1],curve[dist_weld_scan_index,0]))
-            ## solve ik when the scanner is NOT on the layer yet
-            curve_part = deepcopy(curve[:dist_weld_scan_index+1])
-            curve_part = curve_part[::-1]
-            rrd=redundancy_resolution_dual(robot_weld,positioner,curve_part[:,:3],curve_part[:,3:])
-            q_init_table = np.radians([-15, positioner_j2_start])
-            T_start = Transform(orientation_start,curve_part[0,:3]) # starting transfomation in the positioner tip frame
-            T_positioner_start = positioner.fwd(np.radians([-15, positioner_j2_start]),world=True) # positioner starting transformation in the world frame
-            T_start_robot = T_positioner_start*T_start # starting transformation in the robot base frame
-            q_init=robot_weld.inv(T_start_robot.p,T_start_robot.R,zero_config)[0]
-            q_out1, q_out2 = rrd.dual_arm_5dof_stepwise(q_init,q_init_table,w1=R1_w,w2=R2_w)
-            ## solve ik then the torch and scanner is both on the layer
+            for cases in ['forward','backward']:
+                ### forward case (+x direction)
+                ### backward case (-x direction)
+                if cases == 'backward':
+                    curve = curve[::-1]
 
-
-            ## get orientation (R) for curve using scanner position
-            curve_R = []
-            for i in range(len(curve)):
-                dist_weld_scan_index = np.round(dist_weld_scan/path_dl).astype(int)
-                
-
-
-
-
-                # get Rz vector
-                Rz_vec = curve[i,3:]
-                Rz_vec = Rz_vec/np.linalg.norm(Rz_vec)
-                # get Ry vector by using scanner position
-                
-                if lead_lag_flag==0:
-                    if dist_weld_scan_index+i<len(curve):
-                        layer_weld_scan_vec = curve[dist_weld_scan_index+i,:3]-curve[i,:3]
-                    else:
-                        if i!=len(curve)-1:
-                            layer_weld_scan_vec = curve[-1,:3]-curve[i,:3]
-                        else:
-                            layer_weld_scan_vec = curve[-1,:3]-curve[-2,:3]
+                rWeld_js = []
+                positioner_js = []
+                ## get the first point where both the torch and scanner are on the layer
+                layer_weld_scan_vec = curve[dist_weld_scan_index,:3]-curve[0,:3]
+                orientation_start = get_torch_scanner_ori(curve[dist_weld_scan_index,3:], layer_weld_scan_vec, rotate_y_direction)
+                if cases == 'forward':
+                    positioner_j2_start = np.degrees(-1*(np.radians(180)-np.arctan2(curve[dist_weld_scan_index,1],curve[dist_weld_scan_index,0])))
                 else:
-                    if i-dist_weld_scan_index>=0:
-                        layer_weld_scan_vec = curve[i-dist_weld_scan_index,:3]-curve[i,:3]
-                    else:
-                        if i!=0:
-                            layer_weld_scan_vec = curve[0,:3]-curve[i,:3]
-                        else:
-                            layer_weld_scan_vec = curve[1,:3]-curve[0,:3]
-                
-                curve_R.append(np.vstack((Rx_vec,Ry_vec,Rz_vec)).T)
-            ## solve ik
-            rrd=redundancy_resolution_dual(robot_weld,positioner,curve[:,:3],curve_R)
-            q_init_table = np.radians([-15, 270])
-            q_init=robot_weld.inv(scan_p_R2Base[0],scan_R_R2Base[0],zero_config)[0]
-            q_out1, q_out2 = rrd.dual_arm_6dof_stepwise(q_init,q_init_table,w1=R1_w,w2=R2_w)
+                    positioner_j2_start = -90
+                ## solve ik when the scanner is NOT on the layer yet
+                curve_part = deepcopy(curve[:dist_weld_scan_index+1])
+                curve_part = curve_part[::-1]
+                rrd=redundancy_resolution_dual(robot_weld,positioner,curve_part[:,:3],curve_part[:,3:])
+                q_init_table = np.radians([-15, positioner_j2_start])
+                q_init = get_robot_init_from_positioner(robot_weld,positioner,q_init_table,curve_part[0,:3],orientation_start,zero_config=zero_config)
+                q_out1, q_out2 = rrd.dual_arm_5dof_stepwise(q_init,q_init_table,w1=R1_w,w2=R2_w)
+                rWeld_js.extend(q_out1[::-1])
+                positioner_js.extend(q_out2[::-1])
+                ## solve ik when the torch and scanner is both on the layer
+                # get orientation (R) for curve using scanner position
+                curve_R = []
+                for i in range(dist_weld_scan_index+1,len(curve)):
+                    curve_R.append(get_torch_scanner_ori(curve[i,3:], layer_weld_scan_vec, rotate_y_direction))
+                assert len(curve[dist_weld_scan_index+1:,:3]) == len(curve_R), 'curve and curve_R length mismatched'
+                rrd=redundancy_resolution_dual(robot_weld,positioner,curve[dist_weld_scan_index+1:,:3],curve_R)
+                q_init_table = positioner_js[-1]
+                q_init = rWeld_js[-1]
+                q_out1, q_out2 = rrd.dual_arm_6dof_stepwise(q_init,q_init_table,w1=R1_w,w2=R2_w)
+                rWeld_js.extend(q_out1)
+                positioner_js.extend(q_out2)
+                ## solve ik when the torch is NOT on the layer (leaving the layer)
+                curve_part = deepcopy(curve[-dist_weld_scan_index-1:])
+                # get orientation using scanner orientation
+                T_robot = robot_scan_motion.fwd(rWeld_js[-1],world=True)
+                T_positioner = positioner.fwd(positioner_js[-1],world=True)
+                T_robot_positioner = T_positioner.inv()*T_robot
+                curve_R_start = T_robot_positioner.R # starting scanner orientation in the positioner tip frame
+                curve_R_final = np.array([[-1,0,0],\
+                                        [0,-1,0],\
+                                        [0,0,1]]) # target ending scanner orientation in the positioner tip frame
+                rot_k, rot_theta = R2rot(curve_R_start.T@curve_R_final)
+                curve_R = []
+                for i in range(1,len(curve_part)):
+                    curve_R.append(curve_R_start@rot(rot_k,rot_theta*i/(len(curve_part)-1)))
+                    curve_part[i,2] = curve_part[i,2] + torch_z_shift*(i/(len(curve_part)-1))
+                curve_part = curve_part[1:]
+                assert len(curve_part) == len(curve_R), 'curve and curve_R length mismatched'
+                rrd=redundancy_resolution_dual(robot_scan_motion,positioner,curve_part[:,:3],curve_R)
+                q_init_table = positioner_js[-1]
+                q_init = rWeld_js[-1]
+                q_out1, q_out2 = rrd.dual_arm_6dof_stepwise(q_init,q_init_table,w1=R1_w,w2=R2_w)
+                rWeld_js.extend(q_out1)
+                positioner_js.extend(q_out2)
 
-
-            Path('curve_sliced_js').mkdir(parents=True, exist_ok=True)
-            data_dir = 'curve_sliced_js/'
+                Path(data_dir+'curve_sliced_js').mkdir(parents=True, exist_ok=True)
+                if layer_name == 'baselayer':
+                    robot_output_data_dir = data_dir+f'curve_sliced_js/MA2010_base_js{layer_n}_0_{cases}'
+                    positioner_output_data_dir = data_dir+f'curve_sliced_js/D500B_base_js{layer_n}_0_{cases}'
+                else:
+                    robot_output_data_dir = data_dir+f'curve_sliced_js/MA2010_js{layer_n}_0_{cases}'
+                    positioner_output_data_dir = data_dir+f'curve_sliced_js/D500B_js{layer_n}_0_{cases}'
+                np.savetxt(robot_output_data_dir+'.csv',np.array(rWeld_js),delimiter=',')
+                np.savetxt(positioner_output_data_dir+'.csv',np.array(positioner_js),delimiter=',')
+                print(f'{layer_name} {layer_n} {cases} done')
 
 if __name__ == "__main__":
     main()
