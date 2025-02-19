@@ -15,7 +15,7 @@ from weld_dh2v import *
 def main():
     
     weld_arcon = False
-    fuji_scanon = True
+    fuji_scanon = False
     input_from_user = True
 
     ############## Robot definition ##############
@@ -106,7 +106,7 @@ def main():
     arc_off=True
     forward = True
     # for weld_parts in ['base','layer']:
-    for weld_parts in ['layer']:
+    for weld_parts in ['base']:
         if weld_parts == 'base':
             weld_start = baselayer_start
             weld_end = baselayer_end
@@ -114,43 +114,45 @@ def main():
             v_cmd = base_vel
             this_layer_feedrate = base_feedrate
         else:
-            weld_start = 20
+            weld_start = layer_start
             weld_end = layer_end
             nom_incre = layer_nom_incre
             v_cmd = layer_vel
             this_layer_feedrate = layer_feedrate
-        for i in range(weld_start,weld_end,nom_incre):
+        i = weld_start
+        while i < weld_end:
+            print(f'Welding {weld_parts} layer {i}')
             try:
+                if forward:
+                    curve_direction = 'forward'
+                else:
+                    curve_direction = 'backward'
                 # read curve joint space data
                 if weld_parts == 'base':
                     curve = np.loadtxt(data_dir+f'curve_sliced_relative/baselayer{i}_0.csv',delimiter=',')
-                    curve_scan = np.loadtxt(data_dir+f'curve_sliced_relative/baselayer{i}_scanOnly.csv',delimiter=',')
                     curve_js = np.loadtxt(data_dir+f'curve_sliced_js/MA2010_base_js{i}_0.csv', delimiter=',')
-                    curve_js_scan = np.loadtxt(data_dir+f'curve_sliced_js/MA2010_base_js{i}_scanOnly.csv', delimiter=',')
+                    curve_js_cam = np.loadtxt(data_dir+f'curve_sliced_js/MA1440_base_js{i}_{curve_direction}.csv', delimiter=',')
+                    curve_js_positioner = np.loadtxt(data_dir+f'curve_sliced_js/D500B_base_js{i}_{curve_direction}.csv', delimiter=',')
                 else:
                     curve = np.loadtxt(data_dir+f'curve_sliced_relative/slice{i}_0.csv',delimiter=',')
-                    curve_scan = np.loadtxt(data_dir+f'curve_sliced_relative/slice{i}_scanOnly.csv',delimiter=',')
                     curve_js = np.loadtxt(data_dir+f'curve_sliced_js/MA2010_js{i}_0.csv', delimiter=',')
-                    curve_js_scan = np.loadtxt(data_dir+f'curve_sliced_js/MA2010_js{i}_scanOnly.csv', delimiter=',')
+                    curve_js_cam = np.loadtxt(data_dir+f'curve_sliced_js/MA1440_js{i}_{curve_direction}.csv', delimiter=',')
+                    curve_js_positioner = np.loadtxt(data_dir+f'curve_sliced_js/D500B_js{i}_{curve_direction}.csv', delimiter=',')
 
-                weld_start_js = curve_js[0]
-                weld_end_js = curve_js[-1]
-                min_index = np.argmin(np.linalg.norm(curve_js - curve_js_scan[0], axis=1))
-                if min_index == 0:
-                    curve_js = np.vstack((curve_js_scan[::-1],curve_js))
-                    curve = np.vstack((curve_scan[::-1],curve))
-                elif min_index == len(curve_js)-1:
-                    curve_js = np.vstack((curve_js,curve_js_scan))
-                    curve = np.vstack((curve,curve_scan))
-                else:
-                    assert False, 'No match found'
+                # weld_start_js = curve_js[0]
+                # weld_end_js = curve_js[-1]
+                # min_index = np.argmin(np.linalg.norm(curve_js - curve_js_scan[0], axis=1))
+                # if min_index == 0:
+                #     curve_js = np.vstack((curve_js_scan[::-1],curve_js))
+                #     curve = np.vstack((curve_scan[::-1],curve))
+                # elif min_index == len(curve_js)-1:
+                #     curve_js = np.vstack((curve_js,curve_js_scan))
+                #     curve = np.vstack((curve,curve_scan))
+                # else:
+                #     assert False, 'No match found'
                 
                 if not forward:
-                    curve_js = curve_js[::-1]
                     curve = curve[::-1]
-                    weld_start_dummy = deepcopy(weld_start_js)
-                    weld_start_js = deepcopy(weld_end_js)
-                    weld_end_js = deepcopy(weld_start_dummy)
                 lam_relative = calc_lam_cs(curve[:,:3])
                 weld_start_idx = np.where(curve_js==weld_start_js)[0][0]
                 weld_end_idx = np.where(curve_js==weld_end_js)[0][0]

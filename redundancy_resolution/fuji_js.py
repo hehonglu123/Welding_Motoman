@@ -110,7 +110,9 @@ def main():
                     curve = curve[::-1]
 
                 rWeld_js = []
+                rScan_js = []
                 positioner_js = []
+                poScan_js = []
                 ## get the first point where both the torch and scanner are on the layer
                 layer_weld_scan_vec = curve[dist_weld_scan_index,:3]-curve[0,:3]
                 orientation_start = get_torch_scanner_ori(curve[dist_weld_scan_index,3:], layer_weld_scan_vec, rotate_y_direction)
@@ -154,17 +156,20 @@ def main():
                                         [0,0,1]]) # target ending scanner orientation in the positioner tip frame
                 rot_k, rot_theta = R2rot(curve_R_start.T@curve_R_final)
                 curve_R = []
+                curve_quat = []
                 for i in range(1,len(curve_part)):
                     curve_R.append(curve_R_start@rot(rot_k,rot_theta*i/(len(curve_part)-1)))
+                    curve_quat.append(R2q(curve_R[-1]))
                     curve_part[i,2] = curve_part[i,2] + torch_z_shift*(i/(len(curve_part)-1))
                 curve_part = curve_part[1:]
                 assert len(curve_part) == len(curve_R), 'curve and curve_R length mismatched'
+                curve_scan = np.hstack((curve_part,curve_quat))
                 rrd=redundancy_resolution_dual(robot_scan_motion,positioner,curve_part[:,:3],curve_R)
                 q_init_table = positioner_js[-1]
                 q_init = rWeld_js[-1]
                 q_out1, q_out2 = rrd.dual_arm_6dof_stepwise(q_init,q_init_table,w1=R1_w,w2=R2_w)
-                rWeld_js.extend(q_out1)
-                positioner_js.extend(q_out2)
+                rScan_js.extend(q_out1)
+                poScan_js.extend(q_out2)
 
 
                 Path(data_dir+'curve_sliced_js').mkdir(parents=True, exist_ok=True)
@@ -172,13 +177,22 @@ def main():
                     robot_output_data_dir = data_dir+f'curve_sliced_js/MA2010_base_js{layer_n}_0_{cases}'
                     robot_thermal_output_data_dir = data_dir+f'curve_sliced_js/MA1440_base_js{layer_n}_0_{cases}'
                     positioner_output_data_dir = data_dir+f'curve_sliced_js/D500B_base_js{layer_n}_0_{cases}'
+                    robot_scan_output_data_dir = data_dir+f'curve_sliced_js/MA2010_scan_js{layer_n}_0_{cases}'
+                    positioner_scan_output_data_dir = data_dir+f'curve_sliced_js/D500B_scan_js{layer_n}_0_{cases}'
+                    curve_scan_output_data_dir = data_dir+f'curve_sliced_relative/baselayer{layer_n}_0_scan_{cases}.csv'
                 else:
                     robot_output_data_dir = data_dir+f'curve_sliced_js/MA2010_js{layer_n}_0_{cases}'
                     robot_thermal_output_data_dir = data_dir+f'curve_sliced_js/MA1440_js{layer_n}_0_{cases}'
                     positioner_output_data_dir = data_dir+f'curve_sliced_js/D500B_js{layer_n}_0_{cases}'
+                    robot_scan_output_data_dir = data_dir+f'curve_sliced_js/MA2010_scan_js{layer_n}_0_{cases}'
+                    positioner_scan_output_data_dir = data_dir+f'curve_sliced_js/D500B_scan_js{layer_n}_0_{cases}'
+                    curve_scan_output_data_dir = data_dir+f'curve_sliced_relative/slice{layer_n}_0_scan_{cases}.csv'
                 np.savetxt(robot_output_data_dir+'.csv',np.array(rWeld_js),delimiter=',')
                 np.savetxt(robot_thermal_output_data_dir+'.csv',np.array(rThermal_js),delimiter=',')
                 np.savetxt(positioner_output_data_dir+'.csv',np.array(positioner_js),delimiter=',')
+                np.savetxt(robot_scan_output_data_dir+'.csv',np.array(rScan_js),delimiter=',')
+                np.savetxt(positioner_scan_output_data_dir+'.csv',np.array(poScan_js),delimiter=',')
+                np.savetxt(curve_scan_output_data_dir,curve_scan,delimiter=',')
                 print(f'{layer_name} {layer_n} {cases} done')
 
 if __name__ == "__main__":
