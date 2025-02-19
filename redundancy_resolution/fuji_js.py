@@ -163,7 +163,7 @@ def main():
                     curve_part[i,2] = curve_part[i,2] + torch_z_shift*(i/(len(curve_part)-1))
                 curve_part = curve_part[1:]
                 assert len(curve_part) == len(curve_R), 'curve and curve_R length mismatched'
-                curve_scan = np.hstack((curve_part,curve_quat))
+                curve_scan = np.hstack((curve_part[:,:3],curve_quat))
                 rrd=redundancy_resolution_dual(robot_scan_motion,positioner,curve_part[:,:3],curve_R)
                 q_init_table = positioner_js[-1]
                 q_init = rWeld_js[-1]
@@ -177,15 +177,15 @@ def main():
                     robot_output_data_dir = data_dir+f'curve_sliced_js/MA2010_base_js{layer_n}_0_{cases}'
                     robot_thermal_output_data_dir = data_dir+f'curve_sliced_js/MA1440_base_js{layer_n}_0_{cases}'
                     positioner_output_data_dir = data_dir+f'curve_sliced_js/D500B_base_js{layer_n}_0_{cases}'
-                    robot_scan_output_data_dir = data_dir+f'curve_sliced_js/MA2010_scan_js{layer_n}_0_{cases}'
-                    positioner_scan_output_data_dir = data_dir+f'curve_sliced_js/D500B_scan_js{layer_n}_0_{cases}'
+                    robot_scan_output_data_dir = data_dir+f'curve_sliced_js/MA2010_base_js{layer_n}_0_scan_{cases}'
+                    positioner_scan_output_data_dir = data_dir+f'curve_sliced_js/D500B_base_js{layer_n}_0_scan_{cases}'
                     curve_scan_output_data_dir = data_dir+f'curve_sliced_relative/baselayer{layer_n}_0_scan_{cases}.csv'
                 else:
                     robot_output_data_dir = data_dir+f'curve_sliced_js/MA2010_js{layer_n}_0_{cases}'
                     robot_thermal_output_data_dir = data_dir+f'curve_sliced_js/MA1440_js{layer_n}_0_{cases}'
                     positioner_output_data_dir = data_dir+f'curve_sliced_js/D500B_js{layer_n}_0_{cases}'
-                    robot_scan_output_data_dir = data_dir+f'curve_sliced_js/MA2010_scan_js{layer_n}_0_{cases}'
-                    positioner_scan_output_data_dir = data_dir+f'curve_sliced_js/D500B_scan_js{layer_n}_0_{cases}'
+                    robot_scan_output_data_dir = data_dir+f'curve_sliced_js/MA2010_js{layer_n}_0_scan_{cases}'
+                    positioner_scan_output_data_dir = data_dir+f'curve_sliced_js/D500B_js{layer_n}_0_scan_{cases}'
                     curve_scan_output_data_dir = data_dir+f'curve_sliced_relative/slice{layer_n}_0_scan_{cases}.csv'
                 np.savetxt(robot_output_data_dir+'.csv',np.array(rWeld_js),delimiter=',')
                 np.savetxt(robot_thermal_output_data_dir+'.csv',np.array(rThermal_js),delimiter=',')

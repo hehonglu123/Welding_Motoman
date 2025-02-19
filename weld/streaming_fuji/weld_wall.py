@@ -20,14 +20,25 @@ def main():
 
     ############## Robot definition ##############
     config_dir='../../config/'
-    robot=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path=config_dir+'torch.csv',\
-		pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',d=15)
+    robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',d=15,tool_file_path=config_dir+'torch.csv',\
+        pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',\
+        base_marker_config_file=config_dir+'MA2010_marker_config/MA2010_marker_config.yaml',tool_marker_config_file=config_dir+'weldgun_marker_config/weldgun_marker_config.yaml')
     robot_scan=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path=config_dir+'fujicam.csv',\
-    pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv')
-    positioner=positioner_obj('D500B',def_path=config_dir+'D500B_robot_extended_config.yml',tool_file_path=config_dir+'positioner_tcp.csv',\
-		pulse2deg_file_path=config_dir+'D500B_pulse2deg_real.csv',base_transformation_file=config_dir+'D500B_pose.csv')
-
-    positioner_joints = np.radians([-15,180])
+        pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv')
+    # get fujicam standoff distance
+    # Move the fujicam frame along the z-axis with the distance of the standoff distance
+    # will locate the frame onto 
+    # the plane perpendicular to the weldgun axis and passing through the weldgun TCP
+    T_weldgun = robot_weld.fwd(np.zeros(6))
+    T_scanner = robot_scan.fwd(np.zeros(6))
+    fujicam_standoff_d = np.dot((T_weldgun.p-T_scanner.p),T_weldgun.R[:3,2])/np.dot(T_scanner.R[:3,2],T_weldgun.R[:3,2])
+    robot_scan_motion=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',d=fujicam_standoff_d,tool_file_path=config_dir+'fujicam.csv',\
+        pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv')
+    robot_thermal=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.yml',tool_file_path=config_dir+'flir.csv',\
+	                        pulse2deg_file_path=config_dir+'MA1440_A0_pulse2deg_real.csv',base_transformation_file=config_dir+'MA1440_pose.csv')
+    positioner=positioner_obj('D500B',def_path=config_dir+'D500B_robot_default_config.yml',tool_file_path=config_dir+'positioner_tcp.csv',\
+        base_transformation_file=config_dir+'D500B_pose.csv',pulse2deg_file_path=config_dir+'D500B_pulse2deg_real.csv',\
+        base_marker_config_file=config_dir+'D500B_marker_config/D500B_marker_config.yaml',tool_marker_config_file=config_dir+'positioner_tcp_marker_config/positioner_tcp_marker_config.yaml')
     
     ########################################################RR STREAMING########################################################
     # RR_robot_sub = RRN.SubscribeService('rr+tcp://192.168.55.12:59945?service=robot')
@@ -72,12 +83,14 @@ def main():
     # baselayer welding parameters
     base_feedrate = 250
     base_nom_incre = 1
-    base_vel = 5
+    base_nom_vel = 5
     # layer welding parameters
     layer_feedrate = 100
     layer_nom_height = 2
-    layer_vel = 5
+    layer_nom_vel = 5
     layer_nom_incre = int(layer_nom_height/layer_resolution)
+    # scanning parameters
+    scan_nom_vel = 5
 
     feedrate_update_rate=1.	#Hz
 
@@ -94,13 +107,11 @@ def main():
 
     weld_meta_data = {'well_arcon':weld_arcon, 'fuji_scanon':fuji_scanon, 'data_dir':data_dir, 'logdata_dir':logdata_dir\
         ,'base_layer_num':base_layer_num, 'baselayer_resolution':baselayer_resolution, 'layer_num':layer_num, 'layer_resolution':layer_resolution\
-        ,'base_feedrate':base_feedrate, 'base_nom_incre':base_nom_incre, 'base_vel':base_vel\
-        , 'layer_feedrate':layer_feedrate, 'layer_nom_incre':layer_nom_incre, 'layer_vel':layer_vel}
+        ,'base_feedrate':base_feedrate, 'base_nom_incre':base_nom_incre, 'base_nom_vel':base_nom_vel\
+        , 'layer_feedrate':layer_feedrate, 'layer_nom_incre':layer_nom_incre, 'layer_nom_vel':layer_nom_vel}
 
     # get robot 2 resting pose
     q_cur = deepcopy(SS.q_cur)
-    r2_q_rest = q_cur[6:12]
-    print("Robot 2 resting pose: ", np.degrees(r2_q_rest))
 
     ################## print layers ##################
     arc_off=True
@@ -111,13 +122,13 @@ def main():
             weld_start = baselayer_start
             weld_end = baselayer_end
             nom_incre = base_nom_incre
-            v_cmd = base_vel
+            v_cmd = base_nom_vel
             this_layer_feedrate = base_feedrate
         else:
             weld_start = layer_start
             weld_end = layer_end
             nom_incre = layer_nom_incre
-            v_cmd = layer_vel
+            v_cmd = layer_nom_vel
             this_layer_feedrate = layer_feedrate
         i = weld_start
         while i < weld_end:
@@ -130,33 +141,25 @@ def main():
                 # read curve joint space data
                 if weld_parts == 'base':
                     curve = np.loadtxt(data_dir+f'curve_sliced_relative/baselayer{i}_0.csv',delimiter=',')
+                    curve_scan = np.loadtxt(data_dir+f'curve_sliced_relative/baselayer{i}_0_scan_{curve_direction}',delimiter=',')
                     curve_js = np.loadtxt(data_dir+f'curve_sliced_js/MA2010_base_js{i}_0.csv', delimiter=',')
-                    curve_js_cam = np.loadtxt(data_dir+f'curve_sliced_js/MA1440_base_js{i}_{curve_direction}.csv', delimiter=',')
-                    curve_js_positioner = np.loadtxt(data_dir+f'curve_sliced_js/D500B_base_js{i}_{curve_direction}.csv', delimiter=',')
+                    curve_js_cam = np.loadtxt(data_dir+f'curve_sliced_js/MA1440_base_js{i}_0_{curve_direction}.csv', delimiter=',')
+                    curve_js_positioner = np.loadtxt(data_dir+f'curve_sliced_js/D500B_base_js{i}_0_{curve_direction}.csv', delimiter=',')
+                    curve_js_scan = np.loadtxt(data_dir+f'curve_sliced_js/MA2010_base_js{i}_0_scan_{curve_direction}.csv', delimiter=',')
+                    curve_js_pos_scan = np.loadtxt(data_dir+f'curve_sliced_js/D500B_base_js{i}_0_scan_{curve_direction}.csv', delimiter=',')
                 else:
                     curve = np.loadtxt(data_dir+f'curve_sliced_relative/slice{i}_0.csv',delimiter=',')
+                    curve_scan = np.loadtxt(data_dir+f'curve_sliced_relative/slice{i}_0_scan_{curve_direction}',delimiter=',')
                     curve_js = np.loadtxt(data_dir+f'curve_sliced_js/MA2010_js{i}_0.csv', delimiter=',')
-                    curve_js_cam = np.loadtxt(data_dir+f'curve_sliced_js/MA1440_js{i}_{curve_direction}.csv', delimiter=',')
-                    curve_js_positioner = np.loadtxt(data_dir+f'curve_sliced_js/D500B_js{i}_{curve_direction}.csv', delimiter=',')
-
-                # weld_start_js = curve_js[0]
-                # weld_end_js = curve_js[-1]
-                # min_index = np.argmin(np.linalg.norm(curve_js - curve_js_scan[0], axis=1))
-                # if min_index == 0:
-                #     curve_js = np.vstack((curve_js_scan[::-1],curve_js))
-                #     curve = np.vstack((curve_scan[::-1],curve))
-                # elif min_index == len(curve_js)-1:
-                #     curve_js = np.vstack((curve_js,curve_js_scan))
-                #     curve = np.vstack((curve,curve_scan))
-                # else:
-                #     assert False, 'No match found'
+                    curve_js_cam = np.loadtxt(data_dir+f'curve_sliced_js/MA1440_js{i}_0_{curve_direction}.csv', delimiter=',')
+                    curve_js_positioner = np.loadtxt(data_dir+f'curve_sliced_js/D500B_js{i}_0_{curve_direction}.csv', delimiter=',')
+                    curve_js_scan = np.loadtxt(data_dir+f'curve_sliced_js/MA2010_js{i}_0_scan_{curve_direction}.csv', delimiter=',')
+                    curve_js_pos_scan = np.loadtxt(data_dir+f'curve_sliced_js/D500B_js{i}_0_scan_{curve_direction}.csv', delimiter=',')
                 
                 if not forward:
                     curve = curve[::-1]
                 lam_relative = calc_lam_cs(curve[:,:3])
-                weld_start_idx = np.where(curve_js==weld_start_js)[0][0]
-                weld_end_idx = np.where(curve_js==weld_end_js)[0][0]
-                # print(weld_start_idx,weld_end_idx)
+                lam_scan_relative = calc_lam_cs(curve_scan[:,:3])
                 
                 print(f'Welding {weld_parts} layer {i}')
                 if input_from_user:
@@ -167,13 +170,13 @@ def main():
                 # move to start point with z +50
                 z_offset = 35 # mm
                 for z in np.arange(z_offset,0,-5): # a linear movement
-                    T_start = robot.fwd(curve_js[0])
+                    T_start = robot_weld.fwd(curve_js[0])
                     T_start.p[2] += z
-                    curve_js_start_offset = robot.inv(T_start.p, T_start.R, last_joints=curve_js[0])[0]
-                    q_start_offset = np.hstack((curve_js_start_offset, r2_q_rest, positioner_joints))
+                    curve_js_start_offset = robot_weld.inv(T_start.p, T_start.R, last_joints=curve_js[0])[0]
+                    q_start_offset = np.hstack((curve_js_start_offset, curve_js_cam[0], curve_js_positioner[0]))
                     SS.jog2q(q_start_offset)
                 # move to start point
-                q_start = np.hstack((curve_js[0], r2_q_rest, positioner_joints))
+                q_start = np.hstack((curve_js[0], curve_js_cam[0], curve_js_positioner[0]))
                 SS.jog2q(q_start)
                 time.sleep(0.3)
 
@@ -195,25 +198,17 @@ def main():
                     lam_idx=np.where(lam_relative>=lam_cur)[0][0] #get closest two indices and interpolate the joint angle
                     ratio=(lam_cur-lam_relative[lam_idx-1])/(lam_relative[lam_idx]-lam_relative[lam_idx-1])
                     q1=curve_js[lam_idx-1]*(1-ratio)+curve_js[lam_idx]*ratio
-                    q_cmd=np.hstack((q1,r2_q_rest,positioner_joints))
+                    q2=curve_js_cam[lam_idx-1]*(1-ratio)+curve_js_cam[lam_idx]*ratio
+                    q_pos=curve_js_positioner[lam_idx-1]*(1-ratio)+curve_js_positioner[lam_idx]*ratio
+                    q_cmd=np.hstack((q1,q2,q_pos))
 
                     ### if welding start or end
-                    if lam_cur >= lam_relative[weld_start_idx] and lam_cur<lam_relative[weld_end_idx] and arc_off:
-                        print("stop for welding start")
-                        time.sleep(1)
+                    if arc_off:
                         if weld_arcon:
                             print("Welding Start")
                             fronius_client.job_number = int(this_layer_feedrate/10+job_offset)
                             fronius_client.start_weld()
                         arc_off=False
-                        print("continue welding")
-                    if lam_cur >= lam_relative[weld_end_idx] and not arc_off:
-                        print("stop for welding end")
-                        if weld_arcon:
-                            print("Welding End")
-                            fronius_client.stop_weld()
-                        arc_off=True
-                        time.sleep(1)
 
                     ###update welding param
                     if time.perf_counter()-last_update_time>1./feedrate_update_rate:
@@ -246,14 +241,47 @@ def main():
                 js_recording = SS.stop_recording()
                 ########################################
 
+                ####### remain scanning motion ##########################
+                r2_rest_q = q2
+                v_cmd = scan_nom_vel
+                lam_cur=0
+                while lam_cur<lam_scan_relative[-1] - v_cmd/SS.streaming_rate:
+                    loop_start=time.perf_counter()
+
+                    ### get the next q commands
+                    lam_cur+=v_cmd/SS.streaming_rate # get the current lambda (path location)
+                    lam_idx=np.where(lam_scan_relative>=lam_cur)[0][0] #get closest two indices and interpolate the joint angle
+                    ratio=(lam_cur-lam_scan_relative[lam_idx-1])/(lam_scan_relative[lam_idx]-lam_scan_relative[lam_idx-1])
+                    q1=curve_js_scan[lam_idx-1]*(1-ratio)+curve_js_scan[lam_idx]*ratio
+                    q_pos=curve_js_pos_scan[lam_idx-1]*(1-ratio)+curve_js_pos_scan[lam_idx]*ratio
+                    q_cmd=np.hstack((q1,r2_rest_q,q_pos))
+
+                    ### log data
+                    weld_js_exe.append(deepcopy(SS.q_cur)) # log robot joints
+                    if fuji_scanon:
+                        wire_packet=fuji_scan_wire.TryGetInValue() # log fuji cam scanner data
+                        valid_indices=np.where(wire_packet[1].I_data>1)[0]
+                        valid_indices=np.intersect1d(valid_indices,np.where(np.abs(wire_packet[1].Z_data)>50)[0])
+                        line_profile=np.hstack((wire_packet[1].Y_data[valid_indices].reshape(-1,1),wire_packet[1].Z_data[valid_indices].reshape(-1,1)))
+                        scan_exe.append(line_profile)
+                    stamps_exe.append(time.perf_counter()) # log time stamps
+
+                    ### sent position Command to the robot
+                    q_cmd_all.append(np.hstack((time.perf_counter(),i,q_cmd)))
+                    if lam_cur>lam_relative[-1]-v_cmd/SS.streaming_rate:
+                        SS.position_cmd(q_cmd)
+                    else:
+                        SS.position_cmd(q_cmd,loop_start)
+                ########################################
+
                 # move to end point with z +50
                 time.sleep(0.3)
                 z_offset = 35 # mm
                 for z in np.arange(0,z_offset+1,5): # a linear movement
-                    T_end = robot.fwd(curve_js[-1])
+                    T_end = robot_weld.fwd(curve_js_scan[-1])
                     T_end.p[2] += z
-                    curve_js_end_offset = robot.inv(T_end.p, T_end.R, last_joints=curve_js[-1])[0]
-                    q_end_offset = np.hstack((curve_js_end_offset, r2_q_rest, positioner_joints))
+                    curve_js_end_offset = robot_weld.inv(T_end.p, T_end.R, last_joints=curve_js_scan[-1])[0]
+                    q_end_offset = np.hstack((curve_js_end_offset, r2_rest_q, q_pos))
                     SS.jog2q(q_end_offset)
 
                 ### save data
