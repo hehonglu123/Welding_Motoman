@@ -5,6 +5,7 @@ from pathlib import Path
 from matplotlib import pyplot as plt
 from motoman_def import *
 from redundancy_resolution_dual import *
+from redundancy_resolution import *
 
 def get_scanner_ori(Rz_vec, Rx_vec):
     Rz_vec = Rz_vec/np.linalg.norm(Rz_vec)
@@ -49,6 +50,8 @@ def main():
     fujicam_standoff_d = np.dot((T_weldgun.p-T_scanner.p),T_weldgun.R[:3,2])/np.dot(T_scanner.R[:3,2],T_weldgun.R[:3,2])
     robot_scan_motion=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',d=fujicam_standoff_d,tool_file_path=config_dir+'fujicam.csv',\
         pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv')
+    robot_thermal=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.yml',tool_file_path=config_dir+'flir.csv',\
+	                        pulse2deg_file_path=config_dir+'MA1440_A0_pulse2deg_real.csv',base_transformation_file=config_dir+'MA1440_pose.csv')
     positioner=positioner_obj('D500B',def_path=config_dir+'D500B_robot_default_config.yml',tool_file_path=config_dir+'positioner_tcp.csv',\
         base_transformation_file=config_dir+'D500B_pose.csv',pulse2deg_file_path=config_dir+'D500B_pulse2deg_real.csv',\
         base_marker_config_file=config_dir+'D500B_marker_config/D500B_marker_config.yaml',tool_marker_config_file=config_dir+'positioner_tcp_marker_config/positioner_tcp_marker_config.yaml')
@@ -63,6 +66,7 @@ def main():
     ## planning parameters
     R1_w = 0.01
     R2_w = 0.01
+    thermal_distance=400
 
     ## always plan for lagging
     ## then plan for both forward and backward
@@ -135,6 +139,9 @@ def main():
                 q_out1, q_out2 = rrd.dual_arm_6dof_stepwise(q_init,q_init_table,w1=R1_w,w2=R2_w)
                 rWeld_js.extend(q_out1)
                 positioner_js.extend(q_out2)
+                # solve ik for robot with thermal when torch part is done
+                rr_thermal = redundancy_resolution(robot_weld,positioner,curve)
+                rThermal_js = rr_thermal.rob2_flir_resolution([[rWeld_js]],robot_thermal,measure_distance=thermal_distance)[0][0]
                 ## solve ik when the torch is NOT on the layer (leaving the layer)
                 curve_part = deepcopy(curve[-dist_weld_scan_index-1:])
                 # get orientation using scanner orientation
@@ -159,14 +166,18 @@ def main():
                 rWeld_js.extend(q_out1)
                 positioner_js.extend(q_out2)
 
+
                 Path(data_dir+'curve_sliced_js').mkdir(parents=True, exist_ok=True)
                 if layer_name == 'baselayer':
                     robot_output_data_dir = data_dir+f'curve_sliced_js/MA2010_base_js{layer_n}_0_{cases}'
+                    robot_thermal_output_data_dir = data_dir+f'curve_sliced_js/MA1440_base_js{layer_n}_0_{cases}'
                     positioner_output_data_dir = data_dir+f'curve_sliced_js/D500B_base_js{layer_n}_0_{cases}'
                 else:
                     robot_output_data_dir = data_dir+f'curve_sliced_js/MA2010_js{layer_n}_0_{cases}'
+                    robot_thermal_output_data_dir = data_dir+f'curve_sliced_js/MA1440_js{layer_n}_0_{cases}'
                     positioner_output_data_dir = data_dir+f'curve_sliced_js/D500B_js{layer_n}_0_{cases}'
                 np.savetxt(robot_output_data_dir+'.csv',np.array(rWeld_js),delimiter=',')
+                np.savetxt(robot_thermal_output_data_dir+'.csv',np.array(rThermal_js),delimiter=',')
                 np.savetxt(positioner_output_data_dir+'.csv',np.array(positioner_js),delimiter=',')
                 print(f'{layer_name} {layer_n} {cases} done')
 
