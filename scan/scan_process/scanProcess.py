@@ -720,11 +720,10 @@ class ScanProcess():
         
         return profile_height_arr,Transz0_H
 
-    def scan2dh(self,scan,robot_q,target_p,crop_min=[-10,85],crop_max=[10,100],offset_z=2.2):
-        
+    def scan2dDenoise(self,scan,crop_min=[-10,85],crop_max=[10,100]):
+
         dbscan = DBSCAN(eps=0.5,min_samples=20)
         ## remove not in interested region
-        st=time.time()
         mti_pcd=np.delete(scan,scan[1]==0,axis=1)
         mti_pcd=np.delete(mti_pcd,mti_pcd[1]<crop_min[1],axis=1)
         mti_pcd=np.delete(mti_pcd,mti_pcd[1]>crop_max[1],axis=1)
@@ -742,6 +741,12 @@ class ScanProcess():
             mti_pcd_noise_remove=mti_pcd[cluster_id]
         else:
             mti_pcd_noise_remove=mti_pcd
+
+        return mti_pcd_noise_remove
+    
+    def scan2dh(self,scan,robot_q,target_p,crop_min=[-10,85],crop_max=[10,100],offset_z=2.2):
+
+        mti_pcd_noise_remove = self.scan2dDenoise(scan,crop_min=crop_min,crop_max=crop_max)
         
         # transform to R2TCP
         T_R2TCP_S1TCP=self.positioner.fwd(robot_q[6:],world=True).inv()*self.robot.fwd(robot_q[:6],world=True)

@@ -78,14 +78,15 @@ def main():
     path_dl = meta_data['path_dl']
     dist_weld_scan_index = np.round(dist_weld_scan/path_dl).astype(int)
 
-    layers_name = ['baselayer','layer']
+    # layers_name = ['baselayer','layer']
+    layers_name = ['layer']
     for layer_name in layers_name:
         if layer_name == 'baselayer':
             layer_num = meta_data['baselayer_num']
         else:
             layer_num = meta_data['layer_num']
 
-        for layer_n in range(layer_num):
+        for layer_n in range(58,layer_num):
             ##### read curve data #####
             if layer_name == 'baselayer':
                 curve = np.loadtxt(data_dir+f'curve_sliced_relative/baselayer{layer_n}_0.csv',delimiter=',')

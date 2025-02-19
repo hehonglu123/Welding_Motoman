@@ -5,6 +5,7 @@ import numpy as np
 import datetime
 from motoman_def import *
 from lambda_calc import *
+import open3d as o3d
 from RobotRaconteur.Client import *
 from weldRRSensor import *
 from StreamingSend import *
@@ -116,6 +117,8 @@ def main():
     ################## print layers ##################
     arc_off=True
     forward = True
+    Transz0_H=None
+    mean_layer_height = 0
     # for weld_parts in ['base','layer']:
     for weld_parts in ['base']:
         if weld_parts == 'base':
@@ -130,7 +133,7 @@ def main():
             nom_incre = layer_nom_incre
             v_cmd = layer_nom_vel
             this_layer_feedrate = layer_feedrate
-        i = weld_start
+        i=weld_start
         while i < weld_end:
             print(f'Welding {weld_parts} layer {i}')
             try:
@@ -181,7 +184,6 @@ def main():
                 time.sleep(0.3)
 
                 # start joints recording
-                SS.start_recording()
                 ####### welding motion ##########################
                 lam_cur=0
                 last_update_time=time.perf_counter()+5.
@@ -237,8 +239,8 @@ def main():
                 ### welding end
                 if weld_arcon:
                     fronius_client.stop_weld()
+                    time.sleep(0.5)
                 arc_off=True
-                js_recording = SS.stop_recording()
                 ########################################
 
                 ####### remain scanning motion ##########################
@@ -284,7 +286,7 @@ def main():
                     q_end_offset = np.hstack((curve_js_end_offset, r2_rest_q, q_pos))
                     SS.jog2q(q_end_offset)
 
-                ### save data
+                ############3# save data ######################
                 if not os.path.exists(logdata_dir):
                     os.makedirs(logdata_dir)
                 # save meta data
@@ -296,7 +298,6 @@ def main():
                     np.savetxt(logdata_dir+layer_name+f'/baselayer{i}_timestamps_exe.csv', stamps_exe, delimiter=',')
                     np.savetxt(logdata_dir+layer_name+f'/baselayer{i}_weld_js_exe.csv', weld_js_exe, delimiter=',')
                     np.savetxt(logdata_dir+layer_name+f'/baselayer{i}_weld_cmd.csv', welding_cmd_all, delimiter=',')
-                    np.savetxt(logdata_dir+layer_name+f'/baselayer{i}_weld_js_recording.csv', js_recording, delimiter=',')
                     if fuji_scanon:
                         with open(logdata_dir+layer_name+f'/baselayer{i}_scan_exe.pickle', 'wb') as file:
                             pickle.dump(scan_exe, file)
@@ -306,10 +307,63 @@ def main():
                     np.savetxt(logdata_dir+layer_name+f'/layer{i}_timestamps_exe.csv', stamps_exe, delimiter=',')
                     np.savetxt(logdata_dir+layer_name+f'/layer{i}_weld_js_exe.csv', weld_js_exe, delimiter=',')
                     np.savetxt(logdata_dir+layer_name+f'/layer{i}_weld_cmd.csv', welding_cmd_all, delimiter=',')
-                    np.savetxt(logdata_dir+layer_name+f'/layer{i}_weld_js_recording.csv', js_recording, delimiter=',')
                     if fuji_scanon:
                         with open(logdata_dir+layer_name+f'/layer{i}_scan_exe.pickle', 'wb') as file:
                             pickle.dump(scan_exe, file)
+                ##########################################
+                
+                weld_js_exe = np.array(weld_js_exe)
+                stamps_exe = np.array(stamps_exe)
+                ################### get layer increments ############################
+                if fuji_scanon:
+                    scan_process = ScanProcess(robot_scan,positioner)
+                    scan_exe_noise_remove = []
+                    for scan in scan_exe:
+                        scan_noise_remove = scan_process.scan2dDenoise(deepcopy(scan).T,crop_min=[-25,55],crop_max=[25,200])
+                        scan_exe_noise_remove.append(scan_noise_remove)
+                    if fuji_scanon:
+                        if weld_parts == 'base':
+                            with open(logdata_dir+layer_name+f'/baselayer{i}_scan_exe_noise_remove.pickle', 'wb') as f:
+                                pickle.dump(scan_exe_noise_remove, f)
+                        else:
+                            with open(logdata_dir+layer_name+f'/layer{i}_scan_exe_noise_remove.pickle', 'wb') as f:
+                                pickle.dump(scan_exe_noise_remove, f)
+                    pcd = scan_process.pcd_register_mti(scan_exe_noise_remove,weld_js_exe[:,np.append(np.arange(6),np.arange(12,14))],stamps_exe,flip=True,scanner='fuji')
+                    curve_planned_z = np.mean(curve[:,2])
+                    curve_x_end = np.min(curve[:,0])
+                    curve_x_start = np.max(curve[:,0])
+                    curve_y = np.mean(curve[:,1])
+                    z_height_start=curve_planned_z+0.1
+                    crop_extend_x=10
+                    crop_extend_z=20
+                    crop_min=(curve_x_end-crop_extend_x,curve_y-30,-30)
+                    crop_max=(curve_x_start+crop_extend_x,curve_y+30,z_height_start+crop_extend_z)
+                    crop_h_min=(curve_x_end-crop_extend_x,curve_y-20,-30)
+                    crop_h_max=(curve_x_start+crop_extend_x,curve_y+20,z_height_start+crop_extend_z)
+                    pcd = scan_process.pcd_noise_remove(pcd,nb_neighbors=40,std_ratio=1.5,\
+                                                        min_bound=crop_min,max_bound=crop_max,cluster_based_outlier_remove=True,cluster_neighbor=1,min_points=100)
+                    profile_height,Transz0_H = scan_process.pcd2height(deepcopy(pcd),z_height_start,bbox_min=crop_h_min,bbox_max=crop_h_max,Transz0_H=Transz0_H)
+                    print("Transz0_H:",Transz0_H)
+
+                    mean_layer_height = np.mean(profile_height[:,1])
+                    if weld_parts == 'base':
+                        with open(logdata_dir+layer_name+f'/baselayer{i}_profile_height.csv', 'wb') as f:
+                            pickle.dump(profile_height, f)
+                        o3d.io.write_point_cloud(logdata_dir+layer_name+f'/baselayer{i}_pcd.pcd',pcd)
+
+                        i = i+base_nom_incre # baselayer uses base_nom_incre
+                    else:
+                        with open(logdata_dir+layer_name+f'/layer{i}_profile_height.csv', 'wb') as f:
+                            pickle.dump(profile_height, f)
+                        o3d.io.write_point_cloud(logdata_dir+layer_name+f'/layer{i}_pcd.pcd',pcd)
+
+                        i = mean_layer_height/layer_resolution # layer uses mean_layer_height/layer_resolution
+                else:
+                    if weld_parts == 'base':
+                        i = i+base_nom_incre
+                    else:
+                        i = i+layer_nom_incre
+                ##########################################
 
                 ### layer parameters update 
                 forward = not forward
