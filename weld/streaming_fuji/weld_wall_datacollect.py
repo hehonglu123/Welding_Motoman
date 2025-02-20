@@ -48,10 +48,10 @@ def welding_profile_generate(lam_split, VPD, layer_n, v_min, v_max):
 
 def main():
     
-    weld_arcon = False
+    weld_arcon = True
     fuji_scanon = True
     thermal_on = True
-    input_from_user = True
+    input_from_user = False
 
     ############## Robot definition ##############
     config_dir='../../config/'
@@ -109,9 +109,9 @@ def main():
         flir_url = 'rr+tcp://192.168.55.10:60827/?service=camera'
         cam_ser=RRN.ConnectService(flir_url)
         rr_sensors = WeldRRSensor(cam_service=cam_ser)
-        # print("Test 3 Sec.")
-        # rr_sensors.test_all_sensors()
-        # print(len(rr_sensors.ir_recording))
+        print("Test 3 Sec.")
+        rr_sensors.test_all_sensors()
+        print(len(rr_sensors.ir_recording))
     
     ################## Read geometry data ##################
     data_dir = '../../data/wall_weld_test/'
@@ -131,7 +131,7 @@ def main():
     base_nom_vel = 5
     # layer welding parameters
     layer_feedrate = 100 # inch/min
-    layer_nom_height = 2 # mm
+    layer_nom_height = 2.1 # mm
     layer_nom_vel = 5 # mm/s
     layer_nom_incre = int(layer_nom_height/layer_resolution)
     # scanning parameters
@@ -168,6 +168,7 @@ def main():
     # get robot 2 resting pose
     q_cur = deepcopy(SS.q_cur)
 
+    input("Ready to start? Press Enter to continue...")
     ################## print layers ##################
     arc_off=True
     forward = True
@@ -186,6 +187,7 @@ def main():
         layer_count = 0
         i=weld_start
         while i < weld_end:
+            print("=====================================")
             print(f'Welding {weld_parts} layer {i} counting {layer_count} direction {forward}')
             try:
                 if forward:
@@ -228,8 +230,8 @@ def main():
                     feedrate_profile = [base_feedrate]*len(lam_split)
 
                 ### information print
-                print(f'Welding {weld_parts} layer {i}')
-
+                print(f'Velocity Profile: {vel_profile}')
+                print(f'Feedrate Profile: {feedrate_profile}')
 
                 if input_from_user:
                     input("Press Enter to continue...")
@@ -252,7 +254,10 @@ def main():
                 time.sleep(0.1)
 
                 # add a random delay
-                wait_time = np.random.uniform(0,10)
+                if layer_count < 99999999999:
+                    wait_time = 0
+                else:
+                    wait_time = np.random.uniform(0,10)
                 print("Wait for",wait_time,"s")
                 time.sleep(wait_time)
 
@@ -287,7 +292,7 @@ def main():
                             print("Welding Start")
                             fronius_client.job_number = int(round(feedrate_cmd/10)+job_offset)
                             fronius_client.start_weld()
-                            last_update_time=time.perf_counter()
+                        last_update_time=time.perf_counter()
                         arc_off=False
 
                     ###update welding param
@@ -298,7 +303,8 @@ def main():
                             v_cmd = vel_profile[lam_idx]
                             feedrate_cmd = feedrate_profile[lam_idx]
                             # update feedrate to welder
-                            fronius_client.async_set_job_number(int(round(feedrate_cmd/10)+job_offset), welder_handler)
+                            if weld_arcon:
+                                fronius_client.async_set_job_number(int(round(feedrate_cmd/10)+job_offset), welder_handler)
                         # log command data
                         welding_cmd_all.append(np.hstack((time.perf_counter(),i,v_cmd,int(round(feedrate_cmd/10)*10))))
                         last_update_time=time.perf_counter()
@@ -404,7 +410,7 @@ def main():
                     if fuji_scanon:
                         with open(logdata_dir+layer_name+f'/scan_exe_noise_remove.pickle', 'wb') as f:
                             pickle.dump(scan_exe_noise_remove, f)
-                    pcd = scan_process.pcd_register_mti(scan_exe_noise_remove,weld_js_exe[:,np.append(np.arange(6),np.arange(12,14))],stamps_exe,flip=True,scanner='fuji')
+                    pcd = scan_process.pcd_register_mti(scan_exe_noise_remove,weld_js_exe[:,np.append(np.arange(1,7),np.arange(13,15))],stamps_exe,flip=True,scanner='fuji')
                     curve_planned_z = np.mean(curve[:,2])
                     curve_x_end = np.min(curve[:,0])
                     curve_x_start = np.max(curve[:,0])
@@ -422,13 +428,14 @@ def main():
                     print("Transz0_H:",Transz0_H)
 
                     mean_layer_height = np.mean(profile_height[:,1])
+                    print("Mean Layer Height:",mean_layer_height)
                     with open(logdata_dir+layer_name+f'/profile_height.csv', 'wb') as f:
                         pickle.dump(profile_height, f)
                     o3d.io.write_point_cloud(logdata_dir+layer_name+f'/pcd.pcd',pcd)
                     if weld_parts == 'base':
                         i = i+base_nom_incre # baselayer uses base_nom_incre
                     else:
-                        i = mean_layer_height/layer_resolution # layer uses mean_layer_height/layer_resolution
+                        i = (mean_layer_height-2*baselayer_resolution)/layer_resolution # layer uses mean_layer_height/layer_resolution
                 else:
                     if weld_parts == 'base':
                         i = i+base_nom_incre
