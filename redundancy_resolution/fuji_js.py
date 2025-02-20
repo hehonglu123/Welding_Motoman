@@ -62,10 +62,11 @@ def main():
     rotate_y_direction = subproblem1(weld_scan_vec, np.array([0,1,0]), np.array([0,0,1]))
     dist_weld_scan = np.linalg.norm(T_weld_scan.p)
     torch_z_shift = np.dot(T_weld_scan.p,T_weld_scan.R[:3,2])
+    torch_z_shift /= 2
 
     ## planning parameters
-    R1_w = 0.01
-    R2_w = 0.01
+    R1_w = 0.05
+    R2_w = 0.005
     thermal_distance=400
 
     ## always plan for lagging
@@ -79,14 +80,14 @@ def main():
     dist_weld_scan_index = np.round(dist_weld_scan/path_dl).astype(int)
 
     # layers_name = ['baselayer','layer']
-    layers_name = ['layer']
+    layers_name = ['baselayer']
     for layer_name in layers_name:
         if layer_name == 'baselayer':
             layer_num = meta_data['baselayer_num']
         else:
             layer_num = meta_data['layer_num']
 
-        for layer_n in range(58,layer_num):
+        for layer_n in range(0,layer_num):
             ##### read curve data #####
             if layer_name == 'baselayer':
                 curve = np.loadtxt(data_dir+f'curve_sliced_relative/baselayer{layer_n}_0.csv',delimiter=',')
@@ -97,11 +98,19 @@ def main():
             po_lower_limit = deepcopy(positioner.lower_limit)
             po_upper_limit = deepcopy(positioner.upper_limit)
             po_lower_limit = np.radians([-15-0.01,-180])
-            po_upper_limit = np.radians([-15+0.01,0])
+            po_upper_limit = np.radians([-15+0.01,100])
             positioner.lower_limit = po_lower_limit
             positioner.robot.joint_lower_limit = po_lower_limit
             positioner.upper_limit = po_upper_limit
             positioner.robot.joint_upper_limit = po_upper_limit
+
+            # robot scan limits
+            rob_upper_limit = deepcopy(robot_scan_motion.upper_limit)
+            rob_upper_limit[2] = np.radians(55)
+            robot_weld.upper_limit = rob_upper_limit
+            robot_weld.robot.joint_upper_limit = rob_upper_limit
+            robot_scan_motion.upper_limit = rob_upper_limit
+            robot_scan_motion.robot.joint_upper_limit = rob_upper_limit
             
             ##### generate robot js ######
             for cases in ['forward','backward']:
@@ -118,7 +127,8 @@ def main():
                 layer_weld_scan_vec = curve[dist_weld_scan_index,:3]-curve[0,:3]
                 orientation_start = get_torch_scanner_ori(curve[dist_weld_scan_index,3:], layer_weld_scan_vec, rotate_y_direction)
                 if cases == 'forward':
-                    positioner_j2_start = np.degrees(-1*(np.radians(180)-np.arctan2(curve[dist_weld_scan_index,1],curve[dist_weld_scan_index,0])))
+                    # positioner_j2_start = np.degrees(-1*(np.radians(180)-np.arctan2(curve[dist_weld_scan_index,1],curve[dist_weld_scan_index,0])))
+                    positioner_j2_start = 90
                 else:
                     positioner_j2_start = -90
                 ## solve ik when the scanner is NOT on the layer yet
@@ -152,10 +162,16 @@ def main():
                 T_positioner = positioner.fwd(positioner_js[-1],world=True)
                 T_robot_positioner = T_positioner.inv()*T_robot
                 curve_R_start = T_robot_positioner.R # starting scanner orientation in the positioner tip frame
-                curve_R_final = np.array([[-1,0,0],\
-                                        [0,-1,0],\
-                                        [0,0,1]]) # target ending scanner orientation in the positioner tip frame
+                if cases == 'forward':
+                    curve_R_final = np.array([[-1,0,0],\
+                                            [0,-1,0],\
+                                            [0,0,1]]) # target ending scanner orientation in the positioner tip frame
+                else:
+                    curve_R_final = np.array([[1,0,0],\
+                                            [0,1,0],\
+                                            [0,0,1]]) # target ending scanner orientation in the positioner tip frame
                 rot_k, rot_theta = R2rot(curve_R_start.T@curve_R_final)
+                rot_theta /= 2
                 curve_R = []
                 curve_quat = []
                 for i in range(1,len(curve_part)):

@@ -12,11 +12,16 @@ from StreamingSend import *
 from robotics_utils import *
 sys.path.append('../')
 from weld_dh2v import *
+sys.path.append('../../scan/scan_process/')
+sys.path.append('../../scan/scan_tools/')
+from scan_utils import *
+from scanProcess import *
 
 def main():
     
     weld_arcon = False
-    fuji_scanon = False
+    fuji_scanon = True
+    thermal_on = True
     input_from_user = True
 
     ############## Robot definition ##############
@@ -69,13 +74,22 @@ def main():
         obj = sub.GetDefaultClientWait(2)		#connect, timeout=2s
         fuji_scan_wire=sub.SubscribeWire("lineProfile")
         sub.ClientConnectFailed += connect_failed
+
+    ########################################## RR Thermal ########################################################
+    if thermal_on:
+        flir_url = 'rr+tcp://192.168.55.10:60827/?service=camera'
+        cam_ser=RRN.ConnectService(flir_url)
+        rr_sensors = WeldRRSensor(cam_service=cam_ser)
+        # print("Test 3 Sec.")
+        # rr_sensors.test_all_sensors()
+        # print(len(rr_sensors.ir_recording))
     
     ################## Read geometry data ##################
     data_dir = '../../data/wall_weld_test/'
     with open(data_dir+'sliced_meta.yml', 'r') as f:
         meta_data = yaml.safe_load(f)
     
-    base_layer_num= meta_data['baselayernum']
+    base_layer_num= meta_data['baselayer_num']
     baselayer_resolution= meta_data['baselayer_resolution']
     layer_num = meta_data['layer_num']
     layer_resolution = meta_data['layer_resolution']
@@ -84,14 +98,16 @@ def main():
     # baselayer welding parameters
     base_feedrate = 250
     base_nom_incre = 1
-    base_nom_vel = 5
+    base_nom_vel = 4
     # layer welding parameters
     layer_feedrate = 100
     layer_nom_height = 2
-    layer_nom_vel = 5
+    layer_nom_vel = 4
     layer_nom_incre = int(layer_nom_height/layer_resolution)
     # scanning parameters
-    scan_nom_vel = 5
+    scan_nom_vel = 4
+    # collision avoidance z offset
+    safety_z_offset = 50
 
     feedrate_update_rate=1.	#Hz
 
@@ -144,16 +160,16 @@ def main():
                 # read curve joint space data
                 if weld_parts == 'base':
                     curve = np.loadtxt(data_dir+f'curve_sliced_relative/baselayer{i}_0.csv',delimiter=',')
-                    curve_scan = np.loadtxt(data_dir+f'curve_sliced_relative/baselayer{i}_0_scan_{curve_direction}',delimiter=',')
-                    curve_js = np.loadtxt(data_dir+f'curve_sliced_js/MA2010_base_js{i}_0.csv', delimiter=',')
+                    curve_scan = np.loadtxt(data_dir+f'curve_sliced_relative/baselayer{i}_0_scan_{curve_direction}.csv',delimiter=',')
+                    curve_js = np.loadtxt(data_dir+f'curve_sliced_js/MA2010_base_js{i}_0_{curve_direction}.csv', delimiter=',')
                     curve_js_cam = np.loadtxt(data_dir+f'curve_sliced_js/MA1440_base_js{i}_0_{curve_direction}.csv', delimiter=',')
                     curve_js_positioner = np.loadtxt(data_dir+f'curve_sliced_js/D500B_base_js{i}_0_{curve_direction}.csv', delimiter=',')
                     curve_js_scan = np.loadtxt(data_dir+f'curve_sliced_js/MA2010_base_js{i}_0_scan_{curve_direction}.csv', delimiter=',')
                     curve_js_pos_scan = np.loadtxt(data_dir+f'curve_sliced_js/D500B_base_js{i}_0_scan_{curve_direction}.csv', delimiter=',')
                 else:
                     curve = np.loadtxt(data_dir+f'curve_sliced_relative/slice{i}_0.csv',delimiter=',')
-                    curve_scan = np.loadtxt(data_dir+f'curve_sliced_relative/slice{i}_0_scan_{curve_direction}',delimiter=',')
-                    curve_js = np.loadtxt(data_dir+f'curve_sliced_js/MA2010_js{i}_0.csv', delimiter=',')
+                    curve_scan = np.loadtxt(data_dir+f'curve_sliced_relative/slice{i}_0_scan_{curve_direction}.csv',delimiter=',')
+                    curve_js = np.loadtxt(data_dir+f'curve_sliced_js/MA2010_js{i}_0_{curve_direction}.csv', delimiter=',')
                     curve_js_cam = np.loadtxt(data_dir+f'curve_sliced_js/MA1440_js{i}_0_{curve_direction}.csv', delimiter=',')
                     curve_js_positioner = np.loadtxt(data_dir+f'curve_sliced_js/D500B_js{i}_0_{curve_direction}.csv', delimiter=',')
                     curve_js_scan = np.loadtxt(data_dir+f'curve_sliced_js/MA2010_js{i}_0_scan_{curve_direction}.csv', delimiter=',')
@@ -170,14 +186,15 @@ def main():
                 else:
                     time.sleep(1)
 
-                # move to start point with z +50
-                z_offset = 35 # mm
-                for z in np.arange(z_offset,0,-5): # a linear movement
+                # move to start point with safety_z_offset
+                for z in np.arange(safety_z_offset,0,-5): # a linear movement
                     T_start = robot_weld.fwd(curve_js[0])
                     T_start.p[2] += z
                     curve_js_start_offset = robot_weld.inv(T_start.p, T_start.R, last_joints=curve_js[0])[0]
                     q_start_offset = np.hstack((curve_js_start_offset, curve_js_cam[0], curve_js_positioner[0]))
                     SS.jog2q(q_start_offset)
+                    if z==safety_z_offset:
+                        time.sleep(0.1)
                 # move to start point
                 q_start = np.hstack((curve_js[0], curve_js_cam[0], curve_js_positioner[0]))
                 SS.jog2q(q_start)
@@ -192,6 +209,8 @@ def main():
                 weld_js_exe = []
                 scan_exe = []
                 stamps_exe = []
+                if thermal_on:
+                    rr_sensors.start_all_sensors()
                 while lam_cur<lam_relative[-1] - v_cmd/SS.streaming_rate:
                     loop_start=time.perf_counter()
 
@@ -241,6 +260,8 @@ def main():
                     fronius_client.stop_weld()
                     time.sleep(0.5)
                 arc_off=True
+                if thermal_on:
+                    rr_sensors.stop_all_sensors()
                 ########################################
 
                 ####### remain scanning motion ##########################
@@ -276,10 +297,9 @@ def main():
                         SS.position_cmd(q_cmd,loop_start)
                 ########################################
 
-                # move to end point with z +50
+                # move to end point with safety_z_offset
                 time.sleep(0.3)
-                z_offset = 35 # mm
-                for z in np.arange(0,z_offset+1,5): # a linear movement
+                for z in np.arange(0,safety_z_offset+1,5): # a linear movement
                     T_end = robot_weld.fwd(curve_js_scan[-1])
                     T_end.p[2] += z
                     curve_js_end_offset = robot_weld.inv(T_end.p, T_end.R, last_joints=curve_js_scan[-1])[0]
@@ -295,21 +315,17 @@ def main():
                 if weld_parts == 'base':
                     layer_name = 'baselayer'+str(i)
                     pathlib.Path(logdata_dir+layer_name).mkdir(parents=True, exist_ok=True)
-                    np.savetxt(logdata_dir+layer_name+f'/baselayer{i}_timestamps_exe.csv', stamps_exe, delimiter=',')
-                    np.savetxt(logdata_dir+layer_name+f'/baselayer{i}_weld_js_exe.csv', weld_js_exe, delimiter=',')
-                    np.savetxt(logdata_dir+layer_name+f'/baselayer{i}_weld_cmd.csv', welding_cmd_all, delimiter=',')
-                    if fuji_scanon:
-                        with open(logdata_dir+layer_name+f'/baselayer{i}_scan_exe.pickle', 'wb') as file:
-                            pickle.dump(scan_exe, file)
                 else:
                     layer_name = 'layer'+str(i)
                     pathlib.Path(logdata_dir+layer_name).mkdir(parents=True, exist_ok=True)
-                    np.savetxt(logdata_dir+layer_name+f'/layer{i}_timestamps_exe.csv', stamps_exe, delimiter=',')
-                    np.savetxt(logdata_dir+layer_name+f'/layer{i}_weld_js_exe.csv', weld_js_exe, delimiter=',')
-                    np.savetxt(logdata_dir+layer_name+f'/layer{i}_weld_cmd.csv', welding_cmd_all, delimiter=',')
-                    if fuji_scanon:
-                        with open(logdata_dir+layer_name+f'/layer{i}_scan_exe.pickle', 'wb') as file:
-                            pickle.dump(scan_exe, file)
+                np.savetxt(logdata_dir+layer_name+f'/timestamps_exe.csv', stamps_exe, delimiter=',')
+                np.savetxt(logdata_dir+layer_name+f'/weld_js_exe.csv', weld_js_exe, delimiter=',')
+                np.savetxt(logdata_dir+layer_name+f'/weld_cmd.csv', welding_cmd_all, delimiter=',')
+                if fuji_scanon:
+                    with open(logdata_dir+layer_name+f'/scan_exe.pickle', 'wb') as file:
+                        pickle.dump(scan_exe, file)
+                if thermal_on:
+                    rr_sensors.save_all_sensors(logdata_dir+layer_name+'/')
                 ##########################################
                 
                 weld_js_exe = np.array(weld_js_exe)
@@ -322,12 +338,8 @@ def main():
                         scan_noise_remove = scan_process.scan2dDenoise(deepcopy(scan).T,crop_min=[-25,55],crop_max=[25,200])
                         scan_exe_noise_remove.append(scan_noise_remove)
                     if fuji_scanon:
-                        if weld_parts == 'base':
-                            with open(logdata_dir+layer_name+f'/baselayer{i}_scan_exe_noise_remove.pickle', 'wb') as f:
-                                pickle.dump(scan_exe_noise_remove, f)
-                        else:
-                            with open(logdata_dir+layer_name+f'/layer{i}_scan_exe_noise_remove.pickle', 'wb') as f:
-                                pickle.dump(scan_exe_noise_remove, f)
+                        with open(logdata_dir+layer_name+f'/scan_exe_noise_remove.pickle', 'wb') as f:
+                            pickle.dump(scan_exe_noise_remove, f)
                     pcd = scan_process.pcd_register_mti(scan_exe_noise_remove,weld_js_exe[:,np.append(np.arange(6),np.arange(12,14))],stamps_exe,flip=True,scanner='fuji')
                     curve_planned_z = np.mean(curve[:,2])
                     curve_x_end = np.min(curve[:,0])
@@ -346,17 +358,12 @@ def main():
                     print("Transz0_H:",Transz0_H)
 
                     mean_layer_height = np.mean(profile_height[:,1])
+                    with open(logdata_dir+layer_name+f'/profile_height.csv', 'wb') as f:
+                        pickle.dump(profile_height, f)
+                    o3d.io.write_point_cloud(logdata_dir+layer_name+f'/pcd.pcd',pcd)
                     if weld_parts == 'base':
-                        with open(logdata_dir+layer_name+f'/baselayer{i}_profile_height.csv', 'wb') as f:
-                            pickle.dump(profile_height, f)
-                        o3d.io.write_point_cloud(logdata_dir+layer_name+f'/baselayer{i}_pcd.pcd',pcd)
-
                         i = i+base_nom_incre # baselayer uses base_nom_incre
                     else:
-                        with open(logdata_dir+layer_name+f'/layer{i}_profile_height.csv', 'wb') as f:
-                            pickle.dump(profile_height, f)
-                        o3d.io.write_point_cloud(logdata_dir+layer_name+f'/layer{i}_pcd.pcd',pcd)
-
                         i = mean_layer_height/layer_resolution # layer uses mean_layer_height/layer_resolution
                 else:
                     if weld_parts == 'base':
