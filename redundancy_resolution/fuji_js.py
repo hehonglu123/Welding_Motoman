@@ -115,7 +115,7 @@ def main():
             robot_scan_motion.robot.joint_upper_limit = rob_upper_limit
             
             ##### generate robot js ######
-            if layer_n%2 == 0:
+            if layer_n%2 == 1:
                 all_cases = ['forward']
             else:
                 all_cases = ['backward']

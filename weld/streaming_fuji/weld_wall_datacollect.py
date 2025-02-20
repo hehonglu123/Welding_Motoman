@@ -17,6 +17,35 @@ sys.path.append('../../scan/scan_tools/')
 from scan_utils import *
 from scanProcess import *
 
+inch2mm = 25.4
+mm2inch = 1/25.4
+
+def welder_handler(exp):
+	if (exp is not None):
+		# If "err" is not None it means that an exception occurred.
+		# "err" contains the exception object
+		print ("An error occured! " + str(exp))
+		return
+
+def welding_profile_generate(lam_split, VPD, layer_n, v_min, v_max):
+    
+    split_sections = len(lam_split)
+
+    # random choose 1 from 2 cases
+    case = np.random.randint(2)
+    if case == 0: # monotonic increasing/decreasing
+        v_start = np.random.uniform(v_min, v_max)
+        v_end = np.random.uniform(v_min, v_max)
+        vel_profile = np.linspace(v_start, v_end, split_sections)
+    else: # wave-like
+        v_start = np.random.uniform(v_min, v_max)
+        v_amp = -1**(np.random.randint(2))*np.random.uniform((v_max-v_min)/10, (v_max-v_min)/2)
+        vel_profile = v_start + v_amp*np.sin(np.linspace(0, 2*np.pi, split_sections))
+        vel_profile = np.clip(vel_profile, v_min, v_max)
+    feedrate_profile = VPD*vel_profile*mm2inch
+
+    return vel_profile, feedrate_profile
+
 def main():
     
     weld_arcon = False
@@ -109,13 +138,14 @@ def main():
     scan_nom_vel = 5
     # collision avoidance z offset
     safety_z_offset = 50
-
     
     # data collection parameters
     cross_section = 1.2 # mm^2
-    inch2mm = 25.4
     VPD = cross_section*inch2mm*layer_feedrate/layer_nom_vel # volume per distance (mm^3/mm)
-
+    split_sections = 6
+    lam_split = np.linspace(0,meta_data['layer_length'],split_sections+1)[1:]
+    v_minimum = 3
+    v_maximum = 10
 
     # start-end layers
     baselayer_start = 0
@@ -141,8 +171,8 @@ def main():
     forward = True
     Transz0_H=None
     mean_layer_height = 0
-    # for weld_parts in ['base','layer']:
-    for weld_parts in ['base']:
+    for weld_parts in ['base','layer']:
+    # for weld_parts in ['base']:
         if weld_parts == 'base':
             weld_start = baselayer_start
             weld_end = baselayer_end
@@ -186,7 +216,14 @@ def main():
                 lam_relative = calc_lam_cs(curve[:,:3])
                 lam_scan_relative = calc_lam_cs(curve_scan[:,:3])
                 
+                # random generate current layer feedrate, velocity
+                if weld_parts == 'layer':
+                    vel_profile, feedrate_profile = welding_profile_generate(lam_split, VPD, i, v_minimum, v_maximum)
+
+                ### information print
                 print(f'Welding {weld_parts} layer {i}')
+
+
                 if input_from_user:
                     input("Press Enter to continue...")
                 else:
@@ -214,7 +251,6 @@ def main():
                 welding_cmd_all = []
                 weld_js_exe = []
                 scan_exe = []
-                stamps_exe = []
                 if thermal_on:
                     rr_sensors.start_all_sensors()
                 while lam_cur<lam_relative[-1] - v_cmd/SS.streaming_rate:
@@ -245,14 +281,13 @@ def main():
                         last_update_time=time.perf_counter()
                     
                     ### log data
-                    weld_js_exe.append(deepcopy(SS.q_cur)) # log robot joints
                     if fuji_scanon:
                         wire_packet=fuji_scan_wire.TryGetInValue() # log fuji cam scanner data
                         valid_indices=np.where(wire_packet[1].I_data>1)[0]
                         valid_indices=np.intersect1d(valid_indices,np.where(np.abs(wire_packet[1].Z_data)>50)[0])
                         line_profile=np.hstack((wire_packet[1].Y_data[valid_indices].reshape(-1,1),wire_packet[1].Z_data[valid_indices].reshape(-1,1)))
                         scan_exe.append(line_profile)
-                    stamps_exe.append(time.perf_counter()) # log time stamps
+                    weld_js_exe.append(np.append(time.perf_counter(),deepcopy(SS.q_cur))) # log timestamp and robot joints
 
                     ### sent position Command to the robot
                     q_cmd_all.append(np.hstack((time.perf_counter(),i,q_cmd)))
@@ -286,14 +321,13 @@ def main():
                     q_cmd=np.hstack((q1,r2_rest_q,q_pos))
 
                     ### log data
-                    weld_js_exe.append(deepcopy(SS.q_cur)) # log robot joints
                     if fuji_scanon:
                         wire_packet=fuji_scan_wire.TryGetInValue() # log fuji cam scanner data
                         valid_indices=np.where(wire_packet[1].I_data>1)[0]
                         valid_indices=np.intersect1d(valid_indices,np.where(np.abs(wire_packet[1].Z_data)>50)[0])
                         line_profile=np.hstack((wire_packet[1].Y_data[valid_indices].reshape(-1,1),wire_packet[1].Z_data[valid_indices].reshape(-1,1)))
                         scan_exe.append(line_profile)
-                    stamps_exe.append(time.perf_counter()) # log time stamps
+                    weld_js_exe.append(np.append(time.perf_counter(),deepcopy(SS.q_cur))) # log robot joints
 
                     ### sent position Command to the robot
                     q_cmd_all.append(np.hstack((time.perf_counter(),i,q_cmd)))
@@ -324,18 +358,18 @@ def main():
                 else:
                     layer_name = 'layer'+str(i)
                     pathlib.Path(logdata_dir+layer_name).mkdir(parents=True, exist_ok=True)
-                np.savetxt(logdata_dir+layer_name+f'/timestamps_exe.csv', stamps_exe, delimiter=',')
-                np.savetxt(logdata_dir+layer_name+f'/weld_js_exe.csv', weld_js_exe, delimiter=',')
-                np.savetxt(logdata_dir+layer_name+f'/weld_cmd.csv', welding_cmd_all, delimiter=',')
+                np.savetxt(logdata_dir+layer_name+f'/weld_js_exe.csv', weld_js_exe, delimiter=',') # save welding/scanning logged joint space data
+                np.savetxt(logdata_dir+layer_name+f'/js_cmd.csv', q_cmd_all, delimiter=',') # save welding/scanning commanded joint space data
+                np.savetxt(logdata_dir+layer_name+f'/weld_cmd.csv', welding_cmd_all, delimiter=',') # save welding commands
                 if fuji_scanon:
-                    with open(logdata_dir+layer_name+f'/scan_exe.pickle', 'wb') as file:
+                    with open(logdata_dir+layer_name+f'/scan_exe.pickle', 'wb') as file: # save scanning logged data
                         pickle.dump(scan_exe, file)
                 if thermal_on:
-                    rr_sensors.save_all_sensors(logdata_dir+layer_name+'/')
+                    rr_sensors.save_all_sensors(logdata_dir+layer_name+'/') # save thermal data
                 ##########################################
                 
                 weld_js_exe = np.array(weld_js_exe)
-                stamps_exe = np.array(stamps_exe)
+                stamps_exe = deepcopy(weld_js_exe[:,0])
                 ################### get layer increments ############################
                 if fuji_scanon:
                     scan_process = ScanProcess(robot_scan,positioner)
