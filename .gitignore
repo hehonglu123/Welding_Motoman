@@ -358,6 +358,8 @@ generated_src
 
 *.JBI
 
+*.zip
+
 .vscode/
 
 scan/scan_merge/**/points*

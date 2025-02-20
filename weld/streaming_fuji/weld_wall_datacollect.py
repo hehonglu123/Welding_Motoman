@@ -143,7 +143,8 @@ def main():
     cross_section = 1.2 # mm^2
     VPD = cross_section*inch2mm*layer_feedrate/layer_nom_vel # volume per distance (mm^3/mm)
     split_sections = 6
-    lam_split = np.linspace(0,meta_data['layer_length'],split_sections+1)[1:]
+    cmd_change_margin = 1 # mm
+    lam_split = np.linspace(0,meta_data['layer_length'],split_sections+1)[:-1]
     v_minimum = 3
     v_maximum = 10
 
@@ -177,14 +178,10 @@ def main():
             weld_start = baselayer_start
             weld_end = baselayer_end
             nom_incre = base_nom_incre
-            v_cmd = base_nom_vel
-            this_layer_feedrate = base_feedrate
         else:
             weld_start = layer_start
             weld_end = layer_end
             nom_incre = layer_nom_incre
-            v_cmd = layer_nom_vel
-            this_layer_feedrate = layer_feedrate
         i=weld_start
         while i < weld_end:
             print(f'Welding {weld_parts} layer {i}')
@@ -219,6 +216,11 @@ def main():
                 # random generate current layer feedrate, velocity
                 if weld_parts == 'layer':
                     vel_profile, feedrate_profile = welding_profile_generate(lam_split, VPD, i, v_minimum, v_maximum)
+                    assert len(vel_profile) == len(feedrate_profile)
+                    assert len(vel_profile) == len(lam_split), f'{len(vel_profile)} {len(feedrate_profile)} {len(lam_split)}'
+                else:
+                    vel_profile = [base_nom_vel]*len(lam_split)
+                    feedrate_profile = [base_feedrate]*len(lam_split)
 
                 ### information print
                 print(f'Welding {weld_parts} layer {i}')
@@ -227,7 +229,8 @@ def main():
                 if input_from_user:
                     input("Press Enter to continue...")
                 else:
-                    time.sleep(1)
+                    # time.sleep(1)
+                    pass
 
                 # move to start point with safety_z_offset
                 for z in np.arange(safety_z_offset,0,-5): # a linear movement
@@ -241,16 +244,24 @@ def main():
                 # move to start point
                 q_start = np.hstack((curve_js[0], curve_js_cam[0], curve_js_positioner[0]))
                 SS.jog2q(q_start)
-                time.sleep(0.3)
+                time.sleep(0.1)
+
+                # add a random delay
+                wait_time = np.random.uniform(0,10)
+                print("Wait for",wait_time,"s")
+                time.sleep(wait_time)
 
                 # start joints recording
                 ####### welding motion ##########################
                 lam_cur=0
-                last_update_time=time.perf_counter()+5.
+                # last_update_time=time.perf_counter()+5.
                 q_cmd_all = []
                 welding_cmd_all = []
                 weld_js_exe = []
                 scan_exe = []
+                # initial velocity
+                v_cmd = vel_profile[0]
+                feedrate_cmd = feedrate_profile[0]
                 if thermal_on:
                     rr_sensors.start_all_sensors()
                 while lam_cur<lam_relative[-1] - v_cmd/SS.streaming_rate:
@@ -269,16 +280,23 @@ def main():
                     if arc_off:
                         if weld_arcon:
                             print("Welding Start")
-                            fronius_client.job_number = int(this_layer_feedrate/10+job_offset)
+                            fronius_client.job_number = int(round(feedrate_cmd/10)+job_offset)
                             fronius_client.start_weld()
+                            last_update_time=time.perf_counter()
                         arc_off=False
 
                     ###update welding param
                     if time.perf_counter()-last_update_time>1./feedrate_update_rate:
-                        welding_cmd_all.append(np.hstack((time.perf_counter(),i,v_cmd,this_layer_feedrate)))
-                        ## TODO: update welding params
-                        v_cmd = v_cmd
+                        # find the last index smaller than lam_cur
+                        lam_idx=np.where(lam_split-v_cmd*feedrate_update_rate/2<=lam_cur)[0][-1]
+                        v_cmd = vel_profile[lam_idx]
+                        feedrate_cmd = feedrate_profile[lam_idx]
+                        # update feedrate to welder
+                        fronius_client.async_set_job_number(int(round(feedrate_cmd/10)+job_offset), welder_handler)
+                        # log command data
+                        welding_cmd_all.append(np.hstack((time.perf_counter(),i,v_cmd,int(round(feedrate_cmd/10)*10))))
                         last_update_time=time.perf_counter()
+                        print("Update Feedrate, Velocity:",int(round(feedrate_cmd/10)*10),round(v_cmd,1))
                     
                     ### log data
                     if fuji_scanon:
