@@ -79,15 +79,17 @@ def main():
     path_dl = meta_data['path_dl']
     dist_weld_scan_index = np.round(dist_weld_scan/path_dl).astype(int)
 
-    # layers_name = ['baselayer','layer']
-    layers_name = ['baselayer']
+    layers_name = ['baselayer','layer']
+    # layers_name = ['layer']
     for layer_name in layers_name:
         if layer_name == 'baselayer':
             layer_num = meta_data['baselayer_num']
         else:
             layer_num = meta_data['layer_num']
 
-        for layer_n in range(0,layer_num):
+        st = time.time()
+        start_layer = 0
+        for layer_n in range(start_layer,layer_num):
             ##### read curve data #####
             if layer_name == 'baselayer':
                 curve = np.loadtxt(data_dir+f'curve_sliced_relative/baselayer{layer_n}_0.csv',delimiter=',')
@@ -113,7 +115,12 @@ def main():
             robot_scan_motion.robot.joint_upper_limit = rob_upper_limit
             
             ##### generate robot js ######
-            for cases in ['forward','backward']:
+            if layer_n%2 == 0:
+                all_cases = ['forward']
+            else:
+                all_cases = ['backward']
+
+            for cases in all_cases:
                 ### forward case (+x direction)
                 ### backward case (-x direction)
                 if cases == 'backward':
@@ -172,6 +179,7 @@ def main():
                                             [0,0,1]]) # target ending scanner orientation in the positioner tip frame
                 rot_k, rot_theta = R2rot(curve_R_start.T@curve_R_final)
                 rot_theta /= 2
+                print("scanner rotation angle:",np.degrees(rot_theta))
                 curve_R = []
                 curve_quat = []
                 for i in range(1,len(curve_part)):
@@ -211,6 +219,8 @@ def main():
                 np.savetxt(positioner_scan_output_data_dir+'.csv',np.array(poScan_js),delimiter=',')
                 np.savetxt(curve_scan_output_data_dir,curve_scan,delimiter=',')
                 print(f'{layer_name} {layer_n} {cases} done')
+                print(f'Estimated time left h/m/s: {((time.time()-st)/(layer_n-start_layer+1)*(layer_num-layer_n-1))//3600}h {((time.time()-st)/(layer_n-start_layer+1)*(layer_num-layer_n-1))%3600//60}m {((time.time()-st)/(layer_n-start_layer+1)*(layer_num-layer_n-1))%60}s')
+                print('---------------------------------')
 
 if __name__ == "__main__":
     main()

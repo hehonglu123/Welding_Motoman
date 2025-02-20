@@ -8,7 +8,7 @@ layer_length = 110
 baselayernum = 2
 baselayer_resolution = 2.75
 layer_resolution = 0.1
-layer_num = 440
+layer_num = 460
 path_dl = 0.025
 
 positioner_joints = np.radians([-15,180])
