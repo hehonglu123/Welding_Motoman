@@ -143,9 +143,8 @@ def main():
     cross_section = 1.2 # mm^2
     VPD = cross_section*inch2mm*layer_feedrate/layer_nom_vel # volume per distance (mm^3/mm)
     split_sections = 6
-    cmd_change_margin = 1 # mm
     lam_split = np.linspace(0,meta_data['layer_length'],split_sections+1)[:-1]
-    v_minimum = 3
+    v_minimum = 5
     v_maximum = 10
 
     # start-end layers
@@ -162,7 +161,9 @@ def main():
     weld_meta_data = {'well_arcon':weld_arcon, 'fuji_scanon':fuji_scanon, 'data_dir':data_dir, 'logdata_dir':logdata_dir\
         ,'base_layer_num':base_layer_num, 'baselayer_resolution':baselayer_resolution, 'layer_num':layer_num, 'layer_resolution':layer_resolution\
         ,'base_feedrate':base_feedrate, 'base_nom_incre':base_nom_incre, 'base_nom_vel':base_nom_vel\
-        , 'layer_feedrate':layer_feedrate, 'layer_nom_incre':layer_nom_incre, 'layer_nom_vel':layer_nom_vel}
+        , 'layer_feedrate':layer_feedrate, 'layer_nom_incre':layer_nom_incre, 'layer_nom_vel':layer_nom_vel\
+        ,'corss_section':cross_section, 'VPD':VPD, 'split_sections':split_sections, 'lam_split':lam_split\
+        ,'v_minimum':v_minimum, 'v_maximum':v_maximum}
 
     # get robot 2 resting pose
     q_cur = deepcopy(SS.q_cur)
@@ -182,9 +183,10 @@ def main():
             weld_start = layer_start
             weld_end = layer_end
             nom_incre = layer_nom_incre
+        layer_count = 0
         i=weld_start
         while i < weld_end:
-            print(f'Welding {weld_parts} layer {i}')
+            print(f'Welding {weld_parts} layer {i} counting {layer_count} direction {forward}')
             try:
                 if forward:
                     curve_direction = 'forward'
@@ -215,7 +217,10 @@ def main():
                 
                 # random generate current layer feedrate, velocity
                 if weld_parts == 'layer':
-                    vel_profile, feedrate_profile = welding_profile_generate(lam_split, VPD, i, v_minimum, v_maximum)
+                    if layer_count<10:
+                        vel_profile, feedrate_profile = welding_profile_generate(lam_split, VPD, i, v_minimum, v_maximum*0.8)
+                    else:
+                        vel_profile, feedrate_profile = welding_profile_generate(lam_split, VPD, i, v_minimum, v_maximum)
                     assert len(vel_profile) == len(feedrate_profile)
                     assert len(vel_profile) == len(lam_split), f'{len(vel_profile)} {len(feedrate_profile)} {len(lam_split)}'
                 else:
@@ -287,12 +292,13 @@ def main():
 
                     ###update welding param
                     if time.perf_counter()-last_update_time>1./feedrate_update_rate:
-                        # find the last index smaller than lam_cur
-                        lam_idx=np.where(lam_split-v_cmd*feedrate_update_rate/2<=lam_cur)[0][-1]
-                        v_cmd = vel_profile[lam_idx]
-                        feedrate_cmd = feedrate_profile[lam_idx]
-                        # update feedrate to welder
-                        fronius_client.async_set_job_number(int(round(feedrate_cmd/10)+job_offset), welder_handler)
+                        if weld_parts == 'layer':
+                            # find the last index smaller than lam_cur
+                            lam_idx=np.where(lam_split-v_cmd*feedrate_update_rate/2<=lam_cur)[0][-1]
+                            v_cmd = vel_profile[lam_idx]
+                            feedrate_cmd = feedrate_profile[lam_idx]
+                            # update feedrate to welder
+                            fronius_client.async_set_job_number(int(round(feedrate_cmd/10)+job_offset), welder_handler)
                         # log command data
                         welding_cmd_all.append(np.hstack((time.perf_counter(),i,v_cmd,int(round(feedrate_cmd/10)*10))))
                         last_update_time=time.perf_counter()
@@ -431,6 +437,7 @@ def main():
                 ##########################################
 
                 ### layer parameters update 
+                layer_count += 1
                 forward = not forward
             except:
                 traceback.print_exc()
