@@ -36,7 +36,7 @@ def main():
     ## define the robot
     zero_config = np.zeros(6)
     config_dir='../config/'
-    robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',d=15,tool_file_path=config_dir+'torch.csv',\
+    robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',d=10,tool_file_path=config_dir+'torch_robot.csv',\
         pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',\
         base_marker_config_file=config_dir+'MA2010_marker_config/MA2010_marker_config.yaml',tool_marker_config_file=config_dir+'weldgun_marker_config/weldgun_marker_config.yaml')
     robot_scan=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path=config_dir+'fujicam.csv',\
@@ -79,8 +79,8 @@ def main():
     path_dl = meta_data['path_dl']
     dist_weld_scan_index = np.round(dist_weld_scan/path_dl).astype(int)
 
-    layers_name = ['baselayer','layer']
-    # layers_name = ['layer']
+    # layers_name = ['baselayer','layer']
+    layers_name = ['baselayer']
     for layer_name in layers_name:
         if layer_name == 'baselayer':
             layer_num = meta_data['baselayer_num']
@@ -115,10 +115,11 @@ def main():
             robot_scan_motion.robot.joint_upper_limit = rob_upper_limit
             
             ##### generate robot js ######
-            if layer_n%2 == 1:
+            if layer_n%2 == 0:
                 all_cases = ['forward']
             else:
                 all_cases = ['backward']
+            all_cases = ['forward','backward']
 
             for cases in all_cases:
                 ### forward case (+x direction)
@@ -135,9 +136,9 @@ def main():
                 orientation_start = get_torch_scanner_ori(curve[dist_weld_scan_index,3:], layer_weld_scan_vec, rotate_y_direction)
                 if cases == 'forward':
                     # positioner_j2_start = np.degrees(-1*(np.radians(180)-np.arctan2(curve[dist_weld_scan_index,1],curve[dist_weld_scan_index,0])))
-                    positioner_j2_start = 90
+                    positioner_j2_start = -30
                 else:
-                    positioner_j2_start = -90
+                    positioner_j2_start = -30
                 ## solve ik when the scanner is NOT on the layer yet
                 curve_part = deepcopy(curve[:dist_weld_scan_index+1])
                 curve_part = curve_part[::-1]

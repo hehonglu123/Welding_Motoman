@@ -48,14 +48,14 @@ def welding_profile_generate(lam_split, VPD, layer_n, v_min, v_max):
 
 def main():
     
-    weld_arcon = True
-    fuji_scanon = True
-    thermal_on = True
+    weld_arcon = False
+    fuji_scanon = False
+    thermal_on = False
     input_from_user = False
 
     ############## Robot definition ##############
     config_dir='../../config/'
-    robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',d=15,tool_file_path=config_dir+'torch.csv',\
+    robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',d=10,tool_file_path=config_dir+'torch_robot.csv',\
         pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',\
         base_marker_config_file=config_dir+'MA2010_marker_config/MA2010_marker_config.yaml',tool_marker_config_file=config_dir+'weldgun_marker_config/weldgun_marker_config.yaml')
     robot_scan=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path=config_dir+'fujicam.csv',\
@@ -80,6 +80,29 @@ def main():
     RR_robot_sub = RRN.SubscribeService('rr+tcp://localhost:59945?service=robot')
     point_distance=0.04		###STREAMING POINT INTERPOLATED DISTANCE
     SS=StreamingSend(RR_robot_sub,streaming_rate=125.)
+
+    # q_test = np.radians([-29.4778,33.1581,4.9155,-8.8037,-41.0991,21.9657])
+    # T_test = robot_weld.fwd(q_test)
+    # T_test_safe = deepcopy(T_test)
+    # T_test_safe.p[2] += 50
+    # q_test_safe = robot_weld.inv(T_test_safe.p, T_test_safe.R, last_joints=q_test)[0]
+    # T_test_2 = deepcopy(T_test)
+    # T_test_2.R = T_test_2.R@Rz(np.radians(180))
+    # T_test_2_safe = deepcopy(T_test_2)
+    # T_test_2_safe.p[2] += 50
+    # q_test_2 = robot_weld.inv(T_test_2.p, T_test_2.R, last_joints=q_test)[0]
+    # q_test_2_safe = robot_weld.inv(T_test_2_safe.p, T_test_2_safe.R, last_joints=q_test)[0]
+    # print("q_test_2:",np.degrees(q_test_2))
+    # q_cur = deepcopy(SS.q_cur)
+    # q_cmd = np.hstack((q_test_2_safe,q_cur[6:]))
+    # SS.jog2q(q_cmd)
+    # time.sleep(0.1)
+    # q_cmd = np.hstack((q_test_2,q_cur[6:]))
+    # SS.jog2q(q_cmd)
+
+    # SS.deinitialize_robot()
+    # exit()
+
 
     ########################################################RR FRONIUS########################################################
     if weld_arcon:
@@ -253,6 +276,8 @@ def main():
                 SS.jog2q(q_start)
                 time.sleep(0.1)
 
+                input("start")
+
                 # add a random delay
                 if layer_count < 99999999999:
                     wait_time = 0
@@ -334,6 +359,8 @@ def main():
                 if thermal_on:
                     rr_sensors.stop_all_sensors()
                 ########################################
+
+                input("end")
 
                 ####### remain scanning motion ##########################
                 r2_rest_q = q2
