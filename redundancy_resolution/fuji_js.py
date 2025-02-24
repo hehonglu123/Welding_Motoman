@@ -65,8 +65,10 @@ def main():
     torch_z_shift /= 2
 
     ## planning parameters
-    R1_w = 0.05
-    R2_w = 0.005
+    R1_w = 0.005
+    R2_w = 0.05
+    R1_w_scan = 0.005
+    R2_w_scan = 0.05
     thermal_distance=400
 
     ## always plan for lagging
@@ -108,7 +110,7 @@ def main():
 
             # robot scan limits
             rob_upper_limit = deepcopy(robot_scan_motion.upper_limit)
-            rob_upper_limit[2] = np.radians(55)
+            rob_upper_limit[2] = np.radians(45)
             robot_weld.upper_limit = rob_upper_limit
             robot_weld.robot.joint_upper_limit = rob_upper_limit
             robot_scan_motion.upper_limit = rob_upper_limit
@@ -136,9 +138,9 @@ def main():
                 orientation_start = get_torch_scanner_ori(curve[dist_weld_scan_index,3:], layer_weld_scan_vec, rotate_y_direction)
                 if cases == 'forward':
                     # positioner_j2_start = np.degrees(-1*(np.radians(180)-np.arctan2(curve[dist_weld_scan_index,1],curve[dist_weld_scan_index,0])))
-                    positioner_j2_start = -30
+                    positioner_j2_start = -40
                 else:
-                    positioner_j2_start = -30
+                    positioner_j2_start = -40
                 ## solve ik when the scanner is NOT on the layer yet
                 curve_part = deepcopy(curve[:dist_weld_scan_index+1])
                 curve_part = curve_part[::-1]
@@ -193,7 +195,7 @@ def main():
                 rrd=redundancy_resolution_dual(robot_scan_motion,positioner,curve_part[:,:3],curve_R)
                 q_init_table = positioner_js[-1]
                 q_init = rWeld_js[-1]
-                q_out1, q_out2 = rrd.dual_arm_6dof_stepwise(q_init,q_init_table,w1=R1_w,w2=R2_w)
+                q_out1, q_out2 = rrd.dual_arm_6dof_stepwise(q_init,q_init_table,w1=R1_w_scan,w2=R2_w_scan)
                 rScan_js.extend(q_out1)
                 poScan_js.extend(q_out2)
 
