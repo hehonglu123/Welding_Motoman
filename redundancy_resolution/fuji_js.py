@@ -65,11 +65,12 @@ def main():
     torch_z_shift /= 2
 
     ## planning parameters
-    R1_w = 0.005
-    R2_w = 0.05
-    R1_w_scan = 0.005
-    R2_w_scan = 0.05
+    R1_w = 0.001
+    R2_w = 0.01
+    R1_w_scan = 0.01
+    R2_w_scan = 0.001
     thermal_distance=400
+    scanning_extend_distance = 5 # mm
 
     ## always plan for lagging
     ## then plan for both forward and backward
@@ -140,7 +141,7 @@ def main():
                     # positioner_j2_start = np.degrees(-1*(np.radians(180)-np.arctan2(curve[dist_weld_scan_index,1],curve[dist_weld_scan_index,0])))
                     positioner_j2_start = -40
                 else:
-                    positioner_j2_start = -40
+                    positioner_j2_start = -90
                 ## solve ik when the scanner is NOT on the layer yet
                 curve_part = deepcopy(curve[:dist_weld_scan_index+1])
                 curve_part = curve_part[::-1]
@@ -167,6 +168,12 @@ def main():
                 rThermal_js = rr_thermal.rob2_flir_resolution([[rWeld_js]],robot_thermal,measure_distance=thermal_distance)[0][0]
                 ## solve ik when the torch is NOT on the layer (leaving the layer)
                 curve_part = deepcopy(curve[-dist_weld_scan_index-1:])
+                curve_part = curve_part[:,:3]
+                # extend the scanning at the end uniformly
+                extend_vec = curve_part[-1,:3]-curve_part[-2,:3]
+                extend_vec = extend_vec/np.linalg.norm(extend_vec)
+                curve_extend = np.linspace(curve_part[-1,:3],curve_part[-1,:3]+scanning_extend_distance*extend_vec,int(scanning_extend_distance//path_dl+1))
+                curve_part = np.vstack((curve_part,curve_extend[1:]))
                 # get orientation using scanner orientation
                 T_robot = robot_scan_motion.fwd(rWeld_js[-1],world=True)
                 T_positioner = positioner.fwd(positioner_js[-1],world=True)
