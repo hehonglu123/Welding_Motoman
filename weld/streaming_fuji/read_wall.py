@@ -140,8 +140,8 @@ def main():
             curve_x_end = np.min(curve[:,0])
             curve_x_start = np.max(curve[:,0])
             curve_y = np.mean(curve[:,1])
-            # z_height_start=curve_planned_z+0.1
-            z_height_start = 0
+            z_height_start=curve_planned_z+0.1
+            # z_height_start = 0
             print(z_height_start)
             print(curve_y)
             crop_extend_x=10
@@ -155,6 +155,13 @@ def main():
             profile_height, profile_width,Transz0_H = scan_process.pcd2height(deepcopy(pcd),z_height_start,bbox_min=crop_h_min,bbox_max=crop_h_max,Transz0_H=Transz0_H,return_width=True)
             print("Transz0_H:",Transz0_H)
 
+            # apply 1D smoother to profile_width
+            plt.scatter(profile_width[:,0],profile_width[:,1])
+            profile_width[:,1] = np.convolve(profile_width[:,1], np.ones(5)/5, mode='same')
+            plt.scatter(profile_width[:,0],profile_width[:,1])
+            plt.title('Profile Width')
+            plt.show()
+
             # save processed profile height and point cloud
             np.savetxt(this_layer_dir+'_profile_height.csv',profile_height,delimiter=',')
             o3d.io.write_point_cloud(this_layer_dir+'_pcd.pcd',pcd)
@@ -165,9 +172,7 @@ def main():
             plt.title('Profile Height')
             plt.show()
 
-            plt.scatter(profile_width[:,0],profile_width[:,1])
-            plt.title('Profile Width')
-            plt.show()
+            
 
 if __name__ == '__main__':
     main()
