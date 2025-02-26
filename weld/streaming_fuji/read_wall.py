@@ -22,7 +22,7 @@ def main():
     positioner=positioner_obj('D500B',def_path=config_dir+'D500B_robot_extended_config.yml',tool_file_path=config_dir+'positioner_tcp.csv',\
 		pulse2deg_file_path=config_dir+'D500B_pulse2deg_real.csv',base_transformation_file=config_dir+'D500B_pose.csv')
 
-    # positioner_joints = np.radians([-15,180])
+    positioner_joints = np.radians([-15,180])
 
     ################## Read geometry data ##################
     data_dir = '../../data/wall_weld_test/'
@@ -87,16 +87,20 @@ def main():
             # Single scan 2D reconstruction
             target_p = curve[0][:3] + dh_star
             try:
-                with open(this_layer_dir+'_scan_exe_noise_remove.pickle', 'rb') as f:
+                with open(this_layer_dir+'_scan_exe_noise_remove', 'rb') as f:
                     scan_exe_noise_remove = pickle.load(f)
             except FileNotFoundError:
                 scan_exe_noise_remove = []
-                st = time.time()
+                duration_list = []
                 for (weld_js,scan) in zip(weld_js_exe,scan_exe):
-                    delta_h,point_p,scan_noise_remove = scan_process.scan2dh(deepcopy(scan).T,\
-                            weld_js,target_p,crop_min=[-25,55],crop_max=[25,200],offset_z=0)
+                    st = time.time()
+                    scan_noise_remove = scan_process.scan2dDenoise(deepcopy(scan).T,crop_min=[-25,55],crop_max=[25,200])
                     scan_exe_noise_remove.append(scan_noise_remove)
-                print('Single scan 2D reconstruction time:',time.time()-st)
+                    duration_list.append(time.time()-st)
+                # plt.plot(duration_list)
+                # plt.show()
+                print("Average single scan 2D reconstruction time:",np.mean(duration_list))
+                print("Max single scan 2D reconstruction time:",np.max(duration_list))
                 with open(this_layer_dir+'_scan_exe_noise_remove.pickle', 'wb') as f:
                     pickle.dump(scan_exe_noise_remove, f)
             
@@ -125,7 +129,7 @@ def main():
             pcd=None
             # pcd = scan_process.pcd_register_mti(scan_exe,weld_js_exe[:,:6],robot_stamps,static_positioner_q=positioner_joints,flip=True,scanner='fuji')
             pcd_noise_preremoved = scan_process.pcd_register_mti(scan_exe_noise_remove,weld_js_exe[:,:6],robot_stamps,static_positioner_q=positioner_joints,flip=True,scanner='fuji')
-            # visualize_pcd([pcd])
+            visualize_pcd([pcd_noise_preremoved])
             # move pcd_noise_preremoved in y direction
             # pcd_noise_preremoved = pcd_noise_preremoved.translate((0,200,0))
             # visualize_pcd([pcd,pcd_noise_preremoved])
@@ -136,18 +140,19 @@ def main():
             curve_x_end = np.min(curve[:,0])
             curve_x_start = np.max(curve[:,0])
             curve_y = np.mean(curve[:,1])
-            z_height_start=curve_planned_z+0.1
-            # z_height_start = -3
+            # z_height_start=curve_planned_z+0.1
+            z_height_start = 0
             print(z_height_start)
+            print(curve_y)
             crop_extend_x=10
-            crop_extend_z=20
+            crop_extend_z=200
             crop_min=(curve_x_end-crop_extend_x,curve_y-30,-30)
             crop_max=(curve_x_start+crop_extend_x,curve_y+30,z_height_start+crop_extend_z)
             crop_h_min=(curve_x_end-crop_extend_x,curve_y-20,-30)
             crop_h_max=(curve_x_start+crop_extend_x,curve_y+20,z_height_start+crop_extend_z)
             pcd = scan_process.pcd_noise_remove(pcd,nb_neighbors=40,std_ratio=1.5,\
                                                 min_bound=crop_min,max_bound=crop_max,cluster_based_outlier_remove=True,cluster_neighbor=1,min_points=100)
-            profile_height,Transz0_H = scan_process.pcd2height(deepcopy(pcd),z_height_start,bbox_min=crop_h_min,bbox_max=crop_h_max,Transz0_H=Transz0_H)
+            profile_height, profile_width,Transz0_H = scan_process.pcd2height(deepcopy(pcd),z_height_start,bbox_min=crop_h_min,bbox_max=crop_h_max,Transz0_H=Transz0_H,return_width=True)
             print("Transz0_H:",Transz0_H)
 
             # save processed profile height and point cloud
@@ -157,6 +162,11 @@ def main():
             # visualize the reconstructed point cloud
             visualize_pcd([pcd])
             plt.scatter(profile_height[:,0],profile_height[:,1])
+            plt.title('Profile Height')
+            plt.show()
+
+            plt.scatter(profile_width[:,0],profile_width[:,1])
+            plt.title('Profile Width')
             plt.show()
 
 if __name__ == '__main__':

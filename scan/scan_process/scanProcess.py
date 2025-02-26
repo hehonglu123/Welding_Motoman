@@ -605,7 +605,7 @@ class ScanProcess():
     
     def pcd2height(self,scanned_points,z_height_start,bbox_min=(-40,-20,0),bbox_max=(40,20,45),\
                    resolution_z=0.1,windows_z=0.2,resolution_x=0.1,windows_x=1,stop_thres=20,\
-                   stop_thres_w=10,use_points_num=5,width_thres=0.8,Transz0_H=None):
+                   stop_thres_w=10,use_points_num=5,width_thres=0.8,Transz0_H=None,return_width=False):
 
         ##### cross section parameters
         # resolution_z=0.1
@@ -646,6 +646,7 @@ class ScanProcess():
 
         ##### get projection of each z height
         profile_height = {}
+        profile_width = {}
         z_max=np.max(np.asarray(scanned_points.points)[:,2])
         for z in np.arange(z_height_start,z_max+resolution_z,resolution_z):
             #### crop z height
@@ -709,16 +710,31 @@ class ScanProcess():
             
             for pf_i in range(len(profile_p)):
                 profile_height[profile_p[pf_i][0]] = profile_p[pf_i][2]
+                if return_width:
+                    if profile_p[pf_i][0] not in profile_width.keys():
+                        profile_width[profile_p[pf_i][0]] = profile_p[pf_i][1]
+                    else:
+                        if profile_p[pf_i][1]>profile_width[profile_p[pf_i][0]]:
+                            profile_width[profile_p[pf_i][0]] = profile_p[pf_i][1]
 
-        profile_height_arr = []
-        for x in profile_height.keys():
-            profile_height_arr.append(np.array([x,profile_height[x]]))
-        profile_height_arr=np.array(profile_height_arr)
-
+        # profile_height_arr = []
+        # profile_width_arr = []
+        # # for x in profile_height.keys():
+        # #     profile_height_arr.append(np.array([x,profile_height[x]]))
+        profile_height_arr = np.vstack((list(profile_height.keys()),list(profile_height.values()))).T
+        profile_height_arr = profile_height_arr.astype(float)
         profile_height_arr_argsort = np.argsort(profile_height_arr[:,0])
         profile_height_arr=profile_height_arr[profile_height_arr_argsort]
         
-        return profile_height_arr,Transz0_H
+        if not return_width:
+            return profile_height_arr,Transz0_H
+
+        profile_width_arr = np.vstack((list(profile_width.keys()),list(profile_width.values()))).T
+        profile_width_arr = profile_width_arr.astype(float)
+        profile_width_arr_argsort = np.argsort(profile_width_arr[:,0])
+        profile_width_arr=profile_width_arr[profile_width_arr_argsort]
+
+        return profile_height_arr,profile_width_arr,Transz0_H
 
     def scan2dDenoise(self,scan,crop_min=[-10,85],crop_max=[10,100]):
 
