@@ -723,6 +723,8 @@ class ScanProcess():
     def scan2dDenoise(self,scan,crop_min=[-10,85],crop_max=[10,100]):
 
         dbscan = DBSCAN(eps=0.5,min_samples=20)
+        # print("x min max",np.min(scan[0]),np.max(scan[0]))
+        # print("y min max",np.min(scan[1]),np.max(scan[1]))
         ## remove not in interested region
         mti_pcd=np.delete(scan,scan[1]==0,axis=1)
         mti_pcd=np.delete(mti_pcd,mti_pcd[1]<crop_min[1],axis=1)
@@ -731,6 +733,8 @@ class ScanProcess():
         mti_pcd=np.delete(mti_pcd,mti_pcd[0]>crop_max[0],axis=1)
         mti_pcd[0]=-1*mti_pcd[0]
         mti_pcd = mti_pcd.T
+
+        # print("mti_pcd shape:",mti_pcd.shape)
         
         # cluster based noise remove
         dbscan.fit(mti_pcd)
