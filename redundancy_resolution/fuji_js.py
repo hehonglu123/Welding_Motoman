@@ -83,7 +83,7 @@ def main():
     dist_weld_scan_index = np.round(dist_weld_scan/path_dl).astype(int)
 
     # layers_name = ['baselayer','layer']
-    layers_name = ['baselayer']
+    layers_name = ['layer']
     for layer_name in layers_name:
         if layer_name == 'baselayer':
             layer_num = meta_data['baselayer_num']
@@ -122,7 +122,7 @@ def main():
                 all_cases = ['forward']
             else:
                 all_cases = ['backward']
-            all_cases = ['forward','backward']
+            all_cases = ['backward']
 
             for cases in all_cases:
                 ### forward case (+x direction)

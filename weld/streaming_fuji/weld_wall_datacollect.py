@@ -90,6 +90,7 @@ def main():
             fronius_client = fronius_sub.GetDefaultClientWait(1)      #connect, timeout=30s
         except:
             print("Fronius connection failed")
+
             traceback.print_exc()
             SS.deinitialize_robot()
             exit()
@@ -110,7 +111,7 @@ def main():
     if thermal_on:
         flir_url = 'rr+tcp://192.168.55.10:60827/?service=camera'
         cam_ser=RRN.ConnectService(flir_url)
-        rr_sensors = WeldRRSensor(cam_service=cam_ser)
+        rr_sensors = WeldRRSensor(weld_service=fronius_sub,cam_service=cam_ser)
         print("Test 3 Sec.")
         rr_sensors.test_all_sensors()
         print(len(rr_sensors.ir_recording))
@@ -268,8 +269,6 @@ def main():
                 SS.jog2q(q_start)
                 time.sleep(0.1)
 
-                input("start")
-
                 # add a random delay
                 if layer_count < 99999999999:
                     wait_time = 0
@@ -392,9 +391,6 @@ def main():
                     q_start = np.hstack((curve_js_scan[0], q2, curve_js_pos_scan[0]))
                     SS.jog2q(q_start)
                     
-
-                input("end")
-
                 ####### remain scanning motion ##########################
                 r2_rest_q = q2
                 v_cmd = scan_nom_vel
