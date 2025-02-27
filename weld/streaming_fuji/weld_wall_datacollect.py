@@ -187,7 +187,7 @@ def main():
         ,'base_layer_num':base_layer_num, 'baselayer_resolution':baselayer_resolution, 'layer_num':layer_num, 'layer_resolution':layer_resolution\
         ,'base_feedrate':base_feedrate, 'base_nom_incre':base_nom_incre, 'base_nom_vel':base_nom_vel\
         , 'layer_feedrate':layer_feedrate, 'layer_nom_incre':layer_nom_incre, 'layer_nom_vel':layer_nom_vel\
-        ,'corss_section':cross_section, 'VPD':VPD, 'split_sections':split_sections, 'lam_split':lam_split\
+        ,'cross_section':cross_section, 'VPD':VPD, 'split_sections':split_sections, 'lam_split':list(lam_split)\
         ,'v_minimum':v_minimum, 'v_maximum':v_maximum}
 
     # get robot 2 resting pose

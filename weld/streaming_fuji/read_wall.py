@@ -1,4 +1,4 @@
-import time, os, copy, sys, yaml
+import time, os, copy, sys, yaml, inspect
 import glob
 from copy import deepcopy
 import numpy as np
@@ -6,6 +6,8 @@ from matplotlib import pyplot as plt
 import open3d as o3d
 from motoman_def import *
 from robotics_utils import *
+from flir_toolbox import *
+from ultralytics import YOLO
 sys.path.append('../../scan/scan_process/')
 sys.path.append('../../scan/scan_tools/')
 from scan_utils import *
@@ -15,164 +17,255 @@ def main():
 
     ############## Robot definition ##############
     config_dir='../../config/'
-    robot=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path=config_dir+'torch.csv',\
-		pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',d=15)
+    robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',d=10,tool_file_path=config_dir+'torch_robot.csv',\
+        pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',\
+        base_marker_config_file=config_dir+'MA2010_marker_config/MA2010_marker_config.yaml',tool_marker_config_file=config_dir+'weldgun_marker_config/weldgun_marker_config.yaml')
     robot_scan=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path=config_dir+'fujicam.csv',\
-    pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv')
+        pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv')
     positioner=positioner_obj('D500B',def_path=config_dir+'D500B_robot_extended_config.yml',tool_file_path=config_dir+'positioner_tcp.csv',\
 		pulse2deg_file_path=config_dir+'D500B_pulse2deg_real.csv',base_transformation_file=config_dir+'D500B_pose.csv')
 
-    positioner_joints = np.radians([-15,180])
+    # positioner_joints = np.radians([-15,180])
 
     ################## Read geometry data ##################
     data_dir = '../../data/wall_weld_test/'
-    logdata_dir = data_dir+'weld_fujiscan_2025_02_12_19_40_32/'
-    
-    with open(logdata_dir+'weld_meta_data.yml', 'r') as f:
-        meta_data = yaml.safe_load(f)
-    
-    base_layer_num= meta_data['base_layer_num']
-    baselayer_resolution= meta_data['baselayer_resolution']
-    layer_num = meta_data['layer_num']
-    layer_resolution = meta_data['layer_resolution']
 
-    # for weld_parts in ['base','layer']:
-    for weld_parts in ['layer']:
-        if weld_parts == 'base':
-            total_layers_name = glob.glob(logdata_dir+'baselayer*')
-        else:
-            total_layers_name = glob.glob(logdata_dir+'layer*')
-        # get printed layer number
-        layer_nums = []
-        for layer_name in total_layers_name:
-            this_layer = layer_name.split('\\')[-1]
-            this_layer = this_layer.split('r')[-1]
-            layer_nums.append(int(this_layer))
-        layer_nums = np.sort(layer_nums)
+    logdata_dir_all = ['weld_fujiscan_2025_02_26_18_08_18/', 'weld_fujiscan_2025_02_26_16_24_21/', 'weld_fujiscan_2025_02_26_17_39_17/']
 
-        if weld_parts == 'base':
-            dh_star = baselayer_resolution
-        else:
-            dh_star = layer_resolution*(layer_nums[1]-layer_nums[0])
+    for logdata_dir_name in logdata_dir_all:
+        print('Processing:',logdata_dir_name)
 
-        # build layers from bottom to top by layers
-        Transz0_H = None
-        for layer_n in [layer_nums[-1],layer_nums[-2]]:
-            
-            # read layer curve data
-            if weld_parts == 'base':
-                curve = np.loadtxt(data_dir+f'curve_sliced_relative/baselayer{layer_n}_0.csv',delimiter=',')
-            else:
-                curve = np.loadtxt(data_dir+f'curve_sliced_relative/slice{layer_n}_0.csv',delimiter=',')
-
-            # read logged data
-            if weld_parts == 'base':
-                layer_name = 'baselayer'+str(layer_n)
-            else:
-                layer_name = 'layer'+str(layer_n)
-            print('Processing layer:',layer_name)
-            this_layer_dir = logdata_dir+layer_name+'/'+layer_name
-            robot_stamps = np.loadtxt(this_layer_dir+'_timestamps_exe.csv',delimiter=',')
-            weld_js_exe = np.loadtxt(this_layer_dir+'_weld_js_exe.csv',delimiter=',')
-            # get js at index 0~5 and 12 13
-            weld_js_exe = weld_js_exe[:,[0,1,2,3,4,5,12,13]]
-            with open(this_layer_dir+'_scan_exe.pickle', 'rb') as f:
-                scan_exe = pickle.load(f)
-            
-            assert len(weld_js_exe) == len(scan_exe), 'Weld joint and scan data length mismatched'
+        logdata_dir = data_dir+logdata_dir_name
         
-            # processing the scans
-            scan_process = ScanProcess(robot_scan,positioner)
+        with open(logdata_dir+'weld_meta_data.yml', 'r') as f:
+            meta_data = yaml.safe_load(f)
 
-            # Single scan 2D reconstruction
-            target_p = curve[0][:3] + dh_star
-            try:
-                with open(this_layer_dir+'_scan_exe_noise_remove', 'rb') as f:
-                    scan_exe_noise_remove = pickle.load(f)
-            except FileNotFoundError:
-                scan_exe_noise_remove = []
-                duration_list = []
-                for (weld_js,scan) in zip(weld_js_exe,scan_exe):
-                    st = time.time()
-                    scan_noise_remove = scan_process.scan2dDenoise(deepcopy(scan).T,crop_min=[-25,55],crop_max=[25,200])
-                    scan_exe_noise_remove.append(scan_noise_remove)
-                    duration_list.append(time.time()-st)
-                # plt.plot(duration_list)
-                # plt.show()
-                print("Average single scan 2D reconstruction time:",np.mean(duration_list))
-                print("Max single scan 2D reconstruction time:",np.max(duration_list))
-                with open(this_layer_dir+'_scan_exe_noise_remove.pickle', 'wb') as f:
-                    pickle.dump(scan_exe_noise_remove, f)
-            
-            # Draw animation using scan_exe_noise_remove and plt
-            # fig, ax = plt.subplots()
-            # ax.set_xlim(-20, 20)
-            # ax.set_ylim(50, 150)
-            # ax.set_xlabel('X axis')
-            # ax.set_ylabel('Y axis')
-            # ax.set_title(f'Scan Animation for {layer_name}')
-            # fastforward_speed = 16
-            # dt = np.mean(np.diff(robot_stamps))
-            # for i,scan in enumerate(scan_exe_noise_remove[::fastforward_speed]):
-            #     ax.clear()
-            #     ax.set_xlim(-20, 20)
-            #     ax.set_ylim(50, 150)
-            #     ax.set_xlabel('X axis')
-            #     ax.set_ylabel('Y axis')
-            #     ax.set_title(f'Scan Animation for {layer_name}')
-            #     ax.scatter(scan[:, 0], scan[:, 1], s=1)
-            #     ax.text(0, 0, f'Layer {layer_name}\nTime: {dt:.2f}s\nIndex: {i*fastforward_speed+1}/{len(scan_exe_noise_remove)}', fontsize=12)
-            #     plt.pause(dt)
-            # plt.show()
+        last_profile_height = None
+        for weld_parts in ['base','layer']:
+        # for weld_parts in ['layer']:
+            if weld_parts == 'base':
+                total_layers_name = glob.glob(logdata_dir+'baselayer*')
+            else:
+                total_layers_name = glob.glob(logdata_dir+'layer*')
+            # get printed layer number
+            layer_nums = []
+            for layer_name in total_layers_name:
+                this_layer = layer_name.split('\\')[-1]
+                this_layer = this_layer.split('r')[-1]
+                layer_nums.append(int(this_layer))
+            layer_nums = np.sort(layer_nums)
 
-            # whole layer 3D reconstruction
-            pcd=None
-            # pcd = scan_process.pcd_register_mti(scan_exe,weld_js_exe[:,:6],robot_stamps,static_positioner_q=positioner_joints,flip=True,scanner='fuji')
-            pcd_noise_preremoved = scan_process.pcd_register_mti(scan_exe_noise_remove,weld_js_exe[:,:6],robot_stamps,static_positioner_q=positioner_joints,flip=True,scanner='fuji')
-            visualize_pcd([pcd_noise_preremoved])
-            # move pcd_noise_preremoved in y direction
-            # pcd_noise_preremoved = pcd_noise_preremoved.translate((0,200,0))
-            # visualize_pcd([pcd,pcd_noise_preremoved])
-            pcd = pcd_noise_preremoved
+            # build layers from bottom to top by layers
+            Transz0_H = None
+            # for layer_n in [layer_nums[-1],layer_nums[-2]]:
+            for layer_n in layer_nums:
+                
+                # read layer curve data
+                if weld_parts == 'base':
+                    curve = np.loadtxt(data_dir+f'curve_sliced_relative/baselayer{layer_n}_0.csv',delimiter=',')
+                else:
+                    curve = np.loadtxt(data_dir+f'curve_sliced_relative/slice{layer_n}_0.csv',delimiter=',')
 
-            # cropping the point cloud
-            curve_planned_z = np.mean(curve[:,2])
-            curve_x_end = np.min(curve[:,0])
-            curve_x_start = np.max(curve[:,0])
-            curve_y = np.mean(curve[:,1])
-            z_height_start=curve_planned_z+0.1
-            # z_height_start = 0
-            print(z_height_start)
-            print(curve_y)
-            crop_extend_x=10
-            crop_extend_z=200
-            crop_min=(curve_x_end-crop_extend_x,curve_y-30,-30)
-            crop_max=(curve_x_start+crop_extend_x,curve_y+30,z_height_start+crop_extend_z)
-            crop_h_min=(curve_x_end-crop_extend_x,curve_y-20,-30)
-            crop_h_max=(curve_x_start+crop_extend_x,curve_y+20,z_height_start+crop_extend_z)
-            pcd = scan_process.pcd_noise_remove(pcd,nb_neighbors=40,std_ratio=1.5,\
-                                                min_bound=crop_min,max_bound=crop_max,cluster_based_outlier_remove=True,cluster_neighbor=1,min_points=100)
-            profile_height, profile_width,Transz0_H = scan_process.pcd2height(deepcopy(pcd),z_height_start,bbox_min=crop_h_min,bbox_max=crop_h_max,Transz0_H=Transz0_H,return_width=True)
-            print("Transz0_H:",Transz0_H)
+                # read logged data
+                if weld_parts == 'base':
+                    layer_name = 'baselayer'+str(layer_n)
+                else:
+                    layer_name = 'layer'+str(layer_n)
+                print('Processing layer:',layer_name)
+                this_layer_dir = logdata_dir+layer_name+'/'
+                rob_js_exe = np.loadtxt(this_layer_dir+'weld_js_exe.csv',delimiter=',')
+                # get js at index 1~6 and 13 14
+                rob_js_exe = rob_js_exe[:,[0,1,2,3,4,5,6,13,14]]
+                robot_stamps = rob_js_exe[:,0]
+                with open(this_layer_dir+'scan_exe.pickle', 'rb') as f:
+                    scan_exe = pickle.load(f)
+                
+                assert len(rob_js_exe) == len(scan_exe), 'Weld joint and scan data length mismatched'
 
-            # apply 1D smoother to profile_width
-            plt.scatter(profile_width[:,0],profile_width[:,1])
-            profile_width[:,1] = np.convolve(profile_width[:,1], np.ones(5)/5, mode='same')
-            plt.scatter(profile_width[:,0],profile_width[:,1])
-            plt.title('Profile Width')
-            plt.show()
+                ############### get welding js ####################
+                weld_end_id = np.argmax(np.diff(robot_stamps))
+                scan_js_exe = deepcopy(rob_js_exe)
+                weld_js_exe = rob_js_exe[:weld_end_id+1,:]
 
-            # save processed profile height and point cloud
-            np.savetxt(this_layer_dir+'_profile_height.csv',profile_height,delimiter=',')
-            o3d.io.write_point_cloud(this_layer_dir+'_pcd.pcd',pcd)
+                ############### get welding status ##############
+                print("Getting welding status...")
+                welding_status = np.loadtxt(this_layer_dir+'welding.csv',delimiter=',',skiprows=1)
 
-            # visualize the reconstructed point cloud
-            visualize_pcd([pcd])
-            plt.scatter(profile_height[:,0],profile_height[:,1])
-            plt.title('Profile Height')
-            plt.show()
+                ############### get thermal readings ##############
+                print("Getting thermal readings...")
+                try:
+                    thermal_reading = np.loadtxt(this_layer_dir+'thermal.',delimiter=',')
+                except FileNotFoundError:
+                    with open(this_layer_dir+'ir_recording.pickle', 'rb') as f:
+                        ir_exe = pickle.load(f)
+                    ir_stamp = np.loadtxt(this_layer_dir+'ir_stamps.csv',delimiter=',')
+                    torch_model = YOLO(os.path.dirname(inspect.getfile(flir_toolbox))+"/torch.pt")
+                    tip_wire_model = YOLO(os.path.dirname(inspect.getfile(flir_toolbox))+"/tip_wire.pt")
+                    horizontal_offset=0
+                    vertical_offset=3
+                    ir_pixel_window_size=7
+                    flame_centroid_history=[]
+                    thermal_reading = []
+                    thermal_stamp = []
+                    for (ir_image_raw,stamp) in zip(ir_exe,ir_stamp):
+                        ir_image = np.rot90(ir_image_raw, k=-1)
+                        # centroid, bbox, torch_centroid, torch_bbox=weld_detection_aluminum(ir_image,torch_model,percentage_threshold=0.8)
+                        # centroid, bbox, torch_centroid, torch_bbox=weld_detection_steel(ir_image,torch_model,tip_wire_model)
+                        # find max pixel value in ir_image
+                        centroid = np.unravel_index(np.argmax(ir_image, axis=None), ir_image.shape)
+                        if ir_image[centroid] < 1e4:
+                            continue
+                        # draw bbox and centroid on ir_image
+                        if centroid is not None:
+                            ###weighted history filter
+                            if len(flame_centroid_history) > 30:
+                                flame_centroid_history.pop(0)
+                                # Calculate the weight for the previous history values
+                                previous_weight = 0.8 / len(flame_centroid_history)
+                                centroid = 0.2 * centroid + np.sum(np.array(flame_centroid_history) * previous_weight, axis=0)
+                                flame_centroid_history.append(centroid)
 
-            
+                            #find average pixel value 
+                            pixel_coord = (int(centroid[0]) + horizontal_offset, int(centroid[1]) + vertical_offset)
+                            pixel_coord = pixel_coord[::-1]
+                            flame_reading=get_pixel_value(ir_image,pixel_coord,ir_pixel_window_size)
+                            thermal_reading.append(flame_reading)
+                            thermal_stamp.append(stamp)
+                            # print(flame_reading, centroid)
+                            # show image
+                        # plt.imshow(ir_image, cmap='inferno', aspect='auto')
+                        # plt.colorbar(format='%.2f')
+                        # plt.pause(0.1)
+                        # plt.clf()
+                    # save thermal readings
+                    thermal_reading = np.vstack((thermal_stamp,thermal_reading)).T
+                    np.savetxt(this_layer_dir+'thermal.csv',thermal_reading,delimiter=',')
+
+                ################ get speed ##############
+                print("Getting speed...")
+                try:
+                    weld_relative_exe = np.loadtxt(this_layer_dir+'weld_relative_exe.',delimiter=',')
+                    weld_relative_v_exe = np.loadtxt(this_layer_dir+'weld_relative_v_exe.csv',delimiter=',')
+                except FileNotFoundError:
+                    weld_relative_exe = []
+                    weld_relative_v_exe = []
+                    for i in range(len(weld_js_exe)):
+                        t1_world = robot_weld.fwd(weld_js_exe[i,1:7])
+                        t2_world = positioner.fwd(weld_js_exe[i,7:],world=True)
+                        t1_t2 = t2_world.inv()*t1_world
+                        weld_relative_exe.append(t1_t2.p)
+                    weld_relative_exe = np.array(weld_relative_exe)
+                    weld_relative_v_exe=np.linalg.norm(np.diff(weld_relative_exe,axis=0),2,1)/np.diff(weld_js_exe[:,0])
+                    weld_relative_v_exe=np.append(weld_relative_v_exe[0],weld_relative_v_exe)
+                    weld_relative_v_exe=moving_average(weld_relative_v_exe,padding=True)
+                    weld_relative_v_exe=moving_average(weld_relative_v_exe,padding=True)
+                    np.savetxt(this_layer_dir+'weld_relative_exe.csv',weld_relative_exe,delimiter=',')
+                    np.savetxt(this_layer_dir+'weld_relative_v_exe.csv',weld_relative_v_exe,delimiter=',')
+                #############################################
+                
+                ############### get height and width ##############
+                print("Getting height and width...")
+                try:
+                    profile_height = np.loadtxt(this_layer_dir+'profile_height.',delimiter=',')
+                    profile_width = np.loadtxt(this_layer_dir+'profile_width.csv',delimiter=',')
+                except FileNotFoundError:
+                    # processing the scans
+                    scan_process = ScanProcess(robot_scan,positioner)
+
+                    # Single scan 2D reconstruction
+                    try:
+                        with open(this_layer_dir+'scan_exe_noise_remove', 'rb') as f:
+                            scan_exe_noise_remove = pickle.load(f)
+                    except FileNotFoundError:
+                        scan_exe_noise_remove = []
+                        duration_list = []
+                        for (weld_js,scan) in zip(scan_js_exe,scan_exe):
+                            st = time.time()
+                            scan_noise_remove = scan_process.scan2dDenoise(deepcopy(scan).T,crop_min=[-40,30],crop_max=[40,200])
+                            scan_exe_noise_remove.append(scan_noise_remove)
+                            duration_list.append(time.time()-st)
+                        # plt.plot(duration_list)
+                        # plt.show()
+                        # print("Average single scan 2D reconstruction time:",np.mean(duration_list))
+                        # print("Max single scan 2D reconstruction time:",np.max(duration_list))
+                        with open(this_layer_dir+'scan_exe_noise_remove.pickle', 'wb') as f:
+                            pickle.dump(scan_exe_noise_remove, f)
+
+                    # whole layer 3D reconstruction
+                    pcd=None
+                    # pcd = scan_process.pcd_register_mti(scan_exe,scan_js_exe[:,:6],robot_stamps,static_positioner_q=positioner_joints,flip=True,scanner='fuji')
+                    pcd = scan_process.pcd_register_mti(scan_exe_noise_remove,scan_js_exe[:,1:],robot_stamps,flip=True,scanner='fuji')
+                    # visualize_pcd([pcd])
+                    # move pcd_noise_preremoved in y direction
+                    # pcd_noise_preremoved = pcd_noise_preremoved.translate((0,200,0))
+                    # visualize_pcd([pcd,pcd_noise_preremoved])
+
+                    # cropping the point cloud
+                    curve_planned_z = np.mean(curve[:,2])
+                    curve_x_end = np.min(curve[:,0])
+                    curve_x_start = np.max(curve[:,0])
+                    curve_y = np.mean(curve[:,1])
+                    z_height_start=curve_planned_z+0.1
+                    # z_height_start = 0
+                    # print(z_height_start)
+                    # print(curve_y)
+                    crop_extend_x=10
+                    crop_extend_z=20
+                    crop_min=(curve_x_end-crop_extend_x,curve_y-30,-30)
+                    crop_max=(curve_x_start+crop_extend_x,curve_y+30,z_height_start+crop_extend_z)
+                    crop_h_min=(curve_x_end-crop_extend_x,curve_y-20,-30)
+                    crop_h_max=(curve_x_start+crop_extend_x,curve_y+20,z_height_start+crop_extend_z)
+                    # profile_height_noise, profile_width_noise,Transz0_H = scan_process.pcd2height(deepcopy(pcd),z_height_start,bbox_min=crop_h_min,bbox_max=crop_h_max,Transz0_H=Transz0_H,return_width=True)
+                    pcd = scan_process.pcd_noise_remove(pcd,nb_neighbors=40,std_ratio=1.5,\
+                                                        min_bound=crop_min,max_bound=crop_max,cluster_based_outlier_remove=True,cluster_neighbor=1,min_points=100)
+                    profile_height, profile_width,Transz0_H = scan_process.pcd2height(deepcopy(pcd),z_height_start,bbox_min=crop_h_min,bbox_max=crop_h_max,Transz0_H=Transz0_H,return_width=True)
+                    # print("Transz0_H:",Transz0_H)
+
+                    # apply 1D smoother to profile_width
+                    profile_width[:,1] = np.convolve(profile_width[:,1], np.ones(5)/5, mode='same')
+                    # profile_width_noise[:,1] = np.convolve(profile_width_noise[:,1], np.ones(5)/5, mode='same')
+
+                    # save processed profile height and point cloud
+                    np.savetxt(this_layer_dir+'profile_height.csv',profile_height,delimiter=',')
+                    np.savetxt(this_layer_dir+'profile_width.csv',profile_width,delimiter=',')
+                    o3d.io.write_point_cloud(this_layer_dir+'pcd.pcd',pcd)
+                    #############################################
+
+                ################ combine everything in one array ##############
+                profile_welding = []
+                for js_id,x in enumerate(weld_relative_exe[:,0]):
+                    # velocity at the same x
+                    this_v = weld_relative_v_exe[js_id]
+                    # time at the same x
+                    this_t = weld_js_exe[js_id,0]
+                    # height and width at the same x
+                    this_height = profile_height[np.argmin(np.abs(profile_height[:,0]-x)),1]
+                    if last_profile_height is not None:
+                        last_height = last_profile_height[np.argmin(np.abs(last_profile_height[:,0]-x)),1]
+                    else:
+                        last_height = 0
+                    this_dh = this_height - last_height
+                    this_width = profile_width[np.argmin(np.abs(profile_width[:,0]-x)),1]
+                    # welding status at time t
+                    welding_status_idx=np.where(welding_status[:,0]>=this_t)[0][0]
+                    ratio=(this_t-welding_status[:,0][welding_status_idx-1])/(welding_status[:,0][welding_status_idx]-welding_status[:,0][welding_status_idx-1])
+                    this_welding_status=welding_status[:,1:][welding_status_idx-1]*(1-ratio)+welding_status[:,1:][welding_status_idx]*ratio
+                    # thermal reading at time t
+                    thermal_reading_idx=np.where(thermal_reading[:,0]>=this_t)[0][0]
+                    ratio=(this_t-thermal_reading[:,0][thermal_reading_idx-1])/(thermal_reading[:,0][thermal_reading_idx]-thermal_reading[:,0][thermal_reading_idx-1])
+                    this_thermal_reading=thermal_reading[:,1][thermal_reading_idx-1]*(1-ratio)+thermal_reading[:,1][thermal_reading_idx]*ratio
+
+                    this_welding_profile = np.array([this_t,x,this_height,this_dh,this_width,this_v,this_thermal_reading])
+                    this_welding_profile = np.append(this_welding_profile,this_welding_status)
+                    profile_welding.append(this_welding_profile)
+                profile_welding = np.array(profile_welding)
+                # save profile welding with header
+                header = 'time,x,height,dheight,width,v,thermal,voltage,current,feedrate,energy'
+                np.savetxt(this_layer_dir+'profile_welding.csv',profile_welding,delimiter=',',header=header)
+                last_profile_height = profile_height
+                
+                print("Finished processing layer:",layer_name)
+
 
 if __name__ == '__main__':
     main()
