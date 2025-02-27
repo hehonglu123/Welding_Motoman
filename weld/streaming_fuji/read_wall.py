@@ -246,6 +246,8 @@ def main():
                         last_height = 0
                     this_dh = this_height - last_height
                     this_width = profile_width[np.argmin(np.abs(profile_width[:,0]-x)),1]
+                    # torch height
+                    torch_height = weld_relative_exe[js_id,2] - this_height
                     # welding status at time t
                     welding_status_idx=np.where(welding_status[:,0]>=this_t)[0][0]
                     ratio=(this_t-welding_status[:,0][welding_status_idx-1])/(welding_status[:,0][welding_status_idx]-welding_status[:,0][welding_status_idx-1])
@@ -255,12 +257,12 @@ def main():
                     ratio=(this_t-thermal_reading[:,0][thermal_reading_idx-1])/(thermal_reading[:,0][thermal_reading_idx]-thermal_reading[:,0][thermal_reading_idx-1])
                     this_thermal_reading=thermal_reading[:,1][thermal_reading_idx-1]*(1-ratio)+thermal_reading[:,1][thermal_reading_idx]*ratio
 
-                    this_welding_profile = np.array([this_t,x,this_height,this_dh,this_width,this_v,this_thermal_reading])
+                    this_welding_profile = np.array([this_t,x,this_height,this_dh,torch_height,this_width,this_v,this_thermal_reading])
                     this_welding_profile = np.append(this_welding_profile,this_welding_status)
                     profile_welding.append(this_welding_profile)
                 profile_welding = np.array(profile_welding)
                 # save profile welding with header
-                header = 'time,x,height,dheight,width,v,thermal,voltage,current,feedrate,energy'
+                header = 'time,x,height,dheight,torch_height,width,v,thermal,voltage,current,feedrate,energy'
                 np.savetxt(this_layer_dir+'profile_welding.csv',profile_welding,delimiter=',',header=header)
                 last_profile_height = profile_height
                 
