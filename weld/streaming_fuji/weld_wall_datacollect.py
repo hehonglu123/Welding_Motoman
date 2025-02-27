@@ -49,10 +49,10 @@ def welding_profile_generate(lam_split, VPD, cross_section, layer_n, v_min, v_ma
 
 def main():
     
-    weld_arcon = True
+    weld_arcon = False
     welder_log = False
-    fuji_scanon = True
-    thermal_on = True
+    fuji_scanon = False
+    thermal_on = False
     input_from_user = False
 
     ############## Robot definition ##############
@@ -143,7 +143,7 @@ def main():
     # baselayer welding parameters
     base_feedrate = 250 
     base_nom_incre = 1
-    base_nom_vel = 5
+    base_nom_vel = 15
     # layer welding parameters
     layer_feedrate = 100 # inch/min
     layer_nom_height = 3 # mm
@@ -312,8 +312,17 @@ def main():
                     feedrate_cmd = feedrate_profile[0]
                     if thermal_on:
                         rr_sensors.start_all_sensors()
+                    
+                    # time.sleep(3)
+                    q_cur = deepcopy(SS.q_cur)
+                    # motion_start_time = time.time()
+                    # test_motion_start = True
                     while lam_cur<lam_relative[-1] - v_cmd/SS.streaming_rate:
                         loop_start=time.perf_counter()
+                        # if test_motion_start and np.linalg.norm(q_cur-SS.q_cur)>1e-7:
+                        #     print("Motion lag (start move):",time.time()-motion_start_time)
+                        #     test_motion_start = False
+                        q_cur = deepcopy(SS.q_cur)
 
                         ### get the next q commands
                         lam_cur+=v_cmd/SS.streaming_rate # get the current lambda (path location)
@@ -360,7 +369,7 @@ def main():
                         ### sent position Command to the robot
                         q_cmd_all.append(np.hstack((time.perf_counter(),i,q_cmd)))
                         if lam_cur>lam_relative[-1]-v_cmd/SS.streaming_rate:
-                            SS.position_cmd(q_cmd)
+                            SS.position_cmd(q_cmd,loop_start)
                         else:
                             SS.position_cmd(q_cmd,loop_start)
 
@@ -372,6 +381,25 @@ def main():
                     if thermal_on:
                         rr_sensors.stop_all_sensors()
                     ########################################
+
+                    ###### Motion varification
+                    # time.sleep(1/SS.streaming_rate)
+                    # motion_end_time = time.time()
+                    # print_time = time.time()
+                    # print("last q cur:",np.degrees(q_cur))
+                    # print("q cur:",np.degrees(SS.q_cur))
+                    # print("q cmd:",np.degrees(q_cmd))
+                    # while np.linalg.norm(q_cur-SS.q_cur)>1e-7:
+                    #     q_cur = deepcopy(SS.q_cur)
+                    #     time.sleep(1/SS.streaming_rate)
+                    #     if time.time()-print_time>1:
+                    #         print("Motion lag")
+                    #         print("last q cur:",np.degrees(q_cur))
+                    #         print("q cur:",np.degrees(SS.q_cur))
+                    #         print("q cmd:",np.degrees(q_cmd))
+                    #         print_time = time.time()
+                    # print("Motion lag Time:",time.time()-motion_end_time)
+                    ######
 
                     if forward and curve_direction == 'backward':
                         # deal with special case, forward but curve direction is backward
