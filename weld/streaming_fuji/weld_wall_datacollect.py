@@ -339,6 +339,7 @@ def main():
                                 print("Welding Start")
                                 fronius_client.job_number = int(round(feedrate_cmd/10)+job_offset)
                                 fronius_client.start_weld()
+                            welding_cmd_all.append(np.hstack((time.perf_counter(),i,v_cmd,int(round(feedrate_cmd/10)*10))))
                             last_update_time=time.perf_counter()
                             arc_off=False
 
