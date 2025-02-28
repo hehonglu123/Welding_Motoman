@@ -7,10 +7,12 @@ inch2mm = 25.4
 mm2inch = 1/inch2mm
 cross_section = 1.2
 
+ignore_start_end = 8
+
 data_dir = '../../data/wall_weld_test/'
 
-logdata_dir_all = ['weld_fujiscan_2025_02_26_18_08_18/', 'weld_fujiscan_2025_02_26_16_24_21/', 'weld_fujiscan_2025_02_26_17_39_17/']
-# logdata_dir_all = ['weld_fujiscan_2025_02_26_18_08_18/']
+# logdata_dir_all = ['weld_fujiscan_2025_02_26_18_08_18/', 'weld_fujiscan_2025_02_26_16_24_21/', 'weld_fujiscan_2025_02_26_17_39_17/']
+logdata_dir_all = ['weld_fujiscan_2025_02_26_18_08_18/', 'weld_fujiscan_2025_02_26_16_24_21/']
 
 input_signals = ['cmd_v','cmd_feedrate']
 # input_signals = ['cmd_v','cmd_VPD','torch_height']
@@ -52,11 +54,11 @@ for logdata_dir_name in logdata_dir_all:
         x = np.array(weld_data['x'])
         # ignore the first and last 5 mm
         if x[-1]>x[0]:
-            start_index = np.where(x > x[0]+5)[0][0] 
-            end_index = np.where(x < x[-1]-5)[0][-1]
+            start_index = np.where(x > x[0]+ignore_start_end)[0][0] 
+            end_index = np.where(x < x[-1]-ignore_start_end)[0][-1]
         else:
-            start_index = np.where(x < x[0]-5)[0][0] 
-            end_index = np.where(x > x[-1]+5)[0][-1]
+            start_index = np.where(x < x[0]-ignore_start_end)[0][0] 
+            end_index = np.where(x > x[-1]+ignore_start_end)[0][-1]
         for k in weld_data.keys():
             weld_data[k] = weld_data[k][start_index:end_index+1]
         weld_data['power'] = np.array(weld_data['voltage'])*np.array(weld_data['current'])
@@ -74,25 +76,46 @@ for logdata_dir_name in logdata_dir_all:
                         else:
                             data_pairs[meta_data['VPD']][input_sig_key][output_sig_key][data_input] = [data_output]
     
-fig, axs = plt.subplots(len(input_signals), len(output_signals))
-for j,output_sig_key in enumerate(output_signals):
-    for i,input_sig_key in enumerate(input_signals):
+fig, axs = plt.subplots(len(output_signals),len(input_signals))
+for i,input_sig_key in enumerate(input_signals):
+    for j,output_sig_key in enumerate(output_signals):
         for data_VPD in data_pairs.keys():
+            x_values=[]
+            y_values=[]
             for data_input in data_pairs[data_VPD][input_sig_key][output_sig_key].keys():
                 if output_sig_key == 'width':
                     width_data = np.array(data_pairs[data_VPD][input_sig_key][output_sig_key][data_input])
-                    width_data = width_data[width_data>0.6]
-                    data_pairs[data_VPD][input_sig_key][output_sig_key][data_input] = np.mean(width_data)
+                    width_data = width_data[width_data>0.5]
+                    if width_data.size > 0:
+                        data_pairs[data_VPD][input_sig_key][output_sig_key][data_input] = np.mean(width_data)
+                        x_values.append(data_input)
+                        y_values.append(data_pairs[data_VPD][input_sig_key][output_sig_key][data_input])
                 else:
                     data_pairs[data_VPD][input_sig_key][output_sig_key][data_input] = np.mean(data_pairs[data_VPD][input_sig_key][output_sig_key][data_input])
-            x_values = list(data_pairs[data_VPD][input_sig_key][output_sig_key].keys())
-            y_values = list(data_pairs[data_VPD][input_sig_key][output_sig_key].values())
+                    x_values.append(data_input)
+                    y_values.append(data_pairs[data_VPD][input_sig_key][output_sig_key][data_input])
+            # x_values = list(data_pairs[data_VPD][input_sig_key][output_sig_key].keys())
+            # y_values = list(data_pairs[data_VPD][input_sig_key][output_sig_key].values())
             # fitna linear line
             z = np.polyfit(x_values, y_values, 1)
             p = np.poly1d(z)
-            axs[i,j].scatter(x_values, y_values)
-            axs[i,j].plot(x_values, p(x_values))
-            axs[i,j].set_title(input_sig_key + ' vs ' + output_sig_key)
+            axs[j,i].scatter(x_values, y_values)
+            axs[j,i].plot(x_values, p(x_values), 'r--')
+            axs[j,i].set_title(input_sig_key + ' vs ' + output_sig_key)
+plt.show()
 
-
+for data_VPD in data_pairs.keys():
+    feedrate_dh = data_pairs[data_VPD]['cmd_feedrate']['dheight']
+    feedrate_dw = data_pairs[data_VPD]['cmd_feedrate']['width']
+    dhdw_ratio = []
+    for fdr in feedrate_dh.keys():
+        if fdr in feedrate_dw:
+            dhdw = feedrate_dh[fdr]*feedrate_dw[fdr]
+            dhdw_ratio.append(dhdw)
+    # plt.scatter([data_VPD]*len(dhdw_ratio), dhdw_ratio)
+    plt.scatter(list(feedrate_dh.keys()), dhdw_ratio, label='VPD='+str(round(data_VPD)))
+plt.legend()
+plt.xlabel('feedrate')
+plt.ylabel('dh*dw')
+plt.title('feedrate vs dh*dw')
 plt.show()
