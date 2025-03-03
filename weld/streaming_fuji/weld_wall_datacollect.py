@@ -49,10 +49,10 @@ def welding_profile_generate(lam_split, VPD, cross_section, layer_n, v_min, v_ma
 
 def main():
     
-    weld_arcon = False
+    weld_arcon = True
     welder_log = False
-    fuji_scanon = False
-    thermal_on = False
+    fuji_scanon = True
+    thermal_on = True
     input_from_user = False
 
     ############## Robot definition ##############
@@ -143,12 +143,14 @@ def main():
     # baselayer welding parameters
     base_feedrate = 250 
     base_nom_incre = 1
-    base_nom_vel = 15
+    base_nom_vel = 5
     # layer welding parameters
     layer_feedrate = 100 # inch/min
     layer_nom_height = 3 # mm
-    layer_nom_vel = 5 # mm/s
+    layer_nom_vel = 3 # mm/s
     layer_nom_incre = int(layer_nom_height/layer_resolution)
+    # weld starting point sleep
+    weld_start_sleep = 0.2
     # scanning parameters
     scan_nom_vel = 5
     # collision avoidance z offset
@@ -161,8 +163,13 @@ def main():
     VPD = cross_section*inch2mm*layer_feedrate/layer_nom_vel # volume per distance (mm^3/mm)
     split_sections = 6
     lam_split = np.linspace(0,meta_data['layer_length'],split_sections+1)[:-1]
-    v_minimum = 5
-    v_maximum = 10
+    feedrate_min = 100
+    feedrate_max = 220
+    v_minimum = round(cross_section*inch2mm*feedrate_min/VPD,2)
+    v_maximum = cross_section*inch2mm*feedrate_max/VPD
+    print("VPD:",VPD)
+    print("v_minimum:",v_minimum)
+    print("v_maximum:",v_maximum)
 
     # start-end layers
     baselayer_start = 0
@@ -175,20 +182,21 @@ def main():
     formatted_time = current_time.strftime('%Y_%m_%d_%H_%M_%S.%f')[:-7]
     logdata_dir='../../data/wall_weld_test/weld_fujiscan_'+formatted_time+'/'
 
-    read_from_file_layer = False
+    read_from_file_layer = True
+    Transz0_H=None
     if read_from_file_layer:
-        logdata_dir = '../../data/wall_weld_test/weld_fujiscan_2025_02_26_16_24_21/'
-        Transz0_H = [[ 9.99990223e-01, -9.33026578e-05, -4.42109749e-03,  3.43735662e-02],\
-                    [-9.33026578e-05,  9.99109647e-01, -4.21889207e-02 , 3.28014404e-01],\
-                    [ 4.42109749e-03 , 4.21889207e-02,  9.99099869e-01, -7.76789600e+00],\
+        logdata_dir = '../../data/wall_weld_test/weld_fujiscan_2025_03_03_18_10_13/'
+        Transz0_H = [[1.00000000e+00 ,-5.09597574e-07, -2.70277611e-05,  1.91536366e-04],\
+                    [-5.09597574e-07 , 9.99289261e-01 ,-3.76957955e-02,  2.67137025e-01],\
+                    [ 2.70277611e-05 , 3.76957955e-02,  9.99289261e-01, -7.08161630e+00],\
                     [ 0.00000000e+00 , 0.00000000e+00 , 0.00000000e+00,  1.00000000e+00]]
 
     weld_meta_data = {'well_arcon':weld_arcon, 'fuji_scanon':fuji_scanon, 'data_dir':data_dir, 'logdata_dir':logdata_dir\
         ,'base_layer_num':base_layer_num, 'baselayer_resolution':baselayer_resolution, 'layer_num':layer_num, 'layer_resolution':layer_resolution\
         ,'base_feedrate':base_feedrate, 'base_nom_incre':base_nom_incre, 'base_nom_vel':base_nom_vel\
         , 'layer_feedrate':layer_feedrate, 'layer_nom_incre':layer_nom_incre, 'layer_nom_vel':layer_nom_vel\
-        ,'corss_section':cross_section, 'VPD':VPD, 'split_sections':split_sections, 'lam_split':lam_split\
-        ,'v_minimum':v_minimum, 'v_maximum':v_maximum}
+        ,'corss_section':cross_section, 'VPD':VPD, 'split_sections':split_sections, 'lam_split':list(lam_split)\
+        ,'v_minimum':v_minimum, 'v_maximum':v_maximum, 'weld_start_sleep':weld_start_sleep}
 
     # get robot 2 resting pose
     q_cur = deepcopy(SS.q_cur)
@@ -198,19 +206,19 @@ def main():
     ################## print layers ##################
     arc_off=True
     forward = True
-    Transz0_H=None
+
     mean_layer_height = 0
-    for weld_parts in ['base','layer']:
-    # for weld_parts in ['layer']:
+    # for weld_parts in ['base','layer']:
+    for weld_parts in ['layer']:
         if weld_parts == 'base':
             weld_start = baselayer_start
             weld_end = baselayer_end
             nom_incre = base_nom_incre
         else:
-            weld_start = layer_start
+            weld_start = 193
             weld_end = layer_end
             nom_incre = layer_nom_incre
-        layer_count = 0
+        layer_count = 8
         i=weld_start
         input("Start with layer "+str(i)+". Press Enter to continue...")
         while i < weld_end:
@@ -257,7 +265,7 @@ def main():
                 
                     # random generate current layer feedrate, velocity
                     if weld_parts == 'layer':
-                        if layer_count<6:
+                        if layer_count<4:
                             vel_profile, feedrate_profile = welding_profile_generate(lam_split, VPD, cross_section, i, v_minimum, v_maximum*0.8)
                         else:
                             vel_profile, feedrate_profile = welding_profile_generate(lam_split, VPD, cross_section, i, v_minimum, v_maximum)
@@ -339,6 +347,8 @@ def main():
                                 print("Welding Start")
                                 fronius_client.job_number = int(round(feedrate_cmd/10)+job_offset)
                                 fronius_client.start_weld()
+                                time.sleep(weld_start_sleep)
+                            welding_cmd_all.append(np.hstack((time.perf_counter(),i,v_cmd,int(round(feedrate_cmd/10)*10))))
                             last_update_time=time.perf_counter()
                             arc_off=False
 
