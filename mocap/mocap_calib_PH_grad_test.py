@@ -5,7 +5,8 @@ import pickle
 import time
 import sys
 sys.path.append('../toolbox/')
-from robot_def import *
+# from robot_def import *
+from motoman_def import *
 from matplotlib import pyplot as plt
 from calib_analytic_grad import *
 from PH_interp import *
@@ -17,13 +18,14 @@ Rx=np.array([1,0,0])
 Ry=np.array([0,1,0])
 Rz=np.array([0,0,1])
 
-ph_dataset_date='0801'
-test_dataset_date='0801'
+
 config_dir='../config/'
 
-robot_type = 'R1'
+robot_type = 'R2'
 
 if robot_type == 'R1':
+    ph_dataset_date='0801'
+    test_dataset_date='0801'
     robot_marker_dir=config_dir+'MA2010_marker_config/'
     tool_marker_dir=config_dir+'weldgun_marker_config/'
     robot=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',\
@@ -37,6 +39,8 @@ if robot_type == 'R1':
     nom_H=np.array([[0,0,1],[0,1,0],[0,-1,0],\
                    [-1,0,0],[0,-1,0],[-1,0,0]]).T
 elif robot_type == 'R2':
+    ph_dataset_date='0804'
+    test_dataset_date='0804'
     robot_marker_dir=config_dir+'MA1440_marker_config/'
     tool_marker_dir=config_dir+'mti_marker_config/'
     robot=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.yml',\
@@ -245,6 +249,8 @@ ph_param_fbf_Hori=PH_Param(nom_P,nom_H)
 ph_param_fbf_Hori.fit(PH_q_HRotation,method='FBF',useHRotation=True)
 ph_param_fbf_min=PH_Param(nom_P,nom_H)
 ph_param_fbf_min.fit(PH_q_min,method='FBF',useMinimal=True)
+ph_param_fbf_redu=PH_Param(nom_P,nom_H)
+ph_param_fbf_redu.fit(PH_q,method='FBF',useReduced=True)
 # p_coeff,h_coeff = ph_param_fbf_Hori.get_basis_weights()
 # p_coeff_rearange = []
 # for j in range(7):
@@ -271,6 +277,8 @@ error_pos_fbf_hori = []
 error_ori_fbf_hori = []
 error_pose_fbf_min = []
 error_ori_fbf_min = []
+error_pos_fbf_redu = []
+error_ori_fbf_redu = []
 error_pos_baseline = []
 error_ori_baseline = []
 error_pos_PHZero = []
@@ -371,6 +379,18 @@ for N in range(total_test_N):
     error_pose_fbf_min.append(T_tool_base.p-robot_T.p)
     error_ori_fbf_min.append(k*np.degrees(theta))
 
+    #### get error (fbf reduced)
+    opt_P,opt_H = ph_param_fbf_redu.predict(test_q[1:3])
+    if np.any(opt_P is np.nan) or np.any(opt_H is np.nan):
+        print(np.degrees(test_q))
+    robot.robot.P=deepcopy(opt_P)
+    robot.robot.H=deepcopy(opt_H)
+    robot_T = robot.fwd(test_q)
+    k,theta = R2rot(robot_T.R.T@T_tool_base.R)
+    k=np.array(k)
+    error_pos_fbf_redu.append(T_tool_base.p-robot_T.p)
+    error_ori_fbf_redu.append(k*np.degrees(theta))
+
     #### get error (zero)
     robot.robot.P=deepcopy(qzero_P)
     robot.robot.H=deepcopy(qzero_H)
@@ -426,6 +446,7 @@ error_pos_rbf_norm=np.linalg.norm(error_pos_rbf,ord=2,axis=1).flatten()
 error_pos_fbf_norm=np.linalg.norm(error_pos_fbf,ord=2,axis=1).flatten()
 error_pos_fbf_hori_norm=np.linalg.norm(error_pos_fbf_hori,ord=2,axis=1).flatten()
 error_pos_fbf_min_norm=np.linalg.norm(error_pose_fbf_min,ord=2,axis=1).flatten()
+error_pos_fbf_redu_norm=np.linalg.norm(error_pos_fbf_redu,ord=2,axis=1).flatten()
 error_pos_PHZero_norm=np.linalg.norm(error_pos_PHZero,ord=2,axis=1).flatten()
 error_pos_onePH_norm=np.linalg.norm(error_pos_onePH,ord=2,axis=1).flatten()
 error_pos_baseline_norm=np.linalg.norm(error_pos_baseline,ord=2,axis=1).flatten()
@@ -438,6 +459,7 @@ train_error_pos_rbf_norm=error_pos_rbf_norm[:split_index]
 train_error_pos_fbf_norm=error_pos_fbf_norm[:split_index]
 train_error_pos_fbf_hori_norm=error_pos_fbf_hori_norm[:split_index]
 train_error_pos_fbf_min_norm=error_pos_fbf_min_norm[:split_index]
+train_error_pos_fbf_redu_norm=error_pos_fbf_redu_norm[:split_index]
 train_error_pos_PHZero_norm=error_pos_PHZero_norm[:split_index]
 train_error_pos_onePH_norm=error_pos_onePH_norm[:split_index]
 train_error_pos_baseline_norm=error_pos_baseline_norm[:split_index]
@@ -450,6 +472,7 @@ error_pos_rbf_norm=error_pos_rbf_norm[split_index:]
 error_pos_fbf_norm=error_pos_fbf_norm[split_index:]
 error_pos_fbf_hori_norm=error_pos_fbf_hori_norm[split_index:]
 error_pos_fbf_min_norm=error_pos_fbf_min_norm[split_index:]
+error_pos_fbf_redu_norm=error_pos_fbf_redu_norm[split_index:]
 error_pos_PHZero_norm=error_pos_PHZero_norm[split_index:]
 error_pos_onePH_norm=error_pos_onePH_norm[split_index:]
 error_pos_baseline_norm=error_pos_baseline_norm[split_index:]
@@ -462,6 +485,7 @@ error_ori_rbf_norm=np.linalg.norm(error_ori_rbf,ord=2,axis=1).flatten()
 error_ori_fbf_norm=np.linalg.norm(error_ori_fbf,ord=2,axis=1).flatten()
 error_ori_fbf_hori_norm=np.linalg.norm(error_ori_fbf_hori,ord=2,axis=1).flatten()
 error_ori_fbf_min_norm=np.linalg.norm(error_ori_fbf_min,ord=2,axis=1).flatten()
+error_ori_fbf_redu_norm=np.linalg.norm(error_ori_fbf_redu,ord=2,axis=1).flatten()
 error_ori_PHZero_norm=np.linalg.norm(error_ori_PHZero,ord=2,axis=1).flatten()
 error_ori_onePH_norm=np.linalg.norm(error_ori_onePH,ord=2,axis=1).flatten()
 error_ori_baseline_norm=np.linalg.norm(error_ori_baseline,ord=2,axis=1).flatten()
@@ -512,8 +536,9 @@ plt.plot(error_pos_lin_norm,'-o',markersize=1,label='Linear Interp PH')
 # plt.plot(error_pos_cub_norm,'-o',markersize=1,label='Cubic Interp PH')
 # plt.plot(error_pos_rbf_norm,'-o',markersize=1,label='RBF Interp PH')
 plt.plot(error_pos_fbf_norm,'-o',markersize=1,label='Fourier Basis PH')
-plt.plot(error_pos_fbf_hori_norm,'-o',markersize=1,label='Fourier Basis PH (Hori)')
-plt.plot(error_pos_fbf_min_norm,'-o',markersize=1,label='Fourier Basis PH (Minimal)')
+# plt.plot(error_pos_fbf_hori_norm,'-o',markersize=1,label='Fourier Basis PH (Hori)')
+# plt.plot(error_pos_fbf_min_norm,'-o',markersize=1,label='Fourier Basis PH (Minimal)')
+plt.plot(error_pos_fbf_redu_norm,'-o',markersize=1,label='Fourier Basis PH (Reduced)')
 plt.legend(loc=1,fontsize=18)
 plt.title(robot_type+" Position Testing Error using Optimized PH",fontsize=32)
 # plt.xticks(np.arange(0,total_test_N,100),np.round(q1_all[::100]))
@@ -529,10 +554,12 @@ plt.show()
 plot_origin=True
 if plot_origin:
     plt.plot(train_error_pos_origin_norm,'-o',markersize=1,label='Origin PH')    
-# plt.plot(train_error_pos_baseline_norm,'-o',markersize=1,label='CPA PH')
+
 # plt.plot(train_error_pos_PHZero_norm,'-o',markersize=1,label='Zero PH')
+plt.plot(train_error_pos_baseline_norm,'-o',markersize=1,label='CPA PH')
 plt.plot(train_error_pos_onePH_norm,'-o',markersize=1,label='One PH')
 plt.plot(train_error_pos_near_norm,'-o',markersize=1,label='Optimized PH')
+
 # plt.plot(train_error_pos_lin_norm,'-o',markersize=1,label='Linear Interp PH')
 # plt.plot(train_error_pos_cub_norm,'-o',markersize=1,label='Cubic Interp PH')
 # plt.plot(train_error_pos_rbf_norm,'-o',markersize=1,label='RBF Interp PH')
@@ -595,6 +622,8 @@ markdown_str+='|FBF Interp PH (Hori)|'+format(round(np.mean(error_pos_fbf_hori_n
     format(round(np.std(error_pos_fbf_hori_norm),4),'.4f')+'|'+format(round(np.max(error_pos_fbf_hori_norm),4),'.4f')+'|\n'
 markdown_str+='|FBF Interp PH (Minimal)|'+format(round(np.mean(error_pos_fbf_min_norm),4),'.4f')+'|'+\
     format(round(np.std(error_pos_fbf_min_norm),4),'.4f')+'|'+format(round(np.max(error_pos_fbf_min_norm),4),'.4f')+'|\n'
+markdown_str+='|FBF Interp PH (Reduced)|'+format(round(np.mean(error_pos_fbf_redu_norm),4),'.4f')+'|'+\
+    format(round(np.std(error_pos_fbf_redu_norm),4),'.4f')+'|'+format(round(np.max(error_pos_fbf_redu_norm),4),'.4f')+'|\n'
 print(markdown_str)
 
 print("Testing Data (Orientation)")

@@ -5,11 +5,12 @@ from scipy.interpolate import LinearNDInterpolator,CloughTocher2DInterpolator,RB
 from copy import deepcopy
 
 class RBFFourierInterpolator(object):
-    def __init__(self,train_q,value,basis_function_num=2) -> None:
+    def __init__(self,train_q,value,basis_function_num=2,reduced_basis=0) -> None:
         
         self.train_x = np.array(train_q)
         self.train_y = np.array(value)
         self.basis_function_num = basis_function_num
+        self.reduced_basis = reduced_basis
         self.train()
         
     def __call__(self, q):
@@ -26,6 +27,11 @@ class RBFFourierInterpolator(object):
         basis_func_q2q3=np.array(basis_func_q2q3).T
         
         self.coeff_A = self.train_y@np.linalg.pinv(basis_func_q2q3)
+        print(self.coeff_A.shape)
+
+        if self.reduced_basis != 0:
+            U_mat,S_mat,VT = np.linalg.svd(self.coeff_A,full_matrices=False)
+            self.coeff_A = U_mat[:,:self.reduced_basis]@np.diag(S_mat[:self.reduced_basis])@VT[:self.reduced_basis,:]
     
     def predict(self,test_x):
         
@@ -69,7 +75,7 @@ class PH_Param(object):
         self.nom_P = deepcopy(nom_P)
         self.nom_H = deepcopy(nom_H)
 
-    def fit(self,data,method='nearest',useHRotation=False,useMinimal=False):
+    def fit(self,data,method='nearest',useHRotation=False,useMinimal=False,useReduced=False):
 
         train_q = []
         for qkey in data.keys():
@@ -80,6 +86,7 @@ class PH_Param(object):
         self.data=data
         self.useHRotation=(useHRotation or useMinimal)
         self.useMinimal=useMinimal
+        self.useReduced=useReduced
 
         if method=='nearest':
             self.predict_func=self._predict_nearest
@@ -147,9 +154,15 @@ class PH_Param(object):
         fit_P=[]
         fit_H=[]
         for val_p in value_P:
-            fit_P.append(interp_func(self.train_q, val_p))
+            if self.useReduced:
+                fit_P.append(interp_func(self.train_q, val_p, reduced_basis=7))
+            else:
+                fit_P.append(interp_func(self.train_q, val_p))
         for val_h in value_H:
-            fit_H.append(interp_func(self.train_q, val_h))
+            if self.useReduced:
+                fit_H.append(interp_func(self.train_q, val_h, reduced_basis=7))
+            else:
+                fit_H.append(interp_func(self.train_q, val_h))
         self.fit_P=fit_P
         self.fit_H=fit_H
 

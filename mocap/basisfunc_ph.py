@@ -5,7 +5,7 @@ import pickle
 import time
 import sys
 sys.path.append('../toolbox/')
-from robot_def import *
+from motoman_def import *
 from matplotlib import pyplot as plt
 
 from PH_interp import *
@@ -107,12 +107,18 @@ print("Resdual mean",residual_PH_mean)
 # plt.show()
 
 ### SVD on coefficients of basis function
-U,S,VT = np.linalg.svd(coeff_A)
+U,S,VT = np.linalg.svd(coeff_A,full_matrices=True)
+U_mat,S_mat,VT = np.linalg.svd(coeff_A,full_matrices=False)
 
 print(S)
+print(S_mat)
 print(VT.shape)
+print(U.shape)
 print(VT[:2])
 print(VT[-2:])
+
+print(np.allclose(U_mat@np.diag(S_mat)@VT,coeff_A))
+print(U_mat[:,:7]@np.diag(S_mat[:7])@VT[:7,:]-coeff_A)
 
 plt.imshow(np.fabs(VT))
 plt.colorbar()
