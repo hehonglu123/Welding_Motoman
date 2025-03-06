@@ -178,9 +178,11 @@ if useHRotation:
 #### all train data q
 train_q = []
 training_error=[]
+training_error_ori=[]
 for qkey in PH_q.keys():
     train_q.append(np.array(qkey))
-    training_error.append(PH_q[qkey]['train_pos_error'])
+    training_error.append(PH_q[qkey]['train_pos_error'][-1])
+    training_error_ori.append(PH_q[qkey]['train_ori_error'][-1])
 train_q=np.array(train_q)
 try:
     training_error=np.array(training_error)
@@ -216,6 +218,7 @@ except:
 universal_P = PH_q_one['P']
 universal_H = PH_q_one['H']
 training_error_universal=PH_q_one['train_pos_error']
+training_error_ori_universal=PH_q_one['train_ori_error']
 # plt.plot(np.mean(training_error_universal,axis=1))
 # plt.xlabel("Iteration")
 # plt.ylabel("Average Position Error Norm (mm)")
@@ -230,6 +233,10 @@ origin_H = deepcopy(robot.robot.H)
 #### using rotation PH (at zero) as baseline ####
 baseline_P = deepcopy(robot.calib_P)
 baseline_H = deepcopy(robot.calib_H)
+
+
+
+
 #####################################
 
 total_test_N = len(test_robot_q)
@@ -250,7 +257,10 @@ ph_param_fbf_Hori.fit(PH_q_HRotation,method='FBF',useHRotation=True)
 ph_param_fbf_min=PH_Param(nom_P,nom_H)
 ph_param_fbf_min.fit(PH_q_min,method='FBF',useMinimal=True)
 ph_param_fbf_redu=PH_Param(nom_P,nom_H)
-ph_param_fbf_redu.fit(PH_q,method='FBF',useReduced=True)
+ph_param_fbf_redu.fit(PH_q_min,method='FBF',useMinimal=True,useReduced=True)
+
+# exit()
+
 # p_coeff,h_coeff = ph_param_fbf_Hori.get_basis_weights()
 # p_coeff_rearange = []
 # for j in range(7):
@@ -381,10 +391,11 @@ for N in range(total_test_N):
 
     #### get error (fbf reduced)
     opt_P,opt_H = ph_param_fbf_redu.predict(test_q[1:3])
-    if np.any(opt_P is np.nan) or np.any(opt_H is np.nan):
-        print(np.degrees(test_q))
-    robot.robot.P=deepcopy(opt_P)
-    robot.robot.H=deepcopy(opt_H)
+    # if np.any(opt_P is np.nan) or np.any(opt_H is np.nan):
+    #     print(np.degrees(test_q))
+    # robot.robot.P=deepcopy(opt_P)
+    # robot.robot.H=deepcopy(opt_H)
+    robot = get_PH_from_param_minimal(np.append(opt_P,opt_H),robot,unit='radians')
     robot_T = robot.fwd(test_q)
     k,theta = R2rot(robot_T.R.T@T_tool_base.R)
     k=np.array(k)
@@ -491,6 +502,32 @@ error_ori_onePH_norm=np.linalg.norm(error_ori_onePH,ord=2,axis=1).flatten()
 error_ori_baseline_norm=np.linalg.norm(error_ori_baseline,ord=2,axis=1).flatten()
 error_ori_origin_norm=np.linalg.norm(error_ori_origin,ord=2,axis=1).flatten()
 
+train_error_ori_near_norm=error_ori_near_norm[:split_index]
+train_error_ori_lin_norm=error_ori_lin_norm[:split_index]
+train_error_ori_cub_norm=error_ori_cub_norm[:split_index]
+train_error_ori_rbf_norm=error_ori_rbf_norm[:split_index]
+train_error_ori_fbf_norm=error_ori_fbf_norm[:split_index]
+train_error_ori_fbf_hori_norm=error_ori_fbf_hori_norm[:split_index]
+train_error_ori_fbf_min_norm=error_ori_fbf_min_norm[:split_index]
+train_error_ori_fbf_redu_norm=error_ori_fbf_redu_norm[:split_index]
+train_error_ori_PHZero_norm=error_ori_PHZero_norm[:split_index]
+train_error_ori_onePH_norm=error_ori_onePH_norm[:split_index]
+train_error_ori_baseline_norm=error_ori_baseline_norm[:split_index]
+train_error_ori_origin_norm=error_ori_origin_norm[:split_index]
+
+error_ori_near_norm=error_ori_near_norm[split_index:]
+error_ori_lin_norm=error_ori_lin_norm[split_index:]
+error_ori_cub_norm=error_ori_cub_norm[split_index:]
+error_ori_rbf_norm=error_ori_rbf_norm[split_index:]
+error_ori_fbf_norm=error_ori_fbf_norm[split_index:]
+error_ori_fbf_hori_norm=error_ori_fbf_hori_norm[split_index:]
+error_ori_fbf_min_norm=error_ori_fbf_min_norm[split_index:]
+error_ori_fbf_redu_norm=error_ori_fbf_redu_norm[split_index:]
+error_ori_PHZero_norm=error_ori_PHZero_norm[split_index:]
+error_ori_onePH_norm=error_ori_onePH_norm[split_index:]
+error_ori_baseline_norm=error_ori_baseline_norm[split_index:]
+error_ori_origin_norm=error_ori_origin_norm[split_index:]
+
 q_all=q_all[split_index:]
 q2q3=q2q3[split_index:]
 print("Joint configuration and position error norm correlation")
@@ -596,7 +633,7 @@ plt.ylabel("Orientation Error (deg)")
 plt.tight_layout()
 plt.show()
 
-print("Testing Data (Position)")
+print("### Testing Data (Position)")
 markdown_str=''
 markdown_str+='||Mean (mm)|Std (mm)|Max (mm)|\n'
 markdown_str+='|-|-|-|-|\n'
@@ -626,7 +663,7 @@ markdown_str+='|FBF Interp PH (Reduced)|'+format(round(np.mean(error_pos_fbf_red
     format(round(np.std(error_pos_fbf_redu_norm),4),'.4f')+'|'+format(round(np.max(error_pos_fbf_redu_norm),4),'.4f')+'|\n'
 print(markdown_str)
 
-print("Testing Data (Orientation)")
+print("### Testing Data (Orientation)")
 markdown_str=''
 markdown_str+='||Mean (deg)|Std (deg)|Max (deg)|\n'
 markdown_str+='|-|-|-|-|\n'
@@ -648,9 +685,15 @@ markdown_str+='|RBF Interp PH|'+format(round(np.mean(error_ori_rbf_norm),4),'.4f
     format(round(np.std(error_ori_rbf_norm),4),'.4f')+'|'+format(round(np.max(error_ori_rbf_norm),4),'.4f')+'|\n'
 markdown_str+='|FBF Interp PH|'+format(round(np.mean(error_ori_fbf_norm),4),'.4f')+'|'+\
     format(round(np.std(error_ori_fbf_norm),4),'.4f')+'|'+format(round(np.max(error_ori_fbf_norm),4),'.4f')+'|\n'
+markdown_str+='|FBF Interp PH (Hori)|'+format(round(np.mean(error_ori_fbf_hori_norm),4),'.4f')+'|'+\
+    format(round(np.std(error_ori_fbf_hori_norm),4),'.4f')+'|'+format(round(np.max(error_ori_fbf_hori_norm),4),'.4f')+'|\n'
+markdown_str+='|FBF Interp PH (Minimal)|'+format(round(np.mean(error_ori_fbf_min_norm),4),'.4f')+'|'+\
+    format(round(np.std(error_ori_fbf_min_norm),4),'.4f')+'|'+format(round(np.max(error_ori_fbf_min_norm),4),'.4f')+'|\n'
+markdown_str+='|FBF Interp PH (Reduced)|'+format(round(np.mean(error_ori_fbf_redu_norm),4),'.4f')+'|'+\
+    format(round(np.std(error_ori_fbf_redu_norm),4),'.4f')+'|'+format(round(np.max(error_ori_fbf_redu_norm),4),'.4f')+'|\n'
 print(markdown_str)
 
-print("Training Data")
+print("### Training Data (Position)")
 markdown_str=''
 markdown_str+='||Mean (mm)|Std (mm)|Max (mm)|\n'
 markdown_str+='|-|-|-|-|\n'
@@ -662,4 +705,18 @@ markdown_str+='|One PH|'+format(round(np.mean(training_error_universal[-1]),4),'
     format(round(np.std(training_error_universal[-1]),4),'.4f')+'|'+format(round(np.max(training_error_universal[-1]),4),'.4f')+'|\n'
 markdown_str+='|Optimize PH|'+format(round(np.mean(training_error),4),'.4f')+'|'+\
     format(round(np.std(training_error),4),'.4f')+'|'+format(round(np.max(training_error),4),'.4f')+'|\n'
+print(markdown_str)
+
+print("### Training Data (Orientation)")
+markdown_str=''
+markdown_str+='||Mean (deg)|Std (deg)|Max (deg)|\n'
+markdown_str+='|-|-|-|-|\n'
+markdown_str+='|Nominal PH|'+format(round(np.mean(train_error_ori_origin_norm),4),'.4f')+'|'+\
+    format(round(np.std(train_error_ori_origin_norm),4),'.4f')+'|'+format(round(np.max(train_error_ori_origin_norm),4),'.4f')+'|\n'
+markdown_str+='|CPA|'+format(round(np.mean(train_error_ori_baseline_norm),4),'.4f')+'|'+\
+    format(round(np.std(train_error_ori_baseline_norm),4),'.4f')+'|'+format(round(np.max(train_error_ori_baseline_norm),4),'.4f')+'|\n'
+markdown_str+='|One PH|'+format(round(np.mean(training_error_ori_universal[-1]),4),'.4f')+'|'+\
+    format(round(np.std(training_error_ori_universal[-1]),4),'.4f')+'|'+format(round(np.max(training_error_ori_universal[-1]),4),'.4f')+'|\n'
+markdown_str+='|Optimize PH|'+format(round(np.mean(training_error_ori),4),'.4f')+'|'+\
+    format(round(np.std(training_error_ori),4),'.4f')+'|'+format(round(np.max(training_error_ori),4),'.4f')+'|\n'
 print(markdown_str)

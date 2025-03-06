@@ -1,7 +1,7 @@
 from copy import deepcopy
 import sys
 sys.path.append('../toolbox/')
-from robot_def import * 
+from motoman_def import *
 from general_robotics_toolbox import *
 
 import numpy as np
@@ -131,7 +131,7 @@ robot_type='R1'
 # robot_type='S1'
 
 # all_datasets=['train_data','valid_data_1','valid_data_2']
-dataset_date='09162024'
+dataset_date='0801'
 # all_datasets=['test'+dataset_date+'_R1_aftercalib/train_data']
 all_datasets=['test'+dataset_date+'_'+robot_type+'/train_data']
 
@@ -150,6 +150,11 @@ if robot_type=='R1':
     nominal_robot_base = Transform(np.array([[0,1,0],
                                             [0,0,1],
                                             [1,0,0]]),[0,0,0]) 
+    nominal_P = deepcopy(robot.robot.P)
+    nominal_P0i = [robot.robot.P[:,0]]
+    for i in range(6):
+        nominal_P0i.append(nominal_P0i[-1]+robot.robot.P[:,i+1])
+    nominal_H = deepcopy(robot.robot.H)
     H_nom = np.matmul(nominal_robot_base.R,robot.robot.H)
 
     jN=6
@@ -306,14 +311,59 @@ for dataset in all_datasets:
         # k=(j5_center[0]-H_point[0,5])/H[0,5]
         # j6_center = H_point[:,5]+k*H[:,5]
 
+        def make_minimal(p_prime,p_nom,h,h_nom):
+            p = p_prime + np.dot(p_nom-p_prime,h_nom)/np.dot(h,h_nom)*h
+            return p
+        def verify_minimal(p,p_nom,h,h_nom):
+            print("Verify minimal:",np.dot(p-p_nom,h_nom))
+
+        # # minimalize P
+        # p01 = make_minimal(j1_center,nominal_P0i[0],H[:,0],nominal_H[:,0])
+        # verify_minimal(j1_center,nominal_P0i[0],H[:,0],nominal_H[:,0])
+        # verify_minimal(p01,nominal_P0i[0],H[:,0],nominal_H[:,0])
+        # print("=====")
+        # p02 = make_minimal(j2_center,nominal_P0i[1],H[:,1],nominal_H[:,1])
+        # verify_minimal(j2_center,nominal_P0i[1],H[:,1],nominal_H[:,1])
+        # verify_minimal(p02,nominal_P0i[1],H[:,1],nominal_H[:,1])
+        # print("=====")
+        # p03 = make_minimal(j3_center,nominal_P0i[2],H[:,2],nominal_H[:,2])
+        # verify_minimal(j3_center,nominal_P0i[1],H[:,1],nominal_H[:,1])
+        # verify_minimal(p03,nominal_P0i[2],H[:,2],nominal_H[:,2])
+        # print("=====")
+        # p04 = make_minimal(j4_center,nominal_P0i[3],H[:,3],nominal_H[:,3])
+        # verify_minimal(j4_center,nominal_P0i[3],H[:,3],nominal_H[:,3])
+        # verify_minimal(p04,nominal_P0i[3],H[:,3],nominal_H[:,3])
+        # print("=====")
+        # p05 = make_minimal(j5_center,nominal_P0i[4],H[:,4],nominal_H[:,4])
+        # verify_minimal(j5_center,nominal_P0i[4],H[:,4],nominal_H[:,4])
+        # verify_minimal(p05,nominal_P0i[4],H[:,4],nominal_H[:,4])
+        # print("=====")
+        # p06 = make_minimal(j6_center,nominal_P0i[5],H[:,5],nominal_H[:,5])
+        # verify_minimal(j6_center,nominal_P0i[5],H[:,5],nominal_H[:,5])
+        # verify_minimal(p06,nominal_P0i[5],H[:,5],nominal_H[:,5])
+        # #######################
+        # exit()
+
+        j1_center_min = make_minimal(j1_center,nominal_P0i[0],H[:,0],nominal_H[:,0])
+        j2_center_min = make_minimal(j2_center,nominal_P0i[1],H[:,1],nominal_H[:,1])
+        j3_center_min = make_minimal(j3_center,nominal_P0i[2],H[:,2],nominal_H[:,2])
+        j4_center_min = make_minimal(j4_center,nominal_P0i[3],H[:,3],nominal_H[:,3])
+        j5_center_min = make_minimal(j5_center,nominal_P0i[4],H[:,4],nominal_H[:,4])
+        j6_center_min = make_minimal(j6_center,nominal_P0i[5],H[:,5],nominal_H[:,5])
+
         P=np.zeros((3,7))
         P[:,0]=np.array([0,0,0])
-        P[:,1]=j2_center-j1_center
-        P[:,2]=j3_center-j2_center
-        P[:,3]=j4_center-j3_center
-        P[:,4]=j5_center-j4_center
-        P[:,5]=j6_center-j5_center
+        # P[:,1]=j2_center-j1_center
+        # P[:,2]=j3_center-j2_center
+        # P[:,3]=j4_center-j3_center
+        # P[:,4]=j5_center-j4_center
+        # P[:,5]=j6_center-j5_center
         # P[:,6]=tcp_base-j6_center
+        P[:,1]=j2_center_min-j1_center_min
+        P[:,2]=j3_center_min-j2_center_min
+        P[:,3]=j4_center_min-j3_center_min
+        P[:,4]=j5_center_min-j4_center_min
+        P[:,5]=j6_center_min-j5_center_min
         P[:,6] = np.linalg.norm(robot.robot.P[:,5]+robot.robot.P[:,6])*(-1*H[:,5])
 
     else:

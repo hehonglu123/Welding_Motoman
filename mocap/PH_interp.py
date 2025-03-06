@@ -5,12 +5,11 @@ from scipy.interpolate import LinearNDInterpolator,CloughTocher2DInterpolator,RB
 from copy import deepcopy
 
 class RBFFourierInterpolator(object):
-    def __init__(self,train_q,value,basis_function_num=2,reduced_basis=0) -> None:
+    def __init__(self,train_q,value,basis_function_num=2) -> None:
         
         self.train_x = np.array(train_q)
         self.train_y = np.array(value)
         self.basis_function_num = basis_function_num
-        self.reduced_basis = reduced_basis
         self.train()
         
     def __call__(self, q):
@@ -25,13 +24,9 @@ class RBFFourierInterpolator(object):
             basis_func_q2q3.append(this_basis)
         
         basis_func_q2q3=np.array(basis_func_q2q3).T
+        self.basis_func_q2q3 = basis_func_q2q3
         
         self.coeff_A = self.train_y@np.linalg.pinv(basis_func_q2q3)
-        print(self.coeff_A.shape)
-
-        if self.reduced_basis != 0:
-            U_mat,S_mat,VT = np.linalg.svd(self.coeff_A,full_matrices=False)
-            self.coeff_A = U_mat[:,:self.reduced_basis]@np.diag(S_mat[:self.reduced_basis])@VT[:self.reduced_basis,:]
     
     def predict(self,test_x):
         
@@ -155,16 +150,30 @@ class PH_Param(object):
         fit_H=[]
         for val_p in value_P:
             if self.useReduced:
-                fit_P.append(interp_func(self.train_q, val_p, reduced_basis=7))
+                fit_P.append(interp_func(self.train_q, val_p, basis_function_num=1))
             else:
                 fit_P.append(interp_func(self.train_q, val_p))
         for val_h in value_H:
             if self.useReduced:
-                fit_H.append(interp_func(self.train_q, val_h, reduced_basis=7))
+                fit_H.append(interp_func(self.train_q, val_h, basis_function_num=1))
             else:
                 fit_H.append(interp_func(self.train_q, val_h))
         self.fit_P=fit_P
         self.fit_H=fit_H
+
+        # if self.useReduced:
+        #     reduced_basis=3
+        #     coeff_A = []
+        #     for fit_p in fit_P:
+        #         coeff_A.append(fit_p.coeff_A)
+        #     for fit_h in fit_H:
+        #         coeff_A.append(fit_h.coeff_A)
+        #     U_mat,S_mat,VT = np.linalg.svd(coeff_A,full_matrices=False)
+        #     self.coeff_A = U_mat[:,:reduced_basis]@np.diag(S_mat[:reduced_basis])@VT[:reduced_basis,:]
+        #     for i,fit_p in enumerate(fit_P):
+        #         fit_p.coeff_A=self.coeff_A[i]
+        #     for i,fit_h in enumerate(fit_H):
+        #         fit_h.coeff_A=self.coeff_A[i+len(fit_P)]
 
     def predict(self,q2q3):
         

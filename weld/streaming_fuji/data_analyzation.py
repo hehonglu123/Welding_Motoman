@@ -14,9 +14,11 @@ data_dir = '../../data/wall_weld_test/'
 # logdata_dir_all = ['weld_fujiscan_2025_02_26_18_08_18/', 'weld_fujiscan_2025_02_26_16_24_21/', 'weld_fujiscan_2025_02_26_17_39_17/']
 logdata_dir_all = ['weld_fujiscan_2025_02_26_18_08_18/', 'weld_fujiscan_2025_02_26_16_24_21/']
 
-input_signals = ['cmd_v','cmd_feedrate']
+# input_signals = ['cmd_v','cmd_feedrate']
 # input_signals = ['cmd_v','cmd_VPD','torch_height']
-control_signals = ['v','feedrate','power']
+input_signals = ['v','feedrate','power']
+# control_signals = ['v','feedrate','power']
+control_signals = []
 output_signals = ['dheight','width','thermal']
 
 data_pairs = {}
@@ -51,6 +53,7 @@ for logdata_dir_name in logdata_dir_all:
         this_layer_dir = logdata_dir+'layer'+str(layer_n)+'/'
         weld_data = pd.read_csv(this_layer_dir + 'profile_welding.csv', header=0)
         weld_data = weld_data.to_dict(orient='list')
+
         x = np.array(weld_data['x'])
         # ignore the first and last 5 mm
         if x[-1]>x[0]:
@@ -90,6 +93,8 @@ for i,input_sig_key in enumerate(input_signals):
                         data_pairs[data_VPD][input_sig_key][output_sig_key][data_input] = np.mean(width_data)
                         x_values.append(data_input)
                         y_values.append(data_pairs[data_VPD][input_sig_key][output_sig_key][data_input])
+                    else:
+                        data_pairs[data_VPD][input_sig_key][output_sig_key][data_input] = 0.5
                 else:
                     data_pairs[data_VPD][input_sig_key][output_sig_key][data_input] = np.mean(data_pairs[data_VPD][input_sig_key][output_sig_key][data_input])
                     x_values.append(data_input)
@@ -105,11 +110,14 @@ for i,input_sig_key in enumerate(input_signals):
 plt.show()
 
 for data_VPD in data_pairs.keys():
-    feedrate_dh = data_pairs[data_VPD]['cmd_feedrate']['dheight']
-    feedrate_dw = data_pairs[data_VPD]['cmd_feedrate']['width']
+    feedrate_dh = data_pairs[data_VPD]['feedrate']['dheight']
+    feedrate_dw = data_pairs[data_VPD]['feedrate']['width']
     dhdw_ratio = []
     for fdr in feedrate_dh.keys():
         if fdr in feedrate_dw:
+            print(feedrate_dh[fdr])
+            print(feedrate_dw[fdr])
+            print("====")
             dhdw = feedrate_dh[fdr]*feedrate_dw[fdr]
             dhdw_ratio.append(dhdw)
     # plt.scatter([data_VPD]*len(dhdw_ratio), dhdw_ratio)

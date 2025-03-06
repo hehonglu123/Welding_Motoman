@@ -30,7 +30,8 @@ def main():
     ################## Read geometry data ##################
     data_dir = '../../data/wall_weld_test/'
 
-    logdata_dir_all = ['weld_fujiscan_2025_02_26_18_08_18/', 'weld_fujiscan_2025_02_26_16_24_21/', 'weld_fujiscan_2025_02_26_17_39_17/']
+    # logdata_dir_all = ['weld_fujiscan_2025_02_26_18_08_18/', 'weld_fujiscan_2025_02_26_16_24_21/', 'weld_fujiscan_2025_02_26_17_39_17/']
+    logdata_dir_all = ['weld_fujiscan_2025_02_26_18_08_18/', 'weld_fujiscan_2025_02_26_16_24_21/']
 
     for logdata_dir_name in logdata_dir_all:
         print('Processing:',logdata_dir_name)
@@ -41,6 +42,8 @@ def main():
             meta_data = yaml.safe_load(f)
 
         last_profile_height = None
+        # build layers from bottom to top by layers
+        Transz0_H = None
         for weld_parts in ['base','layer']:
         # for weld_parts in ['layer']:
             if weld_parts == 'base':
@@ -55,8 +58,7 @@ def main():
                 layer_nums.append(int(this_layer))
             layer_nums = np.sort(layer_nums)
 
-            # build layers from bottom to top by layers
-            Transz0_H = None
+            
             # for layer_n in [layer_nums[-1],layer_nums[-2]]:
             for layer_n in layer_nums:
                 
@@ -97,7 +99,7 @@ def main():
                 ############### get thermal readings ##############
                 print("Getting thermal readings...")
                 try:
-                    thermal_reading = np.loadtxt(this_layer_dir+'thermal.',delimiter=',')
+                    thermal_reading = np.loadtxt(this_layer_dir+'thermal.csv',delimiter=',')
                 except FileNotFoundError:
                     with open(this_layer_dir+'ir_recording.pickle', 'rb') as f:
                         ir_exe = pickle.load(f)
@@ -147,7 +149,7 @@ def main():
                 ################ get speed ##############
                 print("Getting speed...")
                 try:
-                    weld_relative_exe = np.loadtxt(this_layer_dir+'weld_relative_exe.',delimiter=',')
+                    weld_relative_exe = np.loadtxt(this_layer_dir+'weld_relative_exe.csv',delimiter=',')
                     weld_relative_v_exe = np.loadtxt(this_layer_dir+'weld_relative_v_exe.csv',delimiter=',')
                 except FileNotFoundError:
                     weld_relative_exe = []
@@ -169,7 +171,7 @@ def main():
                 ############### get height and width ##############
                 print("Getting height and width...")
                 try:
-                    profile_height = np.loadtxt(this_layer_dir+'profile_height.',delimiter=',')
+                    profile_height = np.loadtxt(this_layer_dir+'profile_height.csv',delimiter=',')
                     profile_width = np.loadtxt(this_layer_dir+'profile_width.csv',delimiter=',')
                 except FileNotFoundError:
                     # processing the scans
@@ -177,7 +179,7 @@ def main():
 
                     # Single scan 2D reconstruction
                     try:
-                        with open(this_layer_dir+'scan_exe_noise_remove', 'rb') as f:
+                        with open(this_layer_dir+'scan_exe_noise_remove.pickle', 'rb') as f:
                             scan_exe_noise_remove = pickle.load(f)
                     except FileNotFoundError:
                         scan_exe_noise_remove = []
@@ -219,9 +221,10 @@ def main():
                     crop_h_min=(curve_x_end-crop_extend_x,curve_y-20,-30)
                     crop_h_max=(curve_x_start+crop_extend_x,curve_y+20,z_height_start+crop_extend_z)
                     # profile_height_noise, profile_width_noise,Transz0_H = scan_process.pcd2height(deepcopy(pcd),z_height_start,bbox_min=crop_h_min,bbox_max=crop_h_max,Transz0_H=Transz0_H,return_width=True)
-                    pcd = scan_process.pcd_noise_remove(pcd,nb_neighbors=40,std_ratio=1.5,\
-                                                        min_bound=crop_min,max_bound=crop_max,cluster_based_outlier_remove=True,cluster_neighbor=1,min_points=100)
-                    profile_height, profile_width,Transz0_H = scan_process.pcd2height(deepcopy(pcd),z_height_start,bbox_min=crop_h_min,bbox_max=crop_h_max,Transz0_H=Transz0_H,return_width=True)
+                    pcd = scan_process.pcd_noise_remove(pcd,min_bound=crop_min,max_bound=crop_max,outlier_remove=False,cluster_based_outlier_remove=False)
+                    pcd_denoise = scan_process.pcd_noise_remove(pcd,crop_flag=False,nb_neighbors=40,std_ratio=1.5,min_bound=crop_min,max_bound=crop_max,cluster_based_outlier_remove=True,cluster_neighbor=1,min_points=100)
+                    profile_height, _,Transz0_H = scan_process.pcd2height(deepcopy(pcd_denoise),z_height_start,bbox_min=crop_h_min,bbox_max=crop_h_max,Transz0_H=Transz0_H,return_width=True)
+                    _, profile_width,_ = scan_process.pcd2height(deepcopy(pcd),z_height_start,bbox_min=crop_h_min,bbox_max=crop_h_max,Transz0_H=Transz0_H,return_width=True)
                     # print("Transz0_H:",Transz0_H)
 
                     # apply 1D smoother to profile_width
@@ -232,6 +235,7 @@ def main():
                     np.savetxt(this_layer_dir+'profile_height.csv',profile_height,delimiter=',')
                     np.savetxt(this_layer_dir+'profile_width.csv',profile_width,delimiter=',')
                     o3d.io.write_point_cloud(this_layer_dir+'pcd.pcd',pcd)
+                    o3d.io.write_point_cloud(this_layer_dir+'pcd_denoise.pcd',pcd_denoise)
                     #############################################
 
                 ################ combine everything in one array ##############
@@ -263,6 +267,7 @@ def main():
                     welding_status_idx=np.where(welding_status[:,0]>=this_t)[0][0]
                     ratio=(this_t-welding_status[:,0][welding_status_idx-1])/(welding_status[:,0][welding_status_idx]-welding_status[:,0][welding_status_idx-1])
                     this_welding_status=welding_status[:,1:][welding_status_idx-1]*(1-ratio)+welding_status[:,1:][welding_status_idx]*ratio
+
                     # thermal reading at time t
                     thermal_reading_idx=np.where(thermal_reading[:,0]>=this_t)[0][0]
                     ratio=(this_t-thermal_reading[:,0][thermal_reading_idx-1])/(thermal_reading[:,0][thermal_reading_idx]-thermal_reading[:,0][thermal_reading_idx-1])
