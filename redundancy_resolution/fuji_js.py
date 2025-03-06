@@ -66,9 +66,9 @@ def main():
 
     ## planning parameters
     R1_w = 0.001
-    R2_w = 0.01
-    R1_w_scan = 0.01
-    R2_w_scan = 0.001
+    R2_w = 0.05
+    R1_w_scan = 0.001
+    R2_w_scan = 0.05
     thermal_distance=400
     scanning_extend_distance = 5 # mm
 
@@ -82,8 +82,8 @@ def main():
     path_dl = meta_data['path_dl']
     dist_weld_scan_index = np.round(dist_weld_scan/path_dl).astype(int)
 
-    # layers_name = ['baselayer','layer']
-    layers_name = ['layer']
+    layers_name = ['baselayer','layer']
+    # layers_name = ['layer']
     for layer_name in layers_name:
         if layer_name == 'baselayer':
             layer_num = meta_data['baselayer_num']
@@ -122,7 +122,7 @@ def main():
                 all_cases = ['forward']
             else:
                 all_cases = ['backward']
-            all_cases = ['backward']
+            all_cases = ['forward','backward']
 
             for cases in all_cases:
                 ### forward case (+x direction)
@@ -139,7 +139,7 @@ def main():
                 orientation_start = get_torch_scanner_ori(curve[dist_weld_scan_index,3:], layer_weld_scan_vec, rotate_y_direction)
                 if cases == 'forward':
                     # positioner_j2_start = np.degrees(-1*(np.radians(180)-np.arctan2(curve[dist_weld_scan_index,1],curve[dist_weld_scan_index,0])))
-                    positioner_j2_start = -40
+                    positioner_j2_start = 90
                 else:
                     positioner_j2_start = -90
                 ## solve ik when the scanner is NOT on the layer yet

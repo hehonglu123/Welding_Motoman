@@ -49,10 +49,10 @@ def welding_profile_generate(lam_split, VPD, cross_section, layer_n, v_min, v_ma
 
 def main():
     
-    weld_arcon = True
+    weld_arcon = False
     welder_log = False
-    fuji_scanon = True
-    thermal_on = True
+    fuji_scanon = False
+    thermal_on = False
     input_from_user = False
 
     ############## Robot definition ##############
@@ -156,7 +156,7 @@ def main():
     # collision avoidance z offset
     safety_z_offset = 50
     # direction 
-    torch_ori_fix = True # torch orientation fixed
+    torch_ori_fix = False # torch orientation fixed
     
     # data collection parameters
     cross_section = 1.2 # mm^2
@@ -182,7 +182,7 @@ def main():
     formatted_time = current_time.strftime('%Y_%m_%d_%H_%M_%S.%f')[:-7]
     logdata_dir='../../data/wall_weld_test/weld_fujiscan_'+formatted_time+'/'
 
-    read_from_file_layer = True
+    read_from_file_layer = False
     Transz0_H=None
     if read_from_file_layer:
         logdata_dir = '../../data/wall_weld_test/weld_fujiscan_2025_03_03_18_10_13/'
@@ -209,16 +209,16 @@ def main():
 
     mean_layer_height = 0
     # for weld_parts in ['base','layer']:
-    for weld_parts in ['layer']:
+    for weld_parts in ['base']:
         if weld_parts == 'base':
             weld_start = baselayer_start
             weld_end = baselayer_end
             nom_incre = base_nom_incre
         else:
-            weld_start = 193
+            weld_start = layer_start
             weld_end = layer_end
             nom_incre = layer_nom_incre
-        layer_count = 8
+        layer_count = 0
         i=weld_start
         input("Start with layer "+str(i)+". Press Enter to continue...")
         while i < weld_end:
@@ -298,6 +298,9 @@ def main():
                     q_start = np.hstack((curve_js[0], curve_js_cam[0], curve_js_positioner[0]))
                     SS.jog2q(q_start)
                     time.sleep(0.1)
+
+                    time.sleep(1)
+                    input("start")
 
                     # add a random delay
                     if layer_count < 99999999999:
@@ -391,6 +394,9 @@ def main():
                     if thermal_on:
                         rr_sensors.stop_all_sensors()
                     ########################################
+
+                    time.sleep(1)
+                    input("end")
 
                     ###### Motion varification
                     # time.sleep(1/SS.streaming_rate)
