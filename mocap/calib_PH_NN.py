@@ -43,6 +43,7 @@ def test_fourier_accuracy(weights, data_q, data_T,robot,param_nominal):
 def test_fwd_accuracy(model, data_q, data_T,robot,param_nominal):
     
     p_error_all = []
+    ori_error_all = []
     for i,q in enumerate(data_q):
         q2q3 = np.array([q[1],q[2]])
         q2q3 = torch.tensor(q2q3, dtype=torch.float32)
@@ -51,8 +52,11 @@ def test_fwd_accuracy(model, data_q, data_T,robot,param_nominal):
         robot = get_PH_from_param(pred_PH,robot,unit='radians')
         T_pred = robot.fwd(q)
         p_error = np.linalg.norm(T_pred.p - data_T[i][:3])
+        k,theta = R2rot(T_pred.R@q2R(data_T[i][3:]).T)
+        ori_error = np.degrees(k*theta)
         p_error_all.append(p_error)
-    return p_error_all
+        ori_error_all.append(np.abs(ori_error))
+    return p_error_all,ori_error_all
 
 
 def train(inputs_q2q3, targets_delta_PH, training_q, training_T, testing_q, testing_T,robot,param_nominal,robot_type):
@@ -94,22 +98,25 @@ def train(inputs_q2q3, targets_delta_PH, training_q, training_T, testing_q, test
     # model.load_state_dict(torch.load('PH_NN_results/train_200_200_200_lr0.02_2409171041/best_testing_model.pt',weights_only=True))
     # model.load_state_dict(torch.load('PH_NN_results/trainDirect_200_200_200_lr0.0001_wp1_wo57.3_2409191033/best_testing_model.pt',weights_only=True))
     # model.load_state_dict(torch.load('PH_NN_results/trainDirect_Fourier_lr0.0001_wp1_wo57.3_2409301609/best_training_model.pt',weights_only=True))
-    model.load_state_dict(torch.load('PH_NN_results/trainDirect_200_200_200_NN_lr0.0001_wp1_wo57.3_2409301814/best_testing_model.pt',weights_only=True))
-    # model.load_state_dict(torch.load('PH_NN_results/train_R2_400_400_lr0.02_weighted_2409181201/best_testing_model.pt',weights_only=True))
+    # model.load_state_dict(torch.load('PH_NN_results/trainDirect_200_200_200_NN_lr0.0001_wp1_wo57.3_2409301814/best_testing_model.pt',weights_only=True))
+    model.load_state_dict(torch.load('PH_NN_results/train_R2_400_400_lr0.02_weighted_2409181201/best_testing_model.pt',weights_only=True))
 
     # statistics before training
-    training_T_error = test_fwd_accuracy(model, training_q, training_T,robot,param_nominal)
-    testing_T_error = test_fwd_accuracy(model, testing_q, testing_T,robot,param_nominal)
+    training_T_error,training_ori_error = test_fwd_accuracy(model, training_q, training_T,robot,param_nominal)
+    testing_T_error,testing_ori_error = test_fwd_accuracy(model, testing_q, testing_T,robot,param_nominal)
     print('Before training:')
     print(f'Training error: mean={np.mean(training_T_error):.4f}, max={np.max(training_T_error):.4f}')
     print(f'Testing error: mean={np.mean(testing_T_error):.4f}, max={np.max(testing_T_error):.4f}')
 
     if test_only:
         model.eval()
-        testing_T_error = test_fwd_accuracy(model, testing_q, testing_T,robot,param_nominal)
+        testing_T_error,testing_ori_error = test_fwd_accuracy(model, testing_q, testing_T,robot,param_nominal)
         print(f'Max testing error: {np.max(testing_T_error):.2f}')
         print(f'Mean testing error: {np.mean(testing_T_error):.2f}')
         print(f'Std testing error: {np.std(testing_T_error):.2f}')
+        print(f'Max testing ori error: {np.max(testing_ori_error):.2f}')
+        print(f'Mean testing ori error: {np.mean(testing_ori_error):.2f}')
+        print(f'Std testing ori error: {np.std(testing_ori_error):.2f}')
         exit()
 
     # Print the model architecture
@@ -250,13 +257,14 @@ Rx=np.array([1,0,0])
 Ry=np.array([0,1,0])
 Rz=np.array([0,0,1])
 
-ph_dataset_date='0801'
-test_dataset_date='0801'
+
 config_dir='../config/'
 
-robot_type = 'R1'
+robot_type = 'R2'
 
 if robot_type == 'R1':
+    ph_dataset_date='0801'
+    test_dataset_date='0801'
     robot_marker_dir=config_dir+'MA2010_marker_config/'
     tool_marker_dir=config_dir+'weldgun_marker_config/'
     robot=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',\
@@ -270,6 +278,8 @@ if robot_type == 'R1':
     nom_H=np.array([[0,0,1],[0,1,0],[0,-1,0],\
                    [-1,0,0],[0,-1,0],[-1,0,0]]).T
 elif robot_type == 'R2':
+    ph_dataset_date='0804'
+    test_dataset_date='0804'
     robot_marker_dir=config_dir+'MA1440_marker_config/'
     tool_marker_dir=config_dir+'mti_marker_config/'
     robot=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.yml',\

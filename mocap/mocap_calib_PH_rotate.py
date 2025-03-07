@@ -126,12 +126,12 @@ def to_frame(curve_p,curve_R,mocap_stamps,target_frame,markers_id):
 
 config_dir='../config/'
 
-robot_type='R1'
-# robot_type='R2'
+# robot_type='R1'
+robot_type='R2'
 # robot_type='S1'
 
 # all_datasets=['train_data','valid_data_1','valid_data_2']
-dataset_date='0801'
+dataset_date='0804'
 # all_datasets=['test'+dataset_date+'_R1_aftercalib/train_data']
 all_datasets=['test'+dataset_date+'_'+robot_type+'/train_data']
 
@@ -218,6 +218,18 @@ for dataset in all_datasets:
         # read raw data
         curve_p,curve_R,mocap_stamps = read_and_convert_frame(raw_data_dir+'_'+str(j+1),robot.base_rigid_id,robot.tool_markers_id)
 
+        print(curve_p.keys())
+        marker_distance = []
+        for marker_id_1 in curve_p.keys():
+            for marker_id_2 in curve_p.keys():
+                this_marker_distance = np.mean(np.linalg.norm(np.array(curve_p[marker_id_1])-np.array(curve_p[marker_id_2]),axis=1))
+                # print("marker distance:",marker_id_1,marker_id_2,this_marker_distance)
+                if this_marker_distance != 0 and this_marker_distance not in marker_distance:
+                    marker_distance.append(this_marker_distance)
+        print("marker distance:",marker_distance)
+        print("ave marker distance:",np.mean(marker_distance))
+        exit()
+        
         # read q
         with open(raw_data_dir+'_'+str(j+1)+'_robot_q.pickle', 'rb') as handle:
             robot_q = pickle.load(handle)

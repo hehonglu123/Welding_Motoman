@@ -81,6 +81,7 @@ def test_fwd_interp_accuracy(model, vae_model, train_q, data_q, data_T,robot,par
 def test_fwd_accuracy(model, interp_funcs, train_q, data_q, data_T,robot,param_nominal,q_index=np.array([1,2])):
     
     p_error_all = []
+    ori_error_all = []
     for i,q in enumerate(data_q):
         # first, interpolate q2q3 to get latent vector
         # q2q3 = np.array([q[1],q[2]])
@@ -97,8 +98,11 @@ def test_fwd_accuracy(model, interp_funcs, train_q, data_q, data_T,robot,param_n
         robot = get_PH_from_param(pred_PH,robot,unit='radians')
         T_pred = robot.fwd(q)
         p_error = np.linalg.norm(T_pred.p - data_T[i][:3])
+        k,theta = R2rot(T_pred.R@q2R(data_T[i][3:]).T)
+        ori_error = np.degrees(k*theta)
         p_error_all.append(p_error)
-    return p_error_all
+        ori_error_all.append(np.abs(ori_error))
+    return p_error_all,ori_error_all
 
 def latent_space_analysis(inputs_q2q3, data_delta_PH, training_q, training_T, testing_q, testing_T,robot,param_nominal,robot_type):
 
@@ -219,7 +223,8 @@ def trained_model_test(inputs_q2q3, data_delta_PH, training_q, training_T, testi
     data_delta_PH_qall_tensor = torch.tensor(data_delta_PH_qall, dtype=torch.float32)
 
     # AE_model_dir = "trainLATENT_VAE_R1_latent6_2411121154/"
-    AE_model_dir = 'trainLATENT_AE_R1_latent6_2411121051/'
+    # AE_model_dir = 'trainLATENT_AE_R1_latent6_2411121051/'
+    AE_model_dir = 'trainLATENT_AE_R2_latent6_2411201610/'
 
     data_dir = 'PH_NN_results/'+AE_model_dir
     # read meta data
@@ -245,11 +250,18 @@ def trained_model_test(inputs_q2q3, data_delta_PH, training_q, training_T, testi
         interp_funcs.append(LinearNDInterpNearestExtrap(inputs_qall, latent_vec_cpu[:,latent_i]))
     print("Interpolation functions done")
     # get data accuracy
-    training_T_error = test_fwd_accuracy(vae_model, interp_funcs, inputs_qall, training_q, training_T,robot,param_nominal,q_index)
-    testing_T_error = test_fwd_accuracy(vae_model, interp_funcs, inputs_qall, testing_q, testing_T,robot,param_nominal,q_index)
+    training_T_error,training_ori_error = test_fwd_accuracy(vae_model, interp_funcs, inputs_qall, training_q, training_T,robot,param_nominal,q_index)
+    testing_T_error,testing_ori_error = test_fwd_accuracy(vae_model, interp_funcs, inputs_qall, testing_q, testing_T,robot,param_nominal,q_index)
     # print training and testing error, mean, max
     print(f'Training error: mean={np.mean(training_T_error):.4f}, max={np.max(training_T_error):.4f}')
     print(f'Testing error: mean={np.mean(testing_T_error):.4f}, max={np.max(testing_T_error):.4f}')
+
+    print(f'Max testing error: {round(np.max(testing_T_error),2):.2f}')
+    print(f'Mean testing error: {round(np.mean(testing_T_error),2):.2f}')
+    print(f'Std testing error: {round(np.std(testing_T_error),2):.2f}')
+    print(f'Max testing ori error: {round(np.max(testing_ori_error),2):.2f}')
+    print(f'Mean testing ori error: {round(np.mean(testing_ori_error),2):.2f}')
+    print(f'Std testing ori error: {round(np.std(testing_ori_error),2):.2f}')
 
 def train_interp(inputs_q2q3, data_delta_PH, training_q, training_T, testing_q, testing_T,robot,param_nominal,robot_type):
 
@@ -582,15 +594,14 @@ Rz=np.array([0,0,1])
 
 config_dir='../config/'
 \
-ph_dataset_date='0801'
-test_dataset_date='0801'
-robot_type = 'R1'
+
+# robot_type = 'R1'
 ####
-# ph_dataset_date='0804'
-# test_dataset_date='0804'
-# robot_type = 'R2'
+robot_type = 'R2'
 
 if robot_type == 'R1':
+    ph_dataset_date='0801'
+    test_dataset_date='0801'
     robot_marker_dir=config_dir+'MA2010_marker_config/'
     tool_marker_dir=config_dir+'weldgun_marker_config/'
     robot=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',\
@@ -604,6 +615,8 @@ if robot_type == 'R1':
     nom_H=np.array([[0,0,1],[0,1,0],[0,-1,0],\
                    [-1,0,0],[0,-1,0],[-1,0,0]]).T
 elif robot_type == 'R2':
+    ph_dataset_date='0804'
+    test_dataset_date='0804'
     robot_marker_dir=config_dir+'MA1440_marker_config/'
     tool_marker_dir=config_dir+'mti_marker_config/'
     robot=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.yml',\
@@ -697,5 +710,5 @@ param_PH_q = np.array(param_PH_q)
 ## train the NN
 # train(np.array(train_q),np.array(param_PH_q),train_robot_q,train_mocap_T,test_robot_q,test_mocap_T,robot,param_nominal,robot_type)
 # train_interp(np.array(train_q),np.array(param_PH_q),train_robot_q,train_mocap_T,test_robot_q,test_mocap_T,robot,param_nominal,robot_type)
-latent_space_analysis(np.array(train_q),np.array(param_PH_q),train_robot_q,train_mocap_T,test_robot_q,test_mocap_T,robot,param_nominal,robot_type)
-# trained_model_test(np.array(train_q),np.array(param_PH_q),train_robot_q,train_mocap_T,test_robot_q,test_mocap_T,robot,param_nominal,robot_type)
+# latent_space_analysis(np.array(train_q),np.array(param_PH_q),train_robot_q,train_mocap_T,test_robot_q,test_mocap_T,robot,param_nominal,robot_type)
+trained_model_test(np.array(train_q),np.array(param_PH_q),train_robot_q,train_mocap_T,test_robot_q,test_mocap_T,robot,param_nominal,robot_type)

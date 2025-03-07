@@ -163,13 +163,16 @@ def get_PH_from_param(param,robot,unit='radians'):
     robot.robot.H=H.T
     return robot
 
-def get_param_from_PH(robot,this_P,this_H,nom_H):
+def get_param_from_PH(robot,this_P,this_H,nom_H,unit='radians'):
 
     param_H = []
     for i,h in enumerate(this_H.T):
         theta_sol = subproblem2(nom_H[:,i], h, robot.param_k2[i], robot.param_k1[i])
         theta_sol = theta_sol[0] if theta_sol[0][0]<np.pi/2 and theta_sol[0][0]>-np.pi/2 else theta_sol[1]
-        param_H.extend(theta_sol[::-1])
+        if unit=='radians':
+            param_H.extend(theta_sol[::-1])
+        else:
+            param_H.extend(np.degrees(theta_sol[::-1]))
 
     return np.append(np.reshape(this_P.T,-1),np.array(param_H))
 
@@ -282,7 +285,7 @@ def get_PH_from_param_minimal(param,robot,unit='radians'):
     robot.robot.H=H.T
     return robot
 
-def get_param_from_PH_minimal(robot,this_P,this_H,nom_P,nom_H):
+def get_param_from_PH_minimal(robot,this_P,this_H,nom_P,nom_H, unit='radians'):
 
     param_P = []
     delta_oi = []
@@ -308,7 +311,10 @@ def get_param_from_PH_minimal(robot,this_P,this_H,nom_P,nom_H):
     for i,h in enumerate(this_H.T):
         theta_sol = subproblem2(nom_H[:,i], h, robot.param_k2[i], robot.param_k1[i])
         theta_sol = theta_sol[0] if theta_sol[0][0]<np.pi/2 and theta_sol[0][0]>-np.pi/2 else theta_sol[1]
-        param_H.extend(theta_sol[::-1])
+        if unit=='radians':
+            param_H.extend(theta_sol[::-1])
+        else:
+            param_H.extend(np.degrees(theta_sol[::-1]))
     
     return np.append(param_P,np.array(param_H))
 

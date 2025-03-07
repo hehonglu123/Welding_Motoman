@@ -5,7 +5,7 @@ import pickle
 import time
 import sys
 sys.path.append('../toolbox/')
-from robot_def import *
+from motoman_def import *
 from matplotlib import pyplot as plt
 from scipy.optimize import fminbound
 from qpsolvers import solve_qp
@@ -48,7 +48,7 @@ robot.P_nominal=robot.P_nominal.T
 robot.H_nominal=robot.H_nominal.T
 robot = get_H_param_axis(robot) # get the axis to parametrize H
 
-H_unit = 'radians'
+H_unit = 'degrees'
 
 #### using rigid body
 use_toolmaker=True
@@ -80,9 +80,9 @@ minimal=True
 
 ## get initial param from CPA
 if minimal:
-    param_init = get_param_from_PH_minimal(robot,robot.calib_P,robot.calib_H,robot.P_nominal.T,robot.H_nominal.T)
+    param_init = get_param_from_PH_minimal(robot,robot.calib_P,robot.calib_H,robot.P_nominal.T,robot.H_nominal.T,unit=H_unit)
 else:
-    param_init = get_param_from_PH(robot,robot.calib_P,robot.calib_H,robot.H_nominal.T)
+    param_init = get_param_from_PH(robot,robot.calib_P,robot.calib_H,robot.H_nominal.T,unit=H_unit)
 print("Initial Param:",param_init)
 
 #### Gradient
@@ -96,7 +96,7 @@ all_testing_pose=np.arange(N_per_pose)
 # max_iteration = 1000
 max_iteration = 200
 # terminate_eps = 0.00005
-terminate_eps = 0.0002
+terminate_eps = 0.0000000000000002
 terminate_ori_error=999
 # terminate_ori_error=0.05
 
@@ -108,19 +108,21 @@ else:
     total_H = jN*2
 assert total_P+total_H==len(param_init), "Total P and H not match with param_init"
 
-alpha=0.1
-# weight_ori = 1
-# weight_pos = 1
-weight_ori = 1
-weight_pos = 1*np.pi/180
+alpha=0.02
+
+weight_pos = 1
+# weight_ori = 180/np.pi
+weight_ori = 1641
+# weight_pos = 1*np.pi/180
+# weight_pos = 0.0006092193744350433
 weight_P = 1
 # weight_H = np.pi/180
 weight_H = 1
 
-# lambda_H = 5
-# lambda_P = 0.5
 lambda_H = 1
 lambda_P = 1
+# lambda_H = 0.05
+# lambda_P = 0.025
 start_t = time.time()
 
 ### start calibration. Iterate all collected configurations/clusters
@@ -165,10 +167,13 @@ for N in train_set:
             T_tool_base = T_marker_base*robot.T_tool_toolmarker
             vd = robot_init_T.p-T_tool_base.p
             omega_d=s_err_func(robot_init_T.R@T_tool_base.R.T)
+            kd,theta_d = R2rot(robot_init_T.R@T_tool_base.R.T)
+            ori_norm = kd*theta_d
             
             error_pos_ori = np.append(error_pos_ori,np.append(omega_d*weight_ori,vd*weight_pos))
             error_pos.append(vd)
-            error_ori.append(np.degrees(omega_d))  # for plotting purpose only (unit: degrees)          
+            # error_ori.append(np.degrees(omega_d))  # for plotting purpose only (unit: degrees)  
+            error_ori.append(np.degrees(ori_norm))  # for plotting purpose only (unit: degrees)          
         J_ana = np.array(J_ana)
         pos_error_progress.append(error_pos[0])
         pos_error_norm_progress.append(np.linalg.norm(error_pos,ord=2,axis=1))
@@ -267,8 +272,8 @@ for N in train_set:
             save_filename = data_dir+'calib_PH_q_ana_minimal.pickle'
         else:
             save_filename = data_dir+'calib_PH_q_ana.pickle'
-        with open(save_filename,'wb') as file:
-            pickle.dump(PH_q, file)
+        # with open(save_filename,'wb') as file:
+        #     pickle.dump(PH_q, file)
 
     print("================")
     
@@ -362,8 +367,8 @@ if save_PH:
         save_filename = data_dir+'calib_one_PH_ana_minimal.pickle'
     else:
         save_filename = data_dir+'calib_one_PH_ana.pickle'
-    with open(save_filename,'wb') as file:
-        pickle.dump(PH_q, file)
+    # with open(save_filename,'wb') as file:
+    #     pickle.dump(PH_q, file)
 
 if plot_error:
     plt.clf()
