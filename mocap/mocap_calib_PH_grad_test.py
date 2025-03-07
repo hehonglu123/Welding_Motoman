@@ -21,7 +21,7 @@ Rz=np.array([0,0,1])
 
 config_dir='../config/'
 
-robot_type = 'R2'
+robot_type = 'R1'
 
 if robot_type == 'R1':
     ph_dataset_date='0801'
@@ -154,6 +154,7 @@ print(calib_file_name)
 with open(PH_data_dir+calib_file_name,'rb') as file:
     PH_q=pickle.load(file)
 if use_minimal_calib:
+    print(PH_data_dir+calib_file_name[:-7]+'_minimal.pickle')
     with open(PH_data_dir+calib_file_name[:-7]+'_minimal.pickle','rb') as file:
         PH_q_min=pickle.load(file)
 
@@ -179,10 +180,16 @@ if useHRotation:
 train_q = []
 training_error=[]
 training_error_ori=[]
-for qkey in PH_q.keys():
-    train_q.append(np.array(qkey))
-    training_error.append(PH_q[qkey]['train_pos_error'][-1])
-    training_error_ori.append(PH_q[qkey]['train_ori_error'][-1])
+if use_minimal_calib:
+    for qkey in PH_q.keys():
+        train_q.append(np.array(qkey))
+        training_error.append(PH_q_min[qkey]['train_pos_error'][-1])
+        training_error_ori.append(PH_q_min[qkey]['train_ori_error'][-1])
+else:
+    for qkey in PH_q.keys():
+        train_q.append(np.array(qkey))
+        training_error.append(PH_q[qkey]['train_pos_error'])
+        training_error_ori.append(PH_q[qkey]['train_ori_error'])
 train_q=np.array(train_q)
 try:
     training_error=np.array(training_error)
@@ -209,21 +216,28 @@ try:
     with open(PH_data_dir+calib_file_name,'rb') as file:
         PH_q_one=pickle.load(file)
     if use_minimal_calib:
+        print(PH_data_dir+calib_file_name[:-7]+'_minimal.pickle')
         with open(PH_data_dir+calib_file_name[:-7]+'_minimal.pickle','rb') as file:
             PH_q_one_min=pickle.load(file)
 except:
     print("One PH not found")
     PH_q_one=PH_q[train_q_zero_key]
 #### one PH for all ####
+# if use_minimal_calib:
+#     universal_P = PH_q_one_min['P']
+#     universal_H = PH_q_one_min['H']
+#     training_error_universal=PH_q_one_min['train_pos_error']
+#     training_error_ori_universal=PH_q_one_min['train_ori_error']
+# else:
 universal_P = PH_q_one['P']
 universal_H = PH_q_one['H']
 training_error_universal=PH_q_one['train_pos_error']
 training_error_ori_universal=PH_q_one['train_ori_error']
-# plt.plot(np.mean(training_error_universal,axis=1))
-# plt.xlabel("Iteration")
-# plt.ylabel("Average Position Error Norm (mm)")
-# plt.title("Average Position error norm of all poses")
-# plt.show()
+plt.plot(np.mean(training_error_universal,axis=1))
+plt.xlabel("Iteration")
+plt.ylabel("Average Position Error Norm (mm)")
+plt.title("Average Position error norm of all poses")
+plt.show()
 ########################
 
 #### pre-calib #####################

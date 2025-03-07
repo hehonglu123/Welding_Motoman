@@ -173,6 +173,7 @@ def get_param_from_PH(robot,this_P,this_H,nom_H,unit='radians'):
             param_H.extend(theta_sol[::-1])
         else:
             param_H.extend(np.degrees(theta_sol[::-1]))
+        # param_H.extend(theta_sol[::-1])
 
     return np.append(np.reshape(this_P.T,-1),np.array(param_H))
 
