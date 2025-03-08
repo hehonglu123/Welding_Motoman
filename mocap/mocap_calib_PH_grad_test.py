@@ -21,7 +21,7 @@ Rz=np.array([0,0,1])
 
 config_dir='../config/'
 
-robot_type = 'R1'
+robot_type = 'R2'
 
 if robot_type == 'R1':
     ph_dataset_date='0801'
@@ -87,6 +87,10 @@ print(test_data_dir)
 use_raw=False
 test_robot_q = np.loadtxt(test_data_dir+'robot_q_align.csv',delimiter=',')
 test_mocap_T = np.loadtxt(test_data_dir+'mocap_T_align.csv',delimiter=',')
+
+# plt.plot(np.degrees(test_robot_q[700:800,1]))
+# plt.plot(np.degrees(test_robot_q[700:800,2]))
+# plt.show()
 
 train_robot_q = np.loadtxt(PH_data_dir+'robot_q_align.csv',delimiter=',')
 train_mocap_T = np.loadtxt(PH_data_dir+'mocap_T_align.csv',delimiter=',')
@@ -233,11 +237,11 @@ universal_P = PH_q_one['P']
 universal_H = PH_q_one['H']
 training_error_universal=PH_q_one['train_pos_error']
 training_error_ori_universal=PH_q_one['train_ori_error']
-plt.plot(np.mean(training_error_universal,axis=1))
-plt.xlabel("Iteration")
-plt.ylabel("Average Position Error Norm (mm)")
-plt.title("Average Position error norm of all poses")
-plt.show()
+# plt.plot(np.mean(training_error_universal,axis=1))
+# plt.xlabel("Iteration")
+# plt.ylabel("Average Position Error Norm (mm)")
+# plt.title("Average Position error norm of all poses")
+# plt.show()
 ########################
 
 #### pre-calib #####################
@@ -262,6 +266,9 @@ ph_param_lin=PH_Param(nom_P,nom_H)
 ph_param_lin.fit(PH_q,method='linear')
 ph_param_cub=PH_Param(nom_P,nom_H)
 ph_param_cub.fit(PH_q,method='cubic')
+
+
+
 ph_param_rbf=PH_Param(nom_P,nom_H)
 ph_param_rbf.fit(PH_q,method='RBF')
 ph_param_fbf=PH_Param(nom_P,nom_H)
@@ -584,7 +591,7 @@ plt.plot(error_pos_baseline_norm,'-o',markersize=1,label='CPA PH')
 # plt.plot(error_pos_onePH_norm,'-o',markersize=1,label='One PH')
 # plt.plot(error_pos_near_norm,'-o',markersize=1,label='Nearest PH')
 plt.plot(error_pos_lin_norm,'-o',markersize=1,label='Linear Interp PH')
-# plt.plot(error_pos_cub_norm,'-o',markersize=1,label='Cubic Interp PH')
+plt.plot(error_pos_cub_norm,'-o',markersize=1,label='Cubic Interp PH')
 # plt.plot(error_pos_rbf_norm,'-o',markersize=1,label='RBF Interp PH')
 plt.plot(error_pos_fbf_norm,'-o',markersize=1,label='Fourier Basis PH')
 # plt.plot(error_pos_fbf_hori_norm,'-o',markersize=1,label='Fourier Basis PH (Hori)')

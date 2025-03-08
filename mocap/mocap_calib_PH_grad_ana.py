@@ -18,13 +18,13 @@ Rx=np.array([1,0,0])
 Ry=np.array([0,1,0])
 Rz=np.array([0,0,1])
 
-dataset_date='0801'
 
 config_dir='../config/'
 
-robot_type = 'R1'
+robot_type = 'R2'
 
 if robot_type == 'R1':
+    dataset_date='0801'
     robot_marker_dir=config_dir+'MA2010_marker_config/'
     tool_marker_dir=config_dir+'weldgun_marker_config/'
     robot=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',\
@@ -34,6 +34,7 @@ if robot_type == 'R1':
                         base_marker_config_file=robot_marker_dir+'MA2010_'+dataset_date+'_marker_config.yaml',\
                         tool_marker_config_file=tool_marker_dir+'weldgun_'+dataset_date+'_marker_config.yaml')
 elif robot_type == 'R2':
+    dataset_date='0804'
     robot_marker_dir=config_dir+'MA1440_marker_config/'
     tool_marker_dir=config_dir+'mti_marker_config/'
     robot=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.yml',\
@@ -107,187 +108,189 @@ else:
     total_P = (jN+1)*3
     total_H = jN*2
 assert total_P+total_H==len(param_init), "Total P and H not match with param_init"
-
-alpha=0.01
-
-weight_pos = 1
-# weight_ori = 1
-# weight_ori = 180/np.pi
-weight_ori = 1641
-# weight_pos = 1*np.pi/180
-# weight_pos = 0.0006092193744350433
 weight_P = 1
-# weight_H = np.pi/180
 weight_H = 1
 
-# lambda_H = 1
-# lambda_P = 1
-lambda_H = 5
-lambda_P = 2.5
-start_t = time.time()
 
+weight_pos = 1
+weight_ori = 1641
+
+
+# alpha=0.01
+# lambda_H = 25
+# lambda_P = 2.5
+
+alpha=0.02
+lambda_H = 0.5
+lambda_P = 0.25
+
+
+start_t = time.time()
 ### start calibration. Iterate all collected configurations/clusters
 PH_q = {}
-# for N in train_set:
-#     print("Training #"+str(N),"at Pose (q2q3):", np.round(np.degrees(robot_q_sample[N,1:3])))
-#     print("Progress:",str(N)+"/"+str(total_pose),"Time Pass:",str(np.round(time.time()-start_t)))
+for N in train_set:
+    print("Training #"+str(N),"at Pose (q2q3):", np.round(np.degrees(robot_q_sample[N,1:3])))
+    print("Progress:",str(N)+"/"+str(total_pose),"Time Pass:",str(np.round(time.time()-start_t)))
 
-#     # initialize the parameters
-#     param = deepcopy(param_init)
+    # initialize the parameters
+    param = deepcopy(param_init)
 
-#     # start NLE (nonlinear esimation)
-#     st_iter = time.time()
-#     pos_error_progress = []
-#     pos_error_norm_progress = []
-#     ori_error_progress = []
-#     ori_error_norm_progress = []
-#     for iter_N in range(max_iteration):
-#         # update robot PH
-#         if minimal:
-#             robot = get_PH_from_param_minimal(param,robot,unit=H_unit)
-#         else:
-#             robot = get_PH_from_param(param,robot,unit=H_unit)
+    # start NLE (nonlinear esimation)
+    st_iter = time.time()
+    pos_error_progress = []
+    pos_error_norm_progress = []
+    ori_error_progress = []
+    ori_error_norm_progress = []
+    for iter_N in range(max_iteration):
+        # update robot PH
+        if minimal:
+            robot = get_PH_from_param_minimal(param,robot,unit=H_unit)
+        else:
+            robot = get_PH_from_param(param,robot,unit=H_unit)
         
-#         J_ana=[]
-#         error_pos_ori = []
-#         error_pos = []
-#         error_ori = []
-#         for testing_pose in all_testing_pose:
-#             pose_ind=N*N_per_pose+testing_pose
-#             if minimal:
-#                 J_ana_part = jacobian_param_minimal(param,robot,robot_q[pose_ind],unit=H_unit)
-#             else:
-#                 J_ana_part = jacobian_param(param,robot,robot_q[pose_ind],unit=H_unit)
-#             # weighting
-#             J_ana_part[:,:total_P] *= weight_P
-#             J_ana_part[3:,total_P:] *= weight_H
-#             J_ana.extend(J_ana_part)
-#             # get error
-#             robot_init_T = robot.fwd(robot_q[pose_ind])
-#             T_marker_base = Transform(q2R(mocap_T[pose_ind][3:]),mocap_T[pose_ind][:3])
-#             T_tool_base = T_marker_base*robot.T_tool_toolmarker
-#             vd = robot_init_T.p-T_tool_base.p
-#             omega_d=s_err_func(robot_init_T.R@T_tool_base.R.T)
-#             kd,theta_d = R2rot(robot_init_T.R@T_tool_base.R.T)
-#             ori_norm = kd*theta_d
+        J_ana=[]
+        error_pos_ori = []
+        error_pos = []
+        error_ori = []
+        for testing_pose in all_testing_pose:
+            pose_ind=N*N_per_pose+testing_pose
+            if minimal:
+                J_ana_part = jacobian_param_minimal(param,robot,robot_q[pose_ind],unit=H_unit)
+            else:
+                J_ana_part = jacobian_param(param,robot,robot_q[pose_ind],unit=H_unit)
+            # weighting
+            J_ana_part[:,:total_P] *= weight_P
+            J_ana_part[3:,total_P:] *= weight_H
+            J_ana.extend(J_ana_part)
+            # get error
+            robot_init_T = robot.fwd(robot_q[pose_ind])
+            T_marker_base = Transform(q2R(mocap_T[pose_ind][3:]),mocap_T[pose_ind][:3])
+            T_tool_base = T_marker_base*robot.T_tool_toolmarker
+            vd = robot_init_T.p-T_tool_base.p
+            omega_d=s_err_func(robot_init_T.R@T_tool_base.R.T)
+            kd,theta_d = R2rot(robot_init_T.R@T_tool_base.R.T)
+            ori_norm = kd*theta_d
             
-#             error_pos_ori = np.append(error_pos_ori,np.append(omega_d*weight_ori,vd*weight_pos))
-#             error_pos.append(vd)
-#             # error_ori.append(np.degrees(omega_d))  # for plotting purpose only (unit: degrees)  
-#             error_ori.append(np.degrees(ori_norm))  # for plotting purpose only (unit: degrees)          
-#         J_ana = np.array(J_ana)
-#         pos_error_progress.append(error_pos[0])
-#         pos_error_norm_progress.append(np.linalg.norm(error_pos,ord=2,axis=1))
-#         ori_error_progress.append(error_ori[0])
-#         ori_error_norm_progress.append(np.linalg.norm(error_ori,ord=2,axis=1))
+            error_pos_ori = np.append(error_pos_ori,np.append(omega_d*weight_ori,vd*weight_pos))
+            error_pos.append(vd)
+            # error_ori.append(np.degrees(omega_d))  # for plotting purpose only (unit: degrees)  
+            error_ori.append(np.degrees(ori_norm))  # for plotting purpose only (unit: degrees)          
+        J_ana = np.array(J_ana)
+        pos_error_progress.append(error_pos[0])
+        pos_error_norm_progress.append(np.linalg.norm(error_pos,ord=2,axis=1))
+        ori_error_progress.append(error_ori[0])
+        ori_error_norm_progress.append(np.linalg.norm(error_ori,ord=2,axis=1))
         
-#         if iter_N>0 and np.linalg.norm(pos_error_norm_progress[-1]-pos_error_norm_progress[-2])<terminate_eps and np.mean(ori_error_norm_progress[-1])<terminate_ori_error:
-#             break
+        if iter_N>0 and np.linalg.norm(pos_error_norm_progress[-1]-pos_error_norm_progress[-2])<terminate_eps and np.mean(ori_error_norm_progress[-1])<terminate_ori_error:
+            break
         
-#         # update PH
-#         G = J_ana
-#         Kq = np.diag(np.append(np.ones(total_P)*lambda_P,np.ones(total_H)*lambda_H)) ## TODO: tune lambda!!
-#         H=np.matmul(G.T,G)+Kq
-#         H=(H+np.transpose(H))/2
-#         f=-np.matmul(G.T,error_pos_ori)
-#         dph=solve_qp(H,f,solver='quadprog')
+        # update PH
+        G = J_ana
+        Kq = np.diag(np.append(np.ones(total_P)*lambda_P,np.ones(total_H)*lambda_H)) ## TODO: tune lambda!!
+        H=np.matmul(G.T,G)+Kq
+        H=(H+np.transpose(H))/2
+        f=-np.matmul(G.T,error_pos_ori)
+        dph=solve_qp(H,f,solver='quadprog')
         
-#         if (iter_N==0) and plot_grad:
-#             plt.clf()
-#             print("Gradient Size:",G.shape)
-#             plt.matshow(G)
-#             plt.colorbar()
-#             plt.show(block=plot_block)
+        if (iter_N==0) and plot_grad:
+            plt.clf()
+            print("Gradient Size:",G.shape)
+            plt.matshow(G)
+            plt.colorbar()
+            plt.show(block=plot_block)
 
-#         # alpha=fminbound(self.error_calc,0,0.999999999999999999999,args=(q_all[-1],qdot,curve_sliced_relative[i],))
+        # alpha=fminbound(self.error_calc,0,0.999999999999999999999,args=(q_all[-1],qdot,curve_sliced_relative[i],))
         
-#         d_pH_update = -1*alpha*dph
-#         param = param+d_pH_update
+        d_pH_update = -1*alpha*dph
+        param = param+d_pH_update
 
-#     ## J condition number
-#     u,s,v=np.linalg.svd(J_ana)
-#     print("J rank (numpy) / Total singular values: %d/%d"%(np.linalg.matrix_rank(J_ana),len(s)))
-#     print("J condition number: ", s[0]/s[np.linalg.matrix_rank(J_ana)-1])
-#     ## Error status
-#     print("Start/Final Mean Position Error:",round(np.mean(pos_error_norm_progress[0]),5),round(np.mean(pos_error_norm_progress[-1]),5))
-#     print("Start/Final Mean Orientation Error:",round(np.mean(ori_error_norm_progress[0]),5),round(np.mean(ori_error_norm_progress[-1]),5))
-#     print("Time iteration:",time.time()-st_iter)
+    ## J condition number
+    u,s,v=np.linalg.svd(J_ana)
+    print("J rank (numpy) / Total singular values: %d/%d"%(np.linalg.matrix_rank(J_ana),len(s)))
+    print("J condition number: ", s[0]/s[np.linalg.matrix_rank(J_ana)-1])
+    ## Error status
+    print("Start/Final Mean Position Error:",round(np.mean(pos_error_norm_progress[0]),5),round(np.mean(pos_error_norm_progress[-1]),5))
+    print("Start/Final Mean Orientation Error:",round(np.mean(ori_error_norm_progress[0]),5),round(np.mean(ori_error_norm_progress[-1]),5))
+    print("Time iteration:",time.time()-st_iter)
 
-#     if plot_error:
-#         try:
-#             plt.close(fig)
-#         except:
-#             pass
-#         fig,axs = plt.subplots(2,3)
-#         axs[0,0].plot(np.array(pos_error_progress))
-#         axs[0,0].set_title("Position XYZ error of Pose 1")
-#         axs[0,1].plot(np.array(pos_error_norm_progress))
-#         axs[0,1].set_title("Position error norm of all poses")
-#         pos_error_diff = np.linalg.norm(np.diff(pos_error_norm_progress,axis=0),axis=1).flatten()
-#         axs[0,2].plot(np.array(pos_error_diff))
-#         axs[0,2].set_title("Position Error Norm Diff")
-#         axs[1,0].plot(np.array(ori_error_progress))
-#         axs[1,0].set_title("Orientation kdtheta error of Pose 1")
-#         axs[1,1].plot(np.array(ori_error_norm_progress))
-#         axs[1,1].set_title("Orientation error norm of all poses")
-#         ori_error_diff = np.linalg.norm(np.diff(ori_error_norm_progress,axis=0),axis=1).flatten()
-#         axs[1,2].plot(np.array(ori_error_diff))
-#         axs[1,2].set_title("Orientation Error Norm Diff")
-#         # fig.canvas.manager.window.wm_geometry("+%d+%d" % (1920+10,10))
-#         # fig.set_size_inches([13.95,7.92],forward=True)
-#         plt.tight_layout()
-#         plt.show(block=(plot_block or plot_error_iteration))
-#         # plt.pause(0.01)
+    if plot_error:
+        try:
+            plt.close(fig)
+        except:
+            pass
+        fig,axs = plt.subplots(2,3)
+        axs[0,0].plot(np.array(pos_error_progress))
+        axs[0,0].set_title("Position XYZ error of Pose 1")
+        axs[0,1].plot(np.array(pos_error_norm_progress))
+        axs[0,1].set_title("Position error norm of all poses")
+        pos_error_diff = np.linalg.norm(np.diff(pos_error_norm_progress,axis=0),axis=1).flatten()
+        axs[0,2].plot(np.array(pos_error_diff))
+        axs[0,2].set_title("Position Error Norm Diff")
+        axs[1,0].plot(np.array(ori_error_progress))
+        axs[1,0].set_title("Orientation kdtheta error of Pose 1")
+        axs[1,1].plot(np.array(ori_error_norm_progress))
+        axs[1,1].set_title("Orientation error norm of all poses")
+        ori_error_diff = np.linalg.norm(np.diff(ori_error_norm_progress,axis=0),axis=1).flatten()
+        axs[1,2].plot(np.array(ori_error_diff))
+        axs[1,2].set_title("Orientation Error Norm Diff")
+        # fig.canvas.manager.window.wm_geometry("+%d+%d" % (1920+10,10))
+        # fig.set_size_inches([13.95,7.92],forward=True)
+        plt.tight_layout()
+        plt.show(block=(plot_block or plot_error_iteration))
+        # plt.pause(0.01)
         
-#         if plot_error_iteration:
-#             plt.errorbar(np.arange(len(pos_error_norm_progress)),np.mean(pos_error_norm_progress,axis=1),\
-#                 yerr=np.mean(pos_error_norm_progress,axis=1))
-#             plt.xlabel('Iteration',fontsize=15)
-#             plt.xticks(np.arange(0,len(pos_error_norm_progress),len(pos_error_norm_progress)/6).astype(int),fontsize=15)
-#             plt.ylabel('Position Error Norm (mm)',fontsize=15)
-#             plt.yticks(fontsize=15)
-#             plt.title("Mean/Std of Position Error Norm of Poses",fontsize=18)
-#             plt.show()
+        if plot_error_iteration:
+            plt.errorbar(np.arange(len(pos_error_norm_progress)),np.mean(pos_error_norm_progress,axis=1),\
+                yerr=np.mean(pos_error_norm_progress,axis=1))
+            plt.xlabel('Iteration',fontsize=15)
+            plt.xticks(np.arange(0,len(pos_error_norm_progress),len(pos_error_norm_progress)/6).astype(int),fontsize=15)
+            plt.ylabel('Position Error Norm (mm)',fontsize=15)
+            plt.yticks(fontsize=15)
+            plt.title("Mean/Std of Position Error Norm of Poses",fontsize=18)
+            plt.show()
             
-#             plt.errorbar(np.arange(len(ori_error_norm_progress)),np.mean(ori_error_norm_progress,axis=1),\
-#                 yerr=np.mean(ori_error_norm_progress,axis=1))
-#             plt.xlabel('Iteration',fontsize=15)
-#             plt.xticks(np.arange(0,len(pos_error_norm_progress),len(pos_error_norm_progress)/6).astype(int),fontsize=15)
-#             plt.ylabel('Orientation Error Norm (deg)',fontsize=15)
-#             plt.yticks(fontsize=15)
-#             plt.title("Mean/Std of Orientation Error Norm of Poses",fontsize=18)
-#             plt.show()
-#     # update robot PH
-#     if minimal:
-#         robot = get_PH_from_param_minimal(param,robot,unit=H_unit)
-#     else:
-#         robot = get_PH_from_param(param,robot,unit=H_unit)
-#     if save_PH:
-#         q_key = tuple(robot_q_sample[N,1:3])
-#         PH_q[q_key]={}
-#         PH_q[q_key]['P']=robot.robot.P
-#         PH_q[q_key]['H']=robot.robot.H
-#         PH_q[q_key]['train_pos_error']=pos_error_norm_progress
-#         PH_q[q_key]['train_ori_error']=ori_error_norm_progress
-#         if minimal:
-#             save_filename = data_dir+'calib_PH_q_ana_minimal.pickle'
-#         else:
-#             save_filename = data_dir+'calib_PH_q_ana.pickle'
-#         with open(save_filename,'wb') as file:
-#             pickle.dump(PH_q, file)
+            plt.errorbar(np.arange(len(ori_error_norm_progress)),np.mean(ori_error_norm_progress,axis=1),\
+                yerr=np.mean(ori_error_norm_progress,axis=1))
+            plt.xlabel('Iteration',fontsize=15)
+            plt.xticks(np.arange(0,len(pos_error_norm_progress),len(pos_error_norm_progress)/6).astype(int),fontsize=15)
+            plt.ylabel('Orientation Error Norm (deg)',fontsize=15)
+            plt.yticks(fontsize=15)
+            plt.title("Mean/Std of Orientation Error Norm of Poses",fontsize=18)
+            plt.show()
+    # update robot PH
+    if minimal:
+        robot = get_PH_from_param_minimal(param,robot,unit=H_unit)
+    else:
+        robot = get_PH_from_param(param,robot,unit=H_unit)
+    if save_PH:
+        q_key = tuple(robot_q_sample[N,1:3])
+        PH_q[q_key]={}
+        PH_q[q_key]['P']=robot.robot.P
+        PH_q[q_key]['H']=robot.robot.H
+        PH_q[q_key]['train_pos_error']=pos_error_norm_progress
+        PH_q[q_key]['train_ori_error']=ori_error_norm_progress
+        if minimal:
+            save_filename = data_dir+'calib_PH_q_ana_minimal.pickle'
+        else:
+            save_filename = data_dir+'calib_PH_q_ana.pickle'
+        with open(save_filename,'wb') as file:
+            pickle.dump(PH_q, file)
 
-#     print("================")
+    print("================")
     
 # exit()
 ###### get just one optimal pose
 plot_grad=False
 plot_error=False
+
 alpha = 0.2
+
 max_iteration = max_iteration
 # initialize the parameters
 # param = np.zeros(3*(jN+1)+2*jN)
 # param[:3*(jN+1)] = np.reshape(robot.P_nominal,(3*(jN+1),))
 param = deepcopy(param_init)
+
 
 # start NLE (nonlinear esimation)
 pos_error_progress = []
@@ -324,7 +327,7 @@ for iter_N in range(max_iteration):
         T_marker_base = Transform(q2R(mocap_T[pose_ind][3:]),mocap_T[pose_ind][:3])
         T_tool_base = T_marker_base*robot.T_tool_toolmarker
         vd = robot_init_T.p-T_tool_base.p
-        omega_d=s_err_func(robot_init_T.R@T_tool_base.R.T)
+        omega_d=s_err_func(robot_init_T.R@T_tool_base.R.T,s_type=2)/2
         
         error_pos_ori = np.append(error_pos_ori,np.append(omega_d*weight_ori,vd*weight_pos))
         error_pos.append(vd)

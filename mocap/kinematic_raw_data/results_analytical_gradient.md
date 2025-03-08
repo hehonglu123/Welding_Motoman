@@ -48,38 +48,55 @@
 |FBF Interp PH (Minimal)|0.0840|0.0352|0.1764|
 |FBF Interp PH (Reduced)|0.0835|0.0345|0.1778|
 
-## Dataset 0801 R1 (minimal)
-### Training Data
+## Dataset 0801 R1 a=1641
+
+### Training Data (Position)
 ||Mean (mm)|Std (mm)|Max (mm)|
 |-|-|-|-|
 |Nominal PH|1.3188|0.2347|1.8143|
-|One PH|0.2433|0.1360|0.8328|
-|Optimize PH|0.0333|0.0272|0.1913|
+|CPA|0.4871|0.2525|1.2043|
+|One PH|0.2438|0.1360|0.8337|
+|Optimize PH|0.0979|0.0513|0.4576|
+
+### Training Data (Orientation)
+||Mean (deg)|Std (deg)|Max (deg)|
+|-|-|-|-|
+|Nominal PH|0.0467|0.0193|0.1245|
+|CPA|0.0521|0.0208|0.1264|
+|One PH|0.0588|0.0261|0.1397|
+|Optimize PH|0.0386|0.0171|0.1041|
+
 ### Testing Data (Position)
 ||Mean (mm)|Std (mm)|Max (mm)|
 |-|-|-|-|
 |Origin PH|1.2898|0.2067|1.7211|
 |CPA PH|0.4429|0.2017|0.9927|
-|Zero PH|0.4381|0.1968|1.0876|
-|One PH|1.7680|1.6906|6.0710|
-|Nearest PH|0.4552|0.2336|1.4311|
-|Linear Interp PH|0.4423|0.2181|1.3025|
-|Cubic Interp PH|0.4478|0.2310|1.3339|
-|RBF Interp PH|0.4493|0.2272|1.3224|
-|FBF Interp PH|0.3958|0.1416|0.9884|
+|Zero PH|0.4161|0.2053|0.9956|
+|One PH|1.2105|1.0676|4.0281|
+|Nearest PH|0.3000|0.1555|0.7912|
+|Linear Interp PH|0.2944|0.1557|0.8110|
+|Cubic Interp PH|0.2966|0.1564|0.8506|
+|RBF Interp PH|0.2988|0.1570|0.8263|
+|FBF Interp PH|0.3004|0.1318|0.7236|
+|FBF Interp PH (Hori)|0.3004|0.1318|0.7236|
+|FBF Interp PH (Minimal)|0.3004|0.1318|0.7236|
+|FBF Interp PH (Reduced)|0.3084|0.1479|0.7987|
 
 ### Testing Data (Orientation)
 ||Mean (deg)|Std (deg)|Max (deg)|
 |-|-|-|-|
-|Origin PH|0.0691|0.0374|0.2010|
-|CPA PH|0.0663|0.0317|0.1733|
-|Zero PH|0.0736|0.0401|0.2024|
-|One PH|0.4960|0.5982|2.0743|
-|Nearest PH|0.0694|0.0403|0.2742|
-|Linear Interp PH|0.0700|0.0400|0.2488|
-|Cubic Interp PH|0.0694|0.0398|0.2579|
-|RBF Interp PH|0.0695|0.0397|0.2564|
-|FBF Interp PH|0.0710|0.0405|0.2111|
+|Origin PH|0.0951|0.0366|0.2010|
+|CPA PH|0.0828|0.0340|0.1733|
+|Zero PH|0.0829|0.0340|0.1706|
+|One PH|0.2945|0.1543|0.6108|
+|Nearest PH|0.0861|0.0365|0.1901|
+|Linear Interp PH|0.0860|0.0362|0.1901|
+|Cubic Interp PH|0.0859|0.0363|0.1907|
+|RBF Interp PH|0.0861|0.0364|0.1925|
+|FBF Interp PH|0.0866|0.0359|0.1821|
+|FBF Interp PH (Hori)|0.0866|0.0359|0.1821|
+|FBF Interp PH (Minimal)|0.0866|0.0359|0.1821|
+|FBF Interp PH (Reduced)|0.0870|0.0351|0.1813|
 
 ## Dataset 0804 R2
 

@@ -102,8 +102,13 @@ weight_pos = 1
 # lambda_P = 0.1
 # lambda_H = 114
 # lambda_P = 0.1
-lambda_H = 5
-lambda_P = 0.5
+
+# lambda_H = 5
+# lambda_P = 2.5
+
+lambda_H = 0.5
+lambda_P = 0.25
+
 start_t = time.time()
 
 ## get initial param from CPA
