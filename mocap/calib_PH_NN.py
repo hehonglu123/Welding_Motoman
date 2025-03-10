@@ -7,6 +7,7 @@ from PH_interp import *
 from calib_analytic_grad import *
 import datetime
 import time
+from pathlib import Path
 
 from motoman_def import *
 from Models import *
@@ -53,7 +54,7 @@ def test_fwd_accuracy(model, data_q, data_T,robot,param_nominal):
         T_pred = robot.fwd(q)
         p_error = np.linalg.norm(T_pred.p - data_T[i][:3])
         k,theta = R2rot(T_pred.R@q2R(data_T[i][3:]).T)
-        ori_error = np.degrees(k*theta)
+        ori_error = np.degrees(np.linalg.norm(k*theta))
         p_error_all.append(p_error)
         ori_error_all.append(np.abs(ori_error))
     return p_error_all,ori_error_all
@@ -72,7 +73,7 @@ def train(inputs_q2q3, targets_delta_PH, training_q, training_T, testing_q, test
 
     # Define the input size, hidden size, and output size
     input_size = 2
-    hidden_sizes = [400,400]
+    hidden_sizes = [200,200,200]
     output_size = 33
 
     # use fourier basis or not
@@ -99,7 +100,9 @@ def train(inputs_q2q3, targets_delta_PH, training_q, training_T, testing_q, test
     # model.load_state_dict(torch.load('PH_NN_results/trainDirect_200_200_200_lr0.0001_wp1_wo57.3_2409191033/best_testing_model.pt',weights_only=True))
     # model.load_state_dict(torch.load('PH_NN_results/trainDirect_Fourier_lr0.0001_wp1_wo57.3_2409301609/best_training_model.pt',weights_only=True))
     # model.load_state_dict(torch.load('PH_NN_results/trainDirect_200_200_200_NN_lr0.0001_wp1_wo57.3_2409301814/best_testing_model.pt',weights_only=True))
-    model.load_state_dict(torch.load('PH_NN_results/train_R2_400_400_lr0.02_weighted_2409181201/best_testing_model.pt',weights_only=True))
+    # model.load_state_dict(torch.load('PH_NN_results/train_R2_400_400_lr0.02_weighted_2409181201/best_testing_model.pt',weights_only=True))
+    # model.load_state_dict(torch.load('PH_NN_results/train_R1_200_200_200_NN_lr0.02_weighted_2503091846/best_testing_model.pt',weights_only=True))
+    model.load_state_dict(torch.load('PH_NN_results/train_R2_200_200_200_NN_lr0.02_weighted_2503082242/best_testing_model.pt',weights_only=True))
 
     # statistics before training
     training_T_error,training_ori_error = test_fwd_accuracy(model, training_q, training_T,robot,param_nominal)
@@ -123,12 +126,12 @@ def train(inputs_q2q3, targets_delta_PH, training_q, training_T, testing_q, test
     print(model)
     # Define the loss function
     loss_fn = nn.MSELoss()
-    weighted = False
+    weighted = True
     if weighted:
         loss_fn = WeightedMSELoss()
         # weights = torch.tensor([1]*33, dtype=torch.float32)
         weights_P = 1
-        weights_H = 180/np.pi
+        weights_H = 180/np.pi*10
         weights = torch.tensor(np.append(np.ones(21)*weights_P,np.ones(12)*weights_H), dtype=torch.float32)
     # Define the learning rate
     learning_rate = 0.02
@@ -151,7 +154,7 @@ def train(inputs_q2q3, targets_delta_PH, training_q, training_T, testing_q, test
     if weighted:
         folder_path += 'weighted_'
     folder_path += formatted_string+'/'
-    # Path(folder_path).mkdir(parents=True, exist_ok=True)
+    Path(folder_path).mkdir(parents=True, exist_ok=True)
 
     # save a training parameters meta yaml file to folder_path
     meta_data = {'input_size': input_size, 'hidden_sizes': hidden_sizes, 'output_size': output_size, 'learning_rate': learning_rate, 'num_epochs': num_epochs}
@@ -206,12 +209,12 @@ def train(inputs_q2q3, targets_delta_PH, training_q, training_T, testing_q, test
         elif epoch<1001:
             if (epoch+1) % 10 == 0:
                 print_loss = True
-            if (epoch+1) % 100 == 0:
+            if (epoch+1) % 10 == 0:
                 print_error = True
         else:
             if (epoch+1) % 100 == 0:
                 print_loss = True
-            if (epoch+1) % 500 == 0:
+            if (epoch+1) % 100 == 0:
                 print_error = True
 
         model.eval()
@@ -223,8 +226,8 @@ def train(inputs_q2q3, targets_delta_PH, training_q, training_T, testing_q, test
         if print_loss:
             print(f'Epoch [{epoch+1}/{num_epochs}], Loss: {loss.item():.4f}')
         if print_error:
-            training_T_error = test_fwd_accuracy(model, training_q, training_T,robot,param_nominal)
-            testing_T_error = test_fwd_accuracy(model, testing_q, testing_T,robot,param_nominal)
+            training_T_error,training_ori_error = test_fwd_accuracy(model, training_q, training_T,robot,param_nominal)
+            testing_T_error,testing_ori_error = test_fwd_accuracy(model, testing_q, testing_T,robot,param_nominal)
             # print training and testing error, mean, max
             print(f'Training error: mean={np.mean(training_T_error):.4f}, max={np.max(training_T_error):.4f}')
             print(f'Testing error: mean={np.mean(testing_T_error):.4f}, max={np.max(testing_T_error):.4f}')
@@ -239,12 +242,25 @@ def train(inputs_q2q3, targets_delta_PH, training_q, training_T, testing_q, test
                 torch.save(model.state_dict(), folder_path+'best_training_model.pt')
             if best_testing_error > np.max(testing_T_error):
                 best_testing_error = np.max(testing_T_error)
+                mean_testing_error = np.mean(testing_T_error)
+                std_testing_error = np.std(testing_T_error)
+                best_testing_ori_error = np.max(testing_ori_error)
+                mean_testing_ori_error = np.mean(testing_ori_error)
+                std_testing_ori_error = np.std(testing_ori_error)
                 torch.save(model.state_dict(), folder_path+'best_testing_model.pt')
             np.save(folder_path+'training_mean_error_all.npy',np.array(training_mean_error_all))
             np.save(folder_path+'testing_mean_error_all.npy',np.array(testing_mean_error_all))
             np.save(folder_path+'training_max_error_all.npy',np.array(training_max_error_all))
             np.save(folder_path+'testing_max_error_all.npy',np.array(testing_max_error_all))
             np.save(folder_path+'data_sample_epoches.npy',np.array(data_sample_epoches))
+            print("Current best:")
+            print(f'mean testing error: {mean_testing_error:.2f}')
+            print(f'std testing error: {std_testing_error:.2f}')
+            print(f'max testing error: {best_testing_error:.2f}')
+            print(f'mean testing ori error: {mean_testing_ori_error:.2f}')
+            print(f'std testing ori error: {std_testing_ori_error:.2f}')
+            print(f'max testing ori error: {best_testing_ori_error:.2f}')
+            print("=========================")
 
         # training time for each epoch
         epoch_end_time = time.time()

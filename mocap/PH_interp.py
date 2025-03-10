@@ -152,23 +152,17 @@ class PH_Param(object):
             if self.useReduced:
                 fit_P.append(interp_func(self.train_q, val_p, basis_function_num=1))
             else:
-                if self.method != 'cubic':
-                    fit_P.append(interp_func(self.train_q, val_p))
-                else:
-                    fit_P.append(interp_func(self.train_q, val_p,tol=1e-01, maxiter=20))
+                fit_P.append(interp_func(self.train_q, val_p))
         for val_h in value_H:
             if self.useReduced:
                 fit_H.append(interp_func(self.train_q, val_h, basis_function_num=1))
             else:
-                if self.method != 'cubic':
-                    fit_H.append(interp_func(self.train_q, val_h))
-                else:
-                    fit_H.append(interp_func(self.train_q, val_h,tol=1e-01, maxiter=20))
+                fit_H.append(interp_func(self.train_q, val_h))
         self.fit_P=fit_P
         self.fit_H=fit_H
 
         # if self.useReduced:
-        #     reduced_basis=3
+        #     reduced_basis=7
         #     coeff_A = []
         #     for fit_p in fit_P:
         #         coeff_A.append(fit_p.coeff_A)

@@ -21,7 +21,7 @@ Rz=np.array([0,0,1])
 
 config_dir='../config/'
 
-robot_type = 'R2'
+robot_type = 'R1'
 
 if robot_type == 'R1':
     ph_dataset_date='0801'
@@ -158,7 +158,6 @@ print(calib_file_name)
 with open(PH_data_dir+calib_file_name,'rb') as file:
     PH_q=pickle.load(file)
 if use_minimal_calib:
-    print(PH_data_dir+calib_file_name[:-7]+'_minimal.pickle')
     with open(PH_data_dir+calib_file_name[:-7]+'_minimal.pickle','rb') as file:
         PH_q_min=pickle.load(file)
 
@@ -220,7 +219,6 @@ try:
     with open(PH_data_dir+calib_file_name,'rb') as file:
         PH_q_one=pickle.load(file)
     if use_minimal_calib:
-        print(PH_data_dir+calib_file_name[:-7]+'_minimal.pickle')
         with open(PH_data_dir+calib_file_name[:-7]+'_minimal.pickle','rb') as file:
             PH_q_one_min=pickle.load(file)
 except:

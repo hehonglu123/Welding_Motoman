@@ -21,7 +21,7 @@ Rz=np.array([0,0,1])
 
 config_dir='../config/'
 
-robot_type = 'R2'
+robot_type = 'R1'
 
 if robot_type == 'R1':
     dataset_date='0801'
@@ -111,18 +111,18 @@ assert total_P+total_H==len(param_init), "Total P and H not match with param_ini
 weight_P = 1
 weight_H = 1
 
-
 weight_pos = 1
+
+
 weight_ori = 1641
+alpha=0.01
+lambda_H = 30
+lambda_P = 2.5
 
-
-# alpha=0.01
-# lambda_H = 25
-# lambda_P = 2.5
-
-alpha=0.02
-lambda_H = 0.5
-lambda_P = 0.25
+# weight_ori = 10
+# alpha=0.1
+# lambda_H = 0.5
+# lambda_P = 0.25
 
 
 start_t = time.time()

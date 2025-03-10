@@ -99,7 +99,7 @@ def test_fwd_accuracy(model, interp_funcs, train_q, data_q, data_T,robot,param_n
         T_pred = robot.fwd(q)
         p_error = np.linalg.norm(T_pred.p - data_T[i][:3])
         k,theta = R2rot(T_pred.R@q2R(data_T[i][3:]).T)
-        ori_error = np.degrees(k*theta)
+        ori_error = np.degrees(np.linalg.norm(k*theta))
         p_error_all.append(p_error)
         ori_error_all.append(np.abs(ori_error))
     return p_error_all,ori_error_all
@@ -207,7 +207,7 @@ def trained_model_test(inputs_q2q3, data_delta_PH, training_q, training_T, testi
 
     # data preprocessing
     N_per_cluster = 7
-    q_index = np.arange(1,6)
+    q_index = np.arange(1,3)
     data_delta_PH = torch.tensor(data_delta_PH, dtype=torch.float32)
     inputs_q2q3_tensor = torch.tensor(inputs_q2q3, dtype=torch.float32)
     # augmented inputs
@@ -224,7 +224,9 @@ def trained_model_test(inputs_q2q3, data_delta_PH, training_q, training_T, testi
 
     # AE_model_dir = "trainLATENT_VAE_R1_latent6_2411121154/"
     # AE_model_dir = 'trainLATENT_AE_R1_latent6_2411121051/'
-    AE_model_dir = 'trainLATENT_AE_R2_latent6_2411201610/'
+    # AE_model_dir = 'trainLATENT_AE_R2_latent6_2411201610/'
+    # AE_model_dir = 'trainLATENT_AE_R1_latent6_weighted_2503091944/'
+    AE_model_dir = 'trainLATENT_AE_R2_latent6_weighted_2503092025/'
 
     data_dir = 'PH_NN_results/'+AE_model_dir
     # read meta data
@@ -442,12 +444,12 @@ def train(inputs_q2q3, data_delta_PH, training_q, training_T, testing_q, testing
     print("Decoder:", model.decoder)
     # Define the loss function
     loss_mse_fn = nn.MSELoss()
-    weighted = False
+    weighted = True
     if weighted:
         loss_mse_fn = WeightedMSELoss()
         # weights = torch.tensor([1]*33, dtype=torch.float32)
         weights_P = 1
-        weights_H = 180/np.pi
+        weights_H = 180/np.pi*10
         weights = torch.tensor(np.append(np.ones(21)*weights_P,np.ones(12)*weights_H), dtype=torch.float32)
     # Define the learning rate
     learning_rate = 0.003
@@ -536,7 +538,7 @@ def train(inputs_q2q3, data_delta_PH, training_q, training_T, testing_q, testing
         else:
             if (epoch+1) % 100 == 0:
                 print_loss = True
-            if (epoch+1) % 500 == 0:
+            if (epoch+1) % 100 == 0:
                 print_error = True
 
         model.eval()
@@ -553,8 +555,8 @@ def train(inputs_q2q3, data_delta_PH, training_q, training_T, testing_q, testing
             interp_funcs = []
             for latent_i in range(latent_size):
                 interp_funcs.append(LinearNDInterpNearestExtrap(inputs_q2q3, latent_vec_cpu[:,latent_i]))
-            training_T_error = test_fwd_accuracy(model, interp_funcs, inputs_q2q3, training_q, training_T,robot,param_nominal)
-            testing_T_error = test_fwd_accuracy(model, interp_funcs, inputs_q2q3, testing_q, testing_T,robot,param_nominal)
+            training_T_error,training_ori_error = test_fwd_accuracy(model, interp_funcs, inputs_q2q3, training_q, training_T,robot,param_nominal)
+            testing_T_error,testing_ori_error = test_fwd_accuracy(model, interp_funcs, inputs_q2q3, testing_q, testing_T,robot,param_nominal)
             # print training and testing error, mean, max
             print(f'Training error: mean={np.mean(training_T_error):.4f}, max={np.max(training_T_error):.4f}')
             print(f'Testing error: mean={np.mean(testing_T_error):.4f}, max={np.max(testing_T_error):.4f}')
@@ -571,6 +573,11 @@ def train(inputs_q2q3, data_delta_PH, training_q, training_T, testing_q, testing
                 torch.save(model.state_dict(), folder_path+'best_training_model.pt')
             if best_testing_error > np.max(testing_T_error):
                 best_testing_error = np.max(testing_T_error)
+                mean_testing_error = np.mean(testing_T_error)
+                std_testing_error = np.std(testing_T_error)
+                best_testing_ori_error = np.max(testing_ori_error)
+                mean_testing_ori_error = np.mean(testing_ori_error)
+                std_testing_ori_error = np.std(testing_ori_error)
                 torch.save(model.state_dict(), folder_path+'best_testing_model.pt')
             np.save(folder_path+'training_mean_error_all.npy',np.array(training_mean_error_all))
             np.save(folder_path+'testing_mean_error_all.npy',np.array(testing_mean_error_all))
@@ -579,6 +586,14 @@ def train(inputs_q2q3, data_delta_PH, training_q, training_T, testing_q, testing
             np.save(folder_path+'training_std_error_all.npy',np.array(training_std_error_all))
             np.save(folder_path+'testing_std_error_all.npy',np.array(testing_std_error_all))
             np.save(folder_path+'data_sample_epoches.npy',np.array(data_sample_epoches))
+            print("Current best:")
+            print(f'mean testing error: {mean_testing_error:.2f}')
+            print(f'std testing error: {std_testing_error:.2f}')
+            print(f'max testing error: {best_testing_error:.2f}')
+            print(f'mean testing ori error: {mean_testing_ori_error:.2f}')
+            print(f'std testing ori error: {std_testing_ori_error:.2f}')
+            print(f'max testing ori error: {best_testing_ori_error:.2f}')
+            print("=========================")
 
         # training time for each epoch
         epoch_end_time = time.time()

@@ -55,48 +55,48 @@
 |-|-|-|-|
 |Nominal PH|1.3188|0.2347|1.8143|
 |CPA|0.4871|0.2525|1.2043|
-|One PH|0.2438|0.1360|0.8337|
-|Optimize PH|0.0979|0.0513|0.4576|
+|One PH|0.2491|0.1388|0.8551|
+|Optimize PH|0.0980|0.0512|0.4573|
 
 ### Training Data (Orientation)
 ||Mean (deg)|Std (deg)|Max (deg)|
 |-|-|-|-|
 |Nominal PH|0.0467|0.0193|0.1245|
 |CPA|0.0521|0.0208|0.1264|
-|One PH|0.0588|0.0261|0.1397|
-|Optimize PH|0.0386|0.0171|0.1041|
+|One PH|0.0453|0.0183|0.1126|
+|Optimize PH|0.0381|0.0169|0.1032|
 
 ### Testing Data (Position)
 ||Mean (mm)|Std (mm)|Max (mm)|
 |-|-|-|-|
 |Origin PH|1.2898|0.2067|1.7211|
 |CPA PH|0.4429|0.2017|0.9927|
-|Zero PH|0.4161|0.2053|0.9956|
-|One PH|1.2105|1.0676|4.0281|
-|Nearest PH|0.3000|0.1555|0.7912|
-|Linear Interp PH|0.2944|0.1557|0.8110|
-|Cubic Interp PH|0.2966|0.1564|0.8506|
-|RBF Interp PH|0.2988|0.1570|0.8263|
-|FBF Interp PH|0.3004|0.1318|0.7236|
-|FBF Interp PH (Hori)|0.3004|0.1318|0.7236|
-|FBF Interp PH (Minimal)|0.3004|0.1318|0.7236|
-|FBF Interp PH (Reduced)|0.3084|0.1479|0.7987|
+|Zero PH|0.4115|0.2051|0.9853|
+|One PH|0.8249|0.7912|3.4564|
+|Nearest PH|0.3157|0.1657|0.8108|
+|Linear Interp PH|0.3100|0.1663|0.8123|
+|Cubic Interp PH|0.3113|0.1669|0.8289|
+|RBF Interp PH|0.3140|0.1669|0.8276|
+|FBF Interp PH|0.3149|0.1426|0.7358|
+|FBF Interp PH (Hori)|0.3149|0.1426|0.7358|
+|FBF Interp PH (Minimal)|0.3149|0.1426|0.7358|
+|FBF Interp PH (Reduced)|0.3240|0.1592|0.8149|
 
 ### Testing Data (Orientation)
 ||Mean (deg)|Std (deg)|Max (deg)|
 |-|-|-|-|
 |Origin PH|0.0951|0.0366|0.2010|
 |CPA PH|0.0828|0.0340|0.1733|
-|Zero PH|0.0829|0.0340|0.1706|
-|One PH|0.2945|0.1543|0.6108|
-|Nearest PH|0.0861|0.0365|0.1901|
-|Linear Interp PH|0.0860|0.0362|0.1901|
-|Cubic Interp PH|0.0859|0.0363|0.1907|
-|RBF Interp PH|0.0861|0.0364|0.1925|
-|FBF Interp PH|0.0866|0.0359|0.1821|
-|FBF Interp PH (Hori)|0.0866|0.0359|0.1821|
-|FBF Interp PH (Minimal)|0.0866|0.0359|0.1821|
-|FBF Interp PH (Reduced)|0.0870|0.0351|0.1813|
+|Zero PH|0.0831|0.0341|0.1712|
+|One PH|0.1905|0.0906|0.3914|
+|Nearest PH|0.0865|0.0368|0.1902|
+|Linear Interp PH|0.0864|0.0365|0.1902|
+|Cubic Interp PH|0.0863|0.0367|0.1916|
+|RBF Interp PH|0.0865|0.0366|0.1928|
+|FBF Interp PH|0.0869|0.0359|0.1812|
+|FBF Interp PH (Hori)|0.0869|0.0359|0.1812|
+|FBF Interp PH (Minimal)|0.0869|0.0359|0.1812|
+|FBF Interp PH (Reduced)|0.0872|0.0350|0.1798|
 
 ## Dataset 0804 R2
 
@@ -147,3 +147,53 @@
 |FBF Interp PH (Hori)|0.0969|0.0388|0.2027|
 |FBF Interp PH (Minimal)|0.0969|0.0388|0.2027|
 |FBF Interp PH (Reduced)|0.0999|0.0394|0.1973|
+
+## Dataset 0804 R2 a=1641
+
+### Training Data (Position)
+||Mean (mm)|Std (mm)|Max (mm)|
+|-|-|-|-|
+|Nominal PH|1.7658|0.9394|4.1825|
+|CPA|1.5864|0.7866|3.2890|
+|One PH|0.4135|0.2775|1.5297|
+|Optimize PH|0.0359|0.0179|0.1246|
+
+### Training Data (Orientation)
+||Mean (deg)|Std (deg)|Max (deg)|
+|-|-|-|-|
+|Nominal PH|0.1238|0.0439|0.2563|
+|CPA|0.1309|0.0470|0.2807|
+|One PH|0.1017|0.0448|0.2739|
+|Optimize PH|0.0928|0.0467|0.2470|
+
+### Testing Data (Position)
+||Mean (mm)|Std (mm)|Max (mm)|
+|-|-|-|-|
+|Origin PH|1.0777|0.8088|3.0710|
+|CPA PH|1.4370|0.6138|3.1874|
+|Zero PH|1.6786|0.7149|3.2019|
+|One PH|1.7163|1.1999|5.1831|
+|Nearest PH|0.4572|0.2892|1.2870|
+|Linear Interp PH|0.4227|0.2559|1.2276|
+|Cubic Interp PH|1.3751|4.7698|61.2188|
+|RBF Interp PH|0.4657|0.4426|4.9018|
+|FBF Interp PH|0.4182|0.2056|0.9911|
+|FBF Interp PH (Hori)|0.4182|0.2056|0.9911|
+|FBF Interp PH (Minimal)|0.4182|0.2056|0.9911|
+|FBF Interp PH (Reduced)|0.4372|0.1911|0.9843|
+
+### Testing Data (Orientation)
+||Mean (deg)|Std (deg)|Max (deg)|
+|-|-|-|-|
+|Origin PH|0.1141|0.0408|0.2390|
+|CPA PH|0.1126|0.0392|0.2089|
+|Zero PH|0.1082|0.0462|0.2247|
+|One PH|1.0021|0.5789|2.2425|
+|Nearest PH|0.0892|0.0396|0.1921|
+|Linear Interp PH|0.0877|0.0397|0.1919|
+|Cubic Interp PH|0.1342|0.2625|3.4248|
+|RBF Interp PH|0.0905|0.0429|0.3114|
+|FBF Interp PH|0.0873|0.0395|0.1985|
+|FBF Interp PH (Hori)|0.0873|0.0395|0.1985|
+|FBF Interp PH (Minimal)|0.0873|0.0395|0.1985|
+|FBF Interp PH (Reduced)|0.0897|0.0385|0.1892|
