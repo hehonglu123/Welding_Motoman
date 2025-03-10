@@ -151,7 +151,7 @@ def main():
     # layer welding parameters
     layer_feedrate = 100 # inch/min
     layer_nom_height = 3 # mm
-    layer_nom_vel = 3 # mm/s
+    layer_nom_vel = 4 # mm/s
     layer_nom_incre = int(layer_nom_height/layer_resolution)
     # weld starting point sleep
     weld_start_sleep = 0.2
@@ -167,6 +167,7 @@ def main():
     VPD = cross_section*inch2mm*layer_feedrate/layer_nom_vel # volume per distance (mm^3/mm)
     split_sections = 6
     lam_split = np.linspace(0,meta_data['layer_length'],split_sections+1)[:-1]
+    lam_split = lam_split.tolist()
     feedrate_min = 100
     feedrate_max = 220
     v_minimum = round(cross_section*inch2mm*feedrate_min/VPD,2)
@@ -190,16 +191,16 @@ def main():
     Transz0_H=None
     if read_from_file_layer:
         logdata_dir = '../../data/wall_weld_test/weld_fujiscan_2025_03_03_18_10_13/'
-        Transz0_H = [[1.00000000e+00 ,-5.09597574e-07, -2.70277611e-05,  1.91536366e-04],\
-                    [-5.09597574e-07 , 9.99289261e-01 ,-3.76957955e-02,  2.67137025e-01],\
-                    [ 2.70277611e-05 , 3.76957955e-02,  9.99289261e-01, -7.08161630e+00],\
+        Transz0_H = [[ 9.99996717e-01, -9.38152707e-06,  2.56242820e-03, -1.69755313e-02],\
+                    [-9.38152707e-06,  9.99973192e-01,  7.32226246e-03, -4.85084015e-02],\
+                    [-2.56242820e-03, -7.32226246e-03 , 9.99969909e-01, -6.62458387e+00],\
                     [ 0.00000000e+00 , 0.00000000e+00 , 0.00000000e+00,  1.00000000e+00]]
 
     weld_meta_data = {'well_arcon':weld_arcon, 'fuji_scanon':fuji_scanon, 'data_dir':data_dir, 'logdata_dir':logdata_dir\
         ,'base_layer_num':base_layer_num, 'baselayer_resolution':baselayer_resolution, 'layer_num':layer_num, 'layer_resolution':layer_resolution\
         ,'base_feedrate':base_feedrate, 'base_nom_incre':base_nom_incre, 'base_nom_vel':base_nom_vel\
         , 'layer_feedrate':layer_feedrate, 'layer_nom_incre':layer_nom_incre, 'layer_nom_vel':layer_nom_vel\
-        ,'corss_section':cross_section, 'VPD':VPD, 'split_sections':split_sections, 'lam_split':list(lam_split)\
+        ,'corss_section':cross_section, 'VPD':VPD, 'split_sections':split_sections, 'lam_split':lam_split\
         ,'v_minimum':v_minimum, 'v_maximum':v_maximum, 'weld_start_sleep':weld_start_sleep}
 
     # get robot 2 resting pose
@@ -212,8 +213,8 @@ def main():
     forward = True
 
     mean_layer_height = 0
-    # for weld_parts in ['base','layer']:
-    for weld_parts in ['base']:
+    for weld_parts in ['base','layer']:
+    # for weld_parts in ['layer']:
         if weld_parts == 'base':
             weld_start = baselayer_start
             weld_end = baselayer_end
@@ -303,8 +304,7 @@ def main():
                     SS.jog2q(q_start)
                     time.sleep(0.1)
 
-                    time.sleep(1)
-                    input("start")
+                    input("Start")
 
                     # add a random delay
                     if layer_count < 99999999999:
@@ -408,6 +408,8 @@ def main():
                     if thermal_on:
                         rr_sensors.stop_all_sensors()
                     ########################################
+
+                    input("end")
 
                     ###### Motion varification
                     # time.sleep(1/SS.streaming_rate)
@@ -622,6 +624,19 @@ def main():
                     fronius_client.stop_weld()
                     fronius_client.release_welder()
                 SS.deinitialize_robot()
+                if fuji_scanon and scan_online_process:
+                    try:
+                        while len(scan_process.raw_scan_pipe)!=0:
+                            print("Final scan processing...",len(scan_process.raw_scan_pipe))
+                            time.sleep(0.01)
+                        while len(scan_process.denoise_pipe)!=0:
+                            scan_denoise = scan_process.denoise_pipe.pop(0)
+                            scan_exe_noise_remove.append(scan_denoise)
+                        # stop scan process
+                        scan_process.end_denoise_thread_flag = True
+                        scan_denoise_thread.join()
+                    except:
+                        traceback.print_exc()
                 break
     
     if weld_arcon:

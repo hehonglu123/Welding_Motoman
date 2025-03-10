@@ -52,9 +52,10 @@ def main():
     
     weld_arcon = False
     welder_log = False
-    fuji_scanon = False
-    scan_online_process = False
+    fuji_scanon = True
+    scan_online_process = True
     adaptive_layer_height = False
+    compensate_shifting = True
     thermal_on = False
     input_from_user = False
 
@@ -155,7 +156,7 @@ def main():
     # layer welding parameters
     layer_feedrate = 100 # inch/min
     layer_nom_height = 3 # mm
-    layer_nom_vel = 3 # mm/s
+    layer_nom_vel = 5 # mm/s
     layer_nom_incre = int(layer_nom_height/layer_resolution)
     # weld starting point sleep
     weld_start_sleep = 0.2
@@ -165,6 +166,7 @@ def main():
     safety_z_offset = 50
     # direction 
     # torch_ori_fix = False # torch orientation fixed
+    correction_layer = 2
     
     # data collection parameters
     cross_section = 1.2 # mm^2
@@ -205,7 +207,8 @@ def main():
         ,'base_feedrate':base_feedrate, 'base_nom_incre':base_nom_incre, 'base_nom_vel':base_nom_vel\
         , 'layer_feedrate':layer_feedrate, 'layer_nom_incre':layer_nom_incre, 'layer_nom_vel':layer_nom_vel\
         ,'corss_section':cross_section, 'VPD':VPD, 'split_sections':split_sections, 'lam_split':list(lam_split)\
-        ,'v_minimum':v_minimum, 'v_maximum':v_maximum, 'weld_start_sleep':weld_start_sleep}
+        ,'v_minimum':v_minimum, 'v_maximum':v_maximum, 'weld_start_sleep':weld_start_sleep\
+        ,'target_dh':target_dh, 'correction_layer':correction_layer}
 
     # get robot 2 resting pose
     q_cur = deepcopy(SS.q_cur)
@@ -218,15 +221,19 @@ def main():
 
     mean_layer_height = 0
     # for weld_parts in ['base','layer']:
-    for weld_parts in ['base']:
+    for weld_parts in ['layer']:
         if weld_parts == 'base':
             weld_start = baselayer_start
             weld_end = baselayer_end
             nom_incre = base_nom_incre
+            nom_feedrate = base_feedrate
+            nom_velocity = base_nom_vel
         else:
             weld_start = layer_start
             weld_end = layer_end
             nom_incre = layer_nom_incre
+            nom_feedrate = layer_feedrate
+            nom_velocity = layer_nom_vel
         layer_count = 0
         i=weld_start
         input("Start with layer "+str(i)+". Press Enter to continue...")
@@ -271,15 +278,19 @@ def main():
                     # start with scanning 
                     # move to start point with safety_z_offset
                     r2_rest_q = curve_js_cam[0]
-                    for z in np.arange(0,safety_z_offset+1,5): # a linear movement
-                        T_end = robot_weld.fwd(curve_js_scan[-1])
+                    for z in np.arange(safety_z_offset,0,-5): # a linear movement
+                        T_end = robot_weld.fwd(curve_js_scan[0])
                         T_end.p[2] += z
-                        curve_js_end_offset = robot_weld.inv(T_end.p, T_end.R, last_joints=curve_js_scan[-1])[0]
-                        q_end_offset = np.hstack((curve_js_end_offset, r2_rest_q, q_pos))
+                        curve_js_end_offset = robot_weld.inv(T_end.p, T_end.R, last_joints=curve_js_scan[0])[0]
+                        q_end_offset = np.hstack((curve_js_end_offset, r2_rest_q, curve_js_pos_scan[0]))
                         SS.jog2q(q_end_offset)
                     
                     # recording lam height and location
-                    lam_state_height = []
+                    lam_state_height = [[]]*len(lam_split)
+                    lam_curve_shift = np.array([[-1,0,0]]) # [lam, x, y]
+                    # target p (only z matters)
+                    target_p = deepcopy(curve[0][:3])
+                    target_p[2] += target_dh
 
                     ####### scanning motion without welding ##########################
                     q_cmd_all = []
@@ -288,11 +299,10 @@ def main():
                     scan_exe = []
                     if scan_online_process:
                         scan_exe_noise_remove = []
-                        scan_denoise_thread = Thread(target=scan_process.scan_denoise_thread, args=([-40, 30],[40, 200])) # arges: (crop_min, crop_max)
-                        scan_denoise_thread.start()
+                        scan_dh_thread = Thread(target=scan_process.scan2dh_thread, args=(target_p,[-40, 30],[40, 200],-6.6,'fuji'),daemon=True) # arges: (target_p, crop_min, crop_max, offset_z, scanner)
+                        scan_dh_thread.start()
                     v_cmd = scan_nom_vel
                     lam_cur=0
-                    lam_split_i = 0
                     while lam_cur<lam_scan_relative[-1] - v_cmd/SS.streaming_rate:
                         loop_start=time.perf_counter()
 
@@ -315,11 +325,29 @@ def main():
 
                         ### scan online processing
                         if fuji_scanon and scan_online_process:
+                            while scan_process.accessing_key:
+                                time.sleep(0.0000000000001)
+                            scan_process.accessing_key = True
                             scan_process.raw_scan_pipe.append(deepcopy(line_profile))
-                            scan_process.robot_q_pipe.append(deepcopy(weld_js_exe[-1]))
-                            while len(scan_process.denoise_pipe)!=0:
-                                scan_denoise = scan_process.denoise_pipe.pop(0)
+                            scan_process.robot_q_pipe.append(deepcopy(weld_js_exe[-1][np.array([1,2,3,4,5,6,13,14])])) # log robot joints (robot 1 and positioner)
+                            scan_process.accessing_key = False
+                            while len(scan_process.denoise_scan_pipe)!=0:
+                                while scan_process.accessing_key:
+                                    time.sleep(0.0000000000001)
+                                scan_process.accessing_key = True
+                                scan_denoise = scan_process.denoise_scan_pipe.pop(0)
+                                scan_point_location = scan_process.point_location_pipe.pop(0)
+                                scan_delta_h = scan_process.delta_h_pipe.pop(0)
+                                scan_process.accessing_key = False
+                                # get denoise scan
                                 scan_exe_noise_remove.append(scan_denoise)
+                                # get lambda and record height
+                                curve_index = np.argsort(np.linalg.norm(curve[:,:2]-scan_point_location[:2],axis=1))[0]
+                                lam_scan = lam_relative[curve_index]
+                                lam_split_i = np.where(lam_split<=lam_scan)[0][-1]
+                                lam_state_height[lam_split_i].append(scan_delta_h)
+                                curve_shift = scan_point_location[:2]-curve[curve_index][:2]
+                                lam_curve_shift = np.vstack((lam_curve_shift,np.hstack((lam_scan,curve_shift))))
 
                         ### sent position Command to the robot
                         q_cmd_all.append(np.hstack((time.perf_counter(),i,q_cmd)))
@@ -328,13 +356,52 @@ def main():
                         else:
                             SS.position_cmd(q_cmd,loop_start)
                     ########################################
-                    time.sleep(0.5) # for robot to drive to the end point
+
+                    lam_curve_shift = lam_curve_shift[1:]
+                    lam_curve_shift = lam_curve_shift[lam_curve_shift[:,0]!=0]
+
+                    print("Current mean shift x,y:",np.mean(lam_curve_shift[1:,1]),np.mean(lam_curve_shift[1:,2]))
+                    print("Current std shift x,y:",np.std(lam_curve_shift[1:,1]),np.std(lam_curve_shift[1:,2]))
+                    lam_curve_shift = lam_curve_shift[np.argsort(lam_curve_shift[:,0])]
+                    # 1d smoother
+                    lam_curve_shift_smooth = moving_average(lam_curve_shift[:,2],n=11,padding=True)
+                    plt.plot(lam_curve_shift[:,1])
+                    plt.show()
+                    plt.plot(lam_curve_shift[:,2])
+                    plt.plot(lam_curve_shift_smooth)
+                    plt.show()
+                    lam_curve_shift[:,2] = lam_curve_shift_smooth
+                    if compensate_shifting and weld_parts == 'layer':
+                        # get the robot to the shifted position
+                        time_start = time.time()
+                        shifted_xy = lam_curve_shift[0][1:3]
+                        print("Shifted x,y:",shifted_xy)
+                        T_positioner_world = positioner.fwd(curve_js_positioner[0],world=True)
+                        T_robot_origin = robot_weld.fwd(curve_js[0])
+                        print("T robot origin:",T_robot_origin)
+                        T_robot_positioner = T_positioner_world.inv()*T_robot_origin
+                        T_robot_shift = T_robot_positioner
+                        T_robot_shift.p[:2] -= shifted_xy
+                        T_robot_shift = T_positioner_world*T_robot_shift
+                        print("T robot shift:",T_robot_shift)
+                        q_shift = robot_weld.inv(T_robot_shift.p, T_robot_shift.R, last_joints=curve_js[0])[0]
+                        q_cmd[:6] = q_shift # only update the robot 1 joints
+                        print("Shift calculation time:",time.time()-time_start)
+                        time.sleep(0.1)
+                        input("move")
+                        SS.jog2q(q_cmd)
+                    else:
+                        time.sleep(0.5) # for robot to drive to the end point
 
                     ####### welding motion ##########################
                     lam_cur=0
+                    lam_split_i = 0
                     # initial velocity
-                    v_cmd = vel_profile[0]
-                    feedrate_cmd = feedrate_profile[0]
+                    if weld_parts == 'base' or layer_count<correction_layer:
+                        v_cmd = nom_velocity
+                    else:
+                        v_cmd = dh2v_loglog(np.mean(lam_state_height[0]),mode=nom_feedrate)
+                    feedrate_cmd = nom_feedrate
                     if thermal_on:
                         rr_sensors.start_all_sensors()
                     while lam_cur<lam_relative[-1] - v_cmd/SS.streaming_rate:
@@ -348,6 +415,26 @@ def main():
                         q2=curve_js_cam[lam_idx-1]*(1-ratio)+curve_js_cam[lam_idx]*ratio
                         q_pos=curve_js_positioner[lam_idx-1]*(1-ratio)+curve_js_positioner[lam_idx]*ratio
                         q_cmd=np.hstack((q1,q2,q_pos))
+
+                        if compensate_shifting and weld_parts == 'layer':
+                            # get the robot to the shifted position
+                            shifted_i = np.where(lam_curve_shift[:,0]>=lam_cur)[0][0]-1
+                            shifted_xy = lam_curve_shift[shifted_i][1:3]
+                            T_positioner_world = positioner.fwd(q_pos,world=True)
+                            T_robot_origin = robot_weld.fwd(q1)
+                            T_robot_positioner = T_positioner_world.inv()*T_robot_origin
+                            T_robot_shift = T_robot_positioner
+                            T_robot_shift.p[:2] -= shifted_xy
+                            T_robot_shift = T_positioner_world*T_robot_shift
+                            q_shift = robot_weld.inv(T_robot_shift.p, T_robot_shift.R, last_joints=q1)[0]
+                            q_cmd[:6] = q_shift # only update the robot 1 joints
+
+                        ### update speed 
+                        if weld_parts == 'base' or layer_count<correction_layer: 
+                            if lam_split_i < len(lam_split)-1 and lam_cur > lam_split[lam_split_i+1]:
+                                lam_split_i += 1
+                                v_cmd = dh2v_loglog(np.mean(lam_state_height[0]),mode=nom_feedrate)
+                                welding_cmd_all.append(np.hstack((time.perf_counter(),i,v_cmd,int(round(feedrate_cmd/10)*10))))
 
                         ### if welding start or end
                         if arc_off:
@@ -365,8 +452,8 @@ def main():
                             if weld_parts == 'layer':
                                 # find the last index smaller than lam_cur
                                 lam_idx=np.where(lam_split-v_cmd*feedrate_update_rate/2<=lam_cur)[0][-1]
-                                v_cmd = vel_profile[lam_idx]
-                                feedrate_cmd = feedrate_profile[lam_idx]
+                                v_cmd = v_cmd
+                                feedrate_cmd = nom_feedrate #TODO: update feedrate based on the height, width, thermal
                                 # update feedrate to welder
                                 if weld_arcon:
                                     fronius_client.async_set_job_number(int(round(feedrate_cmd/10)+job_offset), welder_handler)
@@ -386,10 +473,29 @@ def main():
 
                         ### scan online processing
                         if fuji_scanon and scan_online_process:
+                            while scan_process.accessing_key:
+                                time.sleep(0.0000000000001)
+                            scan_process.accessing_key = True
                             scan_process.raw_scan_pipe.append(deepcopy(line_profile))
-                            while len(scan_process.denoise_pipe)!=0:
-                                scan_denoise = scan_process.denoise_pipe.pop(0)
+                            scan_process.robot_q_pipe.append(deepcopy(weld_js_exe[-1][np.array([1,2,3,4,5,6,13,14])])) # log robot joints (robot 1 and positioner)
+                            scan_process.accessing_key = False
+                            while len(scan_process.denoise_scan_pipe)!=0:
+                                while scan_process.accessing_key:
+                                    time.sleep(0.0000000000001)
+                                scan_process.accessing_key = True
+                                scan_denoise = scan_process.denoise_scan_pipe.pop(0)
+                                scan_point_location = scan_process.point_location_pipe.pop(0)
+                                scan_delta_h = scan_process.delta_h_pipe.pop(0)
+                                scan_process.accessing_key = False
+                                # get denoise scan
                                 scan_exe_noise_remove.append(scan_denoise)
+                                # get lambda and record height
+                                curve_index = np.argsort(np.linalg.norm(curve[:,:2]-scan_point_location[:2],axis=1))[0]
+                                lam_scan = lam_relative[curve_index]
+                                lam_split_i = np.where(lam_split<=lam_scan)[0][-1]
+                                lam_state_height[lam_split_i].append(scan_delta_h)
+                                curve_shift = scan_point_location[:2]-curve[curve_index][:2]
+                                lam_curve_shift = np.vstack((lam_curve_shift,np.hstack((lam_scan,curve_shift))))
 
                         ### sent position Command to the robot
                         q_cmd_all.append(np.hstack((time.perf_counter(),i,q_cmd)))
@@ -412,12 +518,31 @@ def main():
                         while len(scan_process.raw_scan_pipe)!=0:
                             print("Final scan processing...",len(scan_process.raw_scan_pipe))
                             time.sleep(0.01)
-                        while len(scan_process.denoise_pipe)!=0:
-                            scan_denoise = scan_process.denoise_pipe.pop(0)
+                        while len(scan_process.denoise_scan_pipe)!=0:
+                            scan_denoise = scan_process.denoise_scan_pipe.pop(0)
+                            scan_point_location = scan_process.point_location_pipe.pop(0)
+                            scan_delta_h = scan_process.delta_h_pipe.pop(0)
+                            # get denoise scan
                             scan_exe_noise_remove.append(scan_denoise)
+                            # get lambda and record height
+                            curve_index = np.argsort(np.linalg.norm(curve[:,:2]-scan_point_location[:2],axis=1))[0]
+                            lam_scan = lam_relative[curve_index]
+                            lam_split_i = np.where(lam_split<=lam_scan)[0][-1]
+                            lam_state_height[lam_split_i].append(scan_delta_h)
+                            curve_shift = scan_point_location[:2]-curve[curve_index][:2]
+                            lam_curve_shift = np.vstack((lam_curve_shift,np.hstack((lam_scan,curve_shift))))
                         # stop scan process
                         scan_process.end_denoise_thread_flag = True
-                        scan_denoise_thread.join()
+                        scan_dh_thread.join()
+
+                    # move to end point with safety_z_offset
+                    for z in np.arange(0,safety_z_offset+1,5): # a linear movement
+                        T_end = robot_weld.fwd(curve_js[-1])
+                        T_end.p[2] += z
+                        curve_js_end_offset = robot_weld.inv(T_end.p, T_end.R, last_joints=curve_js[-1])[0]
+                        q_end_offset = np.hstack((curve_js_end_offset, curve_js_cam[-1], curve_js_positioner[-1]))
+                        SS.jog2q(q_end_offset)
+                    time.sleep(0.1)
 
                     ############## save data ######################
                     if not os.path.exists(logdata_dir):

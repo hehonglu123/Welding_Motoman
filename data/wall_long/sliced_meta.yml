@@ -1,0 +1,7 @@
+baselayer_length: 120
+baselayer_num: 2
+baselayer_resolution: 2.75
+layer_length: 110
+layer_num: 460
+layer_resolution: 0.1
+path_dl: 0.025
