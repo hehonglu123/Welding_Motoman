@@ -292,6 +292,7 @@ def main():
                         scan_denoise_thread.start()
                     v_cmd = scan_nom_vel
                     lam_cur=0
+                    lam_split_i = 0
                     while lam_cur<lam_scan_relative[-1] - v_cmd/SS.streaming_rate:
                         loop_start=time.perf_counter()
 
@@ -315,6 +316,7 @@ def main():
                         ### scan online processing
                         if fuji_scanon and scan_online_process:
                             scan_process.raw_scan_pipe.append(deepcopy(line_profile))
+                            scan_process.robot_q_pipe.append(deepcopy(weld_js_exe[-1]))
                             while len(scan_process.denoise_pipe)!=0:
                                 scan_denoise = scan_process.denoise_pipe.pop(0)
                                 scan_exe_noise_remove.append(scan_denoise)

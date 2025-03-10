@@ -119,7 +119,7 @@ alpha=0.01
 lambda_H = 30
 lambda_P = 2.5
 
-# weight_ori = 10
+# weight_ori = 180/pi
 # alpha=0.1
 # lambda_H = 0.5
 # lambda_P = 0.25

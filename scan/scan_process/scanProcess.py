@@ -793,3 +793,21 @@ class ScanProcess():
                 self.denoise_pipe.append(scan_noise_remove)
             else:
                 time.sleep(0.0000000000001)
+    
+    def scan2dh_thread(self,target_p,crop_min=[-40, 30],crop_max=[40, 200],offset_z=2.2):
+        self.end_denoise_thread_flag = False
+        self.raw_scan_pipe = []
+        self.robot_q_pipe = []
+        self.denoise_scan_pipe = []
+        self.point_location_pipe = []
+        self.delta_h_pipe = []
+        while not self.end_denoise_thread_flag:
+            if len(self.raw_scan_pipe)!=0:
+                scan_data = self.raw_scan_pipe.pop(0)
+                robot_q = self.robot_q_pipe.pop(0)
+                delta_h,point_location,mti_pcd_noise_remove = self.scan2dh(scan_data.T,robot_q,target_p,crop_min=crop_min,crop_max=crop_max,offset_z=offset_z)
+                self.denoise_scan_pipe.append(mti_pcd_noise_remove)
+                self.point_location_pipe.append(point_location)
+                self.delta_h_pipe.append(delta_h)
+            else:
+                time.sleep(0.0000000000001)

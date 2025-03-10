@@ -301,6 +301,7 @@ class PH_Param(object):
         plt.title('P Variation',fontsize=18)
         plt.show()
 
+
         # plot H
         print("**H Variation**")
         markdown_str=''
@@ -349,6 +350,77 @@ class PH_Param(object):
         plt.yticks(fontsize=15)
         plt.title('H Variation',fontsize=18)
         plt.show()
+    
+def compare_nominal_between_datasets():
+
+    import pickle
+
+    PH_data_dirs = ['PH_grad_data/test0801_R1/train_data_','PH_grad_data/test0804_R2/train_data_']
+    nom_P_all=[np.array([[0,0,0],[150,0,0],[0,0,760],\
+                   [1082,0,200],[0,0,0],[0,0,0],[100,0,0]]).T,\
+           np.array([[0,0,0],[155,0,0],[0,0,614],\
+                    [640,0,200],[0,0,0],[0,0,0],[100,0,0]]).T ]
+    nom_H_all=[np.array([[0,0,1],[0,1,0],[0,-1,0],\
+                   [-1,0,0],[0,-1,0],[-1,0,0]]).T,\
+               np.array([[0,0,1],[0,1,0],[0,-1,0],\
+                   [-1,0,0],[0,-1,0],[-1,0,0]]).T]
+    
+    p_mean_all = []
+    p_std_all = []
+    h_mean_all = []
+    h_std_all = []
+    for (PH_data_dir,nom_P,nom_H) in zip(PH_data_dirs,nom_P_all,nom_H_all):
+        p_mean=[]
+        p_std=[]
+        h_mean=[]
+        h_std=[]
+        with open(PH_data_dir+'calib_PH_q_ana.pickle','rb') as file:
+            PH_q=pickle.load(file)
+        ph_param=PH_Param(nom_P,nom_H)
+        ph_param.fit(PH_q,method='linear')
+
+        for i in range(len(nom_P[0])):
+            p_dist = []
+            h_ang = []
+            for q in ph_param.train_q:
+                p_dist.append(np.linalg.norm(ph_param.data[tuple(q)]['P'][:,i]-nom_P[:,i]))
+                if i<len(nom_H[0]):
+                    opt_H = ph_param.data[tuple(q)]['H'][:,i]/np.linalg.norm(ph_param.data[tuple(q)]['H'][:,i])
+                    ori_H = nom_H[:,i]/np.linalg.norm(nom_H[:,i])
+                    costh = np.dot(opt_H,ori_H)
+                    sinth = np.linalg.norm(np.cross(opt_H,ori_H))
+                    th = np.arctan2(sinth,costh)
+                    h_ang.append(np.degrees(th))
+            p_mean.append(np.mean(p_dist))
+            p_std.append(np.std(p_dist))
+            if i<len(nom_H[0]):
+                h_mean.append(np.mean(h_ang))
+                h_std.append(np.std(h_ang))
+        p_mean_all.append(p_mean)
+        p_std_all.append(p_std)
+        h_mean_all.append(h_mean)
+        h_std_all.append(h_std)
+        
+    # plot P
+    print("**P Variation**")
+    for p_mean,p_std in zip(p_mean_all,p_std_all):
+        plt.errorbar(np.arange(len(p_mean)),p_mean,p_std)
+    plt.xticks(np.arange(len(p_mean)),['P1','P2','P3','P4','P5','P6','P7'],fontsize=15)
+    plt.ylabel("Deviation Distance (mm)",fontsize=15)
+    plt.yticks(fontsize=15)
+    plt.title('P Variation',fontsize=18)
+    plt.show()
+    # plot H
+    print("**H Variation**")
+    for h_mean,h_std in zip(h_mean_all,h_std_all):
+        plt.errorbar(np.arange(len(h_mean)),h_mean,h_std)
+    plt.xticks(np.arange(len(h_mean)),['H1','H2','H3','H4','H5','H6'],fontsize=15)
+    plt.ylabel("Deviated Angle (deg)",fontsize=15)
+    plt.yticks(fontsize=15)
+    plt.title('H Variation',fontsize=18)
+    plt.show()
+
+
 
 if __name__=='__main__':
 
@@ -368,11 +440,13 @@ if __name__=='__main__':
     # nom_H=np.array([[0,0,1],[0,1,0],[0,-1,0],\
     #             [-1,0,0],[0,-1,0],[-1,0,0]]).T
 
-    import pickle
-    with open(PH_data_dir+'calib_PH_q.pickle','rb') as file:
-        PH_q=pickle.load(file)
+    # import pickle
+    # with open(PH_data_dir+'calib_PH_q_ana.pickle','rb') as file:
+    #     PH_q=pickle.load(file)
 
-    ph_param=PH_Param(nom_P,nom_H)
-    ph_param.fit(PH_q,method='linear')
+    # ph_param=PH_Param(nom_P,nom_H)
+    # ph_param.fit(PH_q,method='linear')
 
-    ph_param.compare_nominal(nom_P,nom_H)
+    # ph_param.compare_nominal(nom_P,nom_H)
+
+    compare_nominal_between_datasets()
