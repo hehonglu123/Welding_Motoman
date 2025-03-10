@@ -780,15 +780,16 @@ class ScanProcess():
 
         delta_h = (target_z[2]-point_location[2])
 
-        # for cluster_i in range(n_clusters_-1):
-        #     cluster_id = dbscan.labels_==cluster_i
-        #     plt.scatter(-1*mti_pcd[cluster_id][:,0],mti_pcd[cluster_id][:,1])
-        # plt.scatter(-1*mti_pcd[:,0],mti_pcd[:,1])
-        # # plt.axhline(y = target_z[2], color = 'r', linestyle = '-')
-        # plt.axhline(y = point_location_z_R2TCP-delta_h, color = 'r', linestyle = '-')
-        # plt.xlim((-30,30))
-        # # plt.ylim((50,120))
-        # plt.ylim((0,120))
-        # plt.show()
-
         return delta_h,point_location,mti_pcd_noise_remove
+    
+    def scan_denoise_thread(self,crop_min=[-40, 30],crop_max=[40, 200]):
+        self.end_denoise_thread_flag = False
+        self.raw_scan_pipe = []
+        self.denoise_pipe = []
+        while not self.end_denoise_thread_flag:
+            if len(self.raw_scan_pipe)!=0:
+                scan_data = self.raw_scan_pipe.pop(0)
+                scan_noise_remove = self.scan2dDenoise(scan_data.T, crop_min=crop_min, crop_max=crop_max)
+                self.denoise_pipe.append(scan_noise_remove)
+            else:
+                time.sleep(0.0000000000001)

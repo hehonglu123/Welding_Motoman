@@ -16,6 +16,7 @@ sys.path.append('../../scan/scan_process/')
 sys.path.append('../../scan/scan_tools/')
 from scan_utils import *
 from scanProcess import *
+from threading import Thread
 
 inch2mm = 25.4
 mm2inch = 1/25.4
@@ -52,6 +53,7 @@ def main():
     weld_arcon = False
     welder_log = False
     fuji_scanon = False
+    scan_online_process = False
     thermal_on = False
     input_from_user = False
 
@@ -110,6 +112,8 @@ def main():
         obj = sub.GetDefaultClientWait(2)		#connect, timeout=2s
         fuji_scan_wire=sub.SubscribeWire("lineProfile")
         sub.ClientConnectFailed += connect_failed
+
+        scan_process = ScanProcess(robot_scan,positioner) # initialize scan process
 
     ########################################## RR Thermal ########################################################
     if thermal_on:
@@ -318,12 +322,15 @@ def main():
                     welding_cmd_all = []
                     weld_js_exe = []
                     scan_exe = []
+                    if scan_online_process:
+                        scan_exe_noise_remove = []
+                        scan_denoise_thread = Thread(target=scan_process.scan_denoise_thread, args=([-40, 30],[40, 200])) # arges: (crop_min, crop_max)
+                        scan_denoise_thread.start()
                     # initial velocity
                     v_cmd = vel_profile[0]
                     feedrate_cmd = feedrate_profile[0]
                     if thermal_on:
                         rr_sensors.start_all_sensors()
-                    
                     # time.sleep(3)
                     q_cur = deepcopy(SS.q_cur)
                     # motion_start_time = time.time()
@@ -379,6 +386,13 @@ def main():
                             scan_exe.append(line_profile)
                         weld_js_exe.append(np.append(time.perf_counter(),deepcopy(SS.q_cur))) # log timestamp and robot joints
 
+                        ### scan online processing
+                        if fuji_scanon and scan_online_process:
+                            scan_process.raw_scan_pipe.append(deepcopy(line_profile))
+                            while len(scan_process.denoise_pipe)!=0:
+                                scan_denoise = scan_process.denoise_pipe.pop(0)
+                                scan_exe_noise_remove.append(scan_denoise)
+
                         ### sent position Command to the robot
                         q_cmd_all.append(np.hstack((time.perf_counter(),i,q_cmd)))
                         if lam_cur>lam_relative[-1]-v_cmd/SS.streaming_rate:
@@ -394,9 +408,6 @@ def main():
                     if thermal_on:
                         rr_sensors.stop_all_sensors()
                     ########################################
-
-                    time.sleep(1)
-                    input("end")
 
                     ###### Motion varification
                     # time.sleep(1/SS.streaming_rate)
@@ -481,6 +492,13 @@ def main():
                             scan_exe.append(line_profile)
                         weld_js_exe.append(np.append(time.perf_counter(),deepcopy(SS.q_cur))) # log robot joints
 
+                        ### scan online processing
+                        if fuji_scanon and scan_online_process:
+                            scan_process.raw_scan_pipe.append(deepcopy(line_profile))
+                            while len(scan_process.denoise_pipe)!=0:
+                                scan_denoise = scan_process.denoise_pipe.pop(0)
+                                scan_exe_noise_remove.append(scan_denoise)
+
                         ### sent position Command to the robot
                         q_cmd_all.append(np.hstack((time.perf_counter(),i,q_cmd)))
                         if lam_cur>lam_scan_relative[-1]-v_cmd/SS.streaming_rate:
@@ -488,9 +506,21 @@ def main():
                         else:
                             SS.position_cmd(q_cmd,loop_start)
                     ########################################
+                    time.sleep(0.3) # for robot to drive to the end point
+
+                    # final scan processing
+                    if fuji_scanon and scan_online_process:
+                        while len(scan_process.raw_scan_pipe)!=0:
+                            print("Final scan processing...",len(scan_process.raw_scan_pipe))
+                            time.sleep(0.01)
+                        while len(scan_process.denoise_pipe)!=0:
+                            scan_denoise = scan_process.denoise_pipe.pop(0)
+                            scan_exe_noise_remove.append(scan_denoise)
+                        # stop scan process
+                        scan_process.end_denoise_thread_flag = True
+                        scan_denoise_thread.join()
 
                     # move to end point with safety_z_offset
-                    time.sleep(0.3)
                     for z in np.arange(0,safety_z_offset+1,5): # a linear movement
                         T_end = robot_weld.fwd(curve_js_scan[-1])
                         T_end.p[2] += z
@@ -498,7 +528,7 @@ def main():
                         q_end_offset = np.hstack((curve_js_end_offset, r2_rest_q, q_pos))
                         SS.jog2q(q_end_offset)
 
-                    ############3# save data ######################
+                    ############## save data ######################
                     if not os.path.exists(logdata_dir):
                         os.makedirs(logdata_dir)
                     # save meta data
@@ -533,14 +563,16 @@ def main():
                 stamps_exe = deepcopy(weld_js_exe[:,0])
                 ################### get layer increments ############################
                 if weld_arcon:
-                    scan_process = ScanProcess(robot_scan,positioner)
-                    scan_exe_noise_remove = []
-                    for scan in scan_exe:
-                        scan_noise_remove = scan_process.scan2dDenoise(deepcopy(scan).T,crop_min=[-40,30],crop_max=[40,200])
-                        scan_exe_noise_remove.append(scan_noise_remove)
+                    # single scan noise remove
+                    if not scan_online_process:
+                        scan_exe_noise_remove = []
+                        for scan in scan_exe:
+                            scan_noise_remove = scan_process.scan2dDenoise(deepcopy(scan).T,crop_min=[-40,30],crop_max=[40,200])
+                            scan_exe_noise_remove.append(scan_noise_remove)
                     if fuji_scanon:
                         with open(logdata_dir+layer_name+f'/scan_exe_noise_remove.pickle', 'wb') as f:
                             pickle.dump(scan_exe_noise_remove, f)
+                    # 3D scan registration
                     pcd = scan_process.pcd_register_mti(scan_exe_noise_remove,weld_js_exe[:,np.append(np.arange(1,7),np.arange(13,15))],stamps_exe,flip=True,scanner='fuji')
                     curve_planned_z = np.mean(curve[:,2])
                     curve_x_end = np.min(curve[:,0])

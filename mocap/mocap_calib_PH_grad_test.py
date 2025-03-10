@@ -21,7 +21,7 @@ Rz=np.array([0,0,1])
 
 config_dir='../config/'
 
-robot_type = 'R1'
+robot_type = 'R2'
 
 if robot_type == 'R1':
     ph_dataset_date='0801'
@@ -589,12 +589,12 @@ plt.plot(error_pos_baseline_norm,'-o',markersize=1,label='CPA PH')
 # plt.plot(error_pos_onePH_norm,'-o',markersize=1,label='One PH')
 # plt.plot(error_pos_near_norm,'-o',markersize=1,label='Nearest PH')
 plt.plot(error_pos_lin_norm,'-o',markersize=1,label='Linear Interp PH')
-plt.plot(error_pos_cub_norm,'-o',markersize=1,label='Cubic Interp PH')
+# plt.plot(error_pos_cub_norm,'-o',markersize=1,label='Cubic Interp PH')
 # plt.plot(error_pos_rbf_norm,'-o',markersize=1,label='RBF Interp PH')
 plt.plot(error_pos_fbf_norm,'-o',markersize=1,label='Fourier Basis PH')
 # plt.plot(error_pos_fbf_hori_norm,'-o',markersize=1,label='Fourier Basis PH (Hori)')
 # plt.plot(error_pos_fbf_min_norm,'-o',markersize=1,label='Fourier Basis PH (Minimal)')
-plt.plot(error_pos_fbf_redu_norm,'-o',markersize=1,label='Fourier Basis PH (Reduced)')
+# plt.plot(error_pos_fbf_redu_norm,'-o',markersize=1,label='Fourier Basis PH (Reduced)')
 plt.legend(loc=1,fontsize=18)
 plt.title(robot_type+" Position Testing Error using Optimized PH",fontsize=32)
 # plt.xticks(np.arange(0,total_test_N,100),np.round(q1_all[::100]))
@@ -646,7 +646,7 @@ plt.legend()
 plt.title("Orientation Error using Optimized PH")
 # plt.xticks(np.arange(0,total_test_N,100),np.round(q1_all[::100]))
 # plt.xlabel("J1 Angle at each orie (degrees)")
-plt.xticks(np.arange(0,total_test_N,50),pos_all[::50])
+plt.xticks(np.arange(0,total_test_N-split_index,100),fontsize=22)
 plt.xlabel("TCP Cartesian Position at Poses")
 plt.ylabel("Orientation Error (deg)")
 plt.tight_layout()
