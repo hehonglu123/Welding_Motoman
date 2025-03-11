@@ -155,8 +155,9 @@ def main():
     base_nom_vel = 5
     # layer welding parameters
     layer_feedrate = 100 # inch/min
-    layer_nom_height = 3 # mm
     layer_nom_vel = 5 # mm/s
+    layer_nom_height = v2dh_loglog(layer_nom_vel,layer_feedrate) # mm
+    print("Layer Nominal Height:",layer_nom_height)
     layer_nom_incre = int(layer_nom_height/layer_resolution)
     # weld starting point sleep
     weld_start_sleep = 0.2
@@ -164,6 +165,8 @@ def main():
     scan_nom_vel = 5
     # collision avoidance z offset
     safety_z_offset = 50
+    # compensate for shifted weld
+    shift_pos_smoother = 21
     # direction 
     # torch_ori_fix = False # torch orientation fixed
     correction_layer = 2
@@ -185,13 +188,13 @@ def main():
     # start-end layers
     baselayer_start = 0
     baselayer_end = base_layer_num
-    layer_start = 0
+    layer_start = 9 # nominal baselayer=5.5. Real data=6.4 (6.4-5.5)/0.1=9
     layer_end = layer_num
     
     ################## Log data dir ##################
     current_time = datetime.datetime.now()
     formatted_time = current_time.strftime('%Y_%m_%d_%H_%M_%S.%f')[:-7]
-    logdata_dir='../../data/wall_weld_test/weld_fujiscan_'+formatted_time+'/'
+    logdata_dir='../../data/wall_weld_test/weld_fujicontrol_'+formatted_time+'/'
 
     read_from_file_layer = False
     Transz0_H=None
@@ -220,24 +223,33 @@ def main():
     forward = True
 
     mean_layer_height = 0
-    # for weld_parts in ['base','layer']:
-    for weld_parts in ['layer']:
+    for weld_parts in ['base','layer']:
+    # for weld_parts in ['layer']:
         if weld_parts == 'base':
             weld_start = baselayer_start
             weld_end = baselayer_end
             nom_incre = base_nom_incre
             nom_feedrate = base_feedrate
             nom_velocity = base_nom_vel
+            last_layer_scan = True # base layer don't need to last layer scan
         else:
             weld_start = layer_start
             weld_end = layer_end
             nom_incre = layer_nom_incre
             nom_feedrate = layer_feedrate
             nom_velocity = layer_nom_vel
+            last_layer_scan = False
         layer_count = 0
         i=weld_start
         input("Start with layer "+str(i)+". Press Enter to continue...")
-        while i < weld_end:
+        while i < weld_end and last_layer_scan == False:
+            if i >= weld_end:
+                last_layer_scan = True
+                weld_arcon = False
+                i = weld_end - 1
+                print("welding turn",weld_arcon)
+                input("Last layer scannning. Press Enter to continue...")
+
             print("=====================================")
             print(f'Welding {weld_parts} layer {i} counting {layer_count} direction {forward}')
             try:
@@ -297,7 +309,7 @@ def main():
                     welding_cmd_all = []
                     weld_js_exe = []
                     scan_exe = []
-                    if scan_online_process:
+                    if scan_online_process and fuji_scanon:
                         scan_exe_noise_remove = []
                         scan_dh_thread = Thread(target=scan_process.scan2dh_thread, args=(target_p,[-40, 30],[40, 200],-6.6,'fuji'),daemon=True) # arges: (target_p, crop_min, crop_max, offset_z, scanner)
                         scan_dh_thread.start()
@@ -318,7 +330,7 @@ def main():
                         if fuji_scanon:
                             wire_packet=fuji_scan_wire.TryGetInValue() # log fuji cam scanner data
                             valid_indices=np.where(wire_packet[1].I_data>1)[0]
-                            valid_indices=np.intersect1d(valid_indices,np.where(np.abs(wire_packet[1].Z_data)>50)[0])
+                            valid_indices=np.intersect1d(valid_indices,np.where(np.abs(wire_packet[1].Z_data)>30)[0])
                             line_profile=np.hstack((wire_packet[1].Y_data[valid_indices].reshape(-1,1),wire_packet[1].Z_data[valid_indices].reshape(-1,1)))
                             scan_exe.append(line_profile)
                         weld_js_exe.append(np.append(time.perf_counter(),deepcopy(SS.q_cur))) # log robot joints
@@ -364,12 +376,14 @@ def main():
                     print("Current std shift x,y:",np.std(lam_curve_shift[1:,1]),np.std(lam_curve_shift[1:,2]))
                     lam_curve_shift = lam_curve_shift[np.argsort(lam_curve_shift[:,0])]
                     # 1d smoother
-                    lam_curve_shift_smooth = moving_average(lam_curve_shift[:,2],n=11,padding=True)
-                    lam_curve_shift[:,2] = lam_curve_shift_smooth
+                    lam_curve_shift_smooth_x = moving_average(lam_curve_shift[:,1],n=shift_pos_smoother,padding=True)
+                    lam_curve_shift_smooth_y = moving_average(lam_curve_shift[:,2],n=shift_pos_smoother,padding=True)
+                    # lam_curve_shift[:,1] = lam_curve_shift_smooth_x
+                    # lam_curve_shift[:,2] = lam_curve_shift_smooth_y
                     if compensate_shifting and weld_parts == 'layer':
                         # get the robot to the shifted position
                         time_start = time.time()
-                        shifted_xy = lam_curve_shift[0][1:3]
+                        shifted_xy = np.mean(lam_curve_shift[:shift_pos_smoother+1][1:3],axis=0)
                         T_positioner_world = positioner.fwd(curve_js_positioner[0],world=True)
                         T_robot_origin = robot_weld.fwd(curve_js[0])
                         T_robot_positioner = T_positioner_world.inv()*T_robot_origin
@@ -410,22 +424,23 @@ def main():
                         if compensate_shifting and weld_parts == 'layer':
                             # get the robot to the shifted position
                             shifted_i = np.where(lam_curve_shift[:,0]>=lam_cur)[0][0]-1
-                            shifted_xy = lam_curve_shift[shifted_i][1:3]
+                            ### moving average for shifting
+                            if shifted_i < (shift_pos_smoother-1)/2:
+                                shifted_xy = np.mean(lam_curve_shift[:shift_pos_smoother+1][1:3],axis=0)
+                            elif shifted_i > len(lam_curve_shift)-(shift_pos_smoother-1)/2:
+                                shifted_xy = np.mean(lam_curve_shift[-shift_pos_smoother:][1:3],axis=0)
+                            else:
+                                shifted_xy = np.mean(lam_curve_shift[shifted_i-int((shift_pos_smoother-1)/2):shifted_i+int((shift_pos_smoother-1)/2)+1][1:3],axis=0)
+                            # compensation in the positioner tcp frame
                             T_positioner_world = positioner.fwd(q_pos,world=True)
                             T_robot_origin = robot_weld.fwd(q1)
                             T_robot_positioner = T_positioner_world.inv()*T_robot_origin
                             T_robot_shift = T_robot_positioner
                             T_robot_shift.p[:2] -= shifted_xy
+                            # transfer back to the welding robot motion
                             T_robot_shift = T_positioner_world*T_robot_shift
                             q_shift = robot_weld.inv(T_robot_shift.p, T_robot_shift.R, last_joints=q1)[0]
                             q_cmd[:6] = q_shift # only update the robot 1 joints
-
-                        ### update speed 
-                        if weld_parts == 'base' or layer_count<correction_layer: 
-                            if lam_split_i < len(lam_split)-1 and lam_cur > lam_split[lam_split_i+1]:
-                                lam_split_i += 1
-                                v_cmd = dh2v_loglog(np.mean(lam_state_height[0]),mode=nom_feedrate)
-                                welding_cmd_all.append(np.hstack((time.perf_counter(),i,v_cmd,int(round(feedrate_cmd/10)*10))))
 
                         ### if welding start or end
                         if arc_off:
@@ -437,6 +452,14 @@ def main():
                             welding_cmd_all.append(np.hstack((time.perf_counter(),i,v_cmd,int(round(feedrate_cmd/10)*10))))
                             last_update_time=time.perf_counter()
                             arc_off=False
+                        
+                        ### update speed 
+                        if weld_parts == 'base' or layer_count<correction_layer: 
+                            if lam_split_i < len(lam_split)-1 and lam_cur > lam_split[lam_split_i+1]:
+                                lam_split_i += 1
+                                v_cmd = dh2v_loglog(np.mean(lam_state_height[lam_split_i]),mode=nom_feedrate)
+                                welding_cmd_all.append(np.hstack((time.perf_counter(),i,v_cmd,int(round(feedrate_cmd/10)*10))))
+                                print("Update Velocity:",round(v_cmd,2), "Mean dh:",np.mean(lam_state_height[lam_split_i]))
 
                         ###update welding param
                         if time.perf_counter()-last_update_time>1./feedrate_update_rate:
@@ -543,16 +566,20 @@ def main():
                         yaml.dump(weld_meta_data, f)
                     if weld_parts == 'base':
                         layer_name = 'baselayer'+str(i)
-                        pathlib.Path(logdata_dir+layer_name).mkdir(parents=True, exist_ok=True)
+                    elif last_layer_scan:
+                        layer_name = 'layer'+str(i)+'_last'
                     else:
                         layer_name = 'layer'+str(i)
-                        pathlib.Path(logdata_dir+layer_name).mkdir(parents=True, exist_ok=True)
+                    pathlib.Path(logdata_dir+layer_name).mkdir(parents=True, exist_ok=True)
                     np.savetxt(logdata_dir+layer_name+f'/weld_js_exe.csv', weld_js_exe, delimiter=',') # save welding/scanning logged joint space data
                     np.savetxt(logdata_dir+layer_name+f'/js_cmd.csv', q_cmd_all, delimiter=',') # save welding/scanning commanded joint space data
                     np.savetxt(logdata_dir+layer_name+f'/weld_cmd.csv', welding_cmd_all, delimiter=',') # save welding commands
                     if fuji_scanon:
                         with open(logdata_dir+layer_name+f'/scan_exe.pickle', 'wb') as file: # save scanning logged data
                             pickle.dump(scan_exe, file)
+                        if scan_online_process:
+                            with open(logdata_dir+layer_name+f'/scan_exe_noise_remove.pickle', 'wb') as f:
+                                pickle.dump(scan_exe_noise_remove, f)
                     if thermal_on:
                         rr_sensors.save_all_sensors(logdata_dir+layer_name+'/') # save thermal data
                     ##########################################
@@ -569,14 +596,13 @@ def main():
                 weld_js_exe = np.array(weld_js_exe)
                 stamps_exe = deepcopy(weld_js_exe[:,0])
                 ################### get layer increments ############################
-                if weld_arcon:
+                if weld_arcon and layer_count>=correction_layer and adaptive_layer_height:
                     # single scan noise remove
                     if not scan_online_process:
                         scan_exe_noise_remove = []
                         for scan in scan_exe:
                             scan_noise_remove = scan_process.scan2dDenoise(deepcopy(scan).T,crop_min=[-40,30],crop_max=[40,200])
                             scan_exe_noise_remove.append(scan_noise_remove)
-                    if fuji_scanon:
                         with open(logdata_dir+layer_name+f'/scan_exe_noise_remove.pickle', 'wb') as f:
                             pickle.dump(scan_exe_noise_remove, f)
                     # 3D scan registration
@@ -609,7 +635,9 @@ def main():
                     if weld_parts == 'base':
                         i = i+base_nom_incre # baselayer uses base_nom_incre
                     else:
-                        i = round((mean_layer_height-2*baselayer_resolution)/layer_resolution) # layer uses mean_layer_height/layer_resolution
+                        # layer uses mean_layer_height/layer_resolution, 
+                        # and add layer_nom_incre because scanner leads the welding
+                        i = round((mean_layer_height-2*baselayer_resolution)/layer_resolution)+layer_nom_incre
                 else:
                     if weld_parts == 'base':
                         i = i+nom_incre
@@ -634,6 +662,7 @@ def main():
     if weld_arcon:
         fronius_client.stop_weld()
         fronius_client.release_welder()
+    
     SS.deinitialize_robot()
 
 if __name__ == '__main__':
