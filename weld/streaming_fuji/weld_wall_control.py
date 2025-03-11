@@ -28,26 +28,6 @@ def welder_handler(exp):
 		print ("An error occured! " + str(exp))
 		return
 
-def welding_profile_generate(lam_split, VPD, cross_section, layer_n, v_min, v_max):
-    
-    split_sections = len(lam_split)
-
-    # random choose 1 from 2 cases
-    case = np.random.randint(2)
-    if case == 0: # monotonic increasing/decreasing
-        v_start = np.random.uniform(v_min, v_max)
-        v_end = np.random.uniform(v_min, v_max)
-        vel_profile = np.linspace(v_start, v_end, split_sections)
-    else: # wave-like
-        v_start = np.random.uniform(v_min, v_max)
-        v_amp = -1**(np.random.randint(2))*np.random.uniform((v_max-v_min)/10, (v_max-v_min)/2)
-        vel_profile = v_start + v_amp*np.sin(np.linspace(0, 2*np.pi, split_sections))
-        vel_profile = np.clip(vel_profile, v_min, v_max)
-    # VPD = cross_section*inch2mm*layer_feedrate/layer_nom_vel # volume per distance (mm^3/mm)
-    feedrate_profile = VPD*vel_profile*mm2inch/cross_section
-
-    return vel_profile, feedrate_profile
-
 def main():
     
     weld_arcon = False
@@ -144,11 +124,13 @@ def main():
     path_dl = meta_data['path_dl']
     dist_weld_scan_index = np.round(dist_weld_scan/path_dl).astype(int)
 
+    # welder config
+    feedrate_update_rate=1.	#Hz
+    job_offset=200
+
     # target dh (dh start)
     target_dh = 2.3
 
-    feedrate_update_rate=1.	#Hz
-    job_offset=200
     # baselayer welding parameters
     base_feedrate = 250 
     base_nom_incre = 1
@@ -177,6 +159,7 @@ def main():
     section_dlam = 2 ## mm
     split_sections = int(meta_data['layer_length']/section_dlam)
     lam_split = np.linspace(0,meta_data['layer_length'],split_sections+1)[:-1]
+    lam_split = lam_split.tolist()
     feedrate_min = 100
     feedrate_max = 220
     # v_minimum = round(cross_section*inch2mm*feedrate_min/VPD,2)
@@ -470,7 +453,7 @@ def main():
                             arc_off=False
                         
                         ### update speed 
-                        if weld_parts == 'base' or layer_count<correction_layer: 
+                        if weld_parts != 'base' and layer_count>=correction_layer: 
                             if lam_split_i < len(lam_split)-1 and lam_cur > lam_split[lam_split_i+1]:
                                 lam_split_i += 1
                                 v_cmd = dh2v_loglog(np.mean(lam_state_height[lam_split_i]),mode=nom_feedrate)
