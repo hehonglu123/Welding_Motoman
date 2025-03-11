@@ -365,30 +365,21 @@ def main():
                     lam_curve_shift = lam_curve_shift[np.argsort(lam_curve_shift[:,0])]
                     # 1d smoother
                     lam_curve_shift_smooth = moving_average(lam_curve_shift[:,2],n=11,padding=True)
-                    plt.plot(lam_curve_shift[:,1])
-                    plt.show()
-                    plt.plot(lam_curve_shift[:,2])
-                    plt.plot(lam_curve_shift_smooth)
-                    plt.show()
                     lam_curve_shift[:,2] = lam_curve_shift_smooth
                     if compensate_shifting and weld_parts == 'layer':
                         # get the robot to the shifted position
                         time_start = time.time()
                         shifted_xy = lam_curve_shift[0][1:3]
-                        print("Shifted x,y:",shifted_xy)
                         T_positioner_world = positioner.fwd(curve_js_positioner[0],world=True)
                         T_robot_origin = robot_weld.fwd(curve_js[0])
-                        print("T robot origin:",T_robot_origin)
                         T_robot_positioner = T_positioner_world.inv()*T_robot_origin
                         T_robot_shift = T_robot_positioner
                         T_robot_shift.p[:2] -= shifted_xy
                         T_robot_shift = T_positioner_world*T_robot_shift
-                        print("T robot shift:",T_robot_shift)
                         q_shift = robot_weld.inv(T_robot_shift.p, T_robot_shift.R, last_joints=curve_js[0])[0]
                         q_cmd[:6] = q_shift # only update the robot 1 joints
                         print("Shift calculation time:",time.time()-time_start)
                         time.sleep(0.1)
-                        input("move")
                         SS.jog2q(q_cmd)
                     else:
                         time.sleep(0.5) # for robot to drive to the end point
@@ -537,7 +528,7 @@ def main():
 
                     # move to end point with safety_z_offset
                     for z in np.arange(0,safety_z_offset+1,5): # a linear movement
-                        T_end = robot_weld.fwd(curve_js[-1])
+                        T_end = robot_weld.fwd(q_cmd[:6])
                         T_end.p[2] += z
                         curve_js_end_offset = robot_weld.inv(T_end.p, T_end.R, last_joints=curve_js[-1])[0]
                         q_end_offset = np.hstack((curve_js_end_offset, curve_js_cam[-1], curve_js_positioner[-1]))
