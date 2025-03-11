@@ -530,8 +530,8 @@ def main():
                     for z in np.arange(0,safety_z_offset+1,5): # a linear movement
                         T_end = robot_weld.fwd(q_cmd[:6])
                         T_end.p[2] += z
-                        curve_js_end_offset = robot_weld.inv(T_end.p, T_end.R, last_joints=curve_js[-1])[0]
-                        q_end_offset = np.hstack((curve_js_end_offset, curve_js_cam[-1], curve_js_positioner[-1]))
+                        curve_js_end_offset = robot_weld.inv(T_end.p, T_end.R, last_joints=q_cmd[:6])[0]
+                        q_end_offset = np.hstack((curve_js_end_offset, q_cmd[6:]))
                         SS.jog2q(q_end_offset)
                     time.sleep(0.1)
 
