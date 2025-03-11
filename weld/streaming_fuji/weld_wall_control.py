@@ -166,7 +166,7 @@ def main():
     # collision avoidance z offset
     safety_z_offset = 50
     # compensate for shifted weld
-    shift_pos_smoother = 21
+    shift_pos_smoother = 61
     # direction 
     # torch_ori_fix = False # torch orientation fixed
     correction_layer = 2
@@ -179,8 +179,10 @@ def main():
     lam_split = np.linspace(0,meta_data['layer_length'],split_sections+1)[:-1]
     feedrate_min = 100
     feedrate_max = 220
-    v_minimum = round(cross_section*inch2mm*feedrate_min/VPD,2)
-    v_maximum = cross_section*inch2mm*feedrate_max/VPD
+    # v_minimum = round(cross_section*inch2mm*feedrate_min/VPD,2)
+    # v_maximum = cross_section*inch2mm*feedrate_max/VPD
+    v_minimum = 2.5
+    v_maximum = 12
     print("VPD:",VPD)
     print("v_minimum:",v_minimum)
     print("v_maximum:",v_maximum)
@@ -189,7 +191,8 @@ def main():
     baselayer_start = 0
     baselayer_end = base_layer_num
     layer_start = 9 # nominal baselayer=5.5. Real data=6.4 (6.4-5.5)/0.1=9
-    layer_end = layer_num
+    # layer_end = layer_num
+    layer_end = 10
     
     ################## Log data dir ##################
     current_time = datetime.datetime.now()
@@ -219,30 +222,32 @@ def main():
     print("Logged Data Dir:",logdata_dir)
     input("Ready to start? Press Enter to continue...")
     ################## print layers ##################
+    last_layer_scan = False
     arc_off=True
     forward = True
 
     mean_layer_height = 0
-    for weld_parts in ['base','layer']:
-    # for weld_parts in ['layer']:
+    # for weld_parts in ['base','layer']:
+    for weld_parts in ['layer']:
         if weld_parts == 'base':
             weld_start = baselayer_start
             weld_end = baselayer_end
             nom_incre = base_nom_incre
             nom_feedrate = base_feedrate
             nom_velocity = base_nom_vel
-            last_layer_scan = True # base layer don't need to last layer scan
         else:
             weld_start = layer_start
             weld_end = layer_end
             nom_incre = layer_nom_incre
             nom_feedrate = layer_feedrate
             nom_velocity = layer_nom_vel
-            last_layer_scan = False
+            
         layer_count = 0
         i=weld_start
         input("Start with layer "+str(i)+". Press Enter to continue...")
-        while i < weld_end and last_layer_scan == False:
+        while i < weld_end or last_layer_scan == False:
+            if i>=weld_end and weld_parts=='base': # base layer don't need to last layer scan
+                break
             if i >= weld_end:
                 last_layer_scan = True
                 weld_arcon = False
@@ -372,18 +377,28 @@ def main():
                     lam_curve_shift = lam_curve_shift[1:]
                     lam_curve_shift = lam_curve_shift[lam_curve_shift[:,0]!=0]
 
-                    print("Current mean shift x,y:",np.mean(lam_curve_shift[1:,1]),np.mean(lam_curve_shift[1:,2]))
-                    print("Current std shift x,y:",np.std(lam_curve_shift[1:,1]),np.std(lam_curve_shift[1:,2]))
+                    print("Current mean shift x,y:",np.mean(lam_curve_shift[:,1]),np.mean(lam_curve_shift[:,2]))
+                    print("Current std shift x,y:",np.std(lam_curve_shift[:,1]),np.std(lam_curve_shift[:,2]))
                     lam_curve_shift = lam_curve_shift[np.argsort(lam_curve_shift[:,0])]
                     # 1d smoother
+                    lam_curve_shift_noise = np.where(np.abs(lam_curve_shift[:,2]-np.mean(lam_curve_shift[:,2]))>3*np.std(lam_curve_shift[:,2]))[0]
+                    print("Noise index:",lam_curve_shift_noise)
+                    lam_curve_shift[lam_curve_shift_noise,2] = np.mean(lam_curve_shift[:,2])
                     lam_curve_shift_smooth_x = moving_average(lam_curve_shift[:,1],n=shift_pos_smoother,padding=True)
                     lam_curve_shift_smooth_y = moving_average(lam_curve_shift[:,2],n=shift_pos_smoother,padding=True)
+                    plt.plot(lam_curve_shift[:,1])
+                    plt.plot(lam_curve_shift_smooth_x)
+                    plt.show()
+                    plt.plot(lam_curve_shift[:,2])
+                    plt.plot(lam_curve_shift_smooth_y)
+                    plt.show()
                     # lam_curve_shift[:,1] = lam_curve_shift_smooth_x
                     # lam_curve_shift[:,2] = lam_curve_shift_smooth_y
-                    if compensate_shifting and weld_parts == 'layer':
+                    if compensate_shifting:
                         # get the robot to the shifted position
                         time_start = time.time()
-                        shifted_xy = np.mean(lam_curve_shift[:shift_pos_smoother+1][1:3],axis=0)
+                        shifted_xy = np.mean(lam_curve_shift[:shift_pos_smoother+1,1:],axis=0)
+                        print("Shifted x,y:",shifted_xy)
                         T_positioner_world = positioner.fwd(curve_js_positioner[0],world=True)
                         T_robot_origin = robot_weld.fwd(curve_js[0])
                         T_robot_positioner = T_positioner_world.inv()*T_robot_origin
@@ -406,6 +421,7 @@ def main():
                         v_cmd = nom_velocity
                     else:
                         v_cmd = dh2v_loglog(np.mean(lam_state_height[0]),mode=nom_feedrate)
+                        v_cmd = np.clip(v_cmd,v_minimum,v_maximum)
                     feedrate_cmd = nom_feedrate
                     if thermal_on:
                         rr_sensors.start_all_sensors()
@@ -421,16 +437,16 @@ def main():
                         q_pos=curve_js_positioner[lam_idx-1]*(1-ratio)+curve_js_positioner[lam_idx]*ratio
                         q_cmd=np.hstack((q1,q2,q_pos))
 
-                        if compensate_shifting and weld_parts == 'layer':
+                        if compensate_shifting and not (weld_parts == 'base' and layer_count==0):
                             # get the robot to the shifted position
                             shifted_i = np.where(lam_curve_shift[:,0]>=lam_cur)[0][0]-1
                             ### moving average for shifting
                             if shifted_i < (shift_pos_smoother-1)/2:
-                                shifted_xy = np.mean(lam_curve_shift[:shift_pos_smoother+1][1:3],axis=0)
+                                shifted_xy = np.mean(lam_curve_shift[:shift_pos_smoother+1,1:3],axis=0)
                             elif shifted_i > len(lam_curve_shift)-(shift_pos_smoother-1)/2:
-                                shifted_xy = np.mean(lam_curve_shift[-shift_pos_smoother:][1:3],axis=0)
+                                shifted_xy = np.mean(lam_curve_shift[-shift_pos_smoother:,1:3],axis=0)
                             else:
-                                shifted_xy = np.mean(lam_curve_shift[shifted_i-int((shift_pos_smoother-1)/2):shifted_i+int((shift_pos_smoother-1)/2)+1][1:3],axis=0)
+                                shifted_xy = np.mean(lam_curve_shift[shifted_i-int((shift_pos_smoother-1)/2):shifted_i+int((shift_pos_smoother-1)/2)+1,1:3],axis=0)
                             # compensation in the positioner tcp frame
                             T_positioner_world = positioner.fwd(q_pos,world=True)
                             T_robot_origin = robot_weld.fwd(q1)
@@ -458,6 +474,7 @@ def main():
                             if lam_split_i < len(lam_split)-1 and lam_cur > lam_split[lam_split_i+1]:
                                 lam_split_i += 1
                                 v_cmd = dh2v_loglog(np.mean(lam_state_height[lam_split_i]),mode=nom_feedrate)
+                                v_cmd = np.clip(v_cmd,v_minimum,v_maximum)
                                 welding_cmd_all.append(np.hstack((time.perf_counter(),i,v_cmd,int(round(feedrate_cmd/10)*10))))
                                 print("Update Velocity:",round(v_cmd,2), "Mean dh:",np.mean(lam_state_height[lam_split_i]))
 
@@ -509,6 +526,8 @@ def main():
                                 lam_split_i = np.where(lam_split<=lam_scan)[0][-1]
                                 lam_state_height[lam_split_i].append(scan_delta_h)
                                 curve_shift = scan_point_location[:2]-curve[curve_index][:2]
+                                if np.abs(curve_shift[1]-np.mean(lam_curve_shift[:,2]))>2*np.std(lam_curve_shift[:,2]):
+                                    curve_shift[1] = np.mean(lam_curve_shift[:,2])
                                 lam_curve_shift = np.vstack((lam_curve_shift,np.hstack((lam_scan,curve_shift))))
 
                         ### sent position Command to the robot
@@ -651,6 +670,8 @@ def main():
                 if read_from_file_layer:
                     input("Next layer "+str(i)+". Press Enter to continue...")
                 read_from_file_layer = False
+
+                print("To next layer",i, last_layer_scan)
             except:
                 traceback.print_exc()
                 if weld_arcon:
