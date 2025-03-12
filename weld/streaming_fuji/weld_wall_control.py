@@ -542,14 +542,15 @@ def main():
                                 scan_exe_noise_remove.append(scan_denoise)
                                 scan_exe_noise_remove_tcp.append(scan_denoise_tcp)
                                 # get lambda and record height
-                                curve_index = np.argsort(np.linalg.norm(curve[:,:2]-scan_point_location[:2],axis=1))[0]
-                                lam_scan = lam_relative[curve_index]
-                                lam_scan_i = np.where(lam_split<=lam_scan)[0][-1]
-                                lam_state_height[lam_scan_i].append(scan_delta_h)
-                                curve_shift = scan_point_location[:2]-curve[curve_index][:2]
-                                if np.abs(curve_shift[1]-np.mean(lam_curve_shift[:,2]))>2*np.std(lam_curve_shift[:,2]):
-                                    curve_shift[1] = np.mean(lam_curve_shift[:,2])
-                                lam_curve_shift = np.vstack((lam_curve_shift,np.hstack((lam_scan,curve_shift))))
+                                if lam_cur<lam_relative[int(-dist_weld_scan_index + 1/path_dl)]:
+                                    curve_index = np.argsort(np.linalg.norm(curve[:,:2]-scan_point_location[:2],axis=1))[0]
+                                    lam_scan = lam_relative[curve_index]
+                                    lam_scan_i = np.where(lam_split<=lam_scan)[0][-1]
+                                    lam_state_height[lam_scan_i].append(scan_delta_h)
+                                    curve_shift = scan_point_location[:2]-curve[curve_index][:2]
+                                    if np.abs(curve_shift[1]-np.mean(lam_curve_shift[:,2]))>2*np.std(lam_curve_shift[:,2]):
+                                        curve_shift[1] = np.mean(lam_curve_shift[:,2])
+                                    lam_curve_shift = np.vstack((lam_curve_shift,np.hstack((lam_scan,curve_shift))))
 
                         ### sent position Command to the robot
                         q_cmd_all.append(np.hstack((time.perf_counter(),i,q_cmd)))

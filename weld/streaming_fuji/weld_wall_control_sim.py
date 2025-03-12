@@ -79,7 +79,7 @@ def main():
     feedrate_update_rate=1.	#Hz
     job_offset=200
 
-    logdata_dir='../../data/wall_weld_test/weld_fujicontrol_2025_03_11_13_03_15/'
+    logdata_dir='../../data/wall_weld_test/weld_fujicontrol_2025_03_12_16_14_17/'
     # read weld meta data
     with open(logdata_dir+'weld_meta_data.yml', 'r') as f:
         weld_meta_data = yaml.safe_load(f)
@@ -104,7 +104,7 @@ def main():
     # torch_ori_fix = False # torch orientation fixed
     correction_layer = weld_meta_data['correction_layer']
     # offset_z
-    offset_z = 6.6
+    offset_z = -7.4
     
     # data collection parameters
     VPD = cross_section*inch2mm*layer_feedrate/layer_nom_vel # volume per distance (mm^3/mm)
@@ -131,8 +131,8 @@ def main():
 
     Transz0_H=None
     mean_layer_height = 0
-    for weld_parts in ['base','layer']:
-    # for weld_parts in ['layer']:
+    # for weld_parts in ['base','layer']:
+    for weld_parts in ['layer']:
         if weld_parts == 'base':
             total_layers_name = glob.glob(logdata_dir+'baselayer*')
         else:
@@ -145,9 +145,12 @@ def main():
             layer_nums.append(int(this_layer))
         layer_nums = np.sort(layer_nums)
             
-        layer_count = 6
         
-        for i in layer_nums[1:]:
+        
+        for i in layer_nums[-5:]:
+            layer_count = np.where(layer_nums==i)[0][0]
+            forward = True if layer_count%2==0 else False
+
             print("=====================================")
             input(f'Welding {weld_parts} layer {i} counting {layer_count} direction {forward}')
             try:
@@ -221,7 +224,7 @@ def main():
                 scan_dh_thread = Thread(target=scan_process.scan2dh_thread, args=(target_p,[-40, 30],[40, 200],offset_z,'fuji'),daemon=True) # arges: (target_p, crop_min, crop_max, offset_z, scanner)
                 scan_dh_thread.start()
                 lam_cur=0
-                for data_i in range(0,weld_start_index):
+                for data_i in range(0,weld_start_index,100):
                     loop_start=time.perf_counter()
 
                     ### get the next q commands
@@ -257,11 +260,16 @@ def main():
                         ax.set_ylim(0, np.max(scan_denoise_tcp[:,2])+np.max(scan_denoise_tcp[:,2])*0.1)
                         plt.draw()
                         plt.pause(0.000000001)
+                        # if scan_delta_h>5 and data_i>100:
+                        #     print("scan delta h:",scan_delta_h)
+                        #     input("Scan height too high, press Enter to continue...")
                         # get denoise scan
                         scan_exe_noise_remove.append(scan_denoise)
                         scan_exe_noise_remove_tcp.append(scan_denoise_tcp)
                         # get lambda and record height
-                        curve_index = np.argsort(np.linalg.norm(curve[:,:2]-scan_point_location[:2],axis=1))[0]
+                        scan_point_curve_dist = np.linalg.norm(curve[:,:2]-scan_point_location[:2],axis=1)
+                        curve_index = np.argsort(scan_point_curve_dist)[0]
+                        # if scan_point_curve_dist[curve_index]<1:
                         lam_scan = lam_relative[curve_index]
                         lam_scan_i = np.where(lam_split<=lam_scan)[0][-1]
                         if scan_delta_h<10:
@@ -334,14 +342,14 @@ def main():
                     # q_cmd=np.hstack((q1,q2,q_pos))
 
                     # get the robot to the shifted position
-                    shifted_i = np.where(lam_curve_shift[:,0]>=lam_cur)[0][0]-1
-                    ### moving average for shifting
-                    if shifted_i < (shift_pos_smoother-1)/2:
-                        shifted_xy = np.mean(lam_curve_shift[:shift_pos_smoother+1,1:3],axis=0)
-                    elif shifted_i > len(lam_curve_shift)-(shift_pos_smoother-1)/2:
-                        shifted_xy = np.mean(lam_curve_shift[-shift_pos_smoother:,1:3],axis=0)
-                    else:
-                        shifted_xy = np.mean(lam_curve_shift[shifted_i-int((shift_pos_smoother-1)/2):shifted_i+int((shift_pos_smoother-1)/2)+1,1:3],axis=0)
+                    # shifted_i = np.where(lam_curve_shift[:,0]>=lam_cur)[0][0]-1
+                    # ### moving average for shifting
+                    # if shifted_i < (shift_pos_smoother-1)/2:
+                    #     shifted_xy = np.mean(lam_curve_shift[:shift_pos_smoother+1,1:3],axis=0)
+                    # elif shifted_i > len(lam_curve_shift)-(shift_pos_smoother-1)/2:
+                    #     shifted_xy = np.mean(lam_curve_shift[-shift_pos_smoother:,1:3],axis=0)
+                    # else:
+                    #     shifted_xy = np.mean(lam_curve_shift[shifted_i-int((shift_pos_smoother-1)/2):shifted_i+int((shift_pos_smoother-1)/2)+1,1:3],axis=0)
 
                     ### if welding start or end
                     pass
@@ -367,7 +375,9 @@ def main():
                                     if len(lam_state_height[lam_split_i_next]) != 0:
                                         lam_state_height[lam_split_i].append(np.mean(lam_state_height[lam_split_i_next]))
                                         break
-                            v_cmd = dh2v_loglog(np.mean(lam_state_height[lam_split_i]),mode=layer_feedrate)
+                            v_cmd_new = dh2v_loglog(np.mean(lam_state_height[lam_split_i]),mode=layer_feedrate)
+                            if not np.isnan(v_cmd_new):
+                                v_cmd = v_cmd_new
                             v_cmd = np.clip(v_cmd,v_minimum,v_maximum)
                             print("Update Velocity:",round(v_cmd,2), "Mean dh:",np.mean(lam_state_height[lam_split_i]))
 
@@ -393,7 +403,7 @@ def main():
                         scan_delta_h = scan_process.delta_h_pipe.pop(0)
                         scan_process.accessing_key = False
                         line.set_data(scan_denoise_tcp[:,1], scan_denoise_tcp[:,2])  # Update both x and y
-                        line_large.set_data([scan_point_location[1]], [scan_point_location[2]+offset_z])  # Update both x and y
+                        line_large.set_data([scan_point_location[1]], [scan_point_location[2]-offset_z])  # Update both x and y
                         ax.set_xlim(30,70)
                         ax.set_ylim(0, np.max(scan_denoise_tcp[:,2])+np.max(scan_denoise_tcp[:,2])*0.1)
                         plt.draw()
@@ -401,15 +411,18 @@ def main():
                         # get denoise scan
                         scan_exe_noise_remove.append(scan_denoise)
                         scan_exe_noise_remove_tcp.append(scan_denoise_tcp)
-                        # get lambda and record height
-                        curve_index = np.argsort(np.linalg.norm(curve[:,:2]-scan_point_location[:2],axis=1))[0]
-                        lam_scan = lam_relative[curve_index]
-                        lam_scan_i = np.where(lam_split<=lam_scan)[0][-1]
-                        lam_state_height[lam_scan_i].append(np.min((scan_delta_h,10)))
-                        curve_shift = scan_point_location[:2]-curve[curve_index][:2]
-                        if np.abs(curve_shift[1]-np.mean(lam_curve_shift[:,2]))>2*np.std(lam_curve_shift[:,2]):
-                            curve_shift[1] = np.mean(lam_curve_shift[:,2])
-                        lam_curve_shift = np.vstack((lam_curve_shift,np.hstack((lam_scan,curve_shift))))
+                        if lam_cur<lam_relative[int(-dist_weld_scan_index + 1/path_dl)]:
+                            # get lambda and record height
+                            scan_point_curve_dist = np.linalg.norm(curve[:,:2]-scan_point_location[:2],axis=1)
+                            curve_index = np.argsort(scan_point_curve_dist)[0]
+                            # if scan_point_curve_dist[curve_index]<1:
+                            lam_scan = lam_relative[curve_index]
+                            lam_scan_i = np.where(lam_split<=lam_scan)[0][-1]
+                            lam_state_height[lam_scan_i].append(np.min((scan_delta_h,10)))
+                            curve_shift = scan_point_location[:2]-curve[curve_index][:2]
+                            if np.abs(curve_shift[1]-np.mean(lam_curve_shift[:,2]))>2*np.std(lam_curve_shift[:,2]):
+                                curve_shift[1] = np.mean(lam_curve_shift[:,2])
+                            lam_curve_shift = np.vstack((lam_curve_shift,np.hstack((lam_scan,curve_shift))))
 
                 ########################################
 
@@ -440,6 +453,10 @@ def main():
                 plt.ioff()  # Turn off interactive mode
                 plt.show()  # Keep the final frame displayed
                 ###################
+
+                for j, lam_height in enumerate(lam_state_height):
+                    if len(lam_height) != 0:
+                        print(f"Layer {i} Section {j} Height: {np.mean(lam_height)}")
                 
                 weld_js_exe = np.array(weld_js_exe)
                 stamps_exe = deepcopy(weld_js_exe[:,0])
