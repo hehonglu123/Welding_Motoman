@@ -103,6 +103,8 @@ def main():
     # direction 
     # torch_ori_fix = False # torch orientation fixed
     correction_layer = weld_meta_data['correction_layer']
+    # offset_z
+    offset_z = 6.6
     
     # data collection parameters
     VPD = cross_section*inch2mm*layer_feedrate/layer_nom_vel # volume per distance (mm^3/mm)
@@ -195,6 +197,7 @@ def main():
                 with open(logdata_dir+f'layer{i}/scan_exe.pickle', 'rb') as file:
                     scan_exe = pickle.load(file)
                 scan_exe_noise_remove = []
+                scan_exe_noise_remove_tcp = []
                 assert len(q_cmd_all)==len(weld_js_exe), "Command and execution data length mismatch"
                 assert len(weld_js_exe)==len(scan_exe), "Execution and scanning data length mismatch"
                 # find the biggest timestamp gap in weld_js_exe
@@ -208,14 +211,15 @@ def main():
                 ax.set_ylim(100, 130)  # Set y-axis limits
                 # Initialize an empty line object
                 line, = ax.plot([], [], '.')  # No data at start
+                line_large, = ax.plot([], [], '.', ms=10)  # No data at start
                 plt.ion()  # Turn on interactive mode
                 plt.show()
                 ######
                 
-                scan_dh_thread = Thread(target=scan_process.scan2dh_thread, args=(target_p,[-40, 30],[40, 200],-6.6,'fuji'),daemon=True) # arges: (target_p, crop_min, crop_max, offset_z, scanner)
+                scan_dh_thread = Thread(target=scan_process.scan2dh_thread, args=(target_p,[-40, 30],[40, 200],offset_z,'fuji'),daemon=True) # arges: (target_p, crop_min, crop_max, offset_z, scanner)
                 scan_dh_thread.start()
                 lam_cur=0
-                for data_i in range(weld_start_index):
+                for data_i in range(0,weld_start_index,100):
                     loop_start=time.perf_counter()
 
                     ### get the next q commands
@@ -240,19 +244,27 @@ def main():
                             time.sleep(0.0000000000001)
                         scan_process.accessing_key = True
                         scan_denoise = scan_process.denoise_scan_pipe.pop(0)
+                        scan_denoise_tcp = scan_process.denoise_scan_tcp_pipe.pop(0)
                         scan_point_location = scan_process.point_location_pipe.pop(0)
                         scan_delta_h = scan_process.delta_h_pipe.pop(0)
                         scan_process.accessing_key = False
-                        line.set_data(scan_denoise[:,0], scan_denoise[:,1])  # Update both x and y
+
+                        print(scan_point_location)
+                        line.set_data(scan_denoise_tcp[:,1], scan_denoise_tcp[:,2])  # Update both x and y
+                        line_large.set_data([scan_point_location[1]], [scan_point_location[2]+offset_z])  # Update both x and y
+                        ax.set_xlim(30,70)
+                        ax.set_ylim(0, np.max(scan_denoise_tcp[:,2])+np.max(scan_denoise_tcp[:,2])*0.1)
                         plt.draw()
                         plt.pause(0.000000001)
                         # get denoise scan
                         scan_exe_noise_remove.append(scan_denoise)
+                        scan_exe_noise_remove_tcp.append(scan_denoise_tcp)
                         # get lambda and record height
                         curve_index = np.argsort(np.linalg.norm(curve[:,:2]-scan_point_location[:2],axis=1))[0]
                         lam_scan = lam_relative[curve_index]
-                        lam_split_i = np.where(lam_split<=lam_scan)[0][-1]
-                        lam_state_height[lam_split_i].append(scan_delta_h)
+                        lam_scan_i = np.where(lam_split<=lam_scan)[0][-1]
+                        if scan_delta_h < 10:
+                            lam_state_height[lam_scan_i].append(scan_delta_h)
                         curve_shift = scan_point_location[:2]-curve[curve_index][:2]
                         lam_curve_shift = np.vstack((lam_curve_shift,np.hstack((lam_scan,curve_shift))))
                 ########################################
@@ -264,6 +276,7 @@ def main():
 
                 lam_curve_shift = lam_curve_shift[1:]
                 lam_curve_shift = lam_curve_shift[lam_curve_shift[:,0]!=0]
+                print(lam_curve_shift[0])
 
                 print("Current mean shift x,y:",np.mean(lam_curve_shift[:,1]),np.mean(lam_curve_shift[:,2]))
                 print("Current std shift x,y:",np.std(lam_curve_shift[:,1]),np.std(lam_curve_shift[:,2]))
@@ -291,7 +304,8 @@ def main():
                 ax.set_xlim(-40, 40)  # Set x-axis limits
                 ax.set_ylim(30, 120)  # Set y-axis limits
                 # Initialize an empty line object
-                line, = ax.plot([], [], lw=2)  # No data at start
+                line, = ax.plot([], [], '.')  # No data at start
+                line_large, = ax.plot([], [], '.', ms=10)  # No data at start
                 plt.ion()  # Turn on interactive mode
                 plt.show()
                 ######
@@ -299,11 +313,14 @@ def main():
                 ####### welding motion ##########################
                 lam_cur=0
                 lam_split_i = 0
+                v_cmd = dh2v_loglog(np.mean(lam_state_height[lam_split_i]),mode=layer_feedrate)
+                v_cmd = np.clip(v_cmd,v_minimum,v_maximum)
+                print("Initial Velocity:",round(v_cmd,2), "Mean dh:",np.mean(lam_state_height[lam_split_i]))
                 for data_i in range(weld_start_index,len(weld_js_exe)):
                     loop_start=time.perf_counter()
 
                     ### get the next q commands
-                    # lam_cur+=v_cmd/streaming_rate # get the current lambda (path location)
+                    lam_cur+=v_cmd/streaming_rate # get the current lambda (path location)
                     # lam_idx=np.where(lam_relative>=lam_cur)[0][0] #get closest two indices and interpolate the joint angle
                     # ratio=(lam_cur-lam_relative[lam_idx-1])/(lam_relative[lam_idx]-lam_relative[lam_idx-1])
                     # q1=curve_js[lam_idx-1]*(1-ratio)+curve_js[lam_idx]*ratio
@@ -325,7 +342,7 @@ def main():
                     pass
                     
                     ### update speed 
-                    if weld_parts != 'base' or layer_count>=correction_layer: 
+                    if weld_parts != 'base' and layer_count>=correction_layer: 
                         if lam_split_i < len(lam_split)-1 and lam_cur > lam_split[lam_split_i+1]:
                             lam_split_i += 1
                             v_cmd = dh2v_loglog(np.mean(lam_state_height[lam_split_i]),mode=layer_feedrate)
@@ -349,16 +366,24 @@ def main():
                             time.sleep(0.0000000000001)
                         scan_process.accessing_key = True
                         scan_denoise = scan_process.denoise_scan_pipe.pop(0)
+                        scan_denoise_tcp = scan_process.denoise_scan_tcp_pipe.pop(0)
                         scan_point_location = scan_process.point_location_pipe.pop(0)
                         scan_delta_h = scan_process.delta_h_pipe.pop(0)
                         scan_process.accessing_key = False
+                        line.set_data(scan_denoise_tcp[:,1], scan_denoise_tcp[:,2])  # Update both x and y
+                        line_large.set_data([scan_point_location[1]], [scan_point_location[2]+offset_z])  # Update both x and y
+                        ax.set_xlim(30,70)
+                        ax.set_ylim(0, np.max(scan_denoise_tcp[:,2])+np.max(scan_denoise_tcp[:,2])*0.1)
+                        plt.draw()
+                        plt.pause(0.000000001)
                         # get denoise scan
                         scan_exe_noise_remove.append(scan_denoise)
+                        scan_exe_noise_remove_tcp.append(scan_denoise_tcp)
                         # get lambda and record height
                         curve_index = np.argsort(np.linalg.norm(curve[:,:2]-scan_point_location[:2],axis=1))[0]
                         lam_scan = lam_relative[curve_index]
-                        lam_split_i = np.where(lam_split<=lam_scan)[0][-1]
-                        lam_state_height[lam_split_i].append(scan_delta_h)
+                        lam_scan_i = np.where(lam_split<=lam_scan)[0][-1]
+                        lam_state_height[lam_scan_i].append(scan_delta_h)
                         curve_shift = scan_point_location[:2]-curve[curve_index][:2]
                         if np.abs(curve_shift[1]-np.mean(lam_curve_shift[:,2]))>2*np.std(lam_curve_shift[:,2]):
                             curve_shift[1] = np.mean(lam_curve_shift[:,2])
@@ -372,10 +397,12 @@ def main():
                     time.sleep(0.01)
                 while len(scan_process.denoise_scan_pipe)!=0:
                     scan_denoise = scan_process.denoise_scan_pipe.pop(0)
+                    scan_denoise_tcp = scan_process.denoise_scan_tcp_pipe.pop(0)
                     scan_point_location = scan_process.point_location_pipe.pop(0)
                     scan_delta_h = scan_process.delta_h_pipe.pop(0)
                     # get denoise scan
                     scan_exe_noise_remove.append(scan_denoise)
+                    scan_exe_noise_remove_tcp.append(scan_denoise_tcp)
                     # get lambda and record height
                     curve_index = np.argsort(np.linalg.norm(curve[:,:2]-scan_point_location[:2],axis=1))[0]
                     lam_scan = lam_relative[curve_index]
@@ -397,13 +424,21 @@ def main():
                 ################### get layer increments ############################
                 if adaptive_layer_height:
                     # single scan noise remove
-                    if not scan_online_process:
-                        scan_exe_noise_remove = []
-                        for scan in scan_exe:
-                            scan_noise_remove = scan_process.scan2dDenoise(deepcopy(scan).T,crop_min=[-40,30],crop_max=[40,200])
-                            scan_exe_noise_remove.append(scan_noise_remove)
+                    # if not scan_online_process:
+                    scan_exe_noise_remove = []
+                    for scan in scan_exe:
+                        scan_noise_remove = scan_process.scan2dDenoise(deepcopy(scan).T,crop_min=[-40,30],crop_max=[40,200])
+                        scan_exe_noise_remove.append(scan_noise_remove)
                     # 3D scan registration
                     pcd = scan_process.pcd_register_mti(scan_exe_noise_remove,weld_js_exe[:,np.append(np.arange(1,7),np.arange(13,15))],stamps_exe,flip=True,scanner='fuji')
+                    # else:
+                    #     pcd = o3d.geometry.PointCloud()
+                    #     for scan_tcp in scan_exe_noise_remove_tcp:
+                    #         pcd_slice = o3d.geometry.PointCloud()
+                    #         pcd_slice.points=o3d.utility.Vector3dVector(scan_tcp)
+                    #         pcd_slice = pcd_slice.voxel_down_sample(voxel_size=0.05)
+                    #         pcd += pcd_slice
+                    visualize_pcd([pcd])
                     curve_planned_z = np.mean(curve[:,2])
                     curve_x_end = np.min(curve[:,0])
                     curve_x_start = np.max(curve[:,0])
@@ -427,6 +462,9 @@ def main():
                     else:
                         # layer uses mean_layer_height/layer_resolution, 
                         # and add layer_nom_incre because scanner leads the welding
+                        print(mean_layer_height)
+                        print(baselayer_resolution)
+                        print(layer_resolution)
                         print("Expected next layer:", round((mean_layer_height-2*baselayer_resolution)/layer_resolution)+layer_nom_incre)
                 ##########################################
 
