@@ -286,7 +286,9 @@ def main():
                         SS.jog2q(q_end_offset)
                     
                     # recording lam height and location
-                    lam_state_height = [[]]*len(lam_split)
+                    lam_state_height = []
+                    for j in range(len(lam_split)):
+                        lam_state_height.append([])
                     lam_curve_shift = np.array([[-1,0,0]]) # [lam, x, y]
                     # target p (only z matters)
                     target_p = deepcopy(curve[0][:3])
@@ -299,6 +301,7 @@ def main():
                     scan_exe = []
                     if scan_online_process and fuji_scanon:
                         scan_exe_noise_remove = []
+                        scan_exe_noise_remove_tcp = []
                         scan_dh_thread = Thread(target=scan_process.scan2dh_thread, args=(target_p,[-40, 30],[40, 200],-6.6,'fuji'),daemon=True) # arges: (target_p, crop_min, crop_max, offset_z, scanner)
                         scan_dh_thread.start()
                     v_cmd = scan_nom_vel
@@ -336,16 +339,19 @@ def main():
                                     time.sleep(0.0000000000001)
                                 scan_process.accessing_key = True
                                 scan_denoise = scan_process.denoise_scan_pipe.pop(0)
+                                scan_denoise_tcp = scan_process.denoise_scan_tcp_pipe.pop(0)
                                 scan_point_location = scan_process.point_location_pipe.pop(0)
                                 scan_delta_h = scan_process.delta_h_pipe.pop(0)
                                 scan_process.accessing_key = False
                                 # get denoise scan
                                 scan_exe_noise_remove.append(scan_denoise)
+                                scan_exe_noise_remove_tcp.append(scan_denoise_tcp)
                                 # get lambda and record height
                                 curve_index = np.argsort(np.linalg.norm(curve[:,:2]-scan_point_location[:2],axis=1))[0]
                                 lam_scan = lam_relative[curve_index]
-                                lam_split_i = np.where(lam_split<=lam_scan)[0][-1]
-                                lam_state_height[lam_split_i].append(scan_delta_h)
+                                lam_scan_i = np.where(lam_split<=lam_scan)[0][-1]
+                                if scan_delta_h<10:
+                                    lam_state_height[lam_scan_i].append(scan_delta_h)
                                 curve_shift = scan_point_location[:2]-curve[curve_index][:2]
                                 lam_curve_shift = np.vstack((lam_curve_shift,np.hstack((lam_scan,curve_shift))))
 
@@ -379,7 +385,6 @@ def main():
                     # lam_curve_shift[:,2] = lam_curve_shift_smooth_y
                     if compensate_shifting:
                         # get the robot to the shifted position
-                        time_start = time.time()
                         shifted_xy = np.mean(lam_curve_shift[:shift_pos_smoother+1,1:],axis=0)
                         print("Shifted x,y:",shifted_xy)
                         T_positioner_world = positioner.fwd(curve_js_positioner[0],world=True)
@@ -390,7 +395,6 @@ def main():
                         T_robot_shift = T_positioner_world*T_robot_shift
                         q_shift = robot_weld.inv(T_robot_shift.p, T_robot_shift.R, last_joints=curve_js[0])[0]
                         q_cmd[:6] = q_shift # only update the robot 1 joints
-                        print("Shift calculation time:",time.time()-time_start)
                         time.sleep(0.1)
                         SS.jog2q(q_cmd)
                     else:
@@ -405,7 +409,7 @@ def main():
                     else:
                         v_cmd = dh2v_loglog(np.mean(lam_state_height[0]),mode=nom_feedrate)
                         v_cmd = np.clip(v_cmd,v_minimum,v_maximum)
-                    feedrate_cmd = nom_feedrate
+                    feedrate_cmd = nom_feedrate #TODO: update feedrate based on the height, width, thermal
                     if thermal_on:
                         rr_sensors.start_all_sensors()
                     while lam_cur<lam_relative[-1] - v_cmd/SS.streaming_rate:
@@ -456,6 +460,23 @@ def main():
                         if weld_parts != 'base' and layer_count>=correction_layer: 
                             if lam_split_i < len(lam_split)-1 and lam_cur > lam_split[lam_split_i+1]:
                                 lam_split_i += 1
+                                if len(lam_state_height[lam_split_i]) == 0:
+                                    lam_split_i_prev = lam_split_i
+                                    while len(lam_state_height[lam_split_i_prev]) == 0:
+                                        lam_split_i_prev -= 1
+                                        if lam_split_i_prev < 0:
+                                            break
+                                        if len(lam_state_height[lam_split_i_prev]) != 0:
+                                            lam_state_height[lam_split_i].append(np.mean(lam_state_height[lam_split_i_prev]))
+                                            break
+                                    lam_split_i_next = lam_split_i
+                                    while len(lam_state_height[lam_split_i_next]) == 0:
+                                        lam_split_i_next += 1
+                                        if lam_split_i_next >= len(lam_split):
+                                            break
+                                        if len(lam_state_height[lam_split_i_next]) != 0:
+                                            lam_state_height[lam_split_i].append(np.mean(lam_state_height[lam_split_i_next]))
+                                            break
                                 v_cmd = dh2v_loglog(np.mean(lam_state_height[lam_split_i]),mode=nom_feedrate)
                                 v_cmd = np.clip(v_cmd,v_minimum,v_maximum)
                                 welding_cmd_all.append(np.hstack((time.perf_counter(),i,v_cmd,int(round(feedrate_cmd/10)*10))))
@@ -498,16 +519,18 @@ def main():
                                     time.sleep(0.0000000000001)
                                 scan_process.accessing_key = True
                                 scan_denoise = scan_process.denoise_scan_pipe.pop(0)
+                                scan_denoise_tcp = scan_process.denoise_scan_tcp_pipe.pop(0)
                                 scan_point_location = scan_process.point_location_pipe.pop(0)
                                 scan_delta_h = scan_process.delta_h_pipe.pop(0)
                                 scan_process.accessing_key = False
                                 # get denoise scan
                                 scan_exe_noise_remove.append(scan_denoise)
+                                scan_exe_noise_remove_tcp.append(scan_denoise_tcp)
                                 # get lambda and record height
                                 curve_index = np.argsort(np.linalg.norm(curve[:,:2]-scan_point_location[:2],axis=1))[0]
                                 lam_scan = lam_relative[curve_index]
-                                lam_split_i = np.where(lam_split<=lam_scan)[0][-1]
-                                lam_state_height[lam_split_i].append(scan_delta_h)
+                                lam_scan_i = np.where(lam_split<=lam_scan)[0][-1]
+                                lam_state_height[lam_scan_i].append(scan_delta_h)
                                 curve_shift = scan_point_location[:2]-curve[curve_index][:2]
                                 if np.abs(curve_shift[1]-np.mean(lam_curve_shift[:,2]))>2*np.std(lam_curve_shift[:,2]):
                                     curve_shift[1] = np.mean(lam_curve_shift[:,2])
@@ -536,15 +559,17 @@ def main():
                             time.sleep(0.01)
                         while len(scan_process.denoise_scan_pipe)!=0:
                             scan_denoise = scan_process.denoise_scan_pipe.pop(0)
+                            scan_denoise_tcp = scan_process.denoise_scan_tcp_pipe.pop(0)
                             scan_point_location = scan_process.point_location_pipe.pop(0)
                             scan_delta_h = scan_process.delta_h_pipe.pop(0)
                             # get denoise scan
                             scan_exe_noise_remove.append(scan_denoise)
+                            scan_exe_noise_remove_tcp.append(scan_denoise_tcp)
                             # get lambda and record height
                             curve_index = np.argsort(np.linalg.norm(curve[:,:2]-scan_point_location[:2],axis=1))[0]
                             lam_scan = lam_relative[curve_index]
-                            lam_split_i = np.where(lam_split<=lam_scan)[0][-1]
-                            lam_state_height[lam_split_i].append(scan_delta_h)
+                            lam_scan_i = np.where(lam_split<=lam_scan)[0][-1]
+                            lam_state_height[lam_scan_i].append(scan_delta_h)
                             curve_shift = scan_point_location[:2]-curve[curve_index][:2]
                             lam_curve_shift = np.vstack((lam_curve_shift,np.hstack((lam_scan,curve_shift))))
                         # stop scan process
@@ -607,13 +632,20 @@ def main():
                             scan_exe_noise_remove.append(scan_noise_remove)
                         with open(logdata_dir+layer_name+f'/scan_exe_noise_remove.pickle', 'wb') as f:
                             pickle.dump(scan_exe_noise_remove, f)
-                    # 3D scan registration
-                    pcd = scan_process.pcd_register_mti(scan_exe_noise_remove,weld_js_exe[:,np.append(np.arange(1,7),np.arange(13,15))],stamps_exe,flip=True,scanner='fuji')
+                        # 3D scan registration
+                        pcd = scan_process.pcd_register_mti(scan_exe_noise_remove,weld_js_exe[:,np.append(np.arange(1,7),np.arange(13,15))],stamps_exe,flip=True,scanner='fuji')
+                    else:
+                        pcd = o3d.geometry.PointCloud()
+                        for scan_tcp in scan_exe_noise_remove_tcp:
+                            pcd_slice = o3d.geometry.PointCloud()
+                            pcd_slice.points=o3d.utility.Vector3dVector(scan_tcp)
+                            pcd_slice = pcd_slice.voxel_down_sample(voxel_size=0.05)
+                            pcd += pcd_slice
                     curve_planned_z = np.mean(curve[:,2])
                     curve_x_end = np.min(curve[:,0])
                     curve_x_start = np.max(curve[:,0])
                     curve_y = np.mean(curve[:,1])
-                    z_height_start=curve_planned_z+0.1
+                    z_height_start=curve_planned_z-5
                     crop_extend_x=10
                     crop_extend_z=20
                     crop_min=(curve_x_end-crop_extend_x,curve_y-30,-30)

@@ -127,7 +127,7 @@ def main():
     ################## print layers ##################
     last_layer_scan = False
     arc_off=True
-    forward = True
+    forward = False
 
     Transz0_H=None
     mean_layer_height = 0
@@ -147,7 +147,7 @@ def main():
             
         layer_count = 6
         
-        for i in layer_nums:
+        for i in layer_nums[1:]:
             print("=====================================")
             input(f'Welding {weld_parts} layer {i} counting {layer_count} direction {forward}')
             try:
@@ -183,7 +183,9 @@ def main():
                 # r2_rest_q = curve_js_cam[0]
                 
                 # recording lam height and location
-                lam_state_height = [[]]*len(lam_split)
+                lam_state_height = []
+                for j in range(len(lam_split)):
+                    lam_state_height.append([])
                 lam_curve_shift = np.array([[-1,0,0]]) # [lam, x, y]
                 # target p (only z matters)
                 target_p = deepcopy(curve[0][:3])
@@ -219,7 +221,7 @@ def main():
                 scan_dh_thread = Thread(target=scan_process.scan2dh_thread, args=(target_p,[-40, 30],[40, 200],offset_z,'fuji'),daemon=True) # arges: (target_p, crop_min, crop_max, offset_z, scanner)
                 scan_dh_thread.start()
                 lam_cur=0
-                for data_i in range(0,weld_start_index,100):
+                for data_i in range(0,weld_start_index):
                     loop_start=time.perf_counter()
 
                     ### get the next q commands
@@ -249,7 +251,6 @@ def main():
                         scan_delta_h = scan_process.delta_h_pipe.pop(0)
                         scan_process.accessing_key = False
 
-                        print(scan_point_location)
                         line.set_data(scan_denoise_tcp[:,1], scan_denoise_tcp[:,2])  # Update both x and y
                         line_large.set_data([scan_point_location[1]], [scan_point_location[2]+offset_z])  # Update both x and y
                         ax.set_xlim(30,70)
@@ -263,7 +264,7 @@ def main():
                         curve_index = np.argsort(np.linalg.norm(curve[:,:2]-scan_point_location[:2],axis=1))[0]
                         lam_scan = lam_relative[curve_index]
                         lam_scan_i = np.where(lam_split<=lam_scan)[0][-1]
-                        if scan_delta_h < 10:
+                        if scan_delta_h<10:
                             lam_state_height[lam_scan_i].append(scan_delta_h)
                         curve_shift = scan_point_location[:2]-curve[curve_index][:2]
                         lam_curve_shift = np.vstack((lam_curve_shift,np.hstack((lam_scan,curve_shift))))
@@ -273,6 +274,10 @@ def main():
                 plt.ioff()  # Turn off interactive mode
                 plt.show()  # Keep the final frame displayed
                 ###################
+
+                for j, lam_height in enumerate(lam_state_height):
+                    if len(lam_height) != 0:
+                        print(f"Layer {i} Section {j} Height: {np.mean(lam_height)}")
 
                 lam_curve_shift = lam_curve_shift[1:]
                 lam_curve_shift = lam_curve_shift[lam_curve_shift[:,0]!=0]
@@ -345,6 +350,23 @@ def main():
                     if weld_parts != 'base' and layer_count>=correction_layer: 
                         if lam_split_i < len(lam_split)-1 and lam_cur > lam_split[lam_split_i+1]:
                             lam_split_i += 1
+                            if len(lam_state_height[lam_split_i]) == 0:
+                                lam_split_i_prev = lam_split_i
+                                while len(lam_state_height[lam_split_i_prev]) == 0:
+                                    lam_split_i_prev -= 1
+                                    if lam_split_i_prev < 0:
+                                        break
+                                    if len(lam_state_height[lam_split_i_prev]) != 0:
+                                        lam_state_height[lam_split_i].append(np.mean(lam_state_height[lam_split_i_prev]))
+                                        break
+                                lam_split_i_next = lam_split_i
+                                while len(lam_state_height[lam_split_i_next]) == 0:
+                                    lam_split_i_next += 1
+                                    if lam_split_i_next >= len(lam_split):
+                                        break
+                                    if len(lam_state_height[lam_split_i_next]) != 0:
+                                        lam_state_height[lam_split_i].append(np.mean(lam_state_height[lam_split_i_next]))
+                                        break
                             v_cmd = dh2v_loglog(np.mean(lam_state_height[lam_split_i]),mode=layer_feedrate)
                             v_cmd = np.clip(v_cmd,v_minimum,v_maximum)
                             print("Update Velocity:",round(v_cmd,2), "Mean dh:",np.mean(lam_state_height[lam_split_i]))
@@ -383,7 +405,7 @@ def main():
                         curve_index = np.argsort(np.linalg.norm(curve[:,:2]-scan_point_location[:2],axis=1))[0]
                         lam_scan = lam_relative[curve_index]
                         lam_scan_i = np.where(lam_split<=lam_scan)[0][-1]
-                        lam_state_height[lam_scan_i].append(scan_delta_h)
+                        lam_state_height[lam_scan_i].append(np.min((scan_delta_h,10)))
                         curve_shift = scan_point_location[:2]-curve[curve_index][:2]
                         if np.abs(curve_shift[1]-np.mean(lam_curve_shift[:,2]))>2*np.std(lam_curve_shift[:,2]):
                             curve_shift[1] = np.mean(lam_curve_shift[:,2])
@@ -424,26 +446,26 @@ def main():
                 ################### get layer increments ############################
                 if adaptive_layer_height:
                     # single scan noise remove
-                    # if not scan_online_process:
-                    scan_exe_noise_remove = []
-                    for scan in scan_exe:
-                        scan_noise_remove = scan_process.scan2dDenoise(deepcopy(scan).T,crop_min=[-40,30],crop_max=[40,200])
-                        scan_exe_noise_remove.append(scan_noise_remove)
-                    # 3D scan registration
-                    pcd = scan_process.pcd_register_mti(scan_exe_noise_remove,weld_js_exe[:,np.append(np.arange(1,7),np.arange(13,15))],stamps_exe,flip=True,scanner='fuji')
-                    # else:
-                    #     pcd = o3d.geometry.PointCloud()
-                    #     for scan_tcp in scan_exe_noise_remove_tcp:
-                    #         pcd_slice = o3d.geometry.PointCloud()
-                    #         pcd_slice.points=o3d.utility.Vector3dVector(scan_tcp)
-                    #         pcd_slice = pcd_slice.voxel_down_sample(voxel_size=0.05)
-                    #         pcd += pcd_slice
+                    if not scan_online_process:
+                        scan_exe_noise_remove = []
+                        for scan in scan_exe:
+                            scan_noise_remove = scan_process.scan2dDenoise(deepcopy(scan).T,crop_min=[-40,30],crop_max=[40,200])
+                            scan_exe_noise_remove.append(scan_noise_remove)
+                        # 3D scan registration
+                        pcd = scan_process.pcd_register_mti(scan_exe_noise_remove,weld_js_exe[:,np.append(np.arange(1,7),np.arange(13,15))],stamps_exe,flip=True,scanner='fuji')
+                    else:
+                        pcd = o3d.geometry.PointCloud()
+                        for scan_tcp in scan_exe_noise_remove_tcp:
+                            pcd_slice = o3d.geometry.PointCloud()
+                            pcd_slice.points=o3d.utility.Vector3dVector(scan_tcp)
+                            pcd_slice = pcd_slice.voxel_down_sample(voxel_size=0.05)
+                            pcd += pcd_slice
                     visualize_pcd([pcd])
                     curve_planned_z = np.mean(curve[:,2])
                     curve_x_end = np.min(curve[:,0])
                     curve_x_start = np.max(curve[:,0])
                     curve_y = np.mean(curve[:,1])
-                    z_height_start=curve_planned_z+0.1
+                    z_height_start=curve_planned_z-3
                     crop_extend_x=10
                     crop_extend_z=20
                     crop_min=(curve_x_end-crop_extend_x,curve_y-30,-30)
@@ -455,17 +477,15 @@ def main():
                     profile_height,Transz0_H = scan_process.pcd2height(deepcopy(pcd),z_height_start,bbox_min=crop_h_min,bbox_max=crop_h_max,Transz0_H=Transz0_H)
                     print("Transz0_H:",Transz0_H)
 
-                    mean_layer_height = np.mean(profile_height[:,1])
+                    print("Profile Height",profile_height[:,1])
+                    mean_layer_height = np.nanmean(profile_height[:,1])
                     print("Mean Layer Height:",mean_layer_height)
-                    if weld_parts == 'base':
-                        print("Expected next layer:", i+base_nom_incre) # baselayer uses base_nom_incre
-                    else:
-                        # layer uses mean_layer_height/layer_resolution, 
-                        # and add layer_nom_incre because scanner leads the welding
-                        print(mean_layer_height)
-                        print(baselayer_resolution)
-                        print(layer_resolution)
-                        print("Expected next layer:", round((mean_layer_height-2*baselayer_resolution)/layer_resolution)+layer_nom_incre)
+                    # if weld_parts == 'base':
+                    #     print("Expected next layer:", i+base_nom_incre) # baselayer uses base_nom_incre
+                    # else:
+                    #     # layer uses mean_layer_height/layer_resolution, 
+                    #     # and add layer_nom_incre because scanner leads the welding
+                    #     print("Expected next layer:", round((mean_layer_height-2*baselayer_resolution)/layer_resolution)+layer_nom_incre)
                 ##########################################
 
                 ### layer parameters update 
