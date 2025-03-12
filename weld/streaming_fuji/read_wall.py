@@ -173,6 +173,8 @@ def main():
                 try:
                     profile_height = np.loadtxt(this_layer_dir+'profile_height.csv',delimiter=',')
                     profile_width = np.loadtxt(this_layer_dir+'profile_width.csv',delimiter=',')
+                    # pcd_denoise = o3d.io.read_point_cloud(this_layer_dir+'pcd_denoise.pcd')
+                    # visualize_pcd([pcd_denoise])
                 except FileNotFoundError:
                     # processing the scans
                     scan_process = ScanProcess(robot_scan,positioner)

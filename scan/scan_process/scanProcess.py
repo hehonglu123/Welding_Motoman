@@ -765,32 +765,33 @@ class ScanProcess():
         return mti_pcd_noise_remove
     
     def scan2dh(self,scan,robot_q,target_p,crop_min=[-10,85],crop_max=[10,100],offset_z=2.2,scanner='mti'):
+        # TODO dh in different welding normal direction
 
         mti_pcd_noise_remove = self.scan2dDenoise(scan,crop_min=crop_min,crop_max=crop_max)
         
         # transform to R2TCP
         T_R2TCP_S1TCP=self.positioner.fwd(robot_q[6:],world=True).inv()*self.robot.fwd(robot_q[:6],world=True)
+        if scanner=='mti':
+            mti_pcd_noise_remove_tcp = np.insert(mti_pcd_noise_remove,1,np.zeros(mti_pcd_noise_remove.shape[0]),axis=1)
+        elif scanner=='fuji':
+            mti_pcd_noise_remove_tcp = np.insert(mti_pcd_noise_remove,0,np.zeros(mti_pcd_noise_remove.shape[0]),axis=1)
+        else:
+            mti_pcd_noise_remove_tcp = np.insert(mti_pcd_noise_remove,0,np.zeros(mti_pcd_noise_remove.shape[0]),axis=1)
+        mti_pcd_noise_remove_tcp = np.matmul(T_R2TCP_S1TCP.R,mti_pcd_noise_remove_tcp.T).T+T_R2TCP_S1TCP.p
+        
         target_z = np.array(target_p)
-        if scanner=='mti':
-            largest_id = np.argsort(mti_pcd_noise_remove[:,1])[:10]
-        elif scanner=='fuji':
-            largest_id = np.argsort(mti_pcd_noise_remove[:,1])[-10:]
-        else:
-            largest_id = np.argsort(mti_pcd_noise_remove[:,1])[-10:]
-        point_location = np.mean(mti_pcd_noise_remove[largest_id],axis=0)
-        point_location_z_R2TCP = deepcopy(point_location[1])
-        if scanner=='mti':
-            point_location = np.insert(point_location,1,0)
-        elif scanner=='fuji':
-            point_location = np.insert(point_location,0,0)
-        else:
-            point_location = np.insert(point_location,0,0)
-        point_location = np.matmul(T_R2TCP_S1TCP.R,point_location)+T_R2TCP_S1TCP.p
+        largest_id = np.argsort(mti_pcd_noise_remove_tcp[:,2])[-int(np.max((2,len(mti_pcd_noise_remove_tcp)*0.05))):]
+        points = mti_pcd_noise_remove_tcp[largest_id]
+        points_filter = points[np.abs(points[:,2]-target_z[2])<10]
+        if len(points_filter)==0:
+            points_filter = points
+
+        point_location = np.mean(points_filter,axis=0)
         point_location[2]=point_location[2]-offset_z
 
         delta_h = (target_z[2]-point_location[2])
 
-        return delta_h,point_location,mti_pcd_noise_remove
+        return delta_h,point_location,mti_pcd_noise_remove,mti_pcd_noise_remove_tcp
     
     def scan_denoise_thread(self,crop_min=[-40, 30],crop_max=[40, 200]):
         self.end_denoise_thread_flag = False
@@ -814,6 +815,7 @@ class ScanProcess():
         self.raw_scan_pipe = []
         self.robot_q_pipe = []
         self.denoise_scan_pipe = []
+        self.denoise_scan_tcp_pipe = []
         self.point_location_pipe = []
         self.delta_h_pipe = []
         self.accessing_key = False
@@ -825,11 +827,12 @@ class ScanProcess():
                 scan_data = self.raw_scan_pipe.pop(0)
                 robot_q = self.robot_q_pipe.pop(0)
                 self.accessing_key = False
-                delta_h,point_location,mti_pcd_noise_remove = self.scan2dh(scan_data.T,robot_q,target_p,crop_min=crop_min,crop_max=crop_max,offset_z=offset_z,scanner=scanner)
+                delta_h,point_location,mti_pcd_noise_remove,mti_pcd_noise_remove_tcp = self.scan2dh(scan_data.T,robot_q,target_p,crop_min=crop_min,crop_max=crop_max,offset_z=offset_z,scanner=scanner)
                 while self.accessing_key:
                     time.sleep(0.0000000000001)
                 self.accessing_key = True
                 self.denoise_scan_pipe.append(mti_pcd_noise_remove)
+                self.denoise_scan_tcp_pipe.append(mti_pcd_noise_remove_tcp)
                 self.point_location_pipe.append(point_location)
                 self.delta_h_pipe.append(delta_h)
                 self.accessing_key = False
