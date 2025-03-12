@@ -428,8 +428,8 @@ def main():
                     # get lambda and record height
                     curve_index = np.argsort(np.linalg.norm(curve[:,:2]-scan_point_location[:2],axis=1))[0]
                     lam_scan = lam_relative[curve_index]
-                    lam_split_i = np.where(lam_split<=lam_scan)[0][-1]
-                    lam_state_height[lam_split_i].append(scan_delta_h)
+                    lam_scan_i = np.where(lam_split<=lam_scan)[0][-1]
+                    lam_state_height[lam_scan_i].append(scan_delta_h)
                     curve_shift = scan_point_location[:2]-curve[curve_index][:2]
                     lam_curve_shift = np.vstack((lam_curve_shift,np.hstack((lam_scan,curve_shift))))
                 # stop scan process
