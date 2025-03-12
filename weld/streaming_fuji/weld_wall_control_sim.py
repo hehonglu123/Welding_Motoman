@@ -252,7 +252,7 @@ def main():
                         scan_process.accessing_key = False
 
                         line.set_data(scan_denoise_tcp[:,1], scan_denoise_tcp[:,2])  # Update both x and y
-                        line_large.set_data([scan_point_location[1]], [scan_point_location[2]+offset_z])  # Update both x and y
+                        line_large.set_data([scan_point_location[1]], [scan_point_location[2]-offset_z])  # Update both x and y
                         ax.set_xlim(30,70)
                         ax.set_ylim(0, np.max(scan_denoise_tcp[:,2])+np.max(scan_denoise_tcp[:,2])*0.1)
                         plt.draw()

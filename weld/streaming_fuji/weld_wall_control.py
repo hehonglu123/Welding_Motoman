@@ -30,13 +30,13 @@ def welder_handler(exp):
 
 def main():
     
-    weld_arcon = False
-    welder_log = False
+    weld_arcon = True
+    welder_log = True
     fuji_scanon = True
     scan_online_process = True
-    adaptive_layer_height = False
+    adaptive_layer_height = True
     compensate_shifting = True
-    thermal_on = False
+    thermal_on = True
     input_from_user = False
 
     ############## Robot definition ##############
@@ -148,10 +148,11 @@ def main():
     # collision avoidance z offset
     safety_z_offset = 50
     # compensate for shifted weld
-    shift_pos_smoother = 61
+    shift_pos_smoother = 501
     # direction 
     # torch_ori_fix = False # torch orientation fixed
     correction_layer = 2
+    offset_z = -7.4
     
     # data collection parameters
     cross_section = 1.2 # mm^2
@@ -159,12 +160,11 @@ def main():
     section_dlam = 2 ## mm
     split_sections = int(meta_data['layer_length']/section_dlam)
     lam_split = np.linspace(0,meta_data['layer_length'],split_sections+1)[:-1]
-    lam_split = lam_split.tolist()
     feedrate_min = 100
     feedrate_max = 220
     # v_minimum = round(cross_section*inch2mm*feedrate_min/VPD,2)
     # v_maximum = cross_section*inch2mm*feedrate_max/VPD
-    v_minimum = 2.5
+    v_minimum = 1
     v_maximum = 12
     print("VPD:",VPD)
     print("v_minimum:",v_minimum)
@@ -173,7 +173,7 @@ def main():
     # start-end layers
     baselayer_start = 0
     baselayer_end = base_layer_num
-    layer_start = 315 # nominal baselayer=5.5. Real data=6.4 (6.4-5.5)/0.1=9
+    layer_start = 9 # nominal baselayer=5.5. Real data=6.4 (6.4-5.5)/0.1=9
     layer_end = layer_num
     # layer_end = 10
     
@@ -186,16 +186,16 @@ def main():
     Transz0_H=None
     if read_from_file_layer:
         logdata_dir = '../../data/wall_weld_test/weld_fujiscan_2025_03_03_18_10_13/'
-        Transz0_H = [[1.00000000e+00 ,-5.09597574e-07, -2.70277611e-05,  1.91536366e-04],\
-                    [-5.09597574e-07 , 9.99289261e-01 ,-3.76957955e-02,  2.67137025e-01],\
-                    [ 2.70277611e-05 , 3.76957955e-02,  9.99289261e-01, -7.08161630e+00],\
-                    [ 0.00000000e+00 , 0.00000000e+00 , 0.00000000e+00,  1.00000000e+00]]
+        Transz0_H = [[9.99996624e-01 ,-1.03837069e-05 , 2.59858273e-03, -1.92253817e-02],\
+                    [-1.03837069e-05,  9.99968066e-01,  7.99168212e-03, -5.91257447e-02],\
+                    [-2.59858273e-03 ,-7.99168212e-03 , 9.99964690e-01, -7.39814924e+00],\
+                    [ 0.00000000e+00 , 0.00000000e+00 , 0.00000000e+00 , 1.00000000e+00]]
 
     weld_meta_data = {'well_arcon':weld_arcon, 'fuji_scanon':fuji_scanon, 'data_dir':data_dir, 'logdata_dir':logdata_dir\
         ,'base_layer_num':base_layer_num, 'baselayer_resolution':baselayer_resolution, 'layer_num':layer_num, 'layer_resolution':layer_resolution\
         ,'base_feedrate':base_feedrate, 'base_nom_incre':base_nom_incre, 'base_nom_vel':base_nom_vel\
         , 'layer_feedrate':layer_feedrate, 'layer_nom_incre':layer_nom_incre, 'layer_nom_vel':layer_nom_vel\
-        ,'corss_section':cross_section, 'VPD':VPD, 'split_sections':split_sections, 'lam_split':list(lam_split)\
+        ,'corss_section':cross_section, 'VPD':VPD, 'split_sections':split_sections, 'lam_split':lam_split.tolist()\
         ,'v_minimum':v_minimum, 'v_maximum':v_maximum, 'weld_start_sleep':weld_start_sleep\
         ,'target_dh':target_dh, 'correction_layer':correction_layer}
 
@@ -210,8 +210,8 @@ def main():
     forward = True
 
     mean_layer_height = 0
-    # for weld_parts in ['base','layer']:
-    for weld_parts in ['layer']:
+    for weld_parts in ['base','layer']:
+    # for weld_parts in ['layer']:
         if weld_parts == 'base':
             weld_start = baselayer_start
             weld_end = baselayer_end
@@ -302,7 +302,7 @@ def main():
                     if scan_online_process and fuji_scanon:
                         scan_exe_noise_remove = []
                         scan_exe_noise_remove_tcp = []
-                        scan_dh_thread = Thread(target=scan_process.scan2dh_thread, args=(target_p,[-40, 30],[40, 200],-6.6,'fuji'),daemon=True) # arges: (target_p, crop_min, crop_max, offset_z, scanner)
+                        scan_dh_thread = Thread(target=scan_process.scan2dh_thread, args=(target_p,[-40, 30],[40, 200],offset_z,'fuji'),daemon=True) # arges: (target_p, crop_min, crop_max, offset_z, scanner)
                         scan_dh_thread.start()
                     v_cmd = scan_nom_vel
                     lam_cur=0
@@ -363,6 +363,11 @@ def main():
                             SS.position_cmd(q_cmd,loop_start)
                     ########################################
 
+                    # show height
+                    for j, lam_height in enumerate(lam_state_height):
+                        if len(lam_height) != 0:
+                            print(f"Layer {i} Section {j} dh: {np.mean(lam_height)}")
+
                     lam_curve_shift = lam_curve_shift[1:]
                     lam_curve_shift = lam_curve_shift[lam_curve_shift[:,0]!=0]
 
@@ -375,30 +380,33 @@ def main():
                     lam_curve_shift[lam_curve_shift_noise,2] = np.mean(lam_curve_shift[:,2])
                     lam_curve_shift_smooth_x = moving_average(lam_curve_shift[:,1],n=shift_pos_smoother,padding=True)
                     lam_curve_shift_smooth_y = moving_average(lam_curve_shift[:,2],n=shift_pos_smoother,padding=True)
-                    plt.plot(lam_curve_shift[:,1])
-                    plt.plot(lam_curve_shift_smooth_x)
-                    plt.show()
-                    plt.plot(lam_curve_shift[:,2])
-                    plt.plot(lam_curve_shift_smooth_y)
-                    plt.show()
+                    # plt.plot(lam_curve_shift[:,1])
+                    # plt.plot(lam_curve_shift_smooth_x)
+                    # plt.show()
+                    # plt.plot(lam_curve_shift[:,2])
+                    # plt.plot(lam_curve_shift_smooth_y)
+                    # plt.show()
                     # lam_curve_shift[:,1] = lam_curve_shift_smooth_x
                     # lam_curve_shift[:,2] = lam_curve_shift_smooth_y
-                    if compensate_shifting:
+                    if compensate_shifting and not (weld_parts == 'base' and layer_count==0):
                         # get the robot to the shifted position
                         shifted_xy = np.mean(lam_curve_shift[:shift_pos_smoother+1,1:],axis=0)
                         print("Shifted x,y:",shifted_xy)
+                        shifted_xy = np.array([0,0])
+                        if not forward:
+                            shifted_xy = np.array([0, -0.8304026453085149])
                         T_positioner_world = positioner.fwd(curve_js_positioner[0],world=True)
                         T_robot_origin = robot_weld.fwd(curve_js[0])
                         T_robot_positioner = T_positioner_world.inv()*T_robot_origin
                         T_robot_shift = T_robot_positioner
-                        T_robot_shift.p[:2] -= shifted_xy
+                        T_robot_shift.p[:2] += shifted_xy
                         T_robot_shift = T_positioner_world*T_robot_shift
                         q_shift = robot_weld.inv(T_robot_shift.p, T_robot_shift.R, last_joints=curve_js[0])[0]
                         q_cmd[:6] = q_shift # only update the robot 1 joints
                         time.sleep(0.1)
                         SS.jog2q(q_cmd)
-                    else:
-                        time.sleep(0.5) # for robot to drive to the end point
+
+                    time.sleep(0.5) # for robot to drive to the end point
 
                     ####### welding motion ##########################
                     lam_cur=0
@@ -434,12 +442,16 @@ def main():
                                 shifted_xy = np.mean(lam_curve_shift[-shift_pos_smoother:,1:3],axis=0)
                             else:
                                 shifted_xy = np.mean(lam_curve_shift[shifted_i-int((shift_pos_smoother-1)/2):shifted_i+int((shift_pos_smoother-1)/2)+1,1:3],axis=0)
+                            shifted_xy = np.array([0,0])
+                            if not forward:
+                                shifted_xy = np.array([0, -0.8304026453085149])
+                            
                             # compensation in the positioner tcp frame
                             T_positioner_world = positioner.fwd(q_pos,world=True)
                             T_robot_origin = robot_weld.fwd(q1)
                             T_robot_positioner = T_positioner_world.inv()*T_robot_origin
                             T_robot_shift = T_robot_positioner
-                            T_robot_shift.p[:2] -= shifted_xy
+                            T_robot_shift.p[:2] += shifted_xy
                             # transfer back to the welding robot motion
                             T_robot_shift = T_positioner_world*T_robot_shift
                             q_shift = robot_weld.inv(T_robot_shift.p, T_robot_shift.R, last_joints=q1)[0]
@@ -460,7 +472,8 @@ def main():
                         if weld_parts != 'base' and layer_count>=correction_layer: 
                             if lam_split_i < len(lam_split)-1 and lam_cur > lam_split[lam_split_i+1]:
                                 lam_split_i += 1
-                                if len(lam_state_height[lam_split_i]) == 0:
+                                if len(lam_state_height[lam_split_i]) == 0 or np.mean(lam_state_height[lam_split_i]) < 0:
+                                    lam_state_height[lam_split_i] = []
                                     lam_split_i_prev = lam_split_i
                                     while len(lam_state_height[lam_split_i_prev]) == 0:
                                         lam_split_i_prev -= 1
@@ -477,7 +490,9 @@ def main():
                                         if len(lam_state_height[lam_split_i_next]) != 0:
                                             lam_state_height[lam_split_i].append(np.mean(lam_state_height[lam_split_i_next]))
                                             break
-                                v_cmd = dh2v_loglog(np.mean(lam_state_height[lam_split_i]),mode=nom_feedrate)
+                                v_cmd_new = dh2v_loglog(np.mean(lam_state_height[lam_split_i]),mode=nom_feedrate)
+                                if not np.isnan(v_cmd_new):
+                                    v_cmd = v_cmd_new
                                 v_cmd = np.clip(v_cmd,v_minimum,v_maximum)
                                 welding_cmd_all.append(np.hstack((time.perf_counter(),i,v_cmd,int(round(feedrate_cmd/10)*10))))
                                 print("Update Velocity:",round(v_cmd,2), "Mean dh:",np.mean(lam_state_height[lam_split_i]))
@@ -623,7 +638,8 @@ def main():
                 weld_js_exe = np.array(weld_js_exe)
                 stamps_exe = deepcopy(weld_js_exe[:,0])
                 ################### get layer increments ############################
-                if weld_arcon and layer_count>=correction_layer and adaptive_layer_height:
+                # if weld_arcon and adaptive_layer_height:
+                if adaptive_layer_height:
                     # single scan noise remove
                     if not scan_online_process:
                         scan_exe_noise_remove = []
@@ -641,6 +657,7 @@ def main():
                             pcd_slice.points=o3d.utility.Vector3dVector(scan_tcp)
                             pcd_slice = pcd_slice.voxel_down_sample(voxel_size=0.05)
                             pcd += pcd_slice
+                        # visualize_pcd([pcd])
                     curve_planned_z = np.mean(curve[:,2])
                     curve_x_end = np.min(curve[:,0])
                     curve_x_start = np.max(curve[:,0])
@@ -672,6 +689,7 @@ def main():
                         # layer uses mean_layer_height/layer_resolution, 
                         # and add layer_nom_incre because scanner leads the welding
                         i = round((mean_layer_height-2*baselayer_resolution)/layer_resolution)+layer_nom_incre
+                        print("Layer Incre to:",i)
                 else:
                     if weld_parts == 'base':
                         i = i+nom_incre

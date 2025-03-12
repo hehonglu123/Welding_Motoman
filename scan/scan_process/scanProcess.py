@@ -787,7 +787,7 @@ class ScanProcess():
             points_filter = points
 
         point_location = np.mean(points_filter,axis=0)
-        point_location[2]=point_location[2]-offset_z
+        point_location[2]=point_location[2]+offset_z
 
         delta_h = (target_z[2]-point_location[2])
 
