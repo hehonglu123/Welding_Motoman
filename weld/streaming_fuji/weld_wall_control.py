@@ -190,9 +190,9 @@ def main():
     # start-end layers
     baselayer_start = 0
     baselayer_end = base_layer_num
-    layer_start = 9 # nominal baselayer=5.5. Real data=6.4 (6.4-5.5)/0.1=9
-    # layer_end = layer_num
-    layer_end = 10
+    layer_start = 315 # nominal baselayer=5.5. Real data=6.4 (6.4-5.5)/0.1=9
+    layer_end = layer_num
+    # layer_end = 10
     
     ################## Log data dir ##################
     current_time = datetime.datetime.now()
