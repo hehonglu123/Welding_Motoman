@@ -36,6 +36,10 @@ def main():
     for logdata_dir_name in logdata_dir_all:
         print('Processing:',logdata_dir_name)
 
+        ## determine if the scanner is leading or lagging
+        if 'scan' in logdata_dir_name:
+            scanner_lagging= True
+
         logdata_dir = data_dir+logdata_dir_name
         
         with open(logdata_dir+'weld_meta_data.yml', 'r') as f:
@@ -44,8 +48,8 @@ def main():
         last_profile_height = None
         # build layers from bottom to top by layers
         Transz0_H = None
-        for weld_parts in ['base','layer']:
-        # for weld_parts in ['layer']:
+        # for weld_parts in ['base','layer']:
+        for weld_parts in ['layer']:
             if weld_parts == 'base':
                 total_layers_name = glob.glob(logdata_dir+'baselayer*')
             else:
@@ -60,14 +64,12 @@ def main():
 
             
             # for layer_n in [layer_nums[-1],layer_nums[-2]]:
-            for layer_n in layer_nums:
-                
+            for layer_n_id, layer_n in enumerate(layer_nums[:-1]):
                 # read layer curve data
                 if weld_parts == 'base':
                     curve = np.loadtxt(data_dir+f'curve_sliced_relative/baselayer{layer_n}_0.csv',delimiter=',')
                 else:
                     curve = np.loadtxt(data_dir+f'curve_sliced_relative/slice{layer_n}_0.csv',delimiter=',')
-
                 # read logged data
                 if weld_parts == 'base':
                     layer_name = 'baselayer'+str(layer_n)

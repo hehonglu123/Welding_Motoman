@@ -598,8 +598,9 @@ def main():
 
                     mean_layer_height = np.mean(profile_height[:,1])
                     print("Mean Layer Height:",mean_layer_height)
-                    with open(logdata_dir+layer_name+f'/profile_height.csv', 'wb') as f:
-                        pickle.dump(profile_height, f)
+                    # with open(logdata_dir+layer_name+f'/profile_height.csv', 'wb') as f:
+                    #     pickle.dump(profile_height, f)
+                    np.savetxt(logdata_dir+layer_name+f'/profile_height.csv', profile_height, delimiter=',')
                     o3d.io.write_point_cloud(logdata_dir+layer_name+f'/pcd.pcd',pcd)
                     if weld_parts == 'base':
                         i = i+base_nom_incre # baselayer uses base_nom_incre

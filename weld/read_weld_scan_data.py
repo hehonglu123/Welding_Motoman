@@ -1,7 +1,7 @@
 from copy import deepcopy
 from pathlib import Path
 import pickle
-import sys
+import sys, glob, traceback,os
 sys.path.append('../scan/scan_tools/')
 sys.path.append('../scan/scan_plan/')
 sys.path.append('../scan/scan_process/')
@@ -110,7 +110,8 @@ x_upper = 999999
 start_id=75 # 75 * 0.1 mm = 7.5 mm
 end_id=-75
 
-datasets=['baseline','correction']
+# datasets=['baseline','scan-n-print']
+datasets=['baseline','scan-n-print','scan-while-print']
 # datasets=['correction']
 
 # datasets=['correction','repeat 1','repeat 2']
@@ -118,19 +119,40 @@ datasets=['baseline','correction']
 datasets_h_mean={}
 datasets_h_std={}
 for dataset in datasets:
+    print("Dataset:",dataset)
 
     if dataset=='baseline':
-        # data_dir = '../data/wall_weld_test/moveL_100_baseline_weld_scan_2023_07_07_15_20_56/'
-        data_dir = '../data/wall_weld_test/movelL_200_steel_baseline_weld_scan_2025_01_08_22_08_57/'
-    elif dataset=='correction':
+        data_dir = '../data/wall_weld_test/moveL_100_baseline_weld_scan_2023_07_07_15_20_56/'
+        # data_dir = '../data/wall_weld_test/movelL_200_steel_baseline_weld_scan_2025_01_08_22_08_57/'
+    elif dataset=='scan-n-print':
         # data_dir = '../data/wall_weld_test/moveL_160_noconstraints_weld_scan_2023_07_05_18_59_53/'
-        # data_dir = '../data/wall_weld_test/moveL_100_weld_scan_2023_07_24_11_19_58/'
+        data_dir = '../data/wall_weld_test/moveL_100_weld_scan_2023_07_24_11_19_58/'
         # data_dir = '../data/wall_weld_test/moveL_100_weld_scan_2023_08_02_15_17_25/'
-        data_dir = '../data/wall_weld_test/moveL_200_steel_weld_scan_2025_01_08_23_11_00/'
+        # data_dir = '../data/wall_weld_test/moveL_200_steel_weld_scan_2025_01_08_23_11_00/'
     elif dataset=='repeat 1':
         data_dir = '../data/wall_weld_test/moveL_100_repeat_weld_scan_2023_08_02_16_03_50/'
     elif dataset=='repeat 2':
         data_dir = '../data/wall_weld_test/moveL_100_repeat_weld_scan_2023_08_02_17_07_02/'
+    elif dataset=='scan-while-print':
+        data_dir = '../data/wall_weld_test/weld_fujicontrol_2025_03_12_18_27_33/'
+
+    total_layers = np.arange(0,9999999)
+    if dataset == 'scan-while-print':
+        total_layers = []
+        for weld_parts in ['base','layer']:
+            if weld_parts == 'base':
+                total_layers_name = glob.glob(data_dir+'baselayer*')
+            else:
+                total_layers_name = glob.glob(data_dir+'layer*')
+            # get printed layer number
+            layer_nums = []
+            for layer_name in total_layers_name:
+                this_layer = layer_name.split('\\')[-1]
+                this_layer = this_layer.split('r')[-1]
+                layer_nums.append(int(this_layer))
+            total_layers.extend(np.sort(layer_nums))
+        total_layers = np.array(total_layers)[1:]
+        print(total_layers)
 
     forward_flag=False
     all_profile_height=[]
@@ -138,18 +160,83 @@ for dataset in datasets:
     all_h_mean=[]
     all_h_std=[]
     pcd_wall = None
-    for i in range(0,9999999):
+    for i in total_layers:
         try:
-            weld_dir=data_dir+'layer_'+str(i)+'/'
+            if dataset == 'scan-while-print':
+                if i == total_layers[0]:
+                    weld_dir=data_dir+'baselayer'+str(i)+'/'
+                else:
+                    weld_dir=data_dir+'layer'+str(i)+'/'
+            else:
+                weld_dir=data_dir+'layer_'+str(i)+'/'
             weld_q=np.loadtxt(weld_dir+'weld_js_exe.csv',delimiter=',')
-            weld_stamp=np.loadtxt(weld_dir+'weld_robot_stamps.csv',delimiter=',')
+            try:
+                weld_stamp=np.loadtxt(weld_dir+'weld_robot_stamps.csv',delimiter=',')
+            except:
+                weld_stamp = weld_q[:,0]
+                weld_q = weld_q[:,1:]
             scan_dir=weld_dir+'scans/'
-            pcd = o3d.io.read_point_cloud(scan_dir+'processed_pcd.pcd')
-            profile_height = np.load(scan_dir+'height_profile.npy')
-            q_out_exe=np.loadtxt(scan_dir+'scan_js_exe.csv',delimiter=',')
-            robot_stamps=np.loadtxt(scan_dir+'scan_robot_stamps.csv',delimiter=',')
-            with open(scan_dir+'mti_scans.pickle', 'rb') as file:
-                mti_recording=pickle.load(file)
+            if os.path.exists(scan_dir+'processed_pcd.pcd'):
+                pcd = o3d.io.read_point_cloud(scan_dir+'processed_pcd.pcd')
+            else:
+                pcd = o3d.io.read_point_cloud(weld_dir+'pcd.pcd')
+            try:
+                profile_height = np.load(scan_dir+'height_profile.npy')
+                print("len of profile height",len(profile_height))
+                # if dataset == 'scan-n-print':
+                #     plt.plot(profile_height[:,0],profile_height[:,1],'-o')
+                #     plt.show()
+                layer_length = 85 if i in total_layers[:2] else 65
+                mean_x = np.mean(profile_height[:,0])
+                profile_height = profile_height[np.where(profile_height[:,0]>mean_x-layer_length/2)[0]]
+                profile_height = profile_height[np.where(profile_height[:,0]<mean_x+layer_length/2)[0]]
+            except:
+                try:
+                    profile_height=np.loadtxt(weld_dir+'profile_height.csv',delimiter=',')
+                    print("len of profile height",len(profile_height))
+                except:
+                    print("switch to pickle")
+                    with open(weld_dir+'profile_height.csv', 'rb') as file:
+                        profile_height=pickle.load(file)
+                    np.savetxt(weld_dir+'profile_height.csv',profile_height,delimiter=',')
+                
+                # if i in total_layers[2:]:
+                #     plt.plot(profile_height[:,0],profile_height[:,1],'-o')
+                # only take +- layer_length/2
+                layer_length = 120 if i in total_layers[:2] else 110
+                print("Layer length:",layer_length)
+                mean_x = np.mean(profile_height[:,0])
+                profile_height = profile_height[np.where(profile_height[:,0]>mean_x-layer_length/2)[0]]
+                profile_height = profile_height[np.where(profile_height[:,0]<mean_x+layer_length/2)[0]]
+                # remove noise
+                # find indexes around profile_height[:,0] = 52~55
+                # delete points with height smaller than mean_height-1
+                idx_range = np.where((profile_height[:,0] >= 52) & (profile_height[:,0] <= 55))[0]
+                if len(idx_range) > 0 and i in total_layers[2:]:
+                    mean_height = np.mean(profile_height[:, 1])
+                    print(np.where(profile_height[:,1] < mean_height-2))
+                    profile_height = np.delete(profile_height, np.where(profile_height[:,1] < mean_height-2), axis=0)
+                # if i in total_layers[2:]:
+                #     plt.plot(profile_height[:,0],profile_height[:,1],'-o')
+                #     plt.show()
+                print("height std:",np.std(profile_height[start_id:end_id,1]))
+                
+                if i in total_layers[14:18]:
+                    plt.plot(profile_height[start_id:end_id,0]-mean_x,profile_height[start_id:end_id,1],'-o')
+                if i == total_layers[17]:
+                    plt.show()
+
+            try:
+                q_out_exe=np.loadtxt(scan_dir+'scan_js_exe.csv',delimiter=',')
+                robot_stamps=np.loadtxt(scan_dir+'scan_robot_stamps.csv',delimiter=',')
+            except:
+                pass
+            try:
+                with open(scan_dir+'mti_scans.pickle', 'rb') as file:
+                    scan_recording=pickle.load(file)
+            except:
+                with open(weld_dir+'scan_exe.pickle', 'rb') as file:
+                    scan_recording=pickle.load(file)
 
             print("Layer",i)
             print("Forward:",not forward_flag)
@@ -159,7 +246,7 @@ for dataset in datasets:
             else:
                 pcd_wall = pcd_wall + pcd
             
-            # for scan_step in mti_recording[len(mti_recording)//2:]:
+            # for scan_step in scan_recording[len(scan_recording)//2:]:
             #     plt.scatter(scan_step[0],-1*scan_step[1]+100)
             #     plt.show()
             # exit()
@@ -167,14 +254,15 @@ for dataset in datasets:
             if plot_pcd:
                 visualize_pcd([pcd])
 
-            # print(mti_recording[0].shape)
+            # print(scan_recording[0].shape)
             # exit()
             
             # q_out_exe=np.loadtxt(data_dir +'scan_js_exe.csv',delimiter=',')
             # robot_stamps=np.loadtxt(data_dir +'robot_stamps.csv',delimiter=',')
             # with open(data_dir +'mti_scans.pickle', 'rb') as file:
-            #     mti_recording=pickle.load(file)
+            #     scan_recording=pickle.load(file)
         except:
+            traceback.print_exc()
             break
 
         if build_height_profile and (i in show_layer):
@@ -188,7 +276,7 @@ for dataset in datasets:
             crop_h_min=(curve_x_end-crop_extend,-20,-10)
             crop_h_max=(curve_x_start+crop_extend,20,z_height_start+30)
             q_init_table=np.radians([-15,200])
-            pcd = scan_process.pcd_register_mti(mti_recording,q_out_exe,robot_stamps,static_positioner_q=q_init_table)
+            pcd = scan_process.pcd_register_mti(scan_recording,q_out_exe,robot_stamps,static_positioner_q=q_init_table)
             # visualize_pcd([pcd])
             pcd = scan_process.pcd_noise_remove(pcd,nb_neighbors=40,std_ratio=1.5,\
                                                 min_bound=crop_min,max_bound=crop_max,cluster_based_outlier_remove=True,cluster_neighbor=1,min_points=100)
