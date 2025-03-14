@@ -104,11 +104,11 @@ show_layer = [12]
 x_lower = -99999
 x_upper = 999999
 
-# start_id=0
-# end_id=-1
+start_id=0
+end_id=-1
 
-start_id=75 # 75 * 0.1 mm = 7.5 mm
-end_id=-75
+# start_id=75 # 75 * 0.1 mm = 7.5 mm
+# end_id=-75
 
 # datasets=['baseline','scan-n-print']
 datasets=['baseline','scan-n-print','scan-while-print']
@@ -224,6 +224,9 @@ for dataset in datasets:
                 if i in total_layers[14:18]:
                     plt.plot(profile_height[start_id:end_id,0]-mean_x,profile_height[start_id:end_id,1],'-o')
                 if i == total_layers[17]:
+                    plt.show()
+                if i==total_layers[-1]:
+                    plt.plot(profile_height[start_id:end_id,0]-mean_x,profile_height[start_id:end_id,1],'-o')
                     plt.show()
 
             try:

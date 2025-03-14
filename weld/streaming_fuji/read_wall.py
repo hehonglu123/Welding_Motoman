@@ -31,12 +31,14 @@ def main():
     data_dir = '../../data/wall_weld_test/'
 
     # logdata_dir_all = ['weld_fujiscan_2025_02_26_18_08_18/', 'weld_fujiscan_2025_02_26_16_24_21/', 'weld_fujiscan_2025_02_26_17_39_17/']
-    logdata_dir_all = ['weld_fujiscan_2025_02_26_18_08_18/', 'weld_fujiscan_2025_02_26_16_24_21/']
+    # logdata_dir_all = ['weld_fujiscan_2025_02_26_18_08_18/', 'weld_fujiscan_2025_02_26_16_24_21/']
+    logdata_dir_all = ['weld_fujicontrol_2025_03_12_18_27_33/']
 
     for logdata_dir_name in logdata_dir_all:
         print('Processing:',logdata_dir_name)
 
         ## determine if the scanner is leading or lagging
+        scanner_lagging= False
         if 'scan' in logdata_dir_name:
             scanner_lagging= True
 
@@ -47,9 +49,11 @@ def main():
 
         last_profile_height = None
         # build layers from bottom to top by layers
-        Transz0_H = None
-        # for weld_parts in ['base','layer']:
-        for weld_parts in ['layer']:
+        all_pcd_transform = []
+        Transz0_H_odd = None
+        Transz0_H_even = None
+        for weld_parts in ['base','layer']:
+        # for weld_parts in ['layer']:
             if weld_parts == 'base':
                 total_layers_name = glob.glob(logdata_dir+'baselayer*')
             else:
@@ -64,12 +68,13 @@ def main():
 
             
             # for layer_n in [layer_nums[-1],layer_nums[-2]]:
-            for layer_n_id, layer_n in enumerate(layer_nums[:-1]):
+            for layer_n_id, layer_n in enumerate(layer_nums):
                 # read layer curve data
                 if weld_parts == 'base':
                     curve = np.loadtxt(data_dir+f'curve_sliced_relative/baselayer{layer_n}_0.csv',delimiter=',')
                 else:
                     curve = np.loadtxt(data_dir+f'curve_sliced_relative/slice{layer_n}_0.csv',delimiter=',')
+
                 # read logged data
                 if weld_parts == 'base':
                     layer_name = 'baselayer'+str(layer_n)
@@ -106,8 +111,6 @@ def main():
                     with open(this_layer_dir+'ir_recording.pickle', 'rb') as f:
                         ir_exe = pickle.load(f)
                     ir_stamp = np.loadtxt(this_layer_dir+'ir_stamps.csv',delimiter=',')
-                    torch_model = YOLO(os.path.dirname(inspect.getfile(flir_toolbox))+"/torch.pt")
-                    tip_wire_model = YOLO(os.path.dirname(inspect.getfile(flir_toolbox))+"/tip_wire.pt")
                     horizontal_offset=0
                     vertical_offset=3
                     ir_pixel_window_size=7
@@ -120,8 +123,8 @@ def main():
                         # centroid, bbox, torch_centroid, torch_bbox=weld_detection_steel(ir_image,torch_model,tip_wire_model)
                         # find max pixel value in ir_image
                         centroid = np.unravel_index(np.argmax(ir_image, axis=None), ir_image.shape)
-                        if ir_image[centroid] < 1e4:
-                            continue
+                        # if ir_image[centroid] < 1e4:
+                        #     continue
                         # draw bbox and centroid on ir_image
                         if centroid is not None:
                             ###weighted history filter
@@ -177,6 +180,8 @@ def main():
                     profile_width = np.loadtxt(this_layer_dir+'profile_width.csv',delimiter=',')
                     # pcd_denoise = o3d.io.read_point_cloud(this_layer_dir+'pcd_denoise.pcd')
                     # visualize_pcd([pcd_denoise])
+                    if layer_n>455:
+                        np.loadtxt(this_layer_dir+'sss.csv',delimiter=',')
                 except FileNotFoundError:
                     # processing the scans
                     scan_process = ScanProcess(robot_scan,positioner)
@@ -214,7 +219,14 @@ def main():
                     curve_x_end = np.min(curve[:,0])
                     curve_x_start = np.max(curve[:,0])
                     curve_y = np.mean(curve[:,1])
-                    z_height_start=curve_planned_z+0.1
+                    if scanner_lagging:
+                        z_height_start=curve_planned_z+0.1
+                    else:
+                        z_height_start=curve_planned_z-5
+                        if layer_n == layer_nums[-1]:
+                            curve_prev = np.loadtxt(data_dir+f'curve_sliced_relative/slice{layer_nums[layer_n_id-1]}_0.csv',delimiter=',')
+                            curve_prev_z = np.mean(curve_prev[:,2])
+                            z_height_start = curve_prev_z
                     # z_height_start = 0
                     # print(z_height_start)
                     # print(curve_y)
@@ -227,9 +239,19 @@ def main():
                     # profile_height_noise, profile_width_noise,Transz0_H = scan_process.pcd2height(deepcopy(pcd),z_height_start,bbox_min=crop_h_min,bbox_max=crop_h_max,Transz0_H=Transz0_H,return_width=True)
                     pcd = scan_process.pcd_noise_remove(pcd,min_bound=crop_min,max_bound=crop_max,outlier_remove=False,cluster_based_outlier_remove=False)
                     pcd_denoise = scan_process.pcd_noise_remove(pcd,crop_flag=False,nb_neighbors=40,std_ratio=1.5,min_bound=crop_min,max_bound=crop_max,cluster_based_outlier_remove=True,cluster_neighbor=1,min_points=100)
+                    # Transz0_H = None
+                    Transz0_H = deepcopy(Transz0_H_even) if layer_n_id % 2 == 0 else deepcopy(Transz0_H_odd)
                     profile_height, _,Transz0_H = scan_process.pcd2height(deepcopy(pcd_denoise),z_height_start,bbox_min=crop_h_min,bbox_max=crop_h_max,Transz0_H=Transz0_H,return_width=True)
                     _, profile_width,_ = scan_process.pcd2height(deepcopy(pcd),z_height_start,bbox_min=crop_h_min,bbox_max=crop_h_max,Transz0_H=Transz0_H,return_width=True)
-                    # print("Transz0_H:",Transz0_H)
+                    print("Transz0_H:",Transz0_H)
+                    if layer_n_id % 2 == 0:
+                        Transz0_H_even = deepcopy(Transz0_H)
+                    else:
+                        Transz0_H_odd = deepcopy(Transz0_H)
+                    pcd_transform = deepcopy(pcd_denoise)
+                    pcd_transform.transform(Transz0_H)
+                    all_pcd_transform.append(pcd_transform)
+                    visualize_pcd([pcd_transform])
 
                     # apply 1D smoother to profile_width
                     profile_width[:,1] = np.convolve(profile_width[:,1], np.ones(5)/5, mode='same')
@@ -285,9 +307,14 @@ def main():
                 header = 'time,x,cmd_v,cmd_feedrate,height,dheight,torch_height,width,v,thermal,voltage,current,feedrate,energy'
                 np.savetxt(this_layer_dir+'profile_welding.csv',profile_welding,delimiter=',',header=header)
                 last_profile_height = profile_height
-                
+
                 print("Finished processing layer:",layer_name)
 
+        cmap = plt.get_cmap('jet')
+        color = cmap(np.linspace(0, 1, len(all_pcd_transform)))
+        for i in range(len(all_pcd_transform)):
+            all_pcd_transform[i].paint_uniform_color(color[i][:3])
+        visualize_pcd(all_pcd_transform)
 
 if __name__ == '__main__':
     main()

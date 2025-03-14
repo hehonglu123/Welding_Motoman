@@ -253,9 +253,6 @@ origin_H = deepcopy(robot.robot.H)
 baseline_P = deepcopy(robot.calib_P)
 baseline_H = deepcopy(robot.calib_H)
 
-
-
-
 #####################################
 
 total_test_N = len(test_robot_q)
