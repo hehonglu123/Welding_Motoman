@@ -252,8 +252,14 @@ class PH_Param(object):
 
     def compare_nominal(self,nom_P,nom_H):
 
-        X = np.linspace(min(self.train_q[:,0]), max(self.train_q[:,0]),1000)
-        Y = np.linspace(min(self.train_q[:,1]), max(self.train_q[:,1]),1000)
+        plot_q = deepcopy(self.train_q)
+        plot_q = plot_q[np.where(plot_q[:,0]>-np.radians(30))]
+        plot_q = plot_q[np.where(plot_q[:,0]<np.radians(5))]
+        plot_q = plot_q[np.where(plot_q[:,1]>-np.radians(30))]
+        plot_q = plot_q[np.where(plot_q[:,1]<np.radians(5))]
+
+        X = np.linspace(min(plot_q[:,0]), max(plot_q[:,0]),1000)
+        Y = np.linspace(min(plot_q[:,1]), max(plot_q[:,1]),1000)
         X, Y = np.meshgrid(X, Y)
         # print(X)
 
@@ -267,17 +273,18 @@ class PH_Param(object):
         fig,axs = plt.subplots(2,4)
         for i in range(len(nom_P[0])):
             p_dist = []
-            for q in self.train_q:
+            for q in plot_q:
                 p_dist.append(np.linalg.norm(self.data[tuple(q)]['P'][:,i]-nom_P[:,i]))
             # use linear interp to plot
-            interp = LinearNDInterpolator(self.train_q, p_dist)
+            # interp = LinearNDInterpolator(plot_q, p_dist)
+            interp = CloughTocher2DInterpolator(plot_q, p_dist)
             Z = interp(X, Y)
             
-            # interp = RBFFourierInterpolator(self.train_q, p_dist)
+            # interp = RBFFourierInterpolator(plot_q, p_dist)
             
             im=axs[int(i/4),int(i%4)].pcolormesh(np.degrees(X), np.degrees(Y), Z, shading='auto')
             plt.colorbar(im,ax=axs[int(i/4),int(i%4)])
-            axs[int(i/4),int(i%4)].plot(np.degrees(self.train_q[:,0]), np.degrees(self.train_q[:,1]), "ok",ms=3, label="Training Poses (q2q3)")
+            axs[int(i/4),int(i%4)].plot(np.degrees(plot_q[:,0]), np.degrees(plot_q[:,1]), "ok",ms=1, label="Training Poses (q2q3)")
             axs[int(i/4),int(i%4)].set_xlabel('q2 (deg)')
             axs[int(i/4),int(i%4)].set_ylabel('q3 (deg)')
             axs[int(i/4),int(i%4)].set_title("Distance to Nominal (mm), P"+str(i+1))
@@ -312,7 +319,7 @@ class PH_Param(object):
         fig,axs = plt.subplots(2,3)
         for i in range(len(nom_H[0])):
             h_ang = []
-            for q in self.train_q:
+            for q in plot_q:
                 opt_H = self.data[tuple(q)]['H'][:,i]/np.linalg.norm(self.data[tuple(q)]['H'][:,i])
                 ori_H = nom_H[:,i]/np.linalg.norm(nom_H[:,i])
                 costh = np.dot(opt_H,ori_H)
@@ -320,13 +327,14 @@ class PH_Param(object):
                 th = np.arctan2(sinth,costh)
                 h_ang.append(np.degrees(th))
             # use linear interp to plot
-            interp = LinearNDInterpolator(self.train_q, h_ang)
+            # interp = LinearNDInterpolator(plot_q, h_ang)
+            interp = CloughTocher2DInterpolator(plot_q, h_ang)
             Z = interp(X, Y)
-            # interp = RBFFourierInterpolator(self.train_q, h_ang)
+            # interp = RBFFourierInterpolator(plot_q, h_ang)
             
             im=axs[int(i/3),int(i%3)].pcolormesh(np.degrees(X), np.degrees(Y), Z, shading='auto')
             plt.colorbar(im,ax=axs[int(i/3),int(i%3)])
-            axs[int(i/3),int(i%3)].plot(np.degrees(self.train_q[:,0]), np.degrees(self.train_q[:,1]), "ok",ms=3, label="Training Poses (q2q3)")
+            axs[int(i/3),int(i%3)].plot(np.degrees(plot_q[:,0]), np.degrees(plot_q[:,1]), "ok",ms=3, label="Training Poses (q2q3)")
             axs[int(i/3),int(i%3)].set_xlabel('q2 (deg)')
             axs[int(i/3),int(i%3)].set_ylabel('q3 (deg)')
             axs[int(i/3),int(i%3)].set_title("Angle to Nominal (deg), H"+str(i+1))
@@ -424,29 +432,34 @@ def compare_nominal_between_datasets():
 
 if __name__=='__main__':
 
-    PH_data_dir='PH_grad_data/test0801_R1/train_data_'
-    test_data_dir='kinematic_raw_data/test0801/'
-    
-    nom_P=np.array([[0,0,0],[150,0,0],[0,0,760],\
-                   [1082,0,200],[0,0,0],[0,0,0],[100,0,0]]).T
-    nom_H=np.array([[0,0,1],[0,1,0],[0,-1,0],\
-                   [-1,0,0],[0,-1,0],[-1,0,0]]).T
-    
-    # PH_data_dir='PH_grad_data/test0804_R2/train_data_'
+    # PH_data_dir='PH_grad_data/test0801_R1/train_data_'
     # test_data_dir='kinematic_raw_data/test0801/'
     
-    # nom_P=np.array([[0,0,0],[155,0,0],[0,0,614],\
-    #                [640,0,200],[0,0,0],[0,0,0],[100,0,0]]).T
+    # nom_P=np.array([[0,0,0],[150,0,0],[0,0,760],\
+    #                [1082,0,200],[0,0,0],[0,0,0],[100,0,0]]).T
     # nom_H=np.array([[0,0,1],[0,1,0],[0,-1,0],\
-    #             [-1,0,0],[0,-1,0],[-1,0,0]]).T
+    #                [-1,0,0],[0,-1,0],[-1,0,0]]).T
+    
+    PH_data_dir='PH_grad_data/test0804_R2/train_data_'
+    test_data_dir='kinematic_raw_data/test0801/'
+    
+    nom_P=np.array([[0,0,0],[155,0,0],[0,0,614],\
+                   [640,0,200],[0,0,0],[0,0,0],[100,0,0]]).T
+    nom_H=np.array([[0,0,1],[0,1,0],[0,-1,0],\
+                [-1,0,0],[0,-1,0],[-1,0,0]]).T
 
-    # import pickle
-    # with open(PH_data_dir+'calib_PH_q_ana.pickle','rb') as file:
-    #     PH_q=pickle.load(file)
+    import pickle
+    with open(PH_data_dir+'calib_PH_q_ana.pickle','rb') as file:
+        PH_q=pickle.load(file)
 
-    # ph_param=PH_Param(nom_P,nom_H)
-    # ph_param.fit(PH_q,method='linear')
+    ph_param=PH_Param(nom_P,nom_H)
+    PH_q_cubic = deepcopy(PH_q)
+    delete_keys_all = np.radians([[-15,-12],[-10,-6],[0,-10],[-10,-1],[-15,-22],[-25,-24],[-20,-28]])
+    for qkey in PH_q.keys():
+        if np.any(np.linalg.norm(np.array(qkey)-delete_keys_all,axis=1)<np.radians(0.5)):
+            print("Delete key:",qkey)
+            del PH_q_cubic[qkey]
+    ph_param.fit(PH_q_cubic,method='cubic')
+    ph_param.compare_nominal(nom_P,nom_H)
 
-    # ph_param.compare_nominal(nom_P,nom_H)
-
-    compare_nominal_between_datasets()
+    # compare_nominal_between_datasets()

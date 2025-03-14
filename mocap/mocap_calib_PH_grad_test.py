@@ -88,10 +88,6 @@ use_raw=False
 test_robot_q = np.loadtxt(test_data_dir+'robot_q_align.csv',delimiter=',')
 test_mocap_T = np.loadtxt(test_data_dir+'mocap_T_align.csv',delimiter=',')
 
-# plt.plot(np.degrees(test_robot_q[700:800,1]))
-# plt.plot(np.degrees(test_robot_q[700:800,2]))
-# plt.show()
-
 train_robot_q = np.loadtxt(PH_data_dir+'robot_q_align.csv',delimiter=',')
 train_mocap_T = np.loadtxt(PH_data_dir+'mocap_T_align.csv',delimiter=',')
 
@@ -157,6 +153,13 @@ calib_file_name = 'calib_PH_q_ana.pickle' if use_analytical_calib else 'calib_PH
 print(calib_file_name)
 with open(PH_data_dir+calib_file_name,'rb') as file:
     PH_q=pickle.load(file)
+delete_keys_all = np.radians([[-20,-8]])
+PH_q_dum = deepcopy(PH_q)
+for qkey in PH_q_dum.keys():
+    if np.any(np.linalg.norm(np.array(qkey)-delete_keys_all,axis=1)<np.radians(0.5)):
+        print("Delete key:",qkey)
+        del PH_q[qkey]
+
 if use_minimal_calib:
     with open(PH_data_dir+calib_file_name[:-7]+'_minimal.pickle','rb') as file:
         PH_q_min=pickle.load(file)
@@ -263,10 +266,14 @@ ph_param_near.fit(PH_q,method='nearest')
 ph_param_lin=PH_Param(nom_P,nom_H)
 ph_param_lin.fit(PH_q,method='linear')
 ph_param_cub=PH_Param(nom_P,nom_H)
-ph_param_cub.fit(PH_q,method='cubic')
-
-
-
+PH_q_cubic = deepcopy(PH_q)
+# delete key
+# delete_keys_all = np.radians([[-20,-8]])
+# for qkey in PH_q.keys():
+#     if np.any(np.linalg.norm(np.array(qkey)-delete_keys_all,axis=1)<np.radians(0.5)):
+#         print("Delete key:",qkey)
+#         del PH_q_cubic[qkey]
+ph_param_cub.fit(PH_q_cubic,method='cubic')
 ph_param_rbf=PH_Param(nom_P,nom_H)
 ph_param_rbf.fit(PH_q,method='RBF')
 ph_param_fbf=PH_Param(nom_P,nom_H)
@@ -589,7 +596,7 @@ plt.plot(error_pos_baseline_norm,'-o',markersize=1,label='CPA PH')
 # plt.plot(error_pos_onePH_norm,'-o',markersize=1,label='One PH')
 # plt.plot(error_pos_near_norm,'-o',markersize=1,label='Nearest PH')
 plt.plot(error_pos_lin_norm,'-o',markersize=1,label='Linear Interp PH')
-# plt.plot(error_pos_cub_norm,'-o',markersize=1,label='Cubic Interp PH')
+plt.plot(error_pos_cub_norm,'-o',markersize=1,label='Cubic Interp PH')
 # plt.plot(error_pos_rbf_norm,'-o',markersize=1,label='RBF Interp PH')
 plt.plot(error_pos_fbf_norm,'-o',markersize=1,label='Fourier Basis PH')
 # plt.plot(error_pos_fbf_hori_norm,'-o',markersize=1,label='Fourier Basis PH (Hori)')
@@ -639,7 +646,7 @@ plt.plot(error_ori_baseline_norm,'-o',markersize=1,label='CPA PH')
 # plt.plot(error_ori_onePH_norm,'-o',markersize=1,label='One PH')
 # plt.plot(error_ori_near_norm,'-o',markersize=1,label='Nearest PH')
 plt.plot(error_ori_lin_norm,'-o',markersize=1,label='Linear Interp PH')
-# plt.plot(error_ori_cub_norm,'-o',markersize=1,label='Cubic Interp PH')
+plt.plot(error_ori_cub_norm,'-o',markersize=1,label='Cubic Interp PH')
 # plt.plot(error_ori_rbf_norm,'-o',markersize=1,label='RBF Interp PH')
 plt.plot(error_ori_fbf_norm,'-o',markersize=1,label='Fourier Basis PH')
 plt.legend()
