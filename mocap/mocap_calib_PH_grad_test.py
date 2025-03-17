@@ -4,8 +4,6 @@ from general_robotics_toolbox import *
 import pickle
 import time
 import sys
-sys.path.append('../toolbox/')
-# from robot_def import *
 from motoman_def import *
 from matplotlib import pyplot as plt
 from calib_analytic_grad import *
