@@ -14,6 +14,11 @@ from StreamingSend import *
 
 def main():
 
+    #### motino parameters ####
+    r2_inward = np.radians([0,10,20,30,40,50])
+    r2_outward = np.array([0,-10,-20,-30,-40,-50])
+    motion_points = 10000
+
     ############## Robot definition ##############
     config_dir='../../config/'
     robot_1=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path=config_dir+'fujicam.csv',\
@@ -58,6 +63,40 @@ def main():
 
     ### get robot starting angle
     starting_q = deepcopy(SS.q_cur)
-    T_tcp_1 = robot_1.fwd(starting_q[:6])
-    T_tcp_2 = robot_2.fwd(starting_q[6:12],world=True)
+    r1_starting = starting_q[0:6]
+    r2_starting = starting_q[6:12]
+    T_tcp_1 = robot_1.fwd_ph(r1_starting,ph_param_fbf_r1)
+    T_tcp_2 = robot_2.fwd_ph(r2_starting,ph_param_fbf_r2,world=True)
     T_tcp1_tcp2 = T_tcp_2.inv() * T_tcp_1
+
+    ### get robot 2 joint path
+    r2_inward_path = np.linspace(r2_starting,r2_inward,motion_points)
+    r2_outward_path = np.linspace(r2_inward_path[-1],r2_outward,motion_points*2)
+
+    ### get robot 1 joint path
+    r1_inward_path = [r1_starting]
+    for r2_wp in r2_inward_path:
+        r1_tcp = robot_2.fwd_ph(r2_wp,ph_param_fbf_r2,world=True)*T_tcp1_tcp2
+        r1_wp = robot_1.inv_iter(r1_tcp.p,r1_tcp.R,q_seed=r1_inward_path[-1])
+        r1_inward_path.append(r1_wp)
+    r1_outward_path = [r1_inward_path[-1]]
+    for r2_wp in r2_outward_path:
+        r1_tcp = robot_2.fwd_ph(r2_wp,ph_param_fbf_r2,world=True)*T_tcp1_tcp2
+        r1_wp = robot_1.inv_iter(r1_tcp.p,r1_tcp.R,q_seed=r1_outward_path[-1])
+        r1_outward_path.append(r1_wp)
+    
+
+    ### jog the robot
+    q_cur = deepcopy(SS.q_cur)
+    q_cmd = deepcopy(q_cur)
+    q_cmd[0:6] = r1_inward_path[0]
+    q_cmd[6:12] = r2_inward_path[0]
+    q_table = q_cur[12:]
+    SS.jog2q(q_cmd)
+    time.sleep(2)
+
+    print('Start moving')
+    for r1_wp,r2_wp in zip(r1_inward_path,r2_inward_path):
+        loop_start=time.perf_counter()
+        q_cmd = np.hstack((r1_wp,r2_wp,q_table))
+        SS.position_cmd(q_cmd,loop_start)
