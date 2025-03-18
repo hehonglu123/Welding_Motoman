@@ -15,7 +15,7 @@ from StreamingSend import *
 def main():
 
     move_robot = False
-    use_nominal = False
+    use_nominal = True
 
     #### motino parameters ####
     r2_inward = np.radians([0,-10,-20,0,20,0])
@@ -93,7 +93,7 @@ def main():
     for r2_wp in r2_inward_path:
         if use_nominal:
             r1_tcp = robot_2.fwd(r2_wp,world=True)*T_tcp1_tcp2
-            r1_wp = robot_1.inv(r1_tcp.p,r1_tcp.R,q_seed=r1_inward_path[-1])
+            r1_wp = robot_1.inv(r1_tcp.p,r1_tcp.R,last_joints=r1_inward_path[-1])[0]
         else:
             r1_tcp = robot_2.fwd_ph(r2_wp,ph_param_fbf_r2,world=True)*T_tcp1_tcp2
             r1_wp = robot_1.inv_iter(r1_tcp.p,r1_tcp.R,q_seed=r1_inward_path[-1])
@@ -106,7 +106,7 @@ def main():
     for r2_wp in r2_outward_path:
         if use_nominal:
             r1_tcp = robot_2.fwd(r2_wp,world=True)*T_tcp1_tcp2
-            r1_wp = robot_1.inv(r1_tcp.p,r1_tcp.R,q_seed=r1_outward_path[-1])
+            r1_wp = robot_1.inv(r1_tcp.p,r1_tcp.R,last_joints=r1_outward_path[-1])[0]
         else:
             r1_tcp = robot_2.fwd_ph(r2_wp,ph_param_fbf_r2,world=True)*T_tcp1_tcp2
             r1_wp = robot_1.inv_iter(r1_tcp.p,r1_tcp.R,q_seed=r1_outward_path[-1])
