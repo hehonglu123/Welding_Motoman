@@ -6,10 +6,8 @@ from RobotRaconteur.Client import *
 import time
 from threading import Thread
 import sys
-sys.path.append('../toolbox/')
-sys.path.append('../redundancy_resolution/')
-from utils import *
-from robot_def import * 
+from robotics_utils import *
+from motoman_def import *
 
 class MocapPoseListener():
     def __init__(self,rr_mocap,robots,collect_base_window=240,use_static_base=False,use_toolmarker_rigid=False):

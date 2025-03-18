@@ -14,13 +14,13 @@ from StreamingSend import *
 
 def main():
 
-    move_robot = False
+    move_robot = True
     use_nominal = True
 
     #### motino parameters ####
-    r2_inward = np.radians([0,-10,-20,0,20,0])
-    r2_outward = np.radians([0,10,-10,0,20,0])
-    motion_points = 1000
+    r2_inward_q2q3 = np.radians([-61,-54])
+    r2_outward_q2q3 = np.radians([38,34])
+    motion_points = 1500
 
     ############## Robot definition ##############
     config_dir='../config/'
@@ -68,10 +68,26 @@ def main():
     ph_param_fbf_r2.fit(PH_q_r2,method='FBF')
 
     ### get robot starting angle
-    if move_robot:
-        starting_q = deepcopy(SS.q_cur)
-    else:
-        starting_q = np.radians([0,-10,-10,0,-10,0,0,0,-15,0,20,0,-15,0])
+    try:
+        starting_q = np.loadtxt('kinematic_raw_data/dual_arm_starting_q.csv',delimiter=',')
+        print("Starting q loaded from file")
+    except FileNotFoundError:
+        if move_robot:
+            starting_q = deepcopy(SS.q_cur)
+        else:
+            starting_q = np.radians([-8.59860665e+00, -6.93776792e+00, -8.44377790e+00,  6.33516407e-01,\
+                                    -1.61991054e+01, -4.12970383e+00, -1.13874631e+01, -5.20642090e-01,\
+                                    -3.51562500e-01, -1.51965726e+00, -6.24622977e+01,  1.64484476e+00,\
+                                    -1.49987698e+01,  5.81095041e-03])
+        np.savetxt('kinematic_raw_data/dual_arm_starting_q.csv',starting_q,delimiter=',')
+    print("Starting q",np.degrees(starting_q))
+    ### get r2 inward/outward joint
+    r2_inward = deepcopy(starting_q[6:12])
+    r2_inward[1:3] = r2_inward_q2q3
+    r2_outward = deepcopy(starting_q[6:12])
+    r2_outward[1:3] = r2_outward_q2q3
+    
+    ### get robot starting TCP
     r1_starting = starting_q[0:6]
     r2_starting = starting_q[6:12]
     if use_nominal:
@@ -86,6 +102,8 @@ def main():
     ### get robot 2 joint path
     r2_inward_path = np.linspace(r2_starting,r2_inward,motion_points)
     r2_outward_path = np.linspace(r2_inward_path[-1],r2_outward,motion_points*2)
+    print("r2_inward_path",r2_inward_path[-1])
+    print("r2_outward_path",r2_outward_path[0])
 
     ### get robot 1 joint path
     counting = 0
@@ -99,8 +117,9 @@ def main():
             r1_wp = robot_1.inv_iter(r1_tcp.p,r1_tcp.R,q_seed=r1_inward_path[-1])
         r1_inward_path.append(r1_wp)
         counting += 1
-        if counting % 100 == 0:
+        if counting % int(motion_points/10) == 0:
             print(counting)
+    r1_inward_path = r1_inward_path[1:]
     counting = 0
     r1_outward_path = [r1_inward_path[-1]]
     for r2_wp in r2_outward_path:
@@ -112,10 +131,15 @@ def main():
             r1_wp = robot_1.inv_iter(r1_tcp.p,r1_tcp.R,q_seed=r1_outward_path[-1])
         r1_outward_path.append(r1_wp)
         counting += 1
-        if counting % 100 == 0:
+        if counting % int(motion_points/10) == 0:
             print(counting)
+    r1_outward_path = r1_outward_path[1:]
+
+    assert len(r1_inward_path) == len(r2_inward_path), "Length mismatch between R1 and R2 inward path"
+    assert len(r1_outward_path) == len(r2_outward_path), "Length mismatch between R1 and R2 outward path"
 
     if move_robot:
+        input('Move to starting position')
         ### jog the robot
         q_cur = deepcopy(SS.q_cur)
         q_cmd = deepcopy(q_cur)
@@ -136,6 +160,8 @@ def main():
             loop_start=time.perf_counter()
             q_cmd = np.hstack((r1_wp,r2_wp,q_table))
             SS.position_cmd(q_cmd,loop_start)
+        
+        SS.deinitialize_robot()
 
 if __name__ == "__main__":
     main()  # execute main function

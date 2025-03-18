@@ -1,7 +1,5 @@
 from copy import deepcopy
 import sys
-sys.path.append('../toolbox/')
-sys.path.append('../redundancy_resolution/')
 from robotics_utils import *
 from motoman_def import *
 from pathlib import Path
@@ -153,11 +151,11 @@ def calib_R2():
                         [0,0,0,0,0,0],
                         [0,0,0,0,0,0],
                         [0,0,0,0,0,0]])
-    q1_1=start_p[0] + np.array([-45,0,0,0,0,0])
-    q1_2=start_p[0] + np.array([45,0,0,0,0,0])
-    q2_1=start_p[1] + np.array([0,55,0,0,0,0])
+    q1_1=start_p[0] + np.array([-35,0,0,0,0,0])
+    q1_2=start_p[0] + np.array([35,0,0,0,0,0])
+    q2_1=start_p[1] + np.array([0,45,0,0,0,0])
     q2_2=start_p[1] + np.array([0,-10,0,0,0,0])
-    q3_1=start_p[2] + np.array([0,0,-70,0,0,0])
+    q3_1=start_p[2] + np.array([0,0,-55,0,0,0])
     q3_2=start_p[2] + np.array([0,0,10,0,0,0])
     q4_1=start_p[3] + np.array([0,0,0,-60,0,0])
     q4_2=start_p[3] + np.array([0,0,0,60,0,0])
@@ -199,11 +197,11 @@ def calib_R1():
                         [0,0,0,0,0,0],
                         [0,0,0,0,0,0],
                         [0,0,0,0,0,0]])
-    q1_1=start_p[0] + np.array([-45,0,0,0,0,0])
-    q1_2=start_p[0] + np.array([45,0,0,0,0,0])
-    q2_1=start_p[1] + np.array([0,50,0,0,0,0])
+    q1_1=start_p[0] + np.array([-35,0,0,0,0,0])
+    q1_2=start_p[0] + np.array([35,0,0,0,0,0])
+    q2_1=start_p[1] + np.array([0,40,0,0,0,0])
     q2_2=start_p[1] + np.array([0,-10,0,0,0,0])
-    q3_1=start_p[2] + np.array([0,0,-60,0,0,0])
+    q3_1=start_p[2] + np.array([0,0,-50,0,0,0])
     q3_2=start_p[2] + np.array([0,0,10,0,0,0])
     q4_1=start_p[3] + np.array([0,0,0,-90,0,0])
     q4_2=start_p[3] + np.array([0,0,0,90,0,0])
@@ -227,7 +225,7 @@ def calib_R1():
 
 if __name__=='__main__':
 
-    calib_R1()
+    # calib_R1()
     
     # calib_S1()
-    # calib_R2()
+    calib_R2()

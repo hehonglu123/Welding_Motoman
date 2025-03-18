@@ -131,7 +131,7 @@ robot_type='R2'
 # robot_type='S1'
 
 # all_datasets=['train_data','valid_data_1','valid_data_2']
-dataset_date='0804'
+dataset_date='03182025'
 # all_datasets=['test'+dataset_date+'_R1_aftercalib/train_data']
 all_datasets=['test'+dataset_date+'_'+robot_type+'/train_data']
 
@@ -179,7 +179,12 @@ elif robot_type=='R2':
     # only R matter
     nominal_robot_base = Transform(np.array([[0,-1,0],
                                             [0,0,1],
-                                            [-1,0,0]]),[0,0,0]) 
+                                            [-1,0,0]]),[0,0,0])
+    nominal_P = deepcopy(robot.robot.P)
+    nominal_P0i = [robot.robot.P[:,0]]
+    for i in range(6):
+        nominal_P0i.append(nominal_P0i[-1]+robot.robot.P[:,i+1])
+    nominal_H = deepcopy(robot.robot.H)
     H_nom = np.matmul(nominal_robot_base.R,robot.robot.H)
 
     jN=6
@@ -219,16 +224,16 @@ for dataset in all_datasets:
         curve_p,curve_R,mocap_stamps = read_and_convert_frame(raw_data_dir+'_'+str(j+1),robot.base_rigid_id,robot.tool_markers_id)
 
         print(curve_p.keys())
-        marker_distance = []
-        for marker_id_1 in curve_p.keys():
-            for marker_id_2 in curve_p.keys():
-                this_marker_distance = np.mean(np.linalg.norm(np.array(curve_p[marker_id_1])-np.array(curve_p[marker_id_2]),axis=1))
-                # print("marker distance:",marker_id_1,marker_id_2,this_marker_distance)
-                if this_marker_distance != 0 and this_marker_distance not in marker_distance:
-                    marker_distance.append(this_marker_distance)
-        print("marker distance:",marker_distance)
-        print("ave marker distance:",np.mean(marker_distance))
-        exit()
+        # marker_distance = []
+        # for marker_id_1 in curve_p.keys():
+        #     for marker_id_2 in curve_p.keys():
+        #         this_marker_distance = np.mean(np.linalg.norm(np.array(curve_p[marker_id_1])-np.array(curve_p[marker_id_2]),axis=1))
+        #         # print("marker distance:",marker_id_1,marker_id_2,this_marker_distance)
+        #         if this_marker_distance != 0 and this_marker_distance not in marker_distance:
+        #             marker_distance.append(this_marker_distance)
+        # print("marker distance:",marker_distance)
+        # print("ave marker distance:",np.mean(marker_distance))
+        # exit()
         
         # read q
         with open(raw_data_dir+'_'+str(j+1)+'_robot_q.pickle', 'rb') as handle:
