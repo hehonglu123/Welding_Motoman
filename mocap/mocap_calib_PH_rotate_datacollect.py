@@ -2,8 +2,8 @@ from copy import deepcopy
 import sys
 sys.path.append('../toolbox/')
 sys.path.append('../redundancy_resolution/')
-from utils import *
-from robot_def import * 
+from robotics_utils import *
+from motoman_def import *
 from pathlib import Path
 from general_robotics_toolbox import *
 from RobotRaconteur.Client import *

@@ -14,13 +14,16 @@ from StreamingSend import *
 
 def main():
 
+    move_robot = False
+    use_nominal = False
+
     #### motino parameters ####
-    r2_inward = np.radians([0,10,20,30,40,50])
-    r2_outward = np.array([0,-10,-20,-30,-40,-50])
-    motion_points = 10000
+    r2_inward = np.radians([0,-10,-20,0,20,0])
+    r2_outward = np.radians([0,10,-10,0,20,0])
+    motion_points = 1000
 
     ############## Robot definition ##############
-    config_dir='../../config/'
+    config_dir='../config/'
     robot_1=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path=config_dir+'fujicam.csv',\
         pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv')
     robot_2=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.yml',tool_file_path=config_dir+'flir.csv',\
@@ -34,19 +37,22 @@ def main():
                    [640,0,200],[0,0,0],[0,0,0],[100,0,0]]).T
     nom_H_r2=np.array([[0,0,1],[0,1,0],[0,-1,0],\
                    [-1,0,0],[0,-1,0],[-1,0,0]]).T
-    ########################################################RR STREAMING########################################################
-    RR_robot_sub = RRN.SubscribeService('rr+tcp://localhost:59945?service=robot')
-    point_distance=0.04		###STREAMING POINT INTERPOLATED DISTANCE
-    SS=StreamingSend(RR_robot_sub,streaming_rate=125.)
+    
+    ##### RobotRaconteur connection #####
+    if move_robot:
+        ########################################################RR STREAMING########################################################
+        RR_robot_sub = RRN.SubscribeService('rr+tcp://localhost:59945?service=robot')
+        point_distance=0.04		###STREAMING POINT INTERPOLATED DISTANCE
+        SS=StreamingSend(RR_robot_sub,streaming_rate=125.)
 
-    ######################################### RR Fujicam ########################################################
-    fujicam_url = 'rr+tcp://localhost:12181/?service=fujicam'
-    def connect_failed(s, client_id, url, err):
-        print ("Client connect failed: " + str(client_id.NodeID) + " url: " + str(url) + " error: " + str(err))
-    sub=RRN.SubscribeService(fujicam_url)
-    obj = sub.GetDefaultClientWait(2)		#connect, timeout=2s
-    fuji_scan_wire=sub.SubscribeWire("lineProfile")
-    sub.ClientConnectFailed += connect_failed
+        ######################################### RR Fujicam ########################################################
+        fujicam_url = 'rr+tcp://localhost:12181/?service=fujicam'
+        def connect_failed(s, client_id, url, err):
+            print ("Client connect failed: " + str(client_id.NodeID) + " url: " + str(url) + " error: " + str(err))
+        sub=RRN.SubscribeService(fujicam_url)
+        obj = sub.GetDefaultClientWait(2)		#connect, timeout=2s
+        fuji_scan_wire=sub.SubscribeWire("lineProfile")
+        sub.ClientConnectFailed += connect_failed
 
     ####### PH Parameters #######
     calib_file_name = 'calib_PH_q_ana.pickle'
@@ -62,41 +68,76 @@ def main():
     ph_param_fbf_r2.fit(PH_q_r2,method='FBF')
 
     ### get robot starting angle
-    starting_q = deepcopy(SS.q_cur)
+    if move_robot:
+        starting_q = deepcopy(SS.q_cur)
+    else:
+        starting_q = np.radians([0,-10,-10,0,-10,0,0,0,-15,0,20,0,-15,0])
     r1_starting = starting_q[0:6]
     r2_starting = starting_q[6:12]
-    T_tcp_1 = robot_1.fwd_ph(r1_starting,ph_param_fbf_r1)
-    T_tcp_2 = robot_2.fwd_ph(r2_starting,ph_param_fbf_r2,world=True)
+    if use_nominal:
+        T_tcp_1 = robot_1.fwd(r1_starting)
+        T_tcp_2 = robot_2.fwd(r2_starting,world=True)
+    else:
+        T_tcp_1 = robot_1.fwd(r1_starting,ph_param_fbf_r1)
+        T_tcp_2 = robot_2.fwd_ph(r2_starting,ph_param_fbf_r2,world=True)
     T_tcp1_tcp2 = T_tcp_2.inv() * T_tcp_1
+    print("T_tcp1_tcp2",T_tcp1_tcp2)
 
     ### get robot 2 joint path
     r2_inward_path = np.linspace(r2_starting,r2_inward,motion_points)
     r2_outward_path = np.linspace(r2_inward_path[-1],r2_outward,motion_points*2)
 
     ### get robot 1 joint path
+    counting = 0
     r1_inward_path = [r1_starting]
     for r2_wp in r2_inward_path:
-        r1_tcp = robot_2.fwd_ph(r2_wp,ph_param_fbf_r2,world=True)*T_tcp1_tcp2
-        r1_wp = robot_1.inv_iter(r1_tcp.p,r1_tcp.R,q_seed=r1_inward_path[-1])
+        if use_nominal:
+            r1_tcp = robot_2.fwd(r2_wp,world=True)*T_tcp1_tcp2
+            r1_wp = robot_1.inv(r1_tcp.p,r1_tcp.R,q_seed=r1_inward_path[-1])
+        else:
+            r1_tcp = robot_2.fwd_ph(r2_wp,ph_param_fbf_r2,world=True)*T_tcp1_tcp2
+            r1_wp = robot_1.inv_iter(r1_tcp.p,r1_tcp.R,q_seed=r1_inward_path[-1])
         r1_inward_path.append(r1_wp)
+        counting += 1
+        if counting % 100 == 0:
+            print(counting)
+    counting = 0
     r1_outward_path = [r1_inward_path[-1]]
     for r2_wp in r2_outward_path:
-        r1_tcp = robot_2.fwd_ph(r2_wp,ph_param_fbf_r2,world=True)*T_tcp1_tcp2
-        r1_wp = robot_1.inv_iter(r1_tcp.p,r1_tcp.R,q_seed=r1_outward_path[-1])
+        if use_nominal:
+            r1_tcp = robot_2.fwd(r2_wp,world=True)*T_tcp1_tcp2
+            r1_wp = robot_1.inv(r1_tcp.p,r1_tcp.R,q_seed=r1_outward_path[-1])
+        else:
+            r1_tcp = robot_2.fwd_ph(r2_wp,ph_param_fbf_r2,world=True)*T_tcp1_tcp2
+            r1_wp = robot_1.inv_iter(r1_tcp.p,r1_tcp.R,q_seed=r1_outward_path[-1])
         r1_outward_path.append(r1_wp)
-    
+        counting += 1
+        if counting % 100 == 0:
+            print(counting)
 
-    ### jog the robot
-    q_cur = deepcopy(SS.q_cur)
-    q_cmd = deepcopy(q_cur)
-    q_cmd[0:6] = r1_inward_path[0]
-    q_cmd[6:12] = r2_inward_path[0]
-    q_table = q_cur[12:]
-    SS.jog2q(q_cmd)
-    time.sleep(2)
+    if move_robot:
+        ### jog the robot
+        q_cur = deepcopy(SS.q_cur)
+        q_cmd = deepcopy(q_cur)
+        q_cmd[0:6] = r1_inward_path[0]
+        q_cmd[6:12] = r2_inward_path[0]
+        q_table = q_cur[12:]
+        SS.jog2q(q_cmd)
+        time.sleep(2)
 
-    print('Start moving')
-    for r1_wp,r2_wp in zip(r1_inward_path,r2_inward_path):
-        loop_start=time.perf_counter()
-        q_cmd = np.hstack((r1_wp,r2_wp,q_table))
-        SS.position_cmd(q_cmd,loop_start)
+        input('Start moving to R1 outstretch R2 inward')
+        for r1_wp,r2_wp in zip(r1_inward_path,r2_inward_path):
+            loop_start=time.perf_counter()
+            q_cmd = np.hstack((r1_wp,r2_wp,q_table))
+            SS.position_cmd(q_cmd,loop_start)
+        
+        input('Start moving to R1 inward R2 outward')
+        for r1_wp,r2_wp in zip(r1_outward_path,r2_outward_path):
+            loop_start=time.perf_counter()
+            q_cmd = np.hstack((r1_wp,r2_wp,q_table))
+            SS.position_cmd(q_cmd,loop_start)
+
+if __name__ == "__main__":
+    main()  # execute main function
+
+    sys.exit()  # exit program
