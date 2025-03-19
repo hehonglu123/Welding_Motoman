@@ -183,13 +183,10 @@ def main():
     logdata_dir='../../data/wall_weld_test/weld_fujicontrol_'+formatted_time+'/'
 
     read_from_file_layer = False
-    Transz0_H=None
+    Transz0_H_even=None
+    Transz0_H_odd=None
     if read_from_file_layer:
         logdata_dir = '../../data/wall_weld_test/weld_fujiscan_2025_03_03_18_10_13/'
-        Transz0_H = [[9.99996624e-01 ,-1.03837069e-05 , 2.59858273e-03, -1.92253817e-02],\
-                    [-1.03837069e-05,  9.99968066e-01,  7.99168212e-03, -5.91257447e-02],\
-                    [-2.59858273e-03 ,-7.99168212e-03 , 9.99964690e-01, -7.39814924e+00],\
-                    [ 0.00000000e+00 , 0.00000000e+00 , 0.00000000e+00 , 1.00000000e+00]]
 
     weld_meta_data = {'well_arcon':weld_arcon, 'fuji_scanon':fuji_scanon, 'data_dir':data_dir, 'logdata_dir':logdata_dir\
         ,'base_layer_num':base_layer_num, 'baselayer_resolution':baselayer_resolution, 'layer_num':layer_num, 'layer_resolution':layer_resolution\
@@ -677,8 +674,13 @@ def main():
                     crop_h_max=(curve_x_start+crop_extend_x,curve_y+20,z_height_start+crop_extend_z)
                     pcd = scan_process.pcd_noise_remove(pcd,nb_neighbors=40,std_ratio=1.5,\
                                                         min_bound=crop_min,max_bound=crop_max,cluster_based_outlier_remove=True,cluster_neighbor=1,min_points=100)
+                    Transz0_H = deepcopy(Transz0_H_even) if layer_count % 2 == 0 else deepcopy(Transz0_H_odd)
                     profile_height,Transz0_H = scan_process.pcd2height(deepcopy(pcd),z_height_start,bbox_min=crop_h_min,bbox_max=crop_h_max,Transz0_H=Transz0_H)
                     print("Transz0_H:",Transz0_H)
+                    if layer_count % 2 == 0:
+                        Transz0_H_even = deepcopy(Transz0_H)
+                    else:
+                        Transz0_H_odd = deepcopy(Transz0_H)
                     if read_from_file_layer:
                         visualize_pcd([pcd])
                         plt.scatter(profile_height[:,0],profile_height[:,1])

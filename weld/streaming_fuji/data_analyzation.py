@@ -12,14 +12,16 @@ ignore_start_end = 8
 data_dir = '../../data/wall_weld_test/'
 
 # logdata_dir_all = ['weld_fujiscan_2025_02_26_18_08_18/', 'weld_fujiscan_2025_02_26_16_24_21/', 'weld_fujiscan_2025_02_26_17_39_17/']
-logdata_dir_all = ['weld_fujiscan_2025_02_26_18_08_18/', 'weld_fujiscan_2025_02_26_16_24_21/']
+# logdata_dir_all = ['weld_fujiscan_2025_02_26_18_08_18/', 'weld_fujiscan_2025_02_26_16_24_21/']
+logdata_dir_all = ['weld_fujicontrol_2025_03_12_18_27_33/']
 
-# input_signals = ['cmd_v','cmd_feedrate']
+input_signals = ['v','cmd_feedrate']
 # input_signals = ['cmd_v','cmd_VPD','torch_height']
-input_signals = ['v','feedrate','power']
+# input_signals = ['v','feedrate','power']
 # control_signals = ['v','feedrate','power']
 control_signals = []
-output_signals = ['dheight','width','thermal']
+# output_signals = ['dheight','width','thermal']
+output_signals = ['dheight','width']
 
 data_pairs = {}
 
@@ -109,21 +111,21 @@ for i,input_sig_key in enumerate(input_signals):
             axs[j,i].set_title(input_sig_key + ' vs ' + output_sig_key)
 plt.show()
 
-for data_VPD in data_pairs.keys():
-    feedrate_dh = data_pairs[data_VPD]['feedrate']['dheight']
-    feedrate_dw = data_pairs[data_VPD]['feedrate']['width']
-    dhdw_ratio = []
-    for fdr in feedrate_dh.keys():
-        if fdr in feedrate_dw:
-            print(feedrate_dh[fdr])
-            print(feedrate_dw[fdr])
-            print("====")
-            dhdw = feedrate_dh[fdr]*feedrate_dw[fdr]
-            dhdw_ratio.append(dhdw)
-    # plt.scatter([data_VPD]*len(dhdw_ratio), dhdw_ratio)
-    plt.scatter(list(feedrate_dh.keys()), dhdw_ratio, label='VPD='+str(round(data_VPD)))
-plt.legend()
-plt.xlabel('feedrate')
-plt.ylabel('dh*dw')
-plt.title('feedrate vs dh*dw')
-plt.show()
+# for data_VPD in data_pairs.keys():
+#     feedrate_dh = data_pairs[data_VPD]['feedrate']['dheight']
+#     feedrate_dw = data_pairs[data_VPD]['feedrate']['width']
+#     dhdw_ratio = []
+#     for fdr in feedrate_dh.keys():
+#         if fdr in feedrate_dw:
+#             print(feedrate_dh[fdr])
+#             print(feedrate_dw[fdr])
+#             print("====")
+#             dhdw = feedrate_dh[fdr]*feedrate_dw[fdr]
+#             dhdw_ratio.append(dhdw)
+#     # plt.scatter([data_VPD]*len(dhdw_ratio), dhdw_ratio)
+#     plt.scatter(list(feedrate_dh.keys()), dhdw_ratio, label='VPD='+str(round(data_VPD)))
+# plt.legend()
+# plt.xlabel('feedrate')
+# plt.ylabel('dh*dw')
+# plt.title('feedrate vs dh*dw')
+# plt.show()

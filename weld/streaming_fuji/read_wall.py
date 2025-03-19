@@ -95,9 +95,12 @@ def main():
                 weld_cmd = np.loadtxt(this_layer_dir+'weld_cmd.csv',delimiter=',')
 
                 ############### get welding js ####################
-                weld_end_id = np.argmax(np.diff(robot_stamps))
+                weld_split_id = np.argmax(np.diff(robot_stamps))
                 scan_js_exe = deepcopy(rob_js_exe)
-                weld_js_exe = rob_js_exe[:weld_end_id+1,:]
+                if scanner_lagging:
+                    weld_js_exe = rob_js_exe[:weld_split_id+1,:]
+                else:
+                    weld_js_exe = rob_js_exe[weld_split_id+1:,:]
 
                 ############### get welding status ##############
                 print("Getting welding status...")
