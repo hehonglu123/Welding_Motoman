@@ -34,6 +34,7 @@ def main():
     # logdata_dir_all = ['weld_fujiscan_2025_02_26_18_08_18/', 'weld_fujiscan_2025_02_26_16_24_21/']
     logdata_dir_all = ['weld_fujicontrol_2025_03_12_18_27_33/']
 
+    run_code_again_flag = False
     for logdata_dir_name in logdata_dir_all:
         print('Processing:',logdata_dir_name)
 
@@ -41,6 +42,7 @@ def main():
         scanner_lagging= False
         if 'scan' in logdata_dir_name:
             scanner_lagging= True
+        
 
         logdata_dir = data_dir+logdata_dir_name
         
@@ -66,7 +68,6 @@ def main():
                 layer_nums.append(int(this_layer))
             layer_nums = np.sort(layer_nums)
 
-            
             # for layer_n in [layer_nums[-1],layer_nums[-2]]:
             for layer_n_id, layer_n in enumerate(layer_nums):
                 # read layer curve data
@@ -78,10 +79,13 @@ def main():
                 # read logged data
                 if weld_parts == 'base':
                     layer_name = 'baselayer'+str(layer_n)
+                    next_layer_name = 'baselayer'+str(layer_nums[layer_n_id+1]) if layer_n_id+1 < len(layer_nums) else 'layer9'
                 else:
                     layer_name = 'layer'+str(layer_n)
+                    next_layer_name = 'layer'+str(layer_nums[layer_n_id+1]) if layer_n_id+1 < len(layer_nums) else ''
                 print('Processing layer:',layer_name)
                 this_layer_dir = logdata_dir+layer_name+'/'
+                next_layer_dir = logdata_dir+next_layer_name+'/'
                 rob_js_exe = np.loadtxt(this_layer_dir+'weld_js_exe.csv',delimiter=',')
                 # get js at index 1~6 and 13 14
                 rob_js_exe = rob_js_exe[:,[0,1,2,3,4,5,6,13,14]]
@@ -179,12 +183,12 @@ def main():
                 ############### get height and width ##############
                 print("Getting height and width...")
                 try:
-                    profile_height = np.loadtxt(this_layer_dir+'profile_height.csv',delimiter=',')
+                    profile_height = np.loadtxt(this_layer_dir+'profile_height',delimiter=',')
                     profile_width = np.loadtxt(this_layer_dir+'profile_width.csv',delimiter=',')
                     # pcd_denoise = o3d.io.read_point_cloud(this_layer_dir+'pcd_denoise.pcd')
                     # visualize_pcd([pcd_denoise])
-                    if layer_n>455:
-                        np.loadtxt(this_layer_dir+'sss.csv',delimiter=',')
+                    # if layer_n>455:
+                    #     np.loadtxt(this_layer_dir+'sss.csv',delimiter=',')
                 except FileNotFoundError:
                     # processing the scans
                     scan_process = ScanProcess(robot_scan,positioner)
@@ -226,7 +230,7 @@ def main():
                         z_height_start=curve_planned_z+0.1
                     else:
                         z_height_start=curve_planned_z-5
-                        if layer_n == layer_nums[-1]:
+                        if layer_n == layer_nums[-1] and weld_parts == 'layer':
                             curve_prev = np.loadtxt(data_dir+f'curve_sliced_relative/slice{layer_nums[layer_n_id-1]}_0.csv',delimiter=',')
                             curve_prev_z = np.mean(curve_prev[:,2])
                             z_height_start = curve_prev_z
@@ -249,12 +253,22 @@ def main():
                     print("Transz0_H:",Transz0_H)
                     if layer_n_id % 2 == 0:
                         Transz0_H_even = deepcopy(Transz0_H)
+                        if layer_n_id==0:
+                            Trans_H_xy = np.eye(4)
+                            Trans_H_xy[-1,0] = 3
+                            Trans_H_xy[-1,1] = 0
+                            Transz0_H_even = Transz0_H_even@Trans_H_xy
                     else:
                         Transz0_H_odd = deepcopy(Transz0_H)
                     pcd_transform = deepcopy(pcd_denoise)
                     pcd_transform.transform(Transz0_H)
                     all_pcd_transform.append(pcd_transform)
-                    visualize_pcd([pcd_transform])
+                    if len(all_pcd_transform) != 0:
+                        cmap = plt.get_cmap('jet')
+                        color = cmap(np.linspace(0, 1, len(all_pcd_transform)))
+                        for i in range(len(all_pcd_transform)):
+                            all_pcd_transform[i].paint_uniform_color(color[i][:3])
+                        visualize_pcd(all_pcd_transform)
 
                     # apply 1D smoother to profile_width
                     profile_width[:,1] = np.convolve(profile_width[:,1], np.ones(5)/5, mode='same')
@@ -268,6 +282,18 @@ def main():
                     #############################################
 
                 ################ combine everything in one array ##############
+                if not scanner_lagging:
+                    if layer_n_id == len(layer_nums)-1 and weld_parts == 'layer':
+                        # if the scanner is leading, the last layer is not welding anything.
+                        break
+                    try:
+                        next_scan_height = np.loadtxt(next_layer_dir+'profile_height.csv',delimiter=',')
+                        next_scan_width = np.loadtxt(next_layer_dir+'profile_width.csv',delimiter=',')
+                    except FileNotFoundError:
+                        next_scan_height = deepcopy(profile_height)
+                        next_scan_width = deepcopy(profile_width)
+                        run_code_again_flag = True
+
                 profile_welding = []
                 for js_id,x in enumerate(weld_relative_exe[:,0]):
                     # time at the same x
@@ -283,22 +309,29 @@ def main():
                     # velocity at the same x
                     this_v = weld_relative_v_exe[js_id]
                     # height and width at the same x
-                    this_height = profile_height[np.argmin(np.abs(profile_height[:,0]-x)),1]
-                    if last_profile_height is not None:
-                        last_height = last_profile_height[np.argmin(np.abs(last_profile_height[:,0]-x)),1]
+                    if scanner_lagging:
+                        this_height = profile_height[np.argmin(np.abs(profile_height[:,0]-x)),1]
+                        if last_profile_height is not None:
+                            last_height = last_profile_height[np.argmin(np.abs(last_profile_height[:,0]-x)),1]
+                        else:
+                            last_height = 0
                     else:
-                        last_height = 0
-                    this_dh = this_height - last_height
-                    this_width = profile_width[np.argmin(np.abs(profile_width[:,0]-x)),1]
+                        this_height = next_scan_height[np.argmin(np.abs(next_scan_height[:,0]-x)),1]
+                        last_height = profile_height[np.argmin(np.abs(profile_height[:,0]-x)),1]
+                    this_dh = this_height - last_height                    
+                    this_width = profile_width[np.argmin(np.abs(profile_width[:,0]-x)),1] if scanner_lagging else next_scan_width[np.argmin(np.abs(next_scan_width[:,0]-x)),1]
+                    
                     # torch height
                     torch_height = weld_relative_exe[js_id,2] - last_height
                     # welding status at time t
-                    welding_status_idx=np.where(welding_status[:,0]>=this_t)[0][0]
+                    welding_status_idx=np.where(welding_status[:,0]>=this_t)[0]
+                    welding_status_idx = -1 if len(welding_status_idx) == 0 else welding_status_idx[0]
                     ratio=(this_t-welding_status[:,0][welding_status_idx-1])/(welding_status[:,0][welding_status_idx]-welding_status[:,0][welding_status_idx-1])
                     this_welding_status=welding_status[:,1:][welding_status_idx-1]*(1-ratio)+welding_status[:,1:][welding_status_idx]*ratio
 
                     # thermal reading at time t
-                    thermal_reading_idx=np.where(thermal_reading[:,0]>=this_t)[0][0]
+                    thermal_reading_idx = np.where(thermal_reading[:,0]>=this_t)[0]
+                    thermal_reading_idx = -1 if len(thermal_reading_idx) == 0 else thermal_reading_idx[0]
                     ratio=(this_t-thermal_reading[:,0][thermal_reading_idx-1])/(thermal_reading[:,0][thermal_reading_idx]-thermal_reading[:,0][thermal_reading_idx-1])
                     this_thermal_reading=thermal_reading[:,1][thermal_reading_idx-1]*(1-ratio)+thermal_reading[:,1][thermal_reading_idx]*ratio
 
@@ -313,11 +346,16 @@ def main():
 
                 print("Finished processing layer:",layer_name)
 
-        cmap = plt.get_cmap('jet')
-        color = cmap(np.linspace(0, 1, len(all_pcd_transform)))
-        for i in range(len(all_pcd_transform)):
-            all_pcd_transform[i].paint_uniform_color(color[i][:3])
-        visualize_pcd(all_pcd_transform)
+    
+        if len(all_pcd_transform) != 0:
+            cmap = plt.get_cmap('jet')
+            color = cmap(np.linspace(0, 1, len(all_pcd_transform)))
+            for i in range(len(all_pcd_transform)):
+                all_pcd_transform[i].paint_uniform_color(color[i][:3])
+            visualize_pcd(all_pcd_transform)
+
+    if run_code_again_flag:
+        print("********** You need to run the code again **********")
 
 if __name__ == '__main__':
     main()
