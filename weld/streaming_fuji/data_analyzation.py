@@ -11,6 +11,8 @@ mm2inch = 1/inch2mm
 cross_section = 1.2
 
 ignore_start_end = 5
+start_x = -55 + ignore_start_end
+end_x = 55 - ignore_start_end
 
 data_dir = '../../data/wall_weld_test/'
 
@@ -38,7 +40,7 @@ for logdata_dir_name in logdata_dir_all:
 
     ## mimicing welding model recursive update
     P_mat = np.eye(2)*0.1 # initial covariance
-    lambda_fac = 1
+    lambda_fac = 0.99
     theta_param = deepcopy(material_param['ER_4043']['100ipm'])
     dataScatters = []
     modelcurveLines = []
@@ -46,11 +48,12 @@ for logdata_dir_name in logdata_dir_all:
     v_plot_min = 1
     v_plot_max = 12
     fig, ax = plt.subplots()
+    ax.set_ylim(0.1,1.9)
     plt.ion()  # Turn on interactive mode
     plt.show()
     z_model = np.polyfit(np.log([v_plot_min,v_plot_max]), np.log(v2dh_loglog([v_plot_min,v_plot_max],100)), 1)
     p_model = np.poly1d(z_model)
-    line, = ax.plot(np.log([v_plot_min,v_plot_max]), p_model(np.log([v_plot_min,v_plot_max])), 'r--')
+    line, = ax.plot(np.log([v_plot_min,v_plot_max]), p_model(np.log([v_plot_min,v_plot_max])), 'g--')
     modelcurveLines.append(line)
     ###
 
@@ -82,11 +85,11 @@ for logdata_dir_name in logdata_dir_all:
         x = np.array(weld_data['x'])
         # ignore the first and last x mm
         if x[-1]>x[0]:
-            start_index = np.where(x > x[0]+ignore_start_end)[0][0] 
-            end_index = np.where(x < x[-1]-ignore_start_end)[0][-1]
+            start_index = np.where(x > start_x)[0][0] 
+            end_index = np.where(x < end_x)[0][-1]
         else:
-            start_index = np.where(x < x[0]-ignore_start_end)[0][0] 
-            end_index = np.where(x > x[-1]+ignore_start_end)[0][-1]
+            start_index = np.where(x < end_x)[0][0] 
+            end_index = np.where(x > start_x)[0][-1]
         for k in weld_data.keys():
             weld_data[k] = weld_data[k][start_index:end_index+1]
         weld_data['power'] = np.array(weld_data['voltage'])*np.array(weld_data['current'])
@@ -117,8 +120,8 @@ for logdata_dir_name in logdata_dir_all:
                 x_raw = x_raw[x_raw!=x_raw[0]]
             x_raw = np.array(x_raw_mean)
             y_raw = np.array(y_raw_mean)
-            # x_raw = x_raw[y_raw>0]
-            # y_raw = y_raw[y_raw>0]
+            x_raw = x_raw[y_raw>0]
+            y_raw = y_raw[y_raw>0]
 
             
             X_new_input = np.vstack((np.log(x_raw), np.ones_like(x_raw))).T
@@ -126,12 +129,18 @@ for logdata_dir_name in logdata_dir_all:
             K_gain = P_mat@X_new_input.T@np.linalg.inv(lambda_fac*np.eye(X_new_input.shape[0])+X_new_input@P_mat@X_new_input.T)
             theta_param = theta_param + K_gain@(Y_new_output-X_new_input@theta_param)
             P_mat = (P_mat-K_gain@X_new_input@P_mat)/lambda_fac
-            scatter = ax.scatter(X_new_input[:,0], Y_new_output,c=cmap(layer_n%10*2),s=1)
-            line, = ax.plot(np.log([v_plot_min,v_plot_max]), theta_param@np.vstack((np.log([v_plot_min,v_plot_max]),[1,1])),c=cmap(layer_n%10*2+1))
+            scatter = ax.scatter(X_new_input[:,0], Y_new_output,c=cmap(layer_n%10*2),s=5)
+            if len(modelcurveLines)<=1:
+                line_newcurve, = ax.plot(np.log([v_plot_min,v_plot_max]), theta_param@np.vstack((np.log([v_plot_min,v_plot_max]),[1,1])), 'r--')
+                modelcurveLines.append(line_newcurve)
+            else:
+                line_newcurve.set_data(np.log([v_plot_min,v_plot_max]), theta_param@np.vstack((np.log([v_plot_min,v_plot_max]),[1,1])))
+            # line.set_data()
             dataScatters.append(scatter)
-            modelcurveLines.append(line)
             print("The velocity when dh=2.3 using new theta_param", np.exp((np.log(2.3)-theta_param[1])/theta_param[0]))
-            plt.pause(1)
+            # if lauer_n_id == 2:
+            #     plt.pause(15)
+            plt.pause(0.1)
             plt.draw()
             ###
     
@@ -172,10 +181,12 @@ for i,input_sig_key in enumerate(input_signals):
 
             z = np.polyfit(x_values, y_values, 1)
             p = np.poly1d(z)
-            axs[j,i].scatter(x_values, y_values)
-            axs[j,i].plot(x_values, p(x_values), 'r--')
+            axs[j,i].scatter(x_values, y_values, s=5)
+            axs[j,i].plot(np.log([v_plot_min,v_plot_max]), p(np.log([v_plot_min,v_plot_max])), 'r--')
             if input_sig_key == 'cmd_v' and output_sig_key in ['dheight']:
-                axs[j,i].plot(np.array([min(x_values),max(x_values)]), p_model(np.array([min(x_values),max(x_values)])), 'g--')
+                axs[j,i].plot(np.log([v_plot_min,v_plot_max]), p_model(np.log([v_plot_min,v_plot_max])), 'g--')
+                axs[i,j].set_ylim(0.1,1.9)
+                axs[i,j].set_xlim(-0.1,2.6)
             axs[j,i].set_title(input_sig_key + ' vs ' + output_sig_key)
 plt.show()
 
