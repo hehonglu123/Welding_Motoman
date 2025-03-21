@@ -21,8 +21,8 @@ data_dir = '../../data/wall_weld_test/'
 # logdata_dir_all = ['weld_fujicontrol_2025_03_12_18_27_33/']
 logdata_dir_all = ['weld_fujiscan_2025_02_26_18_08_18/']
 
-# input_signals = ['cmd_v','cmd_feedrate']
-input_signals = ['v','cmd_feedrate']
+input_signals = ['cmd_v','cmd_feedrate']
+# input_signals = ['v','cmd_feedrate']
 # input_signals = ['cmd_v','cmd_VPD','torch_height']
 # input_signals = ['v','feedrate','power']
 # control_signals = ['v','feedrate','power']
@@ -51,14 +51,14 @@ for logdata_dir_name in logdata_dir_all:
     v_plot_max = 12
     omega_plot_min = 100*inch2mm/60
     omega_plot_max = 220*inch2mm/60
-    # fig, ax = plt.subplots()
-    # ax.set_ylim(0.1,1.9)
-    # plt.ion()  # Turn on interactive mode
-    # plt.show()
+    fig, ax = plt.subplots()
+    ax.set_ylim(0.1,1.9)
+    plt.ion()  # Turn on interactive mode
+    plt.show()
     z_model = np.polyfit(np.log([v_plot_min,v_plot_max]), np.log(v2dh_loglog([v_plot_min,v_plot_max],100)), 1)
     p_model = np.poly1d(z_model)
-    # line, = ax.plot(np.log([v_plot_min,v_plot_max]), p_model(np.log([v_plot_min,v_plot_max])), 'g--')
-    # modelcurveLines.append(line)
+    line, = ax.plot(np.log([v_plot_min,v_plot_max]), p_model(np.log([v_plot_min,v_plot_max])), 'g--')
+    modelcurveLines.append(line)
     ###
 
     with open(logdata_dir+'weld_meta_data.yml', 'r') as f:
@@ -115,47 +115,43 @@ for logdata_dir_name in logdata_dir_all:
         
         ## mimicing welding model update
         if lauer_n_id > 1:
-            x_raw = np.array(weld_data['v'])
+            x_raw = np.array(weld_data['cmd_v'])
             y_raw = np.array(weld_data['dheight'])
-            # x_raw_mean = []
-            # y_raw_mean = []
-            # while len(x_raw)>0:
-            #     x_raw_mean.append(x_raw[0])
-            #     y_raw_mean.append(np.mean(y_raw[x_raw==x_raw[0]]))
-            #     y_raw = y_raw[x_raw!=x_raw[0]]
-            #     x_raw = x_raw[x_raw!=x_raw[0]]
-            # x_raw = np.array(x_raw_mean)
-            # y_raw = np.array(y_raw_mean)
+            x_raw_mean = []
+            y_raw_mean = []
+            while len(x_raw)>0:
+                x_raw_mean.append(x_raw[0])
+                y_raw_mean.append(np.mean(y_raw[x_raw==x_raw[0]]))
+                y_raw = y_raw[x_raw!=x_raw[0]]
+                x_raw = x_raw[x_raw!=x_raw[0]]
+            x_raw = np.array(x_raw_mean)
+            y_raw = np.array(y_raw_mean)
             x_raw = x_raw[y_raw>0]
             y_raw = y_raw[y_raw>0]
 
-            for raw_i in range(int(len(x_raw)/100)):
-                this_x_raw = x_raw[raw_i*100:min((raw_i+1)*100,len(x_raw))]
-                this_y_raw = y_raw[raw_i*100:min((raw_i+1)*100,len(y_raw))]
 
-                X_new_input = np.vstack((np.log(this_x_raw), np.ones_like(this_x_raw))).T
-                Y_new_output = np.log(this_y_raw)
+            X_new_input = np.vstack((np.log(x_raw), np.ones_like(x_raw))).T
+            Y_new_output = np.log(y_raw)
 
-                K_gain = P_mat@X_new_input.T@np.linalg.inv(lambda_fac*np.eye(X_new_input.shape[0])+X_new_input@P_mat@X_new_input.T)
-                theta_param = theta_param + K_gain@(Y_new_output-X_new_input@theta_param)
-                P_mat = (P_mat-K_gain@X_new_input@P_mat)/lambda_fac
-                # scatter = ax.scatter(X_new_input[:,0], Y_new_output,c=cmap(layer_n%10*2),s=5)
-                # if len(modelcurveLines)<=1:
-                #     line_newcurve, = ax.plot(np.log([v_plot_min,v_plot_max]), theta_param@np.vstack((np.log([v_plot_min,v_plot_max]),[1,1])), 'r--')
-                #     modelcurveLines.append(line_newcurve)
-                # else:
-                #     line_newcurve.set_data(np.log([v_plot_min,v_plot_max]), theta_param@np.vstack((np.log([v_plot_min,v_plot_max]),[1,1])))
-                # # line.set_data()
-                # dataScatters.append(scatter)
-                print("The velocity when dh=2.3 using new theta_param", np.exp((np.log(2.3)-theta_param[1])/theta_param[0]))
-                # if lauer_n_id == 2:
-                #     plt.pause(15)
-                # plt.pause(0.1)
-                # plt.draw()
-                ###
+            K_gain = P_mat@X_new_input.T@np.linalg.inv(lambda_fac*np.eye(X_new_input.shape[0])+X_new_input@P_mat@X_new_input.T)
+            theta_param = theta_param + K_gain@(Y_new_output-X_new_input@theta_param)
+            P_mat = (P_mat-K_gain@X_new_input@P_mat)/lambda_fac
+            scatter = ax.scatter(X_new_input[:,0], Y_new_output,c=cmap(layer_n%10*2),s=5)
+            if len(modelcurveLines)<=1:
+                line_newcurve, = ax.plot(np.log([v_plot_min,v_plot_max]), theta_param@np.vstack((np.log([v_plot_min,v_plot_max]),[1,1])), 'r--')
+                modelcurveLines.append(line_newcurve)
+            else:
+                line_newcurve.set_data(np.log([v_plot_min,v_plot_max]), theta_param@np.vstack((np.log([v_plot_min,v_plot_max]),[1,1])))
+            dataScatters.append(scatter)
+            print("The velocity when dh=2.3 using new theta_param", np.exp((np.log(2.3)-theta_param[1])/theta_param[0]))
+            # if lauer_n_id == 2:
+            #     plt.pause(15)
+            plt.pause(0.1)
+            plt.draw()
+            ###
     
-    # plt.ioff()  # Turn off interactive mode
-    # plt.show()
+    plt.ioff()  # Turn off interactive mode
+    plt.show()
 
 fig, axs = plt.subplots(len(output_signals),len(input_signals))
 for i,input_sig_key in enumerate(input_signals):
@@ -182,7 +178,7 @@ for i,input_sig_key in enumerate(input_signals):
             # y_values = list(data_pairs[data_VPD][input_sig_key][output_sig_key].values())
             # fitna linear line
 
-            if input_sig_key in ['v', 'cmd_feedrate'] and output_sig_key in ['dheight','width']:
+            if input_sig_key in ['cmd_v', 'cmd_feedrate'] and output_sig_key in ['dheight','width']:
                 print("Any y_values lower than 0?",np.any(np.array(y_values)<0))
                 x_values = np.log(x_values)
                 y_values = np.log(y_values)
@@ -192,11 +188,11 @@ for i,input_sig_key in enumerate(input_signals):
             z = np.polyfit(x_values, y_values, 1)
             p = np.poly1d(z)
             axs[j,i].scatter(x_values, y_values, s=5)
-            if input_sig_key == 'v':
+            if input_sig_key == 'cmd_v':
                 axs[j,i].plot(np.log([v_plot_min,v_plot_max]), p(np.log([v_plot_min,v_plot_max])), 'r--')
             elif input_sig_key == 'cmd_feedrate':
                 axs[j,i].plot(np.log([omega_plot_min,omega_plot_max]), p(np.log([omega_plot_min,omega_plot_max])), 'r--')
-            if input_sig_key == 'v' and output_sig_key in ['dheight']:
+            if input_sig_key == 'cmd_v' and output_sig_key in ['dheight']:
                 axs[j,i].plot(np.log([v_plot_min,v_plot_max]), p_model(np.log([v_plot_min,v_plot_max])), 'g--')
                 axs[i,j].set_ylim(0.1,1.9)
                 axs[i,j].set_xlim(-0.1,2.6)

@@ -32,8 +32,8 @@ def main():
 
     # logdata_dir_all = ['weld_fujiscan_2025_02_26_18_08_18/', 'weld_fujiscan_2025_02_26_16_24_21/', 'weld_fujiscan_2025_02_26_17_39_17/']
     # logdata_dir_all = ['weld_fujiscan_2025_02_26_18_08_18/', 'weld_fujiscan_2025_02_26_16_24_21/']
-    # logdata_dir_all = ['weld_fujicontrol_2025_03_12_18_27_33/']
-    logdata_dir_all = ['weld_fujiscan_2025_02_26_18_08_18/']
+    logdata_dir_all = ['weld_fujicontrol_2025_03_12_18_27_33/']
+    # logdata_dir_all = ['weld_fujiscan_2025_02_26_18_08_18/']
 
     run_code_again_flag = False # For scanner leading case, need to generate all profile height before actually get dh.
     create_transform = False
@@ -323,10 +323,12 @@ def main():
                         run_code_again_flag = True
 
                 profile_welding = []
-                # for js_id,x in enumerate(weld_relative_exe[:,0]):
-                for x_id, x in enumerate(profile_height[:,0]):
+                for js_id,x in enumerate(weld_relative_exe[:,0]):
+                # for x_id, x in enumerate(profile_height[:,0]):
                     # find closest x in weld_relative_exe
-                    js_id = np.argmin(np.abs(weld_relative_exe[:,0]-x))
+                    # js_id = np.argmin(np.abs(weld_relative_exe[:,0]-x))
+                    if np.min(np.abs(profile_height[:,0]-x)) > 0.3:
+                        continue
 
                     # time at the same x
                     this_t = weld_js_exe[js_id,0]
