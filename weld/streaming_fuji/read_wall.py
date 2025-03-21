@@ -32,7 +32,8 @@ def main():
 
     # logdata_dir_all = ['weld_fujiscan_2025_02_26_18_08_18/', 'weld_fujiscan_2025_02_26_16_24_21/', 'weld_fujiscan_2025_02_26_17_39_17/']
     # logdata_dir_all = ['weld_fujiscan_2025_02_26_18_08_18/', 'weld_fujiscan_2025_02_26_16_24_21/']
-    logdata_dir_all = ['weld_fujicontrol_2025_03_12_18_27_33/']
+    # logdata_dir_all = ['weld_fujicontrol_2025_03_12_18_27_33/']
+    logdata_dir_all = ['weld_fujiscan_2025_02_26_18_08_18/']
 
     run_code_again_flag = False # For scanner leading case, need to generate all profile height before actually get dh.
     create_transform = False
@@ -52,7 +53,8 @@ def main():
         last_profile_height = None
         # build layers from bottom to top by layers
         all_pcd_transform = []
-        if create_transform:
+        all_profile_height = []
+        if create_transform or scanner_lagging:
             Transz0_H_odd = None
             Transz0_H_even = None
             Transicp_H_odd2even = None
@@ -192,6 +194,10 @@ def main():
                 try:
                     profile_height = np.loadtxt(this_layer_dir+'profile_height.csv',delimiter=',')
                     profile_width = np.loadtxt(this_layer_dir+'profile_width.csv',delimiter=',')
+                    all_profile_height.append(profile_height)
+                    # pcd = o3d.io.read_point_cloud(this_layer_dir+'pcd.pcd')
+                    pcd_denoise = o3d.io.read_point_cloud(this_layer_dir+'pcd_denoise.pcd')
+                    all_pcd_transform.append(pcd_denoise)
 
                 except FileNotFoundError:
                     # processing the scans
@@ -317,7 +323,11 @@ def main():
                         run_code_again_flag = True
 
                 profile_welding = []
-                for js_id,x in enumerate(weld_relative_exe[:,0]):
+                # for js_id,x in enumerate(weld_relative_exe[:,0]):
+                for x_id, x in enumerate(profile_height[:,0]):
+                    # find closest x in weld_relative_exe
+                    js_id = np.argmin(np.abs(weld_relative_exe[:,0]-x))
+
                     # time at the same x
                     this_t = weld_js_exe[js_id,0]
                     # weld command right before this time
@@ -360,6 +370,7 @@ def main():
                     this_welding_profile = np.array([this_t,x,this_cmd_v,this_cmd_fr,this_height,this_dh,torch_height,this_width,this_v,this_thermal_reading])
                     this_welding_profile = np.append(this_welding_profile,this_welding_status)
                     profile_welding.append(this_welding_profile)
+                
                 profile_welding = np.array(profile_welding)
                 # save profile welding with header
                 header = 'time,x,cmd_v,cmd_feedrate,height,dheight,torch_height,width,v,thermal,voltage,current,feedrate,energy'
@@ -369,12 +380,22 @@ def main():
                 print("Finished processing layer:",layer_name)
 
     
+
+        fig, ax = plt.subplots()
+        ax.set_title('Profile height')
+        ax.set_xlabel('X')
+        ax.set_ylabel('Z')
+        for i in range(len(all_profile_height)):
+            ax.plot(all_profile_height[i][:,0],all_profile_height[i][:,1],label='Layer '+str(i))
+        # ax.legend()
+        plt.show()
+
         if len(all_pcd_transform) != 0:
-            cmap = plt.get_cmap('jet')
-            color = cmap(np.linspace(0, 1, len(all_pcd_transform)))
+            cmap = plt.get_cmap('tab10')
             for i in range(len(all_pcd_transform)):
-                all_pcd_transform[i].paint_uniform_color(color[i][:3])
+                all_pcd_transform[i].paint_uniform_color(cmap(i%10)[:3])
             visualize_pcd(all_pcd_transform)
+        
 
     if run_code_again_flag:
         print("********** You need to run the code again **********")
