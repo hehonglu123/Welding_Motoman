@@ -18,7 +18,8 @@ data_dir = '../../data/wall_weld_test/'
 
 # logdata_dir_all = ['weld_fujiscan_2025_02_26_18_08_18/', 'weld_fujiscan_2025_02_26_16_24_21/', 'weld_fujiscan_2025_02_26_17_39_17/']
 # logdata_dir_all = ['weld_fujiscan_2025_02_26_18_08_18/', 'weld_fujiscan_2025_02_26_16_24_21/']
-logdata_dir_all = ['weld_fujicontrol_2025_03_12_18_27_33/']
+# logdata_dir_all = ['weld_fujicontrol_2025_03_12_18_27_33/']
+logdata_dir_all = ['weld_fujiscan_2025_02_26_18_08_18/']
 
 input_signals = ['cmd_v','cmd_feedrate']
 # input_signals = ['cmd_v','cmd_VPD','torch_height']
@@ -47,6 +48,8 @@ for logdata_dir_name in logdata_dir_all:
     cmap = plt.get_cmap('tab20')
     v_plot_min = 1
     v_plot_max = 12
+    omega_plot_min = 100*inch2mm/60
+    omega_plot_max = 220*inch2mm/60
     fig, ax = plt.subplots()
     ax.set_ylim(0.1,1.9)
     plt.ion()  # Turn on interactive mode
@@ -95,6 +98,8 @@ for logdata_dir_name in logdata_dir_all:
         weld_data['power'] = np.array(weld_data['voltage'])*np.array(weld_data['current'])
         weld_data['torch_height'] = np.array(weld_data['torch_height'])+np.array(weld_data['dheight'])+15
         weld_data['cmd_VPD'] = cross_section*inch2mm*np.array(weld_data['cmd_feedrate'])/np.array(weld_data['cmd_v'])
+
+        weld_data['cmd_feedrate'] = np.array(weld_data['cmd_feedrate'])*inch2mm/60 # from inch/min to mm/sec
 
         for input_sig_key in data_pairs[meta_data['VPD']].keys():
             for output_sig_key in data_pairs[meta_data['VPD']][input_sig_key].keys():
@@ -172,7 +177,7 @@ for i,input_sig_key in enumerate(input_signals):
             # y_values = list(data_pairs[data_VPD][input_sig_key][output_sig_key].values())
             # fitna linear line
 
-            if input_sig_key == 'cmd_v' and output_sig_key in ['dheight','width']:
+            if input_sig_key in ['cmd_v', 'cmd_feedrate'] and output_sig_key in ['dheight','width']:
                 print("Any y_values lower than 0?",np.any(np.array(y_values)<0))
                 x_values = np.log(x_values)
                 y_values = np.log(y_values)
@@ -182,7 +187,10 @@ for i,input_sig_key in enumerate(input_signals):
             z = np.polyfit(x_values, y_values, 1)
             p = np.poly1d(z)
             axs[j,i].scatter(x_values, y_values, s=5)
-            axs[j,i].plot(np.log([v_plot_min,v_plot_max]), p(np.log([v_plot_min,v_plot_max])), 'r--')
+            if input_sig_key == 'cmd_v':
+                axs[j,i].plot(np.log([v_plot_min,v_plot_max]), p(np.log([v_plot_min,v_plot_max])), 'r--')
+            elif input_sig_key == 'cmd_feedrate':
+                axs[j,i].plot(np.log([omega_plot_min,omega_plot_max]), p(np.log([omega_plot_min,omega_plot_max])), 'r--')
             if input_sig_key == 'cmd_v' and output_sig_key in ['dheight']:
                 axs[j,i].plot(np.log([v_plot_min,v_plot_max]), p_model(np.log([v_plot_min,v_plot_max])), 'g--')
                 axs[i,j].set_ylim(0.1,1.9)
