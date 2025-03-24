@@ -47,8 +47,10 @@ theta_param_dw = []
 ### drawing ###
 v_torch_plot_min = 2
 v_torch_plot_max = 15
-v_wire_plot_min = 80*inch2mm/60
-v_wire_plot_max = 250*inch2mm/60
+# v_wire_plot_min = 80*inch2mm/60
+# v_wire_plot_max = 250*inch2mm/60
+v_wire_plot_min = 2
+v_wire_plot_max = 7
 dataScatters = []
 modelcurveLines = []
 cmap = plt.get_cmap('tab20')
@@ -150,6 +152,10 @@ for logdata_dir_name in logdata_dir_all:
             v_wire = np.array(weld_data['cmd_feedrate'])
             dh_bead = np.array(weld_data['dheight'])
             dw_bead = np.array(weld_data['width'])
+            # v_torch = np.array(weld_data['v'])[::10]
+            # v_wire = np.array(weld_data['feedrate'])[::10]
+            # dh_bead = np.array(weld_data['dheight'])[::10]
+            # dw_bead = np.array(weld_data['width'])[::10]
             
             assert len(v_torch) == len(v_wire) == len(dh_bead) == len(dw_bead), "The length of input signals are not the same"
 
@@ -194,6 +200,11 @@ for logdata_dir_name in logdata_dir_all:
             v_wire = v_wire[dw_bead>0]
             dh_bead = dh_bead[dw_bead>0]
             dw_bead = dw_bead[dw_bead>0]
+            # remove data with v_wire <= 0
+            v_torch = v_torch[v_wire>0]
+            dh_bead = dh_bead[v_wire>0]
+            dw_bead = dw_bead[v_wire>0]
+            v_wire = v_wire[v_wire>0]
             # add to all data
             data_dh_all.extend(dh_bead)
             data_dw_all.extend(dw_bead)
