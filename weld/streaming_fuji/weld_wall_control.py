@@ -358,6 +358,47 @@ def main():
                             SS.position_cmd(q_cmd)
                         else:
                             SS.position_cmd(q_cmd,loop_start)
+                    fuji_scan_time = 0.5 # stay for a while for scanning
+                    fuji_scan_start = time.perf_counter()
+                    while time.perf_counter()-fuji_scan_start<fuji_scan_time:
+                        ### log data
+                        if fuji_scanon:
+                            wire_packet=fuji_scan_wire.TryGetInValue() # log fuji cam scanner data
+                            valid_indices=np.where(wire_packet[1].I_data>1)[0]
+                            valid_indices=np.intersect1d(valid_indices,np.where(np.abs(wire_packet[1].Z_data)>30)[0])
+                            line_profile=np.hstack((wire_packet[1].Y_data[valid_indices].reshape(-1,1),wire_packet[1].Z_data[valid_indices].reshape(-1,1)))
+                            scan_exe.append(line_profile)
+                        weld_js_exe.append(np.append(time.perf_counter(),deepcopy(SS.q_cur))) # log robot joints
+
+                        ### scan online processing
+                        if fuji_scanon and scan_online_process:
+                            while scan_process.accessing_key:
+                                time.sleep(0.0000000000001)
+                            scan_process.accessing_key = True
+                            scan_process.raw_scan_pipe.append(deepcopy(line_profile))
+                            scan_process.robot_q_pipe.append(deepcopy(weld_js_exe[-1][np.array([1,2,3,4,5,6,13,14])])) # log robot joints (robot 1 and positioner)
+                            scan_process.accessing_key = False
+                            while len(scan_process.denoise_scan_pipe)!=0:
+                                while scan_process.accessing_key:
+                                    time.sleep(0.0000000000001)
+                                scan_process.accessing_key = True
+                                scan_denoise = scan_process.denoise_scan_pipe.pop(0)
+                                scan_denoise_tcp = scan_process.denoise_scan_tcp_pipe.pop(0)
+                                scan_point_location = scan_process.point_location_pipe.pop(0)
+                                scan_delta_h = scan_process.delta_h_pipe.pop(0)
+                                scan_process.accessing_key = False
+                                # get denoise scan
+                                scan_exe_noise_remove.append(scan_denoise)
+                                scan_exe_noise_remove_tcp.append(scan_denoise_tcp)
+                                # get lambda and record height
+                                curve_index = np.argsort(np.linalg.norm(curve[:,:2]-scan_point_location[:2],axis=1))[0]
+                                lam_scan = lam_relative[curve_index]
+                                lam_scan_i = np.where(lam_split<=lam_scan)[0][-1]
+                                if scan_delta_h<10:
+                                    lam_state_height[lam_scan_i].append(scan_delta_h)
+                                curve_shift = scan_point_location[:2]-curve[curve_index][:2]
+                                lam_curve_shift = np.vstack((lam_curve_shift,np.hstack((lam_scan,curve_shift))))
+                        time.sleep(1/SS.streaming_rate)
                     ########################################
 
                     # show height

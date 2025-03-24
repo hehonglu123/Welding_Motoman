@@ -290,7 +290,7 @@ def main():
                         pcd_denoise_trans.transform(Transz0_H)
                         all_pcd_transform.append(pcd_denoise_trans)
 
-
+                    # visualize_pcd([pcd_denoise_trans])
                     # if len(all_pcd_transform) != 0:
                     #     cmap = plt.get_cmap('jet')
                     #     color = cmap(np.linspace(0, 1, len(all_pcd_transform)))
