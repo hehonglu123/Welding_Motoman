@@ -31,8 +31,8 @@ def main():
     data_dir = '../../data/wall_weld_test/'
 
     # logdata_dir_all = ['weld_fujiscan_2025_02_26_18_08_18/', 'weld_fujiscan_2025_02_26_16_24_21/', 'weld_fujiscan_2025_02_26_17_39_17/']
-    # logdata_dir_all = ['weld_fujiscan_2025_02_26_18_08_18/', 'weld_fujiscan_2025_02_26_16_24_21/']
-    logdata_dir_all = ['weld_fujicontrol_2025_03_12_18_27_33/']
+    logdata_dir_all = ['weld_fujiscan_2025_02_26_18_08_18/', 'weld_fujiscan_2025_02_26_16_24_21/']
+    # logdata_dir_all = ['weld_fujicontrol_2025_03_12_18_27_33/']
     # logdata_dir_all = ['weld_fujiscan_2025_02_26_18_08_18/']
 
     run_code_again_flag = False # For scanner leading case, need to generate all profile height before actually get dh.
