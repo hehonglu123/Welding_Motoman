@@ -604,7 +604,7 @@ class ScanProcess():
         return scanned_points,Transz0_H
     
     def pcd2height(self,scanned_points,z_height_start,bbox_min=(-40,-20,0),bbox_max=(40,20,45),\
-                   resolution_z=0.1,windows_z=0.2,resolution_x=0.1,windows_x=1,stop_thres=20,\
+                   resolution_z=0.1,windows_z=0.2,resolution_x=0.1,windows_x=1,stop_thres=10,\
                    stop_thres_w=10,use_points_num=5,width_thres=0.8,Transz0_H=None,return_width=False):
 
         ##### cross section parameters
@@ -644,48 +644,64 @@ class ScanProcess():
         # bbox_max=(40,20,45)
         ##################### get welding pieces end ########################
 
+        min_bound = bbox_min
+        max_bound = bbox_max
+        bbox = o3d.geometry.AxisAlignedBoundingBox(min_bound=min_bound,max_bound=max_bound)
+        welds_points=scanned_points.crop(bbox)
+
         ##### get projection of each z height
         profile_height = {}
         profile_width = {}
-        z_max=np.max(np.asarray(scanned_points.points)[:,2])
-        for z in np.arange(z_height_start,z_max+resolution_z,resolution_z):
-            #### crop z height
-            min_bound = (-1e5,-1e5,z-windows_z/2)
-            max_bound = (1e5,1e5,z+windows_z/2)
+        profile_p = []
+        z_max=np.max(np.asarray(welds_points.points)[:,2])
+        for x in np.arange(bbox_min[0],bbox_max[0]+resolution_x,resolution_x):
+
+            min_bound = (x-windows_x/2,-1e5,-1e5)
+            max_bound = (x+windows_x/2,1e5,1e5)
             bbox = o3d.geometry.AxisAlignedBoundingBox(min_bound=min_bound,max_bound=max_bound)
-            points_proj=scanned_points.crop(bbox)
-            ##################
-            
-            min_bound = bbox_min
-            max_bound = bbox_max
-            bbox = o3d.geometry.AxisAlignedBoundingBox(min_bound=min_bound,max_bound=max_bound)
-            welds_points=points_proj.crop(bbox)
+            welds_points_x = welds_points.crop(bbox)
 
             # visualize_pcd([welds_points])
 
             #### get width with x-direction scanning
-            if len(welds_points.points)<stop_thres:
+            if len(welds_points_x.points)<stop_thres:
                 continue
+            
+            if type(z_height_start) is list or type(z_height_start) is np.ndarray:
+                # z height start is the last profile height
+                closest_id=np.where(z_height_start[:,0]>=x)[0]
+                if len(closest_id)==0:
+                    closest_id=-1
+                    this_z_height_start=z_height_start[-1,1]
+                else:
+                    closest_id=closest_id[0]
+                    ratio=(x-z_height_start[closest_id-1,0])/(z_height_start[closest_id,0]-z_height_start[closest_id-1,0])
+                    this_z_height_start=z_height_start[closest_id-1,1]+ratio*(z_height_start[closest_id,1]-z_height_start[closest_id-1,1])
+            else: # list or numpy array
+                this_z_height_start=z_height_start
 
-            profile_p = []
-            for x in np.arange(bbox_min[0],bbox_max[0]+resolution_x,resolution_x):
-                min_bound = (x-windows_x/2,-1e5,-1e5)
-                max_bound = (x+windows_x/2,1e5,1e5)
+            for z in np.arange(this_z_height_start,z_max+resolution_z,resolution_z):
+                
+                #### crop z height
+                min_bound = (-1e5,-1e5,z-windows_z/2)
+                max_bound = (1e5,1e5,z+windows_z/2)
                 bbox = o3d.geometry.AxisAlignedBoundingBox(min_bound=min_bound,max_bound=max_bound)
-                welds_points_x = welds_points.crop(bbox)
-                if len(welds_points_x.points)<stop_thres_w:
+                points_proj=welds_points_x.crop(bbox)
+                ##################
+                
+                if len(points_proj.points)<stop_thres_w:
                     continue
                 # visualize_pcd([welds_points_x])
                 ### get the width
-                sort_y=np.argsort(np.asarray(welds_points_x.points)[:,1])
+                sort_y=np.argsort(np.asarray(points_proj.points)[:,1])
                 y_min_index=sort_y[:use_points_num]
                 y_max_index=sort_y[-use_points_num:]
                 y_mid_index=sort_y[use_points_num:-use_points_num]
                 
                 ### get y and prune y that is too closed
-                y_min_all = np.asarray(welds_points_x.points)[y_min_index,1]
+                y_min_all = np.asarray(points_proj.points)[y_min_index,1]
                 y_min = np.mean(y_min_all)
-                y_max_all = np.asarray(welds_points_x.points)[y_max_index,1]
+                y_max_all = np.asarray(points_proj.points)[y_max_index,1]
                 y_max = np.mean(y_max_all)
 
                 actual_y_min_all=[]
@@ -704,18 +720,15 @@ class ScanProcess():
 
                 this_width=y_max-y_min
                 # z_height_ave = np.mean(np.asarray(welds_points_x.points)[np.append(y_min_index,y_max_index),2])
-                z_height_ave = np.mean(np.asarray(welds_points_x.points)[:,2])
+                z_height_ave = np.mean(np.asarray(points_proj.points)[:,2])
                 profile_p.append(np.array([x,this_width,z_height_ave]))
-            profile_p = np.array(profile_p)
+        profile_p = np.array(profile_p)
             
-            for pf_i in range(len(profile_p)):
-                profile_height[profile_p[pf_i][0]] = profile_p[pf_i][2]
-                if return_width:
-                    if profile_p[pf_i][0] not in profile_width.keys():
-                        profile_width[profile_p[pf_i][0]] = profile_p[pf_i][1]
-                    else:
-                        if profile_p[pf_i][1]>profile_width[profile_p[pf_i][0]]:
-                            profile_width[profile_p[pf_i][0]] = profile_p[pf_i][1]
+        while len(profile_p)>0:
+            profile_height[profile_p[0,0]] = np.max(profile_p[profile_p[:,0]==profile_p[0,0]][:,2])
+            if return_width:
+                profile_width[profile_p[0][0]] = np.max(profile_p[profile_p[:,0]==profile_p[0,0]][:,1])
+            profile_p = profile_p[profile_p[:,0]!=profile_p[0,0]]
 
         # profile_height_arr = []
         # profile_width_arr = []

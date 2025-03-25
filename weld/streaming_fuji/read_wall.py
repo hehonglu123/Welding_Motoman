@@ -31,8 +31,8 @@ def main():
     data_dir = '../../data/wall_weld_test/'
 
     # logdata_dir_all = ['weld_fujiscan_2025_02_26_18_08_18/', 'weld_fujiscan_2025_02_26_16_24_21/', 'weld_fujiscan_2025_02_26_17_39_17/']
-    logdata_dir_all = ['weld_fujiscan_2025_02_26_18_08_18/', 'weld_fujiscan_2025_02_26_16_24_21/']
-    # logdata_dir_all = ['weld_fujicontrol_2025_03_12_18_27_33/']
+    # logdata_dir_all = ['weld_fujiscan_2025_02_26_18_08_18/', 'weld_fujiscan_2025_02_26_16_24_21/']
+    logdata_dir_all = ['weld_fujicontrol_2025_03_12_18_27_33/']
     # logdata_dir_all = ['weld_fujiscan_2025_02_26_18_08_18/']
 
     run_code_again_flag = False # For scanner leading case, need to generate all profile height before actually get dh.
@@ -192,7 +192,7 @@ def main():
                 ############### get height and width ##############
                 print("Getting height and width...")
                 try:
-                    profile_height = np.loadtxt(this_layer_dir+'profile_height.csv',delimiter=',')
+                    profile_height = np.loadtxt(this_layer_dir+'profile_height',delimiter=',')
                     profile_width = np.loadtxt(this_layer_dir+'profile_width.csv',delimiter=',')
                     all_profile_height.append(profile_height)
                     # pcd = o3d.io.read_point_cloud(this_layer_dir+'pcd.pcd')
@@ -258,8 +258,12 @@ def main():
                     pcd_denoise = scan_process.pcd_noise_remove(pcd,crop_flag=False,nb_neighbors=40,std_ratio=1.5,min_bound=crop_min,max_bound=crop_max,cluster_based_outlier_remove=True,cluster_neighbor=1,min_points=100)
                     # Transz0_H = None
                     Transz0_H = deepcopy(Transz0_H_even) if layer_n_id % 2 == 0 else deepcopy(Transz0_H_odd)
-                    profile_height, _,Transz0_H = scan_process.pcd2height(deepcopy(pcd_denoise),z_height_start,bbox_min=crop_h_min,bbox_max=crop_h_max,Transz0_H=Transz0_H,return_width=True)
-                    _, profile_width,_ = scan_process.pcd2height(deepcopy(pcd),z_height_start,bbox_min=crop_h_min,bbox_max=crop_h_max,Transz0_H=Transz0_H,return_width=True)
+                    if last_profile_height is None:
+                        profile_height, _,Transz0_H = scan_process.pcd2height(deepcopy(pcd_denoise),z_height_start,bbox_min=crop_h_min,bbox_max=crop_h_max,Transz0_H=Transz0_H,return_width=True)
+                        _, profile_width,_ = scan_process.pcd2height(deepcopy(pcd),z_height_start,bbox_min=crop_h_min,bbox_max=crop_h_max,Transz0_H=Transz0_H,return_width=True)
+                    else:
+                        profile_height, _,Transz0_H = scan_process.pcd2height(deepcopy(pcd_denoise),z_height_start,bbox_min=crop_h_min,bbox_max=crop_h_max,Transz0_H=Transz0_H,return_width=True)
+                        _, profile_width,_ = scan_process.pcd2height(deepcopy(pcd),z_height_start,bbox_min=crop_h_min,bbox_max=crop_h_max,Transz0_H=Transz0_H,return_width=True)
                     
                     if create_transform:
                         if layer_n_id % 2 == 0:
@@ -290,7 +294,9 @@ def main():
                         pcd_denoise_trans.transform(Transz0_H)
                         all_pcd_transform.append(pcd_denoise_trans)
 
-                    # visualize_pcd([pcd_denoise_trans])
+                    visualize_pcd([pcd_denoise_trans])
+                    plt.plot(profile_height[:,0],profile_height[:,1],'-o')
+                    plt.show()
                     # if len(all_pcd_transform) != 0:
                     #     cmap = plt.get_cmap('jet')
                     #     color = cmap(np.linspace(0, 1, len(all_pcd_transform)))
