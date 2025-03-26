@@ -32,8 +32,9 @@ def main():
 
     # logdata_dir_all = ['weld_fujiscan_2025_02_26_18_08_18/', 'weld_fujiscan_2025_02_26_16_24_21/', 'weld_fujiscan_2025_02_26_17_39_17/']
     # logdata_dir_all = ['weld_fujiscan_2025_02_26_18_08_18/', 'weld_fujiscan_2025_02_26_16_24_21/']
-    logdata_dir_all = ['weld_fujicontrol_2025_03_12_18_27_33/']
+    # logdata_dir_all = ['weld_fujicontrol_2025_03_12_18_27_33/']
     # logdata_dir_all = ['weld_fujiscan_2025_02_26_18_08_18/']
+    logdata_dir_all = ['weld_fujiscan_2025_02_26_18_08_18/', 'weld_fujiscan_2025_02_26_16_24_21/', 'weld_fujicontrol_2025_03_12_18_27_33/']
 
     run_code_again_flag = False # For scanner leading case, need to generate all profile height before actually get dh.
     create_transform = False
@@ -192,7 +193,7 @@ def main():
                 ############### get height and width ##############
                 print("Getting height and width...")
                 try:
-                    profile_height = np.loadtxt(this_layer_dir+'profile_height',delimiter=',')
+                    profile_height = np.loadtxt(this_layer_dir+'profile_height.csv',delimiter=',')
                     profile_width = np.loadtxt(this_layer_dir+'profile_width.csv',delimiter=',')
                     all_profile_height.append(profile_height)
                     # pcd = o3d.io.read_point_cloud(this_layer_dir+'pcd.pcd')
@@ -262,10 +263,19 @@ def main():
                         profile_height, _,Transz0_H = scan_process.pcd2height(deepcopy(pcd_denoise),z_height_start,bbox_min=crop_h_min,bbox_max=crop_h_max,Transz0_H=Transz0_H,return_width=True)
                         _, profile_width,_ = scan_process.pcd2height(deepcopy(pcd),z_height_start,bbox_min=crop_h_min,bbox_max=crop_h_max,Transz0_H=Transz0_H,return_width=True)
                     else:
-                        profile_height, _,Transz0_H = scan_process.pcd2height(deepcopy(pcd_denoise),z_height_start,bbox_min=crop_h_min,bbox_max=crop_h_max,Transz0_H=Transz0_H,return_width=True)
+                        profile_height, _,Transz0_H = scan_process.pcd2height(deepcopy(pcd_denoise),last_profile_height,bbox_min=crop_h_min,bbox_max=crop_h_max,Transz0_H=Transz0_H,return_width=True)
                         _, profile_width,_ = scan_process.pcd2height(deepcopy(pcd),z_height_start,bbox_min=crop_h_min,bbox_max=crop_h_max,Transz0_H=Transz0_H,return_width=True)
                     
-                    if create_transform:
+                    # for visualization
+                    pcd_denoise_trans = deepcopy(pcd_denoise)
+                    pcd_denoise_trans.transform(Transz0_H)
+                    all_pcd_transform.append(pcd_denoise_trans)
+                    all_profile_height.append(profile_height)
+
+                    if scanner_lagging:
+                        Transz0_H_even = deepcopy(Transz0_H)
+                        Transz0_H_odd = deepcopy(Transz0_H)
+                    elif create_transform:
                         if layer_n_id % 2 == 0:
                             Transz0_H_even = deepcopy(Transz0_H)
                             np.savetxt(logdata_dir+'Transz0_H_even.csv',Transz0_H_even,delimiter=',')
@@ -275,9 +285,6 @@ def main():
                                 Transz0_H_odd[0,-1] -= 4
                                 Transz0_H_odd[1,-1] += 1
                             np.savetxt(logdata_dir+'Transz0_H_odd.csv',Transz0_H_odd,delimiter=',')
-                        pcd_transform = deepcopy(pcd_denoise)
-                        pcd_transform.transform(Transz0_H)
-                        all_pcd_transform.append(pcd_transform)
                         if 'control' in logdata_dir_name and layer_n_id == 1 and weld_parts == 'layer':
                             print("Transforming pcd using icp")
                             threshold = 1
@@ -289,14 +296,12 @@ def main():
                                         o3d.pipelines.registration.TransformationEstimationPointToPoint(),
                                         o3d.pipelines.registration.ICPConvergenceCriteria(max_iteration=2000))
                             np.savetxt(logdata_dir+'Trans_icp_odd2even.csv',reg_p2p.transformation,delimiter=',')
-                    else:
-                        pcd_denoise_trans = deepcopy(pcd_denoise)
-                        pcd_denoise_trans.transform(Transz0_H)
-                        all_pcd_transform.append(pcd_denoise_trans)
+                    
+                    
 
-                    visualize_pcd([pcd_denoise_trans])
-                    plt.plot(profile_height[:,0],profile_height[:,1],'-o')
-                    plt.show()
+                    # visualize_pcd([pcd_denoise_trans])
+                    # plt.plot(profile_height[:,0],profile_height[:,1],'-o')
+                    # plt.show()
                     # if len(all_pcd_transform) != 0:
                     #     cmap = plt.get_cmap('jet')
                     #     color = cmap(np.linspace(0, 1, len(all_pcd_transform)))
@@ -389,20 +394,20 @@ def main():
 
     
 
-        fig, ax = plt.subplots()
-        ax.set_title('Profile height')
-        ax.set_xlabel('X')
-        ax.set_ylabel('Z')
-        for i in range(len(all_profile_height)):
-            ax.plot(all_profile_height[i][:,0],all_profile_height[i][:,1],label='Layer '+str(i))
-        # ax.legend()
-        plt.show()
+        # fig, ax = plt.subplots()
+        # ax.set_title('Profile height')
+        # ax.set_xlabel('X')
+        # ax.set_ylabel('Z')
+        # for i in range(len(all_profile_height)):
+        #     ax.plot(all_profile_height[i][:,0],all_profile_height[i][:,1],label='Layer '+str(i))
+        # # ax.legend()
+        # plt.show()
 
-        if len(all_pcd_transform) != 0:
-            cmap = plt.get_cmap('tab10')
-            for i in range(len(all_pcd_transform)):
-                all_pcd_transform[i].paint_uniform_color(cmap(i%10)[:3])
-            visualize_pcd(all_pcd_transform)
+        # if len(all_pcd_transform) != 0:
+        #     cmap = plt.get_cmap('tab10')
+        #     for i in range(len(all_pcd_transform)):
+        #         all_pcd_transform[i].paint_uniform_color(cmap(i%10)[:3])
+        #     visualize_pcd(all_pcd_transform)
         
 
     if run_code_again_flag:

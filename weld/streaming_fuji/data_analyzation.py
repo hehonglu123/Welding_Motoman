@@ -10,7 +10,7 @@ inch2mm = 25.4
 mm2inch = 1/inch2mm
 cross_section = 1.2
 
-ignore_start_end = 5
+ignore_start_end = 10
 start_x = -55 + ignore_start_end
 end_x = 55 - ignore_start_end
 
@@ -47,10 +47,10 @@ theta_param_dw = []
 ### drawing ###
 v_torch_plot_min = 2
 v_torch_plot_max = 15
-# v_wire_plot_min = 80*inch2mm/60
-# v_wire_plot_max = 250*inch2mm/60
-v_wire_plot_min = 2
-v_wire_plot_max = 7
+v_wire_plot_min = 80*inch2mm/60
+v_wire_plot_max = 250*inch2mm/60
+# v_wire_plot_min = 2
+# v_wire_plot_max = 7
 dataScatters = []
 modelcurveLines = []
 cmap = plt.get_cmap('tab20')
@@ -61,24 +61,26 @@ cmap = plt.get_cmap('tab20')
 # p_model = np.poly1d(z_model)
 # line, = ax.plot(np.log([v_torch_plot_min,v_torch_plot_max]), p_model(np.log([v_torch_plot_min,v_torch_plot_max])), 'g--')
 # modelcurveLines.append(line)
-
-fig, ax = plt.subplots(2,1,figsize=(7,9), sharex=True)
-# 
-ax[0].set_xlim(np.log(v_torch_plot_min),np.log(v_torch_plot_max))
-ax[0].set_ylim(np.log(v_wire_plot_min),np.log(v_wire_plot_max))
-ax[1].set_xlim(np.log(v_torch_plot_min),np.log(v_torch_plot_max))
-ax[1].set_ylim(np.log(v_wire_plot_min),np.log(v_wire_plot_max))
-im_dh = ax[0].imshow(np.zeros((10,10)), extent=(np.log(v_torch_plot_min),np.log(v_torch_plot_max),np.log(v_wire_plot_min),np.log(v_wire_plot_max)), aspect='equal')
-im_dw = ax[1].imshow(np.zeros((10,10)), extent=(np.log(v_torch_plot_min),np.log(v_torch_plot_max),np.log(v_wire_plot_min),np.log(v_wire_plot_max)), aspect='equal')
-
-plt.ion()  # Turn on interactive mode
-plt.show()
+# fig, ax = plt.subplots(2,1,figsize=(7,9), sharex=True)
+# # 
+# ax[0].set_xlim(np.log(v_torch_plot_min),np.log(v_torch_plot_max))
+# ax[0].set_ylim(np.log(v_wire_plot_min),np.log(v_wire_plot_max))
+# ax[1].set_xlim(np.log(v_torch_plot_min),np.log(v_torch_plot_max))
+# ax[1].set_ylim(np.log(v_wire_plot_min),np.log(v_wire_plot_max))
+# im_dh = ax[0].imshow(np.zeros((10,10)), extent=(np.log(v_torch_plot_min),np.log(v_torch_plot_max),np.log(v_wire_plot_min),np.log(v_wire_plot_max)), aspect='equal')
+# im_dw = ax[1].imshow(np.zeros((10,10)), extent=(np.log(v_torch_plot_min),np.log(v_torch_plot_max),np.log(v_wire_plot_min),np.log(v_wire_plot_max)), aspect='equal')
+# plt.ion()  # Turn on interactive mode
+# plt.show()
 ###
 
-data_dh_all = []
-data_dw_all = []
+# input to the model
 data_v_wire_all = []
 data_v_torch_all = []
+data_height_all = []
+data_torch_height_all = []
+# output of the model
+data_dh_all = []
+data_dw_all = []
 
 for logdata_dir_name in logdata_dir_all:
     logdata_dir = data_dir + logdata_dir_name
@@ -118,6 +120,7 @@ for logdata_dir_name in logdata_dir_all:
         this_layer_dir = logdata_dir+'layer'+str(layer_n)+'/'
         weld_data = pd.read_csv(this_layer_dir + 'profile_welding.csv', header=0)
         weld_data = weld_data.to_dict(orient='list')
+        print(weld_data.keys())
 
         x = np.array(weld_data['x'])
         # ignore the first and last x mm
@@ -152,6 +155,8 @@ for logdata_dir_name in logdata_dir_all:
             v_wire = np.array(weld_data['cmd_feedrate'])
             dh_bead = np.array(weld_data['dheight'])
             dw_bead = np.array(weld_data['width'])
+            height_bead = np.array(weld_data['height'])-np.array(weld_data['dheight']) # height before deposition
+            torch_h_bead = np.array(weld_data['torch_height'])
             # v_torch = np.array(weld_data['v'])[::10]
             # v_wire = np.array(weld_data['feedrate'])[::10]
             # dh_bead = np.array(weld_data['dheight'])[::10]
@@ -163,6 +168,8 @@ for logdata_dir_name in logdata_dir_all:
             v_wire_mean = []
             dh_bead_mean = []
             dw_bead_mean = []
+            height_bead_mean = []
+            torch_h_bead_mean = []
             while len(v_torch)>0:
                 # find the smallest index of v_torch different from v_torch[0]
                 v_torch_diff_index = np.where(v_torch!=v_torch[0])[0]
@@ -180,34 +187,48 @@ for logdata_dir_name in logdata_dir_all:
                 v_wire_mean.append(v_wire[0])
                 dh_bead_mean.append(np.mean(dh_bead[:diff_index]))
                 dw_bead_mean.append(np.mean(dw_bead[:diff_index]))
+                height_bead_mean.append(np.mean(height_bead[:diff_index]))
+                torch_h_bead_mean.append(np.mean(torch_h_bead[:diff_index]))
                 # remove the used data
                 v_torch = v_torch[diff_index:]
                 v_wire = v_wire[diff_index:]
                 dh_bead = dh_bead[diff_index:]
                 dw_bead = dw_bead[diff_index:]
+                height_bead = height_bead[diff_index:]
+                torch_h_bead = torch_h_bead[diff_index:]
 
             v_torch = np.array(v_torch_mean)
             v_wire = np.array(v_wire_mean)
             dh_bead = np.array(dh_bead_mean)
             dw_bead = np.array(dw_bead_mean)
+            height_bead = np.array(height_bead_mean)
+            torch_h_bead = np.array(torch_h_bead_mean)
             # remove data with dh_bead < 0
             v_torch = v_torch[dh_bead>0]
             v_wire = v_wire[dh_bead>0]
             dw_bead = dw_bead[dh_bead>0]
+            height_bead = height_bead[dh_bead>0]
+            torch_h_bead = torch_h_bead[dh_bead>0]
             dh_bead = dh_bead[dh_bead>0]
             # remove data with dw_bead <= 0
             v_torch = v_torch[dw_bead>0]
             v_wire = v_wire[dw_bead>0]
             dh_bead = dh_bead[dw_bead>0]
+            height_bead = height_bead[dw_bead>0]
+            torch_h_bead = torch_h_bead[dw_bead>0]
             dw_bead = dw_bead[dw_bead>0]
             # remove data with v_wire <= 0
             v_torch = v_torch[v_wire>0]
             dh_bead = dh_bead[v_wire>0]
             dw_bead = dw_bead[v_wire>0]
+            height_bead = height_bead[v_wire>0]
+            torch_h_bead = torch_h_bead[v_wire>0]
             v_wire = v_wire[v_wire>0]
             # add to all data
             data_dh_all.extend(dh_bead)
             data_dw_all.extend(dw_bead)
+            data_height_all.extend(height_bead)
+            data_torch_height_all.extend(torch_h_bead)
             data_v_wire_all.extend(v_wire)
             data_v_torch_all.extend(v_torch)
 
@@ -254,47 +275,75 @@ for logdata_dir_name in logdata_dir_all:
             # for ax_i in range(2):
             #     scatter = ax[ax_i].scatter(np.log(v_torch), np.log(v_wire),c=cmap(layer_n%10*2),s=5)
             #     dataScatters.append(scatter)
-            v_torch_plot = np.linspace(np.log(v_torch_plot_min),np.log(v_torch_plot_max),100)
-            v_wire_plot = np.linspace(np.log(v_wire_plot_min),np.log(v_wire_plot_max),100)
-            v_torch_plot, v_wire_plot = np.meshgrid(v_torch_plot, v_wire_plot)
-            dh_bead_plot = theta_param_dh[0]*v_torch_plot*v_wire_plot + theta_param_dh[1]*v_torch_plot + theta_param_dh[2]*v_wire_plot + theta_param_dh[3]
-            dw_bead_plot = theta_param_dw[0]*v_torch_plot*v_wire_plot + theta_param_dw[1]*v_torch_plot + theta_param_dw[2]*v_wire_plot + theta_param_dw[3]
-            im_dh.set_data(dh_bead_plot)
-            im_dh.set_clim(np.min(dh_bead_plot),np.max(dh_bead_plot))
-            cmap = im_dh.get_cmap()
-            scatter_dh = ax[0].scatter(np.log(v_torch), np.log(v_wire),c=cmap((np.log(dh_bead)-np.min(dh_bead_plot))/np.max(dh_bead_plot)),s=5)
-            dataScatters.append(scatter_dh)
-            im_dw.set_data(dw_bead_plot)
-            im_dw.set_clim(np.min(dw_bead_plot),np.max(dw_bead_plot))
-            cmap = im_dw.get_cmap()
-            scatter_dw = ax[1].scatter(np.log(v_torch), np.log(v_wire),c=cmap((np.log(dw_bead)-np.min(dw_bead_plot))/np.max(dw_bead_plot)),s=5)
-            dataScatters.append(scatter_dw)
+            # v_torch_plot = np.linspace(np.log(v_torch_plot_min),np.log(v_torch_plot_max),100)
+            # v_wire_plot = np.linspace(np.log(v_wire_plot_min),np.log(v_wire_plot_max),100)
+            # v_torch_plot, v_wire_plot = np.meshgrid(v_torch_plot, v_wire_plot)
+            # dh_bead_plot = theta_param_dh[0]*v_torch_plot*v_wire_plot + theta_param_dh[1]*v_torch_plot + theta_param_dh[2]*v_wire_plot + theta_param_dh[3]
+            # dw_bead_plot = theta_param_dw[0]*v_torch_plot*v_wire_plot + theta_param_dw[1]*v_torch_plot + theta_param_dw[2]*v_wire_plot + theta_param_dw[3]
+            # im_dh.set_data(dh_bead_plot)
+            # im_dh.set_clim(np.min(dh_bead_plot),np.max(dh_bead_plot))
+            # cmap = im_dh.get_cmap()
+            # scatter_dh = ax[0].scatter(np.log(v_torch), np.log(v_wire),c=cmap((np.log(dh_bead)-np.min(dh_bead_plot))/np.max(dh_bead_plot)),s=5)
+            # dataScatters.append(scatter_dh)
+            # im_dw.set_data(dw_bead_plot)
+            # im_dw.set_clim(np.min(dw_bead_plot),np.max(dw_bead_plot))
+            # cmap = im_dw.get_cmap()
+            # scatter_dw = ax[1].scatter(np.log(v_torch), np.log(v_wire),c=cmap((np.log(dw_bead)-np.min(dw_bead_plot))/np.max(dw_bead_plot)),s=5)
+            # dataScatters.append(scatter_dw)
+            # plt.pause(0.001)
+            # plt.draw()
 
-            plt.pause(0.001)
-            plt.draw()
+# plt.ioff()  # Turn off interactive mode
+# plt.show()
 
-plt.ioff()  # Turn off interactive mode
-plt.show()
+# save the data to wall_weld_test folder
+data_weld_all = {}
+data_weld_all['dh'] = data_dh_all
+data_weld_all['dw'] = data_dw_all
+data_weld_all['height'] = data_height_all
+data_weld_all['v_torch'] = data_v_torch_all
+data_weld_all['v_wire'] = data_v_wire_all
+data_weld_all['torch_height'] = data_torch_height_all
+header = ''
+for key in data_weld_all.keys():
+    header += key + ','
+header = header[:-1]
+# using panads to save to csv
+data_weld_all = pd.DataFrame(data_weld_all)
+data_weld_all.to_csv(data_dir+'weld_data.csv', index=False, header=header.split(','))
+
 
 print("===============")
+print("Amount of data points",len(data_dh_all))
 ### plot the data using all data
 # X_new_input = np.vstack((np.log(v_torch)*np.log(v_wire), np.log(v_torch), np.log(v_wire), np.ones_like(v_torch))).T
 # X_new_input = np.vstack((np.log(data_v_torch_all)*np.log(data_v_wire_all), np.log(data_v_torch_all), np.log(data_v_wire_all), np.ones_like(data_v_torch_all))).T
 X_new_input = np.vstack((np.log(data_v_torch_all), np.log(data_v_wire_all), np.ones_like(data_v_torch_all))).T
+
 dh_new_output = np.log(data_dh_all)
 dw_new_output = np.log(data_dw_all)
 theta_param_dh = np.linalg.pinv(X_new_input)@dh_new_output
 theta_param_dw = np.linalg.pinv(X_new_input)@dw_new_output
 print("dh bead model",theta_param_dh)
 print("dw bead model",theta_param_dw)
+
+# rmse fitting error
+rmse_dh = np.sqrt(np.mean((dh_new_output-X_new_input@theta_param_dh)**2))
+rmse_dw = np.sqrt(np.mean((dw_new_output-X_new_input@theta_param_dw)**2))
+print("rmse dh (log)",rmse_dh, "dh",np.exp(rmse_dh))
+print("rmse dw (log)",rmse_dw, "dw",np.exp(rmse_dw))
+
+
 fig, ax = plt.subplots(2,1,figsize=(7,9), sharex=True)
 v_torch_plot = np.linspace(np.log(v_torch_plot_min),np.log(v_torch_plot_max),100)
 v_wire_plot = np.linspace(np.log(v_wire_plot_min),np.log(v_wire_plot_max),100)
 v_torch_plot, v_wire_plot = np.meshgrid(v_torch_plot, v_wire_plot)
+
 # dh_bead_plot = theta_param_dh[0]*v_torch_plot*v_wire_plot + theta_param_dh[1]*v_torch_plot + theta_param_dh[2]*v_wire_plot + theta_param_dh[3]
 # dw_bead_plot = theta_param_dw[0]*v_torch_plot*v_wire_plot + theta_param_dw[1]*v_torch_plot + theta_param_dw[2]*v_wire_plot + theta_param_dw[3]
 dh_bead_plot = theta_param_dh[0]*v_torch_plot + theta_param_dh[1]*v_wire_plot + theta_param_dh[2]
 dw_bead_plot = theta_param_dw[0]*v_torch_plot + theta_param_dw[1]*v_wire_plot + theta_param_dw[2]
+
 im_dh = ax[0].imshow(dh_bead_plot, extent=(np.log(v_torch_plot_min),np.log(v_torch_plot_max),np.log(v_wire_plot_min),np.log(v_wire_plot_max)), aspect='equal')
 cmap = im_dh.get_cmap()
 ax[0].scatter(np.log(data_v_torch_all), np.log(data_v_wire_all),c=cmap((np.log(data_dh_all)-np.min(dh_bead_plot))/np.max(dh_bead_plot)),s=5)
@@ -309,6 +358,17 @@ ax[0].set_ylabel('log v_wire')
 ax[1].set_ylabel('log v_wire')
 ax[0].set_title('dh bead model')
 ax[1].set_title('dw bead model')
+plt.show()
+
+X_new_input = np.vstack((np.log(data_v_torch_all), np.ones_like(data_v_torch_all))).T
+theta_param_dh_v_torch = np.linalg.pinv(X_new_input)@dh_new_output
+rmse_dh_v_torch = np.sqrt(np.mean((dh_new_output-X_new_input@theta_param_dh_v_torch)**2))
+print("rmse dh v_torch (log)",rmse_dh_v_torch, "dh",np.exp(rmse_dh_v_torch))
+plt.scatter(np.log(data_v_torch_all), dh_new_output, s=5)
+plt.plot(np.log(data_v_torch_all), X_new_input@theta_param_dh_v_torch, 'r--')
+plt.xlabel('log v_torch')
+plt.ylabel('log dh bead')
+plt.title('dh bead model using v_torch')
 plt.show()
 
 
