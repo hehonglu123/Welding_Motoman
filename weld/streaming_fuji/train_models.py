@@ -236,9 +236,9 @@ def train_NN(train_input,train_output,val_input,val_output,torch_height=True,lay
     model = NeuralNetwork(input_size, output_size, hidden_sizes=hidden_sizes)
     # Define loss (mean squared error) and optimizer (Adam)
     loss_fn = nn.MSELoss()
-    learning_rate = 0.001
+    learning_rate = 0.0001
     # Define the number of epochs
-    num_epochs = 3000
+    num_epochs = 10000
     # Define the optimizer
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
@@ -272,7 +272,7 @@ def train_NN(train_input,train_output,val_input,val_output,torch_height=True,lay
             training_loss_all.append(loss.item())
             validation_loss_all.append(val_loss.item())
 
-            if epoch % 100 == 0:
+            if epoch % 1000 == 0:
                 print(f'Epoch [{epoch}/{num_epochs}], Training Loss: {loss.item():.4f}, Validation Loss: {val_loss.item():.4f}')
         print(f'Training time: {time.perf_counter()-time_start:.2f} seconds')
         ### plot losses ###
@@ -403,7 +403,7 @@ def main():
     output_string_dh += '| Unit (mm) | Train RMSE dh| Test RMSE dh | Train Max dh | Test Max dh | Interval 95% |\n'
     output_string_dh += '|---|---|---|---|---|---|\n'
 
-    output_string_dw = '# Error Distribution\n'
+    output_string_dw = '# Error Distribution dw\n'
     output_string_dw += '| Unit (mm) | Train RMSE dw| Test RMSE dw | Train Max dw | Test Max dw | Interval 95% |\n'
     output_string_dw += '|---|---|---|---|---|---|\n'
 
@@ -437,16 +437,16 @@ def main():
     plot_error_heatmap(dh_error_train_nn, dw_error_train_nn, dh_error_val_nn, dw_error_val_nn, train_input, val_input, plot_title='Error heatmap (neural network model)') # plot training and validation error heatmap for dh and dw
     output_string_dh += f'| Neural Network model | {train_rmse_dh_nn:.2f} | {val_rmse_dh_nn:.2f} | {np.max(np.abs(dh_error_train_nn)):.2f} | {np.max(np.abs(dh_error_val_nn)):.2f} | {dh_inter_95_nn[0]:.2f}~{dh_inter_95_nn[1]:.2f} |\n'
     output_string_dw += f'| Neural Network model | {train_rmse_dw_nn:.2f} | {val_rmse_dw_nn:.2f} | {np.max(np.abs(dw_error_train_nn)):.2f} | {np.max(np.abs(dw_error_val_nn)):.2f} | {dw_inter_95_nn[0]:.2f}~{dw_inter_95_nn[1]:.2f} |\n'
-    # # Gaussian Process model. with torch height
-    # print("Training Gaussian Process model with torch height...")
-    # dh_error_train_gp, dw_error_train_gp, dh_error_val_gp, dw_error_val_gp = \
-    #     train_GP(deepcopy(train_input), deepcopy(train_output), deepcopy(val_input), deepcopy(val_output), torch_height=True, layer_height=False)
-    # train_rmse_dh_gp, train_rmse_dw_gp, val_rmse_dh_gp, val_rmse_dw_gp = \
-    #     get_rmse(dh_error_train_gp), get_rmse(dw_error_train_gp), get_rmse(dh_error_val_gp), get_rmse(dw_error_val_gp)
-    # dh_inter_95_gp, dw_inter_95_gp = plot_error_distribution(np.abs(dh_error_train_gp), np.abs(dw_error_train_gp), np.abs(dh_error_val_gp), np.abs(dw_error_val_gp), plot_title='Error distribution (GP model with torch height)') # plot training and validation error distribution for dh and dw
-    # plot_error_heatmap(dh_error_train_gp, dw_error_train_gp, dh_error_val_gp, dw_error_val_gp, train_input, val_input, plot_title='Error heatmap (GP model with torch height)') # plot training and validation error heatmap for dh and dw
-    # output_string_dh += f'| Gaussian Process model | {train_rmse_dh_gp:.2f} | {val_rmse_dh_gp:.2f} | {np.max(np.abs(dh_error_train_gp)):.2f} | {np.max(np.abs(dh_error_val_gp)):.2f} | {dh_inter_95_gp[0]:.2f}~{dh_inter_95_gp[1]:.2f} |\n'
-    # output_string_dw += f'| Gaussian Process model | {train_rmse_dw_gp:.2f} | {val_rmse_dw_gp:.2f} | {np.max(np.abs(dw_error_train_gp)):.2f} | {np.max(np.abs(dw_error_val_gp)):.2f} | {dw_inter_95_gp[0]:.2f}~{dw_inter_95_gp[1]:.2f} |\n'
+    # Gaussian Process model. with torch height
+    print("Training Gaussian Process model with torch height...")
+    dh_error_train_gp, dw_error_train_gp, dh_error_val_gp, dw_error_val_gp = \
+        train_GP(deepcopy(train_input), deepcopy(train_output), deepcopy(val_input), deepcopy(val_output), torch_height=True, layer_height=False)
+    train_rmse_dh_gp, train_rmse_dw_gp, val_rmse_dh_gp, val_rmse_dw_gp = \
+        get_rmse(dh_error_train_gp), get_rmse(dw_error_train_gp), get_rmse(dh_error_val_gp), get_rmse(dw_error_val_gp)
+    dh_inter_95_gp, dw_inter_95_gp = plot_error_distribution(np.abs(dh_error_train_gp), np.abs(dw_error_train_gp), np.abs(dh_error_val_gp), np.abs(dw_error_val_gp), plot_title='Error distribution (GP model with torch height)') # plot training and validation error distribution for dh and dw
+    plot_error_heatmap(dh_error_train_gp, dw_error_train_gp, dh_error_val_gp, dw_error_val_gp, train_input, val_input, plot_title='Error heatmap (GP model with torch height)') # plot training and validation error heatmap for dh and dw
+    output_string_dh += f'| Gaussian Process model | {train_rmse_dh_gp:.2f} | {val_rmse_dh_gp:.2f} | {np.max(np.abs(dh_error_train_gp)):.2f} | {np.max(np.abs(dh_error_val_gp)):.2f} | {dh_inter_95_gp[0]:.2f}~{dh_inter_95_gp[1]:.2f} |\n'
+    output_string_dw += f'| Gaussian Process model | {train_rmse_dw_gp:.2f} | {val_rmse_dw_gp:.2f} | {np.max(np.abs(dw_error_train_gp)):.2f} | {np.max(np.abs(dw_error_val_gp)):.2f} | {dw_inter_95_gp[0]:.2f}~{dw_inter_95_gp[1]:.2f} |\n'
 
     print(output_string_dh)
     print(output_string_dw)
