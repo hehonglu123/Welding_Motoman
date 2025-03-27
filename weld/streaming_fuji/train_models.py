@@ -69,15 +69,19 @@ def plot_vt_vw_dh_dw(v_torch_range, v_wire_range, dh_pred, dw_pred, plot_title='
 def plot_error_distribution(dh_train_error, dw_train_error, dh_val_error, dw_val_error, plot_title='Error Distribution'):
 
     # fit distribution with exponential distribution
-    dh_lambda_hat = 1 / np.mean(dh_train_error)
-    dh_exp_dist = stats.expon(scale=1/dh_lambda_hat)
-    dw_lambda_hat = 1 / np.mean(dw_train_error)
-    dw_exp_dist = stats.expon(scale=1/dw_lambda_hat)
+    dh_lambda_hat_train = 1 / np.mean(dh_train_error)
+    dh_exp_dist_train = stats.expon(scale=1/dh_lambda_hat_train)
+    dh_lambda_hat_val = 1 / np.mean(dh_val_error)
+    dh_exp_dist_val = stats.expon(scale=1/dh_lambda_hat_val)
+    dw_lambda_hat_train = 1 / np.mean(dw_train_error)
+    dw_exp_dist_train = stats.expon(scale=1/dw_lambda_hat_train)
+    dw_lambda_hat_val = 1 / np.mean(dw_val_error)
+    dw_exp_dist_val = stats.expon(scale=1/dw_lambda_hat_val)
     # fit distribution with half-normal distribution
-    dh_loc_hat, dh_sigma_hat = stats.halfnorm.fit(dh_train_error, floc=0)
-    dh_halfnorm_dist = stats.halfnorm(loc=dh_loc_hat, scale=dh_sigma_hat)
-    dw_loc_hat, dw_sigma_hat = stats.halfnorm.fit(dw_train_error, floc=0)
-    dw_halfnorm_dist = stats.halfnorm(loc=dw_loc_hat, scale=dw_sigma_hat)
+    # dh_loc_hat, dh_sigma_hat = stats.halfnorm.fit(dh_train_error, floc=0)
+    # dh_halfnorm_dist = stats.halfnorm(loc=dh_loc_hat, scale=dh_sigma_hat)
+    # dw_loc_hat, dw_sigma_hat = stats.halfnorm.fit(dw_train_error, floc=0)
+    # dw_halfnorm_dist = stats.halfnorm(loc=dw_loc_hat, scale=dw_sigma_hat)
 
     # plot the error distribution
     fig, ax = plt.subplots(1, 2, figsize=(12, 6))
@@ -85,8 +89,9 @@ def plot_error_distribution(dh_train_error, dw_train_error, dh_val_error, dw_val
     ax[0].hist(dh_train_error, bins=50, density=True, alpha=0.5, label='Train')
     # dh validation error
     ax[0].hist(dh_val_error, bins=50, density=True, alpha=0.5, label='Test')
-    ax[0].plot(np.linspace(0, np.max(dh_train_error), 100), dh_exp_dist.pdf(np.linspace(0, np.max(dh_train_error), 100)), label='Exponential Fit')
-    ax[0].plot(np.linspace(0, np.max(dh_train_error), 100), dh_halfnorm_dist.pdf(np.linspace(0, np.max(dh_train_error), 100)), label='Half-Normal Fit')
+    ax[0].plot(np.linspace(0, np.max(dh_train_error), 100), dh_exp_dist_train.pdf(np.linspace(0, np.max(dh_train_error), 100)), label='Train pdf')
+    # ax[0].plot(np.linspace(0, np.max(dh_train_error), 100), dh_halfnorm_dist.pdf(np.linspace(0, np.max(dh_train_error), 100)), label='Half-Normal Fit')
+    ax[0].plot(np.linspace(0, np.max(dh_train_error), 100), dh_exp_dist_val.pdf(np.linspace(0, np.max(dh_train_error), 100)), label='Test pdf')
     ax[0].set_xlabel('$\Delta h$ Error (mm)', fontsize=xy_label_size)
     ax[0].set_ylabel('Density', fontsize=xy_label_size)
     ax[0].set_title('$\Delta h$ Error Distribution', fontsize=title_size)
@@ -98,8 +103,9 @@ def plot_error_distribution(dh_train_error, dw_train_error, dh_val_error, dw_val
     ax[1].hist(dw_train_error, bins=50, density=True, alpha=0.5, label='Train')
     # dw validation error
     ax[1].hist(dw_val_error, bins=50, density=True, alpha=0.5, label='Test')
-    ax[1].plot(np.linspace(0, np.max(dw_train_error), 100), dw_exp_dist.pdf(np.linspace(0, np.max(dw_train_error), 100)), label='Exponential Fit')
-    ax[1].plot(np.linspace(0, np.max(dw_train_error), 100), dw_halfnorm_dist.pdf(np.linspace(0, np.max(dw_train_error), 100)), label='Half-Normal Fit')
+    ax[1].plot(np.linspace(0, np.max(dw_train_error), 100), dw_exp_dist_train.pdf(np.linspace(0, np.max(dw_train_error), 100)), label='Train pdf')
+    # ax[1].plot(np.linspace(0, np.max(dw_train_error), 100), dw_halfnorm_dist.pdf(np.linspace(0, np.max(dw_train_error), 100)), label='Half-Normal Fit')
+    ax[1].plot(np.linspace(0, np.max(dw_train_error), 100), dw_exp_dist_val.pdf(np.linspace(0, np.max(dw_train_error), 100)), label='Test pdf')
     ax[1].set_xlabel('$\Delta w$ Error (mm)', fontsize=xy_label_size)
     ax[1].set_ylabel('Density', fontsize=xy_label_size)
     ax[1].set_title('$\Delta w$ Error Distribution', fontsize=title_size)
@@ -111,7 +117,7 @@ def plot_error_distribution(dh_train_error, dw_train_error, dh_val_error, dw_val
     plt.tight_layout()
     plt.show()
 
-    return dh_exp_dist.interval(0.95), dw_exp_dist.interval(0.95)
+    return dh_exp_dist_train.interval(0.95), dw_exp_dist_train.interval(0.95)
 
 def plot_error_heatmap(dh_train_error, dw_train_error, dh_val_error, dw_val_error, train_inputs, val_inputs, plot_title='Error Heatmap'):
 
