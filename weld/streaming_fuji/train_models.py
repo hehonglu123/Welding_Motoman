@@ -328,7 +328,7 @@ def train_NN(train_input,train_output,val_input,val_output,torch_height=True,lay
 
     return dh_error_train, dw_error_train, dh_error_val, dw_error_val
 
-def train_GP(train_input,train_output,val_input,val_output,torch_height=True,layer_height=False):
+def train_GP(train_input,train_output,val_input,val_output,torch_height=True,layer_height=False,train_model=True,model_dir=''):
 
     input_chosen = [0,1]
     input_chosen.append(2) if torch_height else None
@@ -348,14 +348,25 @@ def train_GP(train_input,train_output,val_input,val_output,torch_height=True,lay
     # Instantiate and fit separate GP models for each output dimension
     time_start = time.perf_counter()
     gps = []
-    for m in range(output_dimension):
-        gp = GaussianProcessRegressor(kernel=kernel,
-                                    alpha=1e-6,
-                                    n_restarts_optimizer=10,
-                                    normalize_y=True)
-        gp.fit(train_input, train_output[:, m])
-        gps.append(gp)
-        print(f"Optimized kernel for output {m}:", gp.kernel_)
+    if train_model:
+        for m in range(output_dimension):
+            gp = GaussianProcessRegressor(kernel=kernel,
+                                        alpha=1e-6,
+                                        n_restarts_optimizer=10,
+                                        normalize_y=True)
+            gp.fit(train_input, train_output[:, m])
+            print(f"Optimized kernel for output {m}:", gp.kernel_)
+            # Save the model
+            with open(model_dir+f'gp_model_{m}.pkl', 'wb') as f:
+                pickle.dump(gp, f)
+            gps.append(gp)
+    else:
+        for m in range(output_dimension):
+            with open(model_dir+f'gp_model_{m}.pkl', 'rb') as f:
+                gp = pickle.load(f)
+            print(f"Optimized kernel for output {m}:", gp.kernel_)
+            gps.append(gp)
+        
     print(f'Training time: {time.perf_counter()-time_start:.2f} seconds')
 
     # get dh dw training/validation error
