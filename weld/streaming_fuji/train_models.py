@@ -66,6 +66,42 @@ def plot_vt_vw_dh_dw(v_torch_range, v_wire_range, dh_pred, dw_pred, plot_title='
     plt.tight_layout()
     plt.show()
 
+def plot_error_distribution_all(dh_error_all, dw_error_all, plot_title='Error Distribution'):
+
+    # plot the error distribution
+    fig, ax = plt.subplots(1, 2, figsize=(12, 6))
+    cmap = plt.get_cmap('tab10')
+
+    for i,key in enumerate(dh_error_all.keys()):
+        dh_lambda_hat = 1 / np.mean(dh_error_all[key])
+        dh_exp_dist = stats.expon(scale=1/dh_lambda_hat)
+        dw_lambda_hat = 1 / np.mean(dw_error_all[key])
+        dw_exp_dist = stats.expon(scale=1/dw_lambda_hat)
+
+        ax[0].hist(dh_error_all[key], bins=50, density=True, alpha=0.5, label=key, color=cmap(i))
+        ax[0].plot(np.linspace(0, np.max(dh_error_all[key]), 100), dh_exp_dist.pdf(np.linspace(0, np.max(dh_error_all[key]), 100)), label=key+' pdf', color=cmap(i))
+        ax[0].set_xlabel('$\Delta h$ Error (mm)', fontsize=xy_label_size)
+        ax[0].set_ylabel('Density', fontsize=xy_label_size)
+        ax[0].set_title('$\Delta h$ Error Distribution', fontsize=title_size)
+        ax[0].legend(fontsize=legend_size)
+        ax[0].tick_params(axis='x', labelsize=xy_tick_size)
+        ax[0].tick_params(axis='y', labelsize=xy_tick_size)
+        ax[0].grid()
+
+        ax[1].hist(dw_error_all[key], bins=50, density=True, alpha=0.5, label=key, color=cmap(i))
+        ax[1].plot(np.linspace(0, np.max(dw_error_all[key]), 100), dw_exp_dist.pdf(np.linspace(0, np.max(dw_error_all[key]), 100)), label=key+' pdf', color=cmap(i))
+        ax[1].set_xlabel('$\Delta w$ Error (mm)', fontsize=xy_label_size)
+        ax[1].set_ylabel('Density', fontsize=xy_label_size)
+        ax[1].set_title('$\Delta w$ Error Distribution', fontsize=title_size)
+        ax[1].legend(fontsize=legend_size)
+        ax[1].tick_params(axis='x', labelsize=xy_tick_size)
+        ax[1].tick_params(axis='y', labelsize=xy_tick_size)
+        ax[1].grid()
+        
+    plt.suptitle(plot_title, fontsize=sup_title_size)
+    plt.tight_layout()
+    plt.show()
+
 def plot_error_distribution(dh_train_error, dw_train_error, dh_val_error, dw_val_error, plot_title='Error Distribution'):
 
     # fit distribution with exponential distribution
@@ -385,6 +421,32 @@ def train_GP(train_input,train_output,val_input,val_output,torch_height=True,lay
     dw_pred_val, dw_std_val = gps[1].predict(val_input, return_std=True)
     dw_error_val = val_output[:, 1] - dw_pred_val
 
+    ### plot predictions ###
+    ### v_torch = 2~12 mm/sec with 1mm/sec step, 12 included
+    ### v_wire = 100~200 ipm with 10ipm step, 200 included
+    v_torch_range = np.arange(2, 13, 0.2)
+    v_wire_range = np.arange(100, 201, 1) * inch2mm / 60 # ipm to mm/s
+    if torch_height and layer_height:
+        torch_height_ave = np.mean(train_input[:,2])
+        layer_height_ave = np.mean(train_input[:,3])
+        torch_layer_height_ave = np.array([torch_height_ave, layer_height_ave])
+    elif torch_height or layer_height:
+        torch_layer_height_ave = np.array([np.mean(train_input[:,2])])
+    else:
+        torch_layer_height_ave = np.array([])
+    dh_pred = np.zeros((len(v_torch_range), len(v_wire_range)))
+    dw_pred = np.zeros((len(v_torch_range), len(v_wire_range)))
+    for i, v_torch in enumerate(v_torch_range):
+        for j, v_wire in enumerate(v_wire_range):
+            input_data = np.append(np.array([v_torch, v_wire]),torch_layer_height_ave) # add batch dimension
+            input_data = np.reshape(input_data, (1, -1))
+            dh_pred[i,j] = gps[0].predict(input_data)[0]
+            dw_pred[i,j] = gps[1].predict(input_data)[0]
+    dh_pred = dh_pred.flatten()
+    dw_pred = dw_pred.flatten()
+    # plot the predicted dh and dw using colormap and imshow
+    plot_vt_vw_dh_dw(v_torch_range, v_wire_range, dh_pred, dw_pred, plot_title='Predicted $\Delta h$ and $\Delta w$ (neural network model)')
+
     return dh_error_train, dw_error_train, dh_error_val, dw_error_val
 
 def main():
@@ -447,7 +509,7 @@ def main():
     # Neural Network model. with torch height
     print("Training Neural Network model with torch height...")
     dh_error_train_nn, dw_error_train_nn, dh_error_val_nn, dw_error_val_nn = \
-        train_NN(deepcopy(train_input), deepcopy(train_output), deepcopy(val_input), deepcopy(val_output), train_model=False, model_dir='weld_NN_models/')
+        train_NN(deepcopy(train_input), deepcopy(train_output), deepcopy(val_input), deepcopy(val_output), torch_height=True, layer_height=False, train_model=False, model_dir='weld_NN_models/')
     train_rmse_dh_nn, train_rmse_dw_nn, val_rmse_dh_nn, val_rmse_dw_nn = \
         get_rmse(dh_error_train_nn), get_rmse(dw_error_train_nn), get_rmse(dh_error_val_nn), get_rmse(dw_error_val_nn)
     dh_inter_95_nn, dw_inter_95_nn = plot_error_distribution(np.abs(dh_error_train_nn), np.abs(dw_error_train_nn), np.abs(dh_error_val_nn), np.abs(dw_error_val_nn), plot_title='Error distribution (neural network model)') # plot training and validation error distribution for dh and dw
@@ -457,7 +519,7 @@ def main():
     # Gaussian Process model. with torch height
     print("Training Gaussian Process model with torch height...")
     dh_error_train_gp, dw_error_train_gp, dh_error_val_gp, dw_error_val_gp = \
-        train_GP(deepcopy(train_input), deepcopy(train_output), deepcopy(val_input), deepcopy(val_output), torch_height=True, layer_height=False)
+        train_GP(deepcopy(train_input), deepcopy(train_output), deepcopy(val_input), deepcopy(val_output), torch_height=True, layer_height=False, train_model=False, model_dir='weld_GP_models/')
     train_rmse_dh_gp, train_rmse_dw_gp, val_rmse_dh_gp, val_rmse_dw_gp = \
         get_rmse(dh_error_train_gp), get_rmse(dw_error_train_gp), get_rmse(dh_error_val_gp), get_rmse(dw_error_val_gp)
     dh_inter_95_gp, dw_inter_95_gp = plot_error_distribution(np.abs(dh_error_train_gp), np.abs(dw_error_train_gp), np.abs(dh_error_val_gp), np.abs(dw_error_val_gp), plot_title='Error distribution (GP model with torch height)') # plot training and validation error distribution for dh and dw
@@ -465,8 +527,61 @@ def main():
     output_string_dh += f'| Gaussian Process model | {train_rmse_dh_gp:.2f} | {val_rmse_dh_gp:.2f} | {np.max(np.abs(dh_error_train_gp)):.2f} | {np.max(np.abs(dh_error_val_gp)):.2f} | {dh_inter_95_gp[0]:.2f}~{dh_inter_95_gp[1]:.2f} |\n'
     output_string_dw += f'| Gaussian Process model | {train_rmse_dw_gp:.2f} | {val_rmse_dw_gp:.2f} | {np.max(np.abs(dw_error_train_gp)):.2f} | {np.max(np.abs(dw_error_val_gp)):.2f} | {dw_inter_95_gp[0]:.2f}~{dw_inter_95_gp[1]:.2f} |\n'
 
+    dh_error_all = {}
+    dh_error_all['Linear loglog'] = np.abs(np.append(dh_error_train_lnln_lin, dh_error_val_lnln_lin))
+    dh_error_all['Quadratic loglog'] = np.abs(np.append(dh_error_train_lnln_qua, dh_error_val_lnln_qua))
+    dh_error_all['Neural Network'] = np.abs(np.append(dh_error_train_nn, dh_error_val_nn))
+    dh_error_all['Gaussian Process'] = np.abs(np.append(dh_error_train_gp, dh_error_val_gp))
+    dw_error_all = {}
+    dw_error_all['Linear loglog'] = np.abs(np.append(dw_error_train_lnln_lin, dw_error_val_lnln_lin))
+    dw_error_all['Quadratic loglog'] = np.abs(np.append(dw_error_train_lnln_qua, dw_error_val_lnln_qua))
+    dw_error_all['Neural Network'] = np.abs(np.append(dw_error_train_nn, dw_error_val_nn))
+    dw_error_all['Gaussian Process'] = np.abs(np.append(dw_error_train_gp, dw_error_val_gp))
+    plot_error_distribution_all(dh_error_all, dw_error_all, plot_title='Error distribution (all models)') # plot training and validation error distribution for dh and dw
+
+
     print(output_string_dh)
     print(output_string_dw)
+
+    ### NN ablation study
+    # dh_error_train_nn, dw_error_train_nn, dh_error_val_nn, dw_error_val_nn = \
+    #     train_NN(deepcopy(train_input), deepcopy(train_output), deepcopy(val_input), deepcopy(val_output), torch_height=False, layer_height=False, train_model=True, model_dir='weld_NN_models/model_vt_vw_')
+    # train_rmse_dh_nn, train_rmse_dw_nn, val_rmse_dh_nn, val_rmse_dw_nn = \
+    #     get_rmse(dh_error_train_nn), get_rmse(dw_error_train_nn), get_rmse(dh_error_val_nn), get_rmse(dw_error_val_nn)
+    # dh_inter_95_nn, dw_inter_95_nn = plot_error_distribution(np.abs(dh_error_train_nn), np.abs(dw_error_train_nn), np.abs(dh_error_val_nn), np.abs(dw_error_val_nn), plot_title='Error distribution (neural network model)') # plot training and validation error distribution for dh and dw
+    # plot_error_heatmap(dh_error_train_nn, dw_error_train_nn, dh_error_val_nn, dw_error_val_nn, train_input, val_input, plot_title='Error heatmap (neural network model)') # plot training and validation error heatmap for dh and dw
+    # output_string_dh += f'| NN (v $\omega$) | {train_rmse_dh_nn:.2f} | {val_rmse_dh_nn:.2f} | {np.max(np.abs(dh_error_train_nn)):.2f} | {np.max(np.abs(dh_error_val_nn)):.2f} | {dh_inter_95_nn[0]:.2f}~{dh_inter_95_nn[1]:.2f} |\n'
+    # output_string_dw += f'| NN (v $\omega$) | {train_rmse_dw_nn:.2f} | {val_rmse_dw_nn:.2f} | {np.max(np.abs(dw_error_train_nn)):.2f} | {np.max(np.abs(dw_error_val_nn)):.2f} | {dw_inter_95_nn[0]:.2f}~{dw_inter_95_nn[1]:.2f} |\n'
+    
+    # dh_error_train_nn, dw_error_train_nn, dh_error_val_nn, dw_error_val_nn = \
+    #     train_NN(deepcopy(train_input), deepcopy(train_output), deepcopy(val_input), deepcopy(val_output), torch_height=True, layer_height=False, train_model=True, model_dir='weld_NN_models/model_vt_vw_ht_')
+    # train_rmse_dh_nn, train_rmse_dw_nn, val_rmse_dh_nn, val_rmse_dw_nn = \
+    #     get_rmse(dh_error_train_nn), get_rmse(dw_error_train_nn), get_rmse(dh_error_val_nn), get_rmse(dw_error_val_nn)
+    # dh_inter_95_nn, dw_inter_95_nn = plot_error_distribution(np.abs(dh_error_train_nn), np.abs(dw_error_train_nn), np.abs(dh_error_val_nn), np.abs(dw_error_val_nn), plot_title='Error distribution (neural network model)') # plot training and validation error distribution for dh and dw
+    # plot_error_heatmap(dh_error_train_nn, dw_error_train_nn, dh_error_val_nn, dw_error_val_nn, train_input, val_input, plot_title='Error heatmap (neural network model)') # plot training and validation error heatmap for dh and dw
+    # output_string_dh += f'| NN (v $\omega$ $h_t$) | {train_rmse_dh_nn:.2f} | {val_rmse_dh_nn:.2f} | {np.max(np.abs(dh_error_train_nn)):.2f} | {np.max(np.abs(dh_error_val_nn)):.2f} | {dh_inter_95_nn[0]:.2f}~{dh_inter_95_nn[1]:.2f} |\n'
+    # output_string_dw += f'| NN (v $\omega$ $h_t$) | {train_rmse_dw_nn:.2f} | {val_rmse_dw_nn:.2f} | {np.max(np.abs(dw_error_train_nn)):.2f} | {np.max(np.abs(dw_error_val_nn)):.2f} | {dw_inter_95_nn[0]:.2f}~{dw_inter_95_nn[1]:.2f} |\n'
+    
+    # dh_error_train_nn, dw_error_train_nn, dh_error_val_nn, dw_error_val_nn = \
+    #     train_NN(deepcopy(train_input), deepcopy(train_output), deepcopy(val_input), deepcopy(val_output), torch_height=False, layer_height=True, train_model=True, model_dir='weld_NN_models/model_vt_vw_hl_')
+    # train_rmse_dh_nn, train_rmse_dw_nn, val_rmse_dh_nn, val_rmse_dw_nn = \
+    #     get_rmse(dh_error_train_nn), get_rmse(dw_error_train_nn), get_rmse(dh_error_val_nn), get_rmse(dw_error_val_nn)
+    # dh_inter_95_nn, dw_inter_95_nn = plot_error_distribution(np.abs(dh_error_train_nn), np.abs(dw_error_train_nn), np.abs(dh_error_val_nn), np.abs(dw_error_val_nn), plot_title='Error distribution (neural network model)') # plot training and validation error distribution for dh and dw
+    # plot_error_heatmap(dh_error_train_nn, dw_error_train_nn, dh_error_val_nn, dw_error_val_nn, train_input, val_input, plot_title='Error heatmap (neural network model)') # plot training and validation error heatmap for dh and dw
+    # output_string_dh += f'| NN (v $\omega$ $h_l$) | {train_rmse_dh_nn:.2f} | {val_rmse_dh_nn:.2f} | {np.max(np.abs(dh_error_train_nn)):.2f} | {np.max(np.abs(dh_error_val_nn)):.2f} | {dh_inter_95_nn[0]:.2f}~{dh_inter_95_nn[1]:.2f} |\n'
+    # output_string_dw += f'| NN (v $\omega$ $h_l$) | {train_rmse_dw_nn:.2f} | {val_rmse_dw_nn:.2f} | {np.max(np.abs(dw_error_train_nn)):.2f} | {np.max(np.abs(dw_error_val_nn)):.2f} | {dw_inter_95_nn[0]:.2f}~{dw_inter_95_nn[1]:.2f} |\n'
+    
+    # dh_error_train_nn, dw_error_train_nn, dh_error_val_nn, dw_error_val_nn = \
+    #     train_NN(deepcopy(train_input), deepcopy(train_output), deepcopy(val_input), deepcopy(val_output), torch_height=True, layer_height=True, train_model=True, model_dir='weld_NN_models/model_vt_vw_ht_hl_')
+    # train_rmse_dh_nn, train_rmse_dw_nn, val_rmse_dh_nn, val_rmse_dw_nn = \
+    #     get_rmse(dh_error_train_nn), get_rmse(dw_error_train_nn), get_rmse(dh_error_val_nn), get_rmse(dw_error_val_nn)
+    # dh_inter_95_nn, dw_inter_95_nn = plot_error_distribution(np.abs(dh_error_train_nn), np.abs(dw_error_train_nn), np.abs(dh_error_val_nn), np.abs(dw_error_val_nn), plot_title='Error distribution (neural network model)') # plot training and validation error distribution for dh and dw
+    # plot_error_heatmap(dh_error_train_nn, dw_error_train_nn, dh_error_val_nn, dw_error_val_nn, train_input, val_input, plot_title='Error heatmap (neural network model)') # plot training and validation error heatmap for dh and dw
+    # output_string_dh += f'| NN (v $\omega$ $h_t$ $h_l$) | {train_rmse_dh_nn:.2f} | {val_rmse_dh_nn:.2f} | {np.max(np.abs(dh_error_train_nn)):.2f} | {np.max(np.abs(dh_error_val_nn)):.2f} | {dh_inter_95_nn[0]:.2f}~{dh_inter_95_nn[1]:.2f} |\n'
+    # output_string_dw += f'| NN (v $\omega$ $h_t$ $h_l$) | {train_rmse_dw_nn:.2f} | {val_rmse_dw_nn:.2f} | {np.max(np.abs(dw_error_train_nn)):.2f} | {np.max(np.abs(dw_error_val_nn)):.2f} | {dw_inter_95_nn[0]:.2f}~{dw_inter_95_nn[1]:.2f} |\n'
+    
+    # print(output_string_dh)
+    # print(output_string_dw)
 
 if __name__ == "__main__":
     main()
