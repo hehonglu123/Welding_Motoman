@@ -162,6 +162,26 @@ def plot_error_heatmap(dh_train_error, dw_train_error, dh_val_error, dw_val_erro
     inputs_all = np.concatenate((train_inputs, val_inputs))
     dw_inputs_all_ipm = inputs_all[:, 1] * mm2inch * 60 # convert mm/s to ipm
 
+    ## 3D bar error heatmap
+    fig = plt.figure(1, 2, figsize=(12, 6))
+    ax = fig.add_subplot(111, projection='3d')
+    # ax.bar3d(inputs_all[:, 0], dw_inputs_all_ipm, np.zeros_like(dh_error_all), 0.2, 0.2, dh_error_all, shade=True)
+    # use error as colormap with bar3d
+    ax.bar3d(inputs_all[:, 0], inputs_all[:, 1], np.zeros_like(dh_error_all), 0.2, 0.2, dh_error_all, shade=True, color=plt.cm.viridis(dh_error_all/np.max[0](dh_error_all)))
+    ax.set_xlabel('Torch Speed (mm/s)', fontsize=xy_label_size)
+    ax.set_ylabel('Wire Feedrate (ipm)', fontsize=xy_label_size)
+    ax.set_zlabel('$\Delta h$ Error (mm)', fontsize=xy_label_size)
+    ax.set_title('$\Delta h$ Error Heatmap', fontsize=title_size)
+    ax.set_xticks(np.arange(min(inputs_all[:, 0]), max(inputs_all[:, 0])+1, 2))
+    ax.set_yticks(np.arange(min(dw_inputs_all_ipm), max(dw_inputs_all_ipm)+1, 20) * inch2mm / 60)
+    ax.set_yticklabels(np.arange(min(dw_inputs_all_ipm), max(dw_inputs_all_ipm)+1, 20).astype(int), fontsize=xy_tick_size)
+    ax.set_zticks(np.arange(0, np.max(dh_error_all)+1, 0.5))
+    ax.set_zticklabels(np.arange(0, np.max(dh_error_all)+1, 0.5).astype(int), fontsize=xy_tick_size)
+    ax.set_box_aspect([1, 1, 0.5])  # aspect ratio is 1:1:0.5
+    plt.title(plot_title, fontsize=sup_title_size)
+    plt.tight_layout()
+    plt.show()
+
     fig, ax = plt.subplots(1, 2, figsize=(12, 6))
     ax[0].scatter(inputs_all[:, 0], inputs_all[:, 1], c=dh_error_all, cmap='viridis', marker='o')
     ax[0].set_xlabel('Torch Speed (mm/s)', fontsize=xy_label_size)

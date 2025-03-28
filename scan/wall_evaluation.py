@@ -5,7 +5,7 @@ import numpy as np
 from robotics_utils import *
 from result_analysis import *
 from scipy.spatial import ConvexHull, Delaunay
-from animation_3d import animation_mesh
+from scan.scan_tools.animation_3d import animation_mesh
     
 dataset='wall/'
 sliced_alg='dense_slice/'

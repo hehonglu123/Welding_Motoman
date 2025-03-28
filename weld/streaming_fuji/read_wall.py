@@ -12,6 +12,7 @@ sys.path.append('../../scan/scan_process/')
 sys.path.append('../../scan/scan_tools/')
 from scan_utils import *
 from scanProcess import *
+from animation_3d import *
 
 def main():
 
@@ -32,9 +33,9 @@ def main():
 
     # logdata_dir_all = ['weld_fujiscan_2025_02_26_18_08_18/', 'weld_fujiscan_2025_02_26_16_24_21/', 'weld_fujiscan_2025_02_26_17_39_17/']
     # logdata_dir_all = ['weld_fujiscan_2025_02_26_18_08_18/', 'weld_fujiscan_2025_02_26_16_24_21/']
-    # logdata_dir_all = ['weld_fujicontrol_2025_03_12_18_27_33/']
+    logdata_dir_all = ['weld_fujicontrol_2025_03_12_18_27_33/']
     # logdata_dir_all = ['weld_fujiscan_2025_02_26_18_08_18/']
-    logdata_dir_all = ['weld_fujiscan_2025_02_26_18_08_18/', 'weld_fujiscan_2025_02_26_16_24_21/', 'weld_fujicontrol_2025_03_12_18_27_33/']
+    # logdata_dir_all = ['weld_fujiscan_2025_02_26_18_08_18/', 'weld_fujiscan_2025_02_26_16_24_21/', 'weld_fujicontrol_2025_03_12_18_27_33/']
 
     run_code_again_flag = False # For scanner leading case, need to generate all profile height before actually get dh.
     create_transform = False
@@ -198,7 +199,11 @@ def main():
                     all_profile_height.append(profile_height)
                     # pcd = o3d.io.read_point_cloud(this_layer_dir+'pcd.pcd')
                     pcd_denoise = o3d.io.read_point_cloud(this_layer_dir+'pcd_denoise.pcd')
-                    all_pcd_transform.append(pcd_denoise)
+
+                    Transz0_H = deepcopy(Transz0_H_even) if layer_n_id % 2 == 0 else deepcopy(Transz0_H_odd)
+                    pcd_denoise_trans = deepcopy(pcd_denoise)
+                    pcd_denoise_trans.transform(Transz0_H)
+                    all_pcd_transform.append(pcd_denoise_trans)
 
                 except FileNotFoundError:
                     # processing the scans
@@ -394,20 +399,22 @@ def main():
 
     
 
-        # fig, ax = plt.subplots()
-        # ax.set_title('Profile height')
-        # ax.set_xlabel('X')
-        # ax.set_ylabel('Z')
-        # for i in range(len(all_profile_height)):
-        #     ax.plot(all_profile_height[i][:,0],all_profile_height[i][:,1],label='Layer '+str(i))
-        # # ax.legend()
-        # plt.show()
+        fig, ax = plt.subplots()
+        ax.set_title('Profile height')
+        ax.set_xlabel('X')
+        ax.set_ylabel('Z')
+        for i in range(len(all_profile_height)):
+            plot_indeces = all_profile_height[i][:,1]>np.mean(all_profile_height[i][:,1])-5
+            ax.plot(all_profile_height[i][plot_indeces,0],all_profile_height[i][plot_indeces,1],label='Layer '+str(i))
+        # ax.legend()
+        plt.show()
 
-        # if len(all_pcd_transform) != 0:
-        #     cmap = plt.get_cmap('tab10')
-        #     for i in range(len(all_pcd_transform)):
-        #         all_pcd_transform[i].paint_uniform_color(cmap(i%10)[:3])
-        #     visualize_pcd(all_pcd_transform)
+        if len(all_pcd_transform) != 0:
+            cmap = plt.get_cmap('tab10')
+            for i in range(len(all_pcd_transform)):
+                all_pcd_transform[i].paint_uniform_color(cmap(i%10)[:3])
+            visualize_pcd(all_pcd_transform)
+            animation_mesh(all_pcd_transform)
         
 
     if run_code_again_flag:

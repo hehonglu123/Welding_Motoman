@@ -9,7 +9,6 @@ from robotics_utils import *
 from motoman_def import *
 from scan_utils import *
 from scanProcess import *
-from weld_dh2v import *
 
 from weld_dh2v import *
 from general_robotics_toolbox import *
