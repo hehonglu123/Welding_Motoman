@@ -97,7 +97,9 @@ def plot_error_distribution_all(dh_error_all, dw_error_all, plot_title='Error Di
         ax[1].tick_params(axis='x', labelsize=xy_tick_size)
         ax[1].tick_params(axis='y', labelsize=xy_tick_size)
         ax[1].grid()
-        
+    
+    ax[0].set_xlim(-0.2, 1.2)
+    ax[1].set_xlim(-0.2, 2.2)
     plt.suptitle(plot_title, fontsize=sup_title_size)
     plt.tight_layout()
     plt.show()
@@ -163,24 +165,24 @@ def plot_error_heatmap(dh_train_error, dw_train_error, dh_val_error, dw_val_erro
     dw_inputs_all_ipm = inputs_all[:, 1] * mm2inch * 60 # convert mm/s to ipm
 
     ## 3D bar error heatmap
-    fig = plt.figure(1, 2, figsize=(12, 6))
-    ax = fig.add_subplot(111, projection='3d')
-    # ax.bar3d(inputs_all[:, 0], dw_inputs_all_ipm, np.zeros_like(dh_error_all), 0.2, 0.2, dh_error_all, shade=True)
-    # use error as colormap with bar3d
-    ax.bar3d(inputs_all[:, 0], inputs_all[:, 1], np.zeros_like(dh_error_all), 0.2, 0.2, dh_error_all, shade=True, color=plt.cm.viridis(dh_error_all/np.max[0](dh_error_all)))
-    ax.set_xlabel('Torch Speed (mm/s)', fontsize=xy_label_size)
-    ax.set_ylabel('Wire Feedrate (ipm)', fontsize=xy_label_size)
-    ax.set_zlabel('$\Delta h$ Error (mm)', fontsize=xy_label_size)
-    ax.set_title('$\Delta h$ Error Heatmap', fontsize=title_size)
-    ax.set_xticks(np.arange(min(inputs_all[:, 0]), max(inputs_all[:, 0])+1, 2))
-    ax.set_yticks(np.arange(min(dw_inputs_all_ipm), max(dw_inputs_all_ipm)+1, 20) * inch2mm / 60)
-    ax.set_yticklabels(np.arange(min(dw_inputs_all_ipm), max(dw_inputs_all_ipm)+1, 20).astype(int), fontsize=xy_tick_size)
-    ax.set_zticks(np.arange(0, np.max(dh_error_all)+1, 0.5))
-    ax.set_zticklabels(np.arange(0, np.max(dh_error_all)+1, 0.5).astype(int), fontsize=xy_tick_size)
-    ax.set_box_aspect([1, 1, 0.5])  # aspect ratio is 1:1:0.5
-    plt.title(plot_title, fontsize=sup_title_size)
-    plt.tight_layout()
-    plt.show()
+    # fig = plt.figure(1, 2)
+    # ax = fig.add_subplot(111, projection='3d')
+    # # ax.bar3d(inputs_all[:, 0], dw_inputs_all_ipm, np.zeros_like(dh_error_all), 0.2, 0.2, dh_error_all, shade=True)
+    # # use error as colormap with bar3d
+    # ax.bar3d(inputs_all[:, 0], inputs_all[:, 1], np.zeros_like(dh_error_all), 0.2, 0.2, dh_error_all, shade=True, color=plt.cm.viridis(dh_error_all/np.max[0](dh_error_all)))
+    # ax.set_xlabel('Torch Speed (mm/s)', fontsize=xy_label_size)
+    # ax.set_ylabel('Wire Feedrate (ipm)', fontsize=xy_label_size)
+    # ax.set_zlabel('$\Delta h$ Error (mm)', fontsize=xy_label_size)
+    # ax.set_title('$\Delta h$ Error Heatmap', fontsize=title_size)
+    # ax.set_xticks(np.arange(min(inputs_all[:, 0]), max(inputs_all[:, 0])+1, 2))
+    # ax.set_yticks(np.arange(min(dw_inputs_all_ipm), max(dw_inputs_all_ipm)+1, 20) * inch2mm / 60)
+    # ax.set_yticklabels(np.arange(min(dw_inputs_all_ipm), max(dw_inputs_all_ipm)+1, 20).astype(int), fontsize=xy_tick_size)
+    # ax.set_zticks(np.arange(0, np.max(dh_error_all)+1, 0.5))
+    # ax.set_zticklabels(np.arange(0, np.max(dh_error_all)+1, 0.5).astype(int), fontsize=xy_tick_size)
+    # ax.set_box_aspect([1, 1, 0.5])  # aspect ratio is 1:1:0.5
+    # plt.title(plot_title, fontsize=sup_title_size)
+    # plt.tight_layout()
+    # plt.show()
 
     fig, ax = plt.subplots(1, 2, figsize=(12, 6))
     ax[0].scatter(inputs_all[:, 0], inputs_all[:, 1], c=dh_error_all, cmap='viridis', marker='o')
@@ -272,7 +274,7 @@ def train_loglog(train_input,train_output,val_input,val_output,quadratic=False):
     dh_pred = dh_pred.flatten()
     dw_pred = dw_pred.flatten()
     # plot the predicted dh and dw using colormap and imshow
-    plot_title = 'Predicted $\Delta h$ and $\Delta w$ (log-log linear model)' if not quadratic else 'Predicted $\Delta h$ and $\Delta w$ (log-log quadratic model)'
+    plot_title = 'Predicted $\Delta h$ and $\Delta w$ (Linear Model)' if not quadratic else 'Predicted $\Delta h$ and $\Delta w$ (Quadratic Model)'
     plot_vt_vw_dh_dw(v_torch_range, v_wire_range, dh_pred, dw_pred, plot_title=plot_title)
     
     return train_dh_error, train_dw_error, val_dh_error, val_dw_error
@@ -386,7 +388,7 @@ def train_NN(train_input,train_output,val_input,val_output,torch_height=True,lay
     dh_pred = dh_pred.flatten()
     dw_pred = dw_pred.flatten()
     # plot the predicted dh and dw using colormap and imshow
-    plot_vt_vw_dh_dw(v_torch_range, v_wire_range, dh_pred, dw_pred, plot_title='Predicted $\Delta h$ and $\Delta w$ (neural network model)')
+    plot_vt_vw_dh_dw(v_torch_range, v_wire_range, dh_pred, dw_pred, plot_title='Predicted $\Delta h$ and $\Delta w$ (NN Model)')
 
     return dh_error_train, dw_error_train, dh_error_val, dw_error_val
 
@@ -465,7 +467,7 @@ def train_GP(train_input,train_output,val_input,val_output,torch_height=True,lay
     dh_pred = dh_pred.flatten()
     dw_pred = dw_pred.flatten()
     # plot the predicted dh and dw using colormap and imshow
-    plot_vt_vw_dh_dw(v_torch_range, v_wire_range, dh_pred, dw_pred, plot_title='Predicted $\Delta h$ and $\Delta w$ (neural network model)')
+    plot_vt_vw_dh_dw(v_torch_range, v_wire_range, dh_pred, dw_pred, plot_title='Predicted $\Delta h$ and $\Delta w$ (GP Model)')
 
     return dh_error_train, dw_error_train, dh_error_val, dw_error_val
 
