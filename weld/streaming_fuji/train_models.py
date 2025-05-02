@@ -475,7 +475,7 @@ def main():
     
     # read data from weld_data
     data_dir = '../../data/wall_weld_test/'
-    weld_data = pd.read_csv(data_dir + 'weld_data.csv', header=0)
+    weld_data = pd.read_csv(data_dir + 'weld_data/weld_data.csv', header=0)
     weld_data = weld_data.to_dict(orient='list')
 
     # load data to numpy arrays
