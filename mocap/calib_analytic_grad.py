@@ -319,6 +319,15 @@ def get_param_from_PH_minimal(robot,this_P,this_H,nom_P,nom_H, unit='radians'):
     
     return np.append(param_P,np.array(param_H))
 
+def get_param_from_PH_minimal_tool(robot,this_P,this_H,nom_P,nom_H, unit='radians'):
+
+    param_ph = get_param_from_PH_minimal(robot,this_P,this_H,nom_P,nom_H, unit=unit)
+    param_tool_p = deepcopy(param_ph[-3:])
+    param_ph = param_ph[:-3]
+    param_tool_R = R2rpy(np.eye(3))
+    param_tool = np.append(param_tool_p,param_tool_R)
+    return param_ph, param_tool
+
 def jacobian_param_minimal(param,robot,theta,unit='radians'):
 
     jN=len(theta)

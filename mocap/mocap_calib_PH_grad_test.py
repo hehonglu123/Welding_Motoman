@@ -58,7 +58,6 @@ robot.H_nominal=deepcopy(robot.robot.H)
 robot.P_nominal=robot.P_nominal.T
 robot.H_nominal=robot.H_nominal.T
 robot = get_H_param_axis(robot) # get the axis to parametrize H
-param_nominal = np.array(np.reshape(robot.robot.P.T,-1).tolist()+[0]*12)
 jN = len(robot.robot.H.T)
 
 #### using rigid body
