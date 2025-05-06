@@ -66,6 +66,9 @@ def get_robot_prepared(robot: robot_obj, nom_P=None, nom_H=None, unit='radians')
     robot.robot.T_flange = Transform(np.eye(3),[0,0,0])
     robot.T_tool_toolmarker = Transform(np.eye(3),[0,0,0])
 
+    # print("robot in zero configuration world:", robot.fwd(np.zeros(6), world=True))
+    # print("robot in zero configuration base:", robot.fwd(np.zeros(6), world=False))
+
     # q_test_1 = np.zeros(6) # get the base frame in the inertial frame
     # q_test_2 = np.random.uniform(robot.lower_limit,robot.upper_limit) # get the base frame in the inertial frame
     # T_test_1 = robot.fwd(q_test_1, world=True) # get the base frame in the inertial frame
@@ -84,6 +87,10 @@ def get_robot_prepared(robot: robot_obj, nom_P=None, nom_H=None, unit='radians')
     robot.P_nominal=robot.P_nominal.T
     robot.H_nominal=robot.H_nominal.T
     robot = get_H_param_axis(robot) 
+
+    print("robot H", robot.robot.H.T)
+    print("robot P", robot.robot.P.T)
+    print("k1 k2 of robot:", robot.param_k1, robot.param_k2)
 
     # get param ph and param tool
     param_ph, param_tool = get_param_from_PH_minimal_tool(robot, robot.robot.P, robot.robot.H, nom_P, nom_H, unit=unit)
@@ -137,7 +144,6 @@ def main():
     print('robot 2 base frame in inertial frame:', robot2.base_H)
     # convert the base frame information in PH, tool parameters, and get robot prepared
     robot1, param_ph1, param_t1 = get_robot_prepared(robot1, nom_P1, nom_H1, unit=using_unit)
-    print("======")
     robot2, param_ph2, param_t2 = get_robot_prepared(robot2, nom_P2, nom_H2, unit=using_unit)
     assert type(robot1) == robot_obj, 'robot1 is not a robot_obj'
     assert type(robot2) == robot_obj, 'robot2 is not a robot_obj'
@@ -145,6 +151,7 @@ def main():
     # print zero configuration in the inertial frame
     print("robot 1 zero configuration in inertial frame:", robot1.fwd(np.zeros(jN1), world=True))
     print("robot 2 zero configuration in inertial frame:", robot2.fwd(np.zeros(jN2), world=True))
+    print("Tool 1 in tool 2 frame zero configuration:", robot2.fwd(np.zeros(jN2)).inv() * robot1.fwd(np.zeros(jN1)))
     print("robot 1 initial parameters:", param_ph1, param_t1)
     print("robot 2 initial parameters:", param_ph2, param_t2)
 
@@ -162,18 +169,31 @@ def main():
     param_t2_gt[:3] = np.random.uniform(-1,1,3) # tool dp of robot2, mm
     param_t2_gt[3:] = np.radians(np.random.uniform(-0.05,0.05,3)) # tool dR of robot2, radians
 
+    exit()
+
     # generate the simulated dataset
     data_N = 1000
-    data_collected = []
+    data_joints = []
+    data_T = []
+    t1_t2_lower_limit_p = np.array([-500, -500, -1500])
+    t1_t2_upper_limit_p = np.array([500, 500, 0])
     r1_lower_limit = np.clip(robot1.robot.joint_lower_limit, -np.pi, np.pi)
     r1_upper_limit = np.clip(robot1.robot.joint_upper_limit, -np.pi, np.pi)
     r2_lower_limit = np.clip(robot2.robot.joint_lower_limit, -np.pi, np.pi)
     r2_upper_limit = np.clip(robot2.robot.joint_upper_limit, -np.pi, np.pi)
-    # t1_t2_limit_p = 
     for i in range(data_N):
         # randomize a set of joint angles for robot2
         q1 = np.random.uniform(r1_lower_limit, r1_upper_limit, jN1)
         q2 = np.random.uniform(r2_lower_limit, r2_upper_limit, jN2)
+        # check if t1_t2 p is in the limit
+        t1 = robot1.fwd(q1)
+        t2 = robot2.fwd(q2)
+        t1_t2 = t2.inv() * t1
+        if np.any(t1_t2.p < t1_t2_lower_limit_p) or np.any(t1_t2.p > t1_t2_upper_limit_p):
+            continue
+        # get ground truth T and joints
+        data_joints.append(np.concatenate((q1, q2)))
+        # get the tool transformation in the inertial frame, with using the ground truth parameters
 
 if __name__ == '__main__':
     main()

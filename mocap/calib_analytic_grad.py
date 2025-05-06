@@ -112,6 +112,11 @@ def get_H_param_axis(robot):
     k1=[]
     k2=[]
     for j in range(jN):
+        # find the plane perpendicular to H[j]
+                
+
+
+
         if np.fabs(np.dot(Rx,robot.robot.H[:,j]))>0.999:
             if np.dot(Rx,robot.robot.H[:,j])>0:
                 k1.append(Ry)
