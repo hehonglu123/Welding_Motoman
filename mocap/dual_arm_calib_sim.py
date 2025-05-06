@@ -7,6 +7,7 @@ from general_robotics_toolbox import *
 import numpy as np
 import time
 import yaml
+from qpsolvers import solve_qp
 from PH_interp import *
 from calib_analytic_grad import *
 
@@ -148,27 +149,18 @@ def main():
     param_t2_gt[:3] = np.random.uniform(-1,1,3) # tool dp of robot2, mm
     param_t2_gt[3:] = np.radians(np.random.uniform(-0.05,0.05,3)) # tool dR of robot2, radians
 
-    param_test = np.random.uniform(-0.5,0.5,24) # test parameters, mm and radians
-    param_test = np.insert(param_test,2*jN1,np.zeros(3))
-    robot1 = get_PH_from_param_minimal(param_test, robot1, unit=using_unit)
-    param_test_ver = get_param_from_PH_minimal(robot1, robot1.robot.P, robot1.robot.H, robot1.P_nominal.T, robot1.H_nominal.T, unit=using_unit)
-    print("test parameters:", param_test, param_test_ver)
-    print("diff:", param_test_ver-param_test)
-    # exit()
+    # print("robot 1 ground truth parameters:",param_ph1_gt, param_t1_gt)
+    robot1_gt, _ = get_PH_tool_from_param_minimal(param_ph1_gt, param_t1_gt, robot1, unit=using_unit)
+    # print("robot 1 ground truth PH:", robot1_gt.robot.P.T, robot1_gt.robot.H.T)
+    # print("robot 1 ground truth tool:", robot1_gt.robot.R_tool, robot1_gt.robot.p_tool)
 
-    print("robot 1 ground truth parameters:",param_ph1_gt, param_t1_gt)
-    robot1, param_t1_gt = get_PH_tool_from_param_minimal(param_ph1_gt, param_t1_gt, robot1, unit=using_unit)
-    print("robot 1 ground truth PH:", robot1.robot.P.T, robot1.robot.H.T)
-    print("robot 1 ground truth tool:", robot1.robot.R_tool, robot1.robot.p_tool)
-    param_ph1_gt_ver, param_t1_gt_ver = get_param_from_PH_minimal_tool(robot1, robot1.robot.P, robot1.robot.H, unit=using_unit)
-    print("robot 1 ground truth parameters ver:", param_ph1_gt_ver, param_t1_gt_ver)
-
-    print("diff ph:",param_ph1_gt_ver-param_ph1_gt)
-    print("diff tool:",param_t1_gt_ver-param_t1_gt)
-    exit()
+    # print("robot 2 ground truth parameters:",param_ph2_gt, param_t2_gt)
+    robot2_gt, _ = get_PH_tool_from_param_minimal(param_ph2_gt, param_t2_gt, robot2, unit=using_unit)
+    # print("robot 2 ground truth PH:", robot2_gt.robot.P.T, robot2_gt.robot.H.T)
+    # print("robot 2 ground truth tool:", robot2_gt.robot.R_tool, robot2_gt.robot.p_tool)
 
     # generate the simulated dataset
-    data_N = 1000
+    data_N = 500
     data_joints = []
     data_T = []
     t1_t2_lower_limit_p = np.array([-500, -500, -1500])
@@ -182,14 +174,75 @@ def main():
         q1 = np.random.uniform(r1_lower_limit, r1_upper_limit, jN1)
         q2 = np.random.uniform(r2_lower_limit, r2_upper_limit, jN2)
         # check if t1_t2 p is in the limit
-        t1 = robot1.fwd(q1)
-        t2 = robot2.fwd(q2)
-        t1_t2 = t2.inv() * t1
-        if np.any(t1_t2.p < t1_t2_lower_limit_p) or np.any(t1_t2.p > t1_t2_upper_limit_p):
+        t1_gt = robot1_gt.fwd(q1)
+        t2_gt = robot2_gt.fwd(q2)
+        t1_t2_gt = t2_gt.inv() * t1_gt
+        if np.any(t1_t2_gt.p < t1_t2_lower_limit_p) or np.any(t1_t2_gt.p > t1_t2_upper_limit_p):
             continue
         # get ground truth T and joints
         data_joints.append(np.concatenate((q1, q2)))
-        # get the tool transformation in the inertial frame, with using the ground truth parameters
+        # get the tool transformation in the inertial frame, with the ground truth parameters
+        data_T.append(np.append(t1_t2_gt.p, R2q(t1_t2_gt.R)))
+
+    # calibration
+    weight_P = 1
+    weight_H = 1
+    weight_pos = 1
+    weight_ori = 1641
+    alpha=0.01
+    lambda_H = 30
+    lambda_P = 2.5
+    lambda_tool_p = 2.5
+    lambda_tool_R = 15
+    total_P1 = 2*jN1 # total number of P parameters to be estimated. robot 1
+    total_H1 = 2*jN1 # total number of H parameters to be estimated. robot 1
+    total_P2 = 2*jN2 # total number of P parameters to be estimated. robot 2
+    total_H2 = 2*jN2 # total number of H parameters to be estimated. robot 2
+    total_tool_p = 3 # total number of tool p parameters to be estimated, for 1 robot
+    total_tool_R = 3 # total number of tool R parameters to be estimated, for 1 robot
+    max_iteration = 200
+    
+    pos_error_norm_progress = []
+    ori_error_norm_progress = []
+    param_ph1_error_progress = []
+    param_ph2_error_progress = []
+    param_t1_error_progress = []
+    param_t2_error_progress = []
+    for iter_N in range(max_iteration):
+        # get the current robots using params
+        robot1, param_t1 = get_PH_tool_from_param_minimal(param_ph1, param_t1, robot1, unit=using_unit)
+        robot2, param_t2 = get_PH_tool_from_param_minimal(param_ph2, param_t2, robot2, unit=using_unit)
+
+        J_ana = []
+        error_pos_ori = []
+        for data_q in data_joints:
+            # get J_ana
+            # get error
+            pass
+
+        J_ana = np.array(J_ana)
+
+        # update PH using QP
+        # parameters: param_ph1, param_t1, param_ph2, param_t2
+        G = J_ana
+        Kq = np.hstack((np.ones(total_P1)*lambda_P, np.ones(total_H1)*lambda_H, \
+                        np.ones(total_tool_p)*lambda_tool_p, np.ones(total_tool_R)*lambda_tool_R,\
+                        np.ones(total_P2)*lambda_P, np.ones(total_H2)*lambda_H, \
+                        np.ones(total_tool_p)*lambda_tool_p, np.ones(total_tool_R)*lambda_tool_R))
+        Kq = np.diag(Kq)
+        H=G.T@G + Kq
+        H = (H + H.T) / 2
+        f = -G.T@error_pos_ori
+        dparam = solve_qp(H, f, solver='quadprog')
+
+        param_ph1 = param_ph1 + dparam[:total_P1+total_H1]
+        dparam = dparam[total_P1+total_H1:]
+        param_t1 = param_t1 + dparam[:total_tool_p+total_tool_R]
+        dparam = dparam[total_tool_p+total_tool_R:]
+        param_ph2 = param_ph2 + dparam[:total_P2+total_H2]
+        dparam = dparam[total_P2+total_H2:]
+        param_t2 = param_t2 + dparam[:total_tool_p+total_tool_R]
+
 
 if __name__ == '__main__':
     main()
