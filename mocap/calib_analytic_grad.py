@@ -358,7 +358,7 @@ def jacobian_param_minimal(param,robot:robot_obj,theta,unit='radians'):
 
     jN=len(theta)
     
-    # get current P,H (given param)
+    # get current P,H (given param)m this is the same as get_PH_from_param_minimal
     P = []
     for oi in range(jN):
         delta_o = param[2*oi]*robot.param_k1[oi]+param[2*oi+1]*robot.param_k2[oi]
@@ -387,8 +387,10 @@ def jacobian_param_minimal(param,robot:robot_obj,theta,unit='radians'):
            rot_k1_alpha[-1]@robot.H_nominal[j]
         H.append(hi)
     H=np.array(H)
-    robot.robot.P = P.T
-    robot.robot.H = H.T
+    robot.robot.P=P.T
+    robot.robot.H=H.T
+    ######################################
+
     Pn=deepcopy(robot.P_nominal)
     Hn=deepcopy(robot.H_nominal)
     
@@ -432,6 +434,20 @@ def jacobian_param_minimal(param,robot:robot_obj,theta,unit='radians'):
         # J[3:,:] = J[3:,:]*(np.pi/180)
     
     return J
+
+def jacobian_param_minimal_dual(param1, robot1:robot_obj, param2, robot2:robot_obj, theta, unit='radians'):
+
+    jN1 = len(robot1.robot.H[0])
+    jN2 = len(robot2.robot.H[0])
+
+    param1_dummy = np.insert(param1,2*jN1,np.zeros(3))
+    param2_dummy = np.insert(param2,2*jN2,np.zeros(3))
+    J1 = jacobian_param_minimal(param1_dummy, robot1, theta, unit=unit)
+    J1 = np.delete(J1,[2*jN1,2*jN1+1,2*jN1+2],axis=1)
+    J2 = jacobian_param_minimal(param2_dummy, robot2, theta, unit=unit)
+    J2 = np.delete(J2,[2*jN2,2*jN2+1,2*jN2+2],axis=1)
+
+    
 
 def minimal_test(robot):
 
