@@ -112,34 +112,37 @@ def get_H_param_axis(robot):
     k1=[]
     k2=[]
     for j in range(jN):
-        # find the plane perpendicular to H[j]
-                
+        align_Rx = np.fabs(np.dot(Rx,robot.robot.H[:,j]))
+        align_Ry = np.fabs(np.dot(Ry,robot.robot.H[:,j]))
+        align_Rz = np.fabs(np.dot(Rz,robot.robot.H[:,j]))
 
+        if align_Rx>=align_Ry and align_Rx>=align_Rz:
+            this_k1 = Ry-np.dot(Ry,robot.robot.H[:,j])*robot.robot.H[:,j]
+            this_k1 = this_k1/np.linalg.norm(this_k1)
+            this_k2 = Rz-np.dot(Rz,robot.robot.H[:,j])*robot.robot.H[:,j]-np.dot(Rz,this_k1)*this_k1
+            this_k2 = this_k2/np.linalg.norm(this_k2)
+            if np.dot(Rx,robot.robot.H[:,j])<0:
+                this_k1 = -this_k1
+        elif align_Ry>=align_Rx and align_Ry>=align_Rz:
+            this_k1 = Rz-np.dot(Rz,robot.robot.H[:,j])*robot.robot.H[:,j]
+            this_k1 = this_k1/np.linalg.norm(this_k1)
+            this_k2 = Rx-np.dot(Rx,robot.robot.H[:,j])*robot.robot.H[:,j]-np.dot(Rx,this_k1)*this_k1
+            this_k2 = this_k2/np.linalg.norm(this_k2)
+            if np.dot(Ry,robot.robot.H[:,j])<0:
+                this_k1 = -this_k1
+        elif align_Rz>=align_Rx and align_Rz>=align_Ry:
+            this_k1 = Rx-np.dot(Rx,robot.robot.H[:,j])*robot.robot.H[:,j]
+            this_k1 = this_k1/np.linalg.norm(this_k1)
+            this_k2 = Ry-np.dot(Ry,robot.robot.H[:,j])*robot.robot.H[:,j]-np.dot(Ry,this_k1)*this_k1
+            this_k2 = this_k2/np.linalg.norm(this_k2)
+            if np.dot(Rz,robot.robot.H[:,j])<0:
+                this_k1 = -this_k1
+        assert np.allclose(np.dot(this_k1,this_k2),0),'k1 and k2 should be orthogonal.'
+        assert np.allclose(np.dot(this_k1,robot.robot.H[:,j]),0),'k1 should be orthogonal to H.'
+        assert np.allclose(np.dot(this_k2,robot.robot.H[:,j]),0),'k2 should be orthogonal to H.'
 
-
-        if np.fabs(np.dot(Rx,robot.robot.H[:,j]))>0.999:
-            if np.dot(Rx,robot.robot.H[:,j])>0:
-                k1.append(Ry)
-                k2.append(Rz)
-            else:
-                k1.append(Rz)
-                k2.append(Ry)
-        elif np.fabs(np.dot(Ry,robot.robot.H[:,j]))>0.999:
-            if  np.dot(Ry,robot.robot.H[:,j])>0:
-                k1.append(Rz)
-                k2.append(Rx)
-            else:
-                k1.append(Rx)
-                k2.append(Rz)
-        elif np.fabs(np.dot(Rz,robot.robot.H[:,j]))>0.999:
-            if np.dot(Rz,robot.robot.H[:,j])>0:
-                k1.append(Rx)
-                k2.append(Ry)
-            else:
-                k1.append(Ry)
-                k2.append(Rx)
-        else:
-            assert AssertionError,'Assume h is aligned well with x or y or z axis.'
+        k1.append(this_k1)
+        k2.append(this_k2)
     robot.param_k1=np.array(k1)
     robot.param_k2=np.array(k2)
     return robot
@@ -255,12 +258,12 @@ def jacobian_param(param,robot,theta,unit='radians',minimal=False):
     
     return J
 
-def get_PH_from_param_minimal(param,robot,unit='radians'):
+def get_PH_from_param_minimal(param,robot: robot_obj,unit='radians'):
     
     jN=len(robot.robot.H[0])
     # get current P,H (given param)
     P = []
-    for oi in range(6):
+    for oi in range(jN):
         delta_o = param[2*oi]*robot.param_k1[oi]+param[2*oi+1]*robot.param_k2[oi]
         if oi==0:
             delta_P = deepcopy(delta_o)
@@ -290,6 +293,23 @@ def get_PH_from_param_minimal(param,robot,unit='radians'):
     robot.robot.P=P.T
     robot.robot.H=H.T
     return robot
+
+def get_PH_tool_from_param_minimal(param_ph,param_tool,robot: robot_obj,unit='radians'):
+
+    jN = len(robot.robot.H[0])
+    # insert a dummy P jN+1
+    param_ph = np.insert(param_ph,2*jN,np.zeros(3))
+    robot = get_PH_from_param_minimal(param_ph,robot,unit=unit)
+    robot.robot.P[:,-1] = np.zeros(3) # the last p is in the tool transformation
+    # tool transformation
+    tool_dT = Transform(rpy2R(param_tool[3:]),param_tool[:3])
+    tool_origin = Transform(robot.robot.R_tool, robot.robot.p_tool)
+    tool_new = tool_origin*tool_dT
+    robot.R_tool = robot.robot.R_tool = tool_new.R
+    robot.p_tool = robot.robot.p_tool = tool_new.p
+    param_tool = np.zeros(6)
+
+    return robot, param_tool
 
 def get_param_from_PH_minimal(robot,this_P,this_H,nom_P,nom_H, unit='radians'):
 
@@ -324,11 +344,12 @@ def get_param_from_PH_minimal(robot,this_P,this_H,nom_P,nom_H, unit='radians'):
     
     return np.append(param_P,np.array(param_H))
 
-def get_param_from_PH_minimal_tool(robot,this_P,this_H,nom_P,nom_H, unit='radians'):
+def get_param_from_PH_minimal_tool(robot,this_P,this_H, unit='radians'):
 
-    param_ph = get_param_from_PH_minimal(robot,this_P,this_H,nom_P,nom_H, unit=unit)
-    param_tool_p = deepcopy(param_ph[-3:])
-    param_ph = param_ph[:-3]
+    jN = len(robot.robot.H[0])
+    param_ph = get_param_from_PH_minimal(robot,this_P,this_H,robot.P_nominal.T,robot.H_nominal.T, unit=unit)
+    param_ph = np.delete(param_ph,[2*jN,2*jN+1,2*jN+2])
+    param_tool_p = np.zeros(3)
     param_tool_R = R2rpy(np.eye(3))
     param_tool = np.append(param_tool_p,param_tool_R)
     return param_ph, param_tool
