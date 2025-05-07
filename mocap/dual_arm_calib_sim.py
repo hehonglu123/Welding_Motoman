@@ -1,5 +1,5 @@
+from matplotlib import pyplot as plt
 from copy import deepcopy
-import sys
 from robotics_utils import *
 from motoman_def  import *
 
@@ -160,16 +160,16 @@ def main():
     # print("robot 2 ground truth tool:", robot2_gt.robot.R_tool, robot2_gt.robot.p_tool)
 
     # generate the simulated dataset
-    data_N = 500
+    data_N = 100
     data_joints = []
-    data_T = []
+    data_T_gt = []
     t1_t2_lower_limit_p = np.array([-500, -500, -1500])
     t1_t2_upper_limit_p = np.array([500, 500, 0])
     r1_lower_limit = np.clip(robot1.robot.joint_lower_limit, -np.pi, np.pi)
     r1_upper_limit = np.clip(robot1.robot.joint_upper_limit, -np.pi, np.pi)
     r2_lower_limit = np.clip(robot2.robot.joint_lower_limit, -np.pi, np.pi)
     r2_upper_limit = np.clip(robot2.robot.joint_upper_limit, -np.pi, np.pi)
-    for i in range(data_N):
+    while len(data_joints) < data_N:
         # randomize a set of joint angles for robot2
         q1 = np.random.uniform(r1_lower_limit, r1_upper_limit, jN1)
         q2 = np.random.uniform(r2_lower_limit, r2_upper_limit, jN2)
@@ -179,10 +179,12 @@ def main():
         t1_t2_gt = t2_gt.inv() * t1_gt
         if np.any(t1_t2_gt.p < t1_t2_lower_limit_p) or np.any(t1_t2_gt.p > t1_t2_upper_limit_p):
             continue
+        print("data #:", len(data_joints))
         # get ground truth T and joints
         data_joints.append(np.concatenate((q1, q2)))
         # get the tool transformation in the inertial frame, with the ground truth parameters
-        data_T.append(np.append(t1_t2_gt.p, R2q(t1_t2_gt.R)))
+        data_T_gt.append(np.append(t1_t2_gt.p, R2q(t1_t2_gt.R)))
+    input("Data generation complete. Press Enter to continue...")
 
     # calibration
     weight_P = 1
@@ -200,14 +202,18 @@ def main():
     total_H2 = 2*jN2 # total number of H parameters to be estimated. robot 2
     total_tool_p = 3 # total number of tool p parameters to be estimated, for 1 robot
     total_tool_R = 3 # total number of tool R parameters to be estimated, for 1 robot
-    max_iteration = 200
+    max_iteration = 10
     
     pos_error_norm_progress = []
     ori_error_norm_progress = []
-    param_ph1_error_progress = []
-    param_ph2_error_progress = []
-    param_t1_error_progress = []
-    param_t2_error_progress = []
+    param_p1_error_progress = []
+    param_h1_error_progress = []
+    param_p2_error_progress = []
+    param_h2_error_progress = []
+    param_t1p_error_progress = []
+    param_t1R_error_progress = []
+    param_t2p_error_progress = []
+    param_t2R_error_progress = []
     for iter_N in range(max_iteration):
         # get the current robots using params
         robot1, param_t1 = get_PH_tool_from_param_minimal(param_ph1, param_t1, robot1, unit=using_unit)
@@ -215,23 +221,47 @@ def main():
 
         J_ana = []
         error_pos_ori = []
-        for data_q in data_joints:
+        error_pos = []
+        error_ori = []
+        for (data_q,data_T) in zip(data_joints, data_T_gt):
             # get J_ana
             this_J_dual = jacobian_param_minimal_dual(param_ph1, data_q[:jN1], robot1, \
                                                       param_ph2, data_q[jN1:], robot2, unit=using_unit)
             this_J_tool = jacobian_tool_dual(data_q[:jN1], robot1, \
                                              data_q[jN1:], robot2, unit=using_unit)
+            this_J = np.vstack((this_J_dual, this_J_tool))
+            J_ana.extend(this_J)
             # get error
-            pass
-
+            T_gt = Transform(q2R(data_T[3:]), data_T[:3]) # ground truth T
+            t2_t1_pred = robot2.fwd(data_q[jN1:]).inv() * robot1.fwd(data_q[:jN1]) # t2_t1_pred
+            vd = t2_t1_pred.p - T_gt.p # position error
+            omega_d=s_err_func(t2_t1_pred.R@T_gt.R.T)
+            kd,theta_d = R2rot(t2_t1_pred.R@T_gt.R.T)
+            ori_norm = kd*theta_d
+            error_pos_ori = np.append(error_pos_ori,np.append(omega_d*weight_ori,vd*weight_pos))
+            error_pos.append(np.linalg.norm(vd))
+            # error_ori.append(np.degrees(omega_d))  # for plotting purpose only (unit: degrees)  
+            error_ori.append(np.degrees(ori_norm))  # for plotting purpose only (unit: degrees)   
         J_ana = np.array(J_ana)
+        pos_error_norm_progress.append(np.mean(error_pos))
+        ori_error_norm_progress.append(np.mean(error_ori))
+        param_p1_error_progress.append(np.linalg.norm(param_ph1[:jN1*2]-param_ph1_gt[:jN1*2]))
+        param_h1_error_progress.append(np.linalg.norm(param_ph1[jN1*2:]-param_ph1_gt[jN1*2:]))
+        param_p2_error_progress.append(np.linalg.norm(param_ph2[:jN2*2]-param_ph2_gt[:jN2*2]))
+        param_h2_error_progress.append(np.linalg.norm(param_ph2[jN2*2:]-param_ph2_gt[jN2*2:]))
+        param_t1p_error_progress.append(np.linalg.norm(robot1.robot.p_tool-robot1_gt.robot.p_tool))
+        param_t1R_error_progress.append(np.linalg.norm(R2rpy(robot1.robot.R_tool@robot1_gt.robot.R_tool.T)))
+        param_t2p_error_progress.append(np.linalg.norm(robot2.robot.p_tool-robot2_gt.robot.p_tool))
+        param_t2R_error_progress.append(np.linalg.norm(R2rpy(robot2.robot.R_tool@robot2_gt.robot.R_tool.T)))
+
+        print(J_ana.shape)
 
         # update PH using QP
         # parameters: param_ph1, param_t1, param_ph2, param_t2
         G = J_ana
         Kq = np.hstack((np.ones(total_P1)*lambda_P, np.ones(total_H1)*lambda_H, \
-                        np.ones(total_tool_p)*lambda_tool_p, np.ones(total_tool_R)*lambda_tool_R,\
                         np.ones(total_P2)*lambda_P, np.ones(total_H2)*lambda_H, \
+                        np.ones(total_tool_p)*lambda_tool_p, np.ones(total_tool_R)*lambda_tool_R,\
                         np.ones(total_tool_p)*lambda_tool_p, np.ones(total_tool_R)*lambda_tool_R))
         Kq = np.diag(Kq)
         H=G.T@G + Kq
@@ -241,11 +271,48 @@ def main():
 
         param_ph1 = param_ph1 + dparam[:total_P1+total_H1]
         dparam = dparam[total_P1+total_H1:]
-        param_t1 = param_t1 + dparam[:total_tool_p+total_tool_R]
-        dparam = dparam[total_tool_p+total_tool_R:]
         param_ph2 = param_ph2 + dparam[:total_P2+total_H2]
         dparam = dparam[total_P2+total_H2:]
+        param_t1 = param_t1 + dparam[:total_tool_p+total_tool_R]
+        dparam = dparam[total_tool_p+total_tool_R:]
         param_t2 = param_t2 + dparam[:total_tool_p+total_tool_R]
+
+    # plot error progress in a 2x3 grid
+    fig, axs = plt.subplots(2, 3, figsize=(15, 10))
+    axs[0, 0].plot(pos_error_norm_progress, label='Position Error', color='blue')
+    axs[0, 0].set_title('Position Error Progress')
+    axs[0, 0].set_xlabel('Iteration')
+    axs[0, 0].set_ylabel('Error Norm (mm)')
+    axs[0, 1].plot(ori_error_norm_progress, label='Orientation Error', color='orange')
+    axs[0, 1].set_title('Orientation Error Progress')
+    axs[0, 1].set_xlabel('Iteration')
+    axs[0, 1].set_ylabel('Error Norm (degrees)')
+    axs[0, 2].plot(param_p1_error_progress, label='P1 Error', color='green')
+    axs[0, 2].plot(param_p2_error_progress, label='P2 Error', color='red')
+    axs[0, 2].set_title('P Error Progress')
+    axs[0, 2].set_xlabel('Iteration')
+    axs[0, 2].set_ylabel('Error Norm (mm)')
+    axs[0, 2].legend()
+    axs[1, 0].plot(param_h1_error_progress, label='H1 Error', color='purple')
+    axs[1, 0].plot(param_h2_error_progress, label='H2 Error', color='brown')
+    axs[1, 0].set_title('H Error Progress')
+    axs[1, 0].set_xlabel('Iteration')
+    axs[1, 0].set_ylabel('Error Norm (degrees)')
+    axs[1, 0].legend()
+    axs[1, 1].plot(param_t1p_error_progress, label='Tool P1 Error', color='pink')
+    axs[1, 1].plot(param_t2p_error_progress, label='Tool P2 Error', color='cyan')
+    axs[1, 1].set_title('Tool P Error Progress')
+    axs[1, 1].set_xlabel('Iteration')
+    axs[1, 1].set_ylabel('Error Norm (mm)')
+    axs[1, 1].legend()
+    axs[1, 2].plot(param_t1R_error_progress, label='Tool R1 Error', color='gray')
+    axs[1, 2].plot(param_t2R_error_progress, label='Tool R2 Error', color='olive')
+    axs[1, 2].set_title('Tool R Error Progress')
+    axs[1, 2].set_xlabel('Iteration')
+    axs[1, 2].set_ylabel('Error Norm (degrees)')
+    axs[1, 2].legend()
+    plt.tight_layout()
+    plt.show()
 
 
 if __name__ == '__main__':
