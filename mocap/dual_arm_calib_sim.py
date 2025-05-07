@@ -217,6 +217,8 @@ def main():
         error_pos_ori = []
         for data_q in data_joints:
             # get J_ana
+            this_J_dual = jacobian_param_minimal_dual(param_ph1, data_q[:jN1], robot1, \
+                                                      param_ph2, data_q[jN1:], robot2, unit=using_unit)
             # get error
             pass
 

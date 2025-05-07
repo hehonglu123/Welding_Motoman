@@ -435,19 +435,58 @@ def jacobian_param_minimal(param,robot:robot_obj,theta,unit='radians'):
     
     return J
 
-def jacobian_param_minimal_dual(param1, robot1:robot_obj, param2, robot2:robot_obj, theta, unit='radians'):
+def jacobian_param_minimal_dual(param1, theta1, robot1:robot_obj, param2, theta2, robot2:robot_obj, unit='radians'):
 
     jN1 = len(robot1.robot.H[0])
     jN2 = len(robot2.robot.H[0])
 
     param1_dummy = np.insert(param1,2*jN1,np.zeros(3))
     param2_dummy = np.insert(param2,2*jN2,np.zeros(3))
-    J1 = jacobian_param_minimal(param1_dummy, robot1, theta, unit=unit)
+    J1 = jacobian_param_minimal(param1_dummy, robot1, theta1, unit=unit)
     J1 = np.delete(J1,[2*jN1,2*jN1+1,2*jN1+2],axis=1)
-    J2 = jacobian_param_minimal(param2_dummy, robot2, theta, unit=unit)
+    J2 = jacobian_param_minimal(param2_dummy, robot2, theta2, unit=unit)
     J2 = np.delete(J2,[2*jN2,2*jN2+1,2*jN2+2],axis=1)
+    t1 = robot1.fwd(theta1)
+    t2 = robot2.fwd(theta2)
+    R0t2 = t2.R
+    Rt20 = np.linalg.inv(R0t2)
+    # J = [(dR/dP Rt0)vee (dR/dH Rt0)vee
+    #      dp/dP dp/dH]
+    # J dual = [(dR/dP1 Rt1t2)vee (dR/dH1 Rt1t2)vee (dR/dP2 Rt1t2)vee (dR/dH2 Rt1t2)vee
+    #           dp/dP1 dp/dH1 dp/dP2 dp/dH2]
+    dp_dP1 = Rt20@J1[3:,0:2*jN1]
+    dp_dP2 = -Rt20@J2[3:,0:2*jN2]
+    dsi_dP1 = np.zeros((3,2*jN1))
+    dsi_dP2 = np.zeros((3,2*jN2))
+    dp_dH1 = Rt20@J1[3:,2*jN1:]
+    dp_dH2 = []
+    dsi_dH1 = []
+    dsi_dH2 = []
+    for (dsidh1, dsish2) in zip(J1[0:3,0:2*jN1].T, J2[0:3,0:2*jN2].T):
+        dsidh1_hat = hat(dsidh1)
+        dsidh2_hat = hat(dsish2)
+        dp_dh2 = Rt20@(dsidh2_hat.T)@(t1.p-t2.p)-Rt20@J2[3:,2*jN2:]
+        dp_dH2.append(dp_dh2)
 
-    
+        dRdh1 = Rt20@dsidh1_hat@R0t2
+        dRdh2 = Rt20@(dsidh2_hat.T)@R0t2
+        dsi_dH1.append(invhat(dRdh1))
+        dsi_dH2.append(invhat(dRdh2))
+    dp_dH2 = np.array(dp_dH2).T
+    dsi_dH1 = np.array(dsi_dH1).T
+    dsi_dH2 = np.array(dsi_dH2).T
+
+    J_dual = np.zeros((6, len(param1)+len(param2)))
+    J_dual[0:3,0:2*jN1] = dp_dP1
+    J_dual[0:3,2*jN1:4*jN1] = dp_dH1
+    J_dual[0:3,4*jN1:4*jN1+2*jN2] = dp_dP2
+    J_dual[0:3,4*jN1+2*jN2:] = dp_dH2
+    J_dual[3:6,0:2*jN1] = dsi_dP1
+    J_dual[3:6,2*jN1:4*jN1] = dsi_dH1
+    J_dual[3:6,4*jN1:4*jN1+2*jN2] = dsi_dP2
+    J_dual[3:6,4*jN1+2*jN2:] = dsi_dH2
+
+    return J_dual
 
 def minimal_test(robot):
 
