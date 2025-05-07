@@ -219,6 +219,8 @@ def main():
             # get J_ana
             this_J_dual = jacobian_param_minimal_dual(param_ph1, data_q[:jN1], robot1, \
                                                       param_ph2, data_q[jN1:], robot2, unit=using_unit)
+            this_J_tool = jacobian_tool_dual(data_q[:jN1], robot1, \
+                                             data_q[jN1:], robot2, unit=using_unit)
             # get error
             pass
 

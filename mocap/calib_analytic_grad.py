@@ -488,6 +488,61 @@ def jacobian_param_minimal_dual(param1, theta1, robot1:robot_obj, param2, theta2
 
     return J_dual
 
+def jacobian_tool(theta, robot:robot_obj, unit='radians'):
+    jN = len(theta)    
+    # rpy2R = Rz(y)@Ry(p)Rx(r)
+
+    # J = [dR/dpt dR/dsi
+    #      dp/dpt dp/dsi]
+    J = np.zeros((6,6))
+
+    R0n = np.eye(3)
+    for j, th in enumerate(theta):
+        R0n = R0n@rot(robot.robot.H[:,j],th)
+    J[3:,:3]=R0n
+
+    tool_rpy = R2rpy(robot.robot.R_tool)
+    rot_ex = rot(Rx,tool_rpy[2])
+    rot_ey = rot(Ry,tool_rpy[1])
+    rot_ez = rot(Rz,tool_rpy[0])
+    J[:3,3] = invhat(R0n@rot_ez@rot_ey@hat(Rx)@rot_ex)
+    J[:3,4] = invhat(R0n@rot_ez@hat(Ry)@rot_ey@rot_ex)
+    J[:3,5] = invhat(R0n@hat(Rz)@rot_ez@rot_ey@rot_ex)
+
+    return J
+
+def jacobian_tool_dual(theta1, robot1:robot_obj, theta2, robot2:robot_obj, unit='radians'):
+    
+    # J dual = [dR/dpt1 dR/dsi1 dR/dpt2 dR/dsi2
+    #           dp/dpt1 dp/dsi1 dp/dpt2 dp/dsi2]
+
+    J1 = jacobian_tool(theta1, robot1, unit=unit)
+    J2 = jacobian_tool(theta2, robot2, unit=unit)
+    t2 = robot2.fwd(theta2)
+    R0t2 = t2.R
+    Rt20 = np.linalg.inv(R0t2)
+
+    J_dual = np.zeros((6, 12))
+    J_dual[3:,:3] = Rt20@J1[3:,:3]
+    J_dual[3:,6:9] = -Rt20@J2[3:,:3]
+    dRdsi1 = []
+    dRdsi2 = []
+    for (dsids1, dsids2) in zip(J1[0:3,3:].T, J2[0:3,3:].T):
+        dsids1_hat = hat(dsids1)
+        dsids2_hat = hat(dsids2)
+
+        dRds1 = Rt20@dsids1_hat@R0t2
+        dRds2 = Rt20@(dsids2_hat.T)@R0t2
+
+        dRdsi1.append(invhat(dRds1))
+        dRdsi2.append(invhat(dRds2))
+    dRdsi1 = np.array(dRdsi1).T
+    dRdsi2 = np.array(dRdsi2).T
+    J_dual[:3,3:6] = dRdsi1
+    J_dual[:3,9:12] = dRdsi2
+    
+    return J_dual
+
 def minimal_test(robot):
 
     # get orthogonal axis of each joint
