@@ -459,21 +459,23 @@ def jacobian_param_minimal_dual(param1, theta1, robot1:robot_obj, param2, theta2
     dsi_dP1 = np.zeros((3,2*jN1))
     dsi_dP2 = np.zeros((3,2*jN2))
     dp_dH1 = Rt20@J1[3:,2*jN1:]
-    dp_dH2 = []
+    
     dsi_dH1 = []
-    dsi_dH2 = []
-    for (dsidh1, dsish2) in zip(J1[0:3,0:2*jN1].T, J2[0:3,0:2*jN2].T):
+    for j,dsidh1 in enumerate(J1[0:3,2*jN1:].T):
         dsidh1_hat = hat(dsidh1)
-        dsidh2_hat = hat(dsish2)
-        dp_dh2 = Rt20@(dsidh2_hat.T)@(t1.p-t2.p)-Rt20@J2[3:,2*jN2:]
-        dp_dH2.append(dp_dh2)
+        dsi_dH1.append(invhat(Rt20@dsidh1_hat@R0t2))
+    dsi_dH1 = np.array(dsi_dH1).T
 
-        dRdh1 = Rt20@dsidh1_hat@R0t2
+    dp_dH2 = []
+    dsi_dH2 = []
+    for j,dsidh2 in enumerate(J2[0:3,2*jN2:].T):
+        dsidh2_hat = hat(dsidh2)
+        dp_dh2 = Rt20@(dsidh2_hat.T)@(t1.p-t2.p)-Rt20@J2[3:,2*jN2+j]
+        dp_dH2.append(dp_dh2)
         dRdh2 = Rt20@(dsidh2_hat.T)@R0t2
-        dsi_dH1.append(invhat(dRdh1))
         dsi_dH2.append(invhat(dRdh2))
     dp_dH2 = np.array(dp_dH2).T
-    dsi_dH1 = np.array(dsi_dH1).T
+    
     dsi_dH2 = np.array(dsi_dH2).T
 
     J_dual = np.zeros((6, len(param1)+len(param2)))
@@ -489,9 +491,7 @@ def jacobian_param_minimal_dual(param1, theta1, robot1:robot_obj, param2, theta2
     return J_dual
 
 def jacobian_tool(theta, robot:robot_obj, unit='radians'):
-    jN = len(theta)    
     # rpy2R = Rz(y)@Ry(p)Rx(r)
-
     # J = [dR/dpt dR/dsi
     #      dp/dpt dp/dsi]
     J = np.zeros((6,6))

@@ -160,30 +160,37 @@ def main():
     # print("robot 2 ground truth tool:", robot2_gt.robot.R_tool, robot2_gt.robot.p_tool)
 
     # generate the simulated dataset
-    data_N = 100
-    data_joints = []
-    data_T_gt = []
-    t1_t2_lower_limit_p = np.array([-500, -500, -1500])
-    t1_t2_upper_limit_p = np.array([500, 500, 0])
-    r1_lower_limit = np.clip(robot1.robot.joint_lower_limit, -np.pi, np.pi)
-    r1_upper_limit = np.clip(robot1.robot.joint_upper_limit, -np.pi, np.pi)
-    r2_lower_limit = np.clip(robot2.robot.joint_lower_limit, -np.pi, np.pi)
-    r2_upper_limit = np.clip(robot2.robot.joint_upper_limit, -np.pi, np.pi)
-    while len(data_joints) < data_N:
-        # randomize a set of joint angles for robot2
-        q1 = np.random.uniform(r1_lower_limit, r1_upper_limit, jN1)
-        q2 = np.random.uniform(r2_lower_limit, r2_upper_limit, jN2)
-        # check if t1_t2 p is in the limit
-        t1_gt = robot1_gt.fwd(q1)
-        t2_gt = robot2_gt.fwd(q2)
-        t1_t2_gt = t2_gt.inv() * t1_gt
-        if np.any(t1_t2_gt.p < t1_t2_lower_limit_p) or np.any(t1_t2_gt.p > t1_t2_upper_limit_p):
-            continue
-        print("data #:", len(data_joints))
-        # get ground truth T and joints
-        data_joints.append(np.concatenate((q1, q2)))
-        # get the tool transformation in the inertial frame, with the ground truth parameters
-        data_T_gt.append(np.append(t1_t2_gt.p, R2q(t1_t2_gt.R)))
+    try:
+        data_joints = np.loadtxt('data_joints_dual_sim.csv',delimiter=',')
+        data_T_gt = np.loadtxt('data_T_gt_dual_sim.csv',delimiter=',')
+        data_N = len(data_joints)
+    except:
+        data_N = 100
+        data_joints = []
+        data_T_gt = []
+        t1_t2_lower_limit_p = np.array([-500, -500, -1500])
+        t1_t2_upper_limit_p = np.array([500, 500, 0])
+        r1_lower_limit = np.clip(robot1.robot.joint_lower_limit, -np.pi, np.pi)
+        r1_upper_limit = np.clip(robot1.robot.joint_upper_limit, -np.pi, np.pi)
+        r2_lower_limit = np.clip(robot2.robot.joint_lower_limit, -np.pi, np.pi)
+        r2_upper_limit = np.clip(robot2.robot.joint_upper_limit, -np.pi, np.pi)
+        while len(data_joints) < data_N:
+            # randomize a set of joint angles for robot2
+            q1 = np.random.uniform(r1_lower_limit, r1_upper_limit, jN1)
+            q2 = np.random.uniform(r2_lower_limit, r2_upper_limit, jN2)
+            # check if t1_t2 p is in the limit
+            t1_gt = robot1_gt.fwd(q1)
+            t2_gt = robot2_gt.fwd(q2)
+            t1_t2_gt = t2_gt.inv() * t1_gt
+            if np.any(t1_t2_gt.p < t1_t2_lower_limit_p) or np.any(t1_t2_gt.p > t1_t2_upper_limit_p):
+                continue
+            print("data #:", len(data_joints))
+            # get ground truth T and joints
+            data_joints.append(np.concatenate((q1, q2)))
+            # get the tool transformation in the inertial frame, with the ground truth parameters
+            data_T_gt.append(np.append(t1_t2_gt.p, R2q(t1_t2_gt.R)))
+        np.savetxt('data_joints_dual_sim.csv', data_joints, delimiter=',')
+        np.savetxt('data_T_gt_dual_sim.csv', data_T_gt, delimiter=',')
     input("Data generation complete. Press Enter to continue...")
 
     # calibration
@@ -215,6 +222,7 @@ def main():
     param_t2p_error_progress = []
     param_t2R_error_progress = []
     for iter_N in range(max_iteration):
+        print("Iteration #:", iter_N)
         # get the current robots using params
         robot1, param_t1 = get_PH_tool_from_param_minimal(param_ph1, param_t1, robot1, unit=using_unit)
         robot2, param_t2 = get_PH_tool_from_param_minimal(param_ph2, param_t2, robot2, unit=using_unit)
@@ -229,19 +237,17 @@ def main():
                                                       param_ph2, data_q[jN1:], robot2, unit=using_unit)
             this_J_tool = jacobian_tool_dual(data_q[:jN1], robot1, \
                                              data_q[jN1:], robot2, unit=using_unit)
-            this_J = np.vstack((this_J_dual, this_J_tool))
+            this_J = np.hstack((this_J_dual, this_J_tool))
             J_ana.extend(this_J)
             # get error
             T_gt = Transform(q2R(data_T[3:]), data_T[:3]) # ground truth T
             t2_t1_pred = robot2.fwd(data_q[jN1:]).inv() * robot1.fwd(data_q[:jN1]) # t2_t1_pred
             vd = t2_t1_pred.p - T_gt.p # position error
             omega_d=s_err_func(t2_t1_pred.R@T_gt.R.T)
-            kd,theta_d = R2rot(t2_t1_pred.R@T_gt.R.T)
-            ori_norm = kd*theta_d
             error_pos_ori = np.append(error_pos_ori,np.append(omega_d*weight_ori,vd*weight_pos))
             error_pos.append(np.linalg.norm(vd))
             # error_ori.append(np.degrees(omega_d))  # for plotting purpose only (unit: degrees)  
-            error_ori.append(np.degrees(ori_norm))  # for plotting purpose only (unit: degrees)   
+            error_ori.append(np.linalg.norm(omega_d))  # for plotting purpose only (unit: degrees)   
         J_ana = np.array(J_ana)
         pos_error_norm_progress.append(np.mean(error_pos))
         ori_error_norm_progress.append(np.mean(error_ori))
@@ -254,8 +260,7 @@ def main():
         param_t2p_error_progress.append(np.linalg.norm(robot2.robot.p_tool-robot2_gt.robot.p_tool))
         param_t2R_error_progress.append(np.linalg.norm(R2rpy(robot2.robot.R_tool@robot2_gt.robot.R_tool.T)))
 
-        print(J_ana.shape)
-
+        print("Pose error, orientation error:", np.mean(error_ori), np.mean(error_pos))
         # update PH using QP
         # parameters: param_ph1, param_t1, param_ph2, param_t2
         G = J_ana
@@ -269,13 +274,13 @@ def main():
         f = -G.T@error_pos_ori
         dparam = solve_qp(H, f, solver='quadprog')
 
-        param_ph1 = param_ph1 + dparam[:total_P1+total_H1]
+        param_ph1 = param_ph1 - alpha*dparam[:total_P1+total_H1]
         dparam = dparam[total_P1+total_H1:]
-        param_ph2 = param_ph2 + dparam[:total_P2+total_H2]
+        param_ph2 = param_ph2 - alpha*dparam[:total_P2+total_H2]
         dparam = dparam[total_P2+total_H2:]
-        param_t1 = param_t1 + dparam[:total_tool_p+total_tool_R]
+        param_t1 = param_t1 - alpha*dparam[:total_tool_p+total_tool_R]
         dparam = dparam[total_tool_p+total_tool_R:]
-        param_t2 = param_t2 + dparam[:total_tool_p+total_tool_R]
+        param_t2 = param_t2 - alpha*dparam[:total_tool_p+total_tool_R]
 
     # plot error progress in a 2x3 grid
     fig, axs = plt.subplots(2, 3, figsize=(15, 10))
