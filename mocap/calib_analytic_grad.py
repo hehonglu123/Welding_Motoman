@@ -258,8 +258,10 @@ def jacobian_param(param,robot,theta,unit='radians',minimal=False):
     
     return J
 
-def get_PH_from_param_minimal(param,robot: robot_obj,unit='radians'):
+def get_PH_from_param_minimal(param,robot_origin: robot_obj,unit='radians'):
     
+    robot = deepcopy(robot_origin)
+
     jN=len(robot.robot.H[0])
     # get current P,H (given param)
     P = []
@@ -294,7 +296,9 @@ def get_PH_from_param_minimal(param,robot: robot_obj,unit='radians'):
     robot.robot.H=H.T
     return robot
 
-def get_PH_tool_from_param_minimal(param_ph,param_tool,robot: robot_obj,unit='radians'):
+def get_PH_tool_from_param_minimal(param_ph,param_tool,robot_origin: robot_obj,unit='radians'):
+
+    robot = deepcopy(robot_origin)
 
     jN = len(robot.robot.H[0])
     # insert a dummy P jN+1
@@ -346,6 +350,7 @@ def get_param_from_PH_minimal(robot,this_P,this_H,nom_P,nom_H, unit='radians'):
 
 def get_param_from_PH_minimal_tool(robot,this_P,this_H, unit='radians'):
 
+
     jN = len(robot.robot.H[0])
     param_ph = get_param_from_PH_minimal(robot,this_P,this_H,robot.P_nominal.T,robot.H_nominal.T, unit=unit)
     param_ph = np.delete(param_ph,[2*jN,2*jN+1,2*jN+2])
@@ -354,7 +359,8 @@ def get_param_from_PH_minimal_tool(robot,this_P,this_H, unit='radians'):
     param_tool = np.append(param_tool_p,param_tool_R)
     return param_ph, param_tool
 
-def jacobian_param_minimal(param,robot:robot_obj,theta,unit='radians'):
+def jacobian_param_minimal(param,robot_origin:robot_obj,theta,unit='radians'):
+    robot = deepcopy(robot_origin)
 
     jN=len(theta)
     
@@ -435,7 +441,9 @@ def jacobian_param_minimal(param,robot:robot_obj,theta,unit='radians'):
     
     return J
 
-def jacobian_param_minimal_dual(param1, theta1, robot1:robot_obj, param2, theta2, robot2:robot_obj, unit='radians'):
+def jacobian_param_minimal_dual(param1, theta1, robot1_origin:robot_obj, param2, theta2, robot2_origin:robot_obj, unit='radians'):
+    robot1 = deepcopy(robot1_origin)
+    robot2 = deepcopy(robot2_origin)
 
     jN1 = len(robot1.robot.H[0])
     jN2 = len(robot2.robot.H[0])
@@ -479,18 +487,19 @@ def jacobian_param_minimal_dual(param1, theta1, robot1:robot_obj, param2, theta2
     dsi_dH2 = np.array(dsi_dH2).T
 
     J_dual = np.zeros((6, len(param1)+len(param2)))
-    J_dual[0:3,0:2*jN1] = dp_dP1
-    J_dual[0:3,2*jN1:4*jN1] = dp_dH1
-    J_dual[0:3,4*jN1:4*jN1+2*jN2] = dp_dP2
-    J_dual[0:3,4*jN1+2*jN2:] = dp_dH2
-    J_dual[3:6,0:2*jN1] = dsi_dP1
-    J_dual[3:6,2*jN1:4*jN1] = dsi_dH1
-    J_dual[3:6,4*jN1:4*jN1+2*jN2] = dsi_dP2
-    J_dual[3:6,4*jN1+2*jN2:] = dsi_dH2
-
+    J_dual[0:3,0:2*jN1] = dsi_dP1
+    J_dual[0:3,2*jN1:4*jN1] = dsi_dH1
+    J_dual[0:3,4*jN1:4*jN1+2*jN2] = dsi_dP2
+    J_dual[0:3,4*jN1+2*jN2:] = dsi_dH2
+    J_dual[3:6,0:2*jN1] = dp_dP1
+    J_dual[3:6,2*jN1:4*jN1] = dp_dH1
+    J_dual[3:6,4*jN1:4*jN1+2*jN2] = dp_dP2
+    J_dual[3:6,4*jN1+2*jN2:] = dp_dH2
+    
     return J_dual
 
 def jacobian_tool(theta, robot:robot_obj, unit='radians'):
+    robot = deepcopy(robot)
     # rpy2R = Rz(y)@Ry(p)Rx(r)
     # J = [dR/dpt dR/dsi
     #      dp/dpt dp/dsi]

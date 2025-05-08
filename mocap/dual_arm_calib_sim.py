@@ -135,36 +135,49 @@ def main():
     print("robot 1 initial parameters:", param_ph1, param_t1)
     print("robot 2 initial parameters:", param_ph2, param_t2)
 
-    # generate a random ph, t, ground truth
-    param_ph1_gt = deepcopy(param_ph1)
-    param_ph2_gt = deepcopy(param_ph2)
-    param_t1_gt = deepcopy(param_t1)
-    param_t2_gt = deepcopy(param_t2)
-    param_ph1_gt[:jN1*2] = np.random.uniform(-0.5,0.5,jN1*2) # vi, wi of robot1, mm
-    param_ph1_gt[jN1*2:] = np.radians(np.random.uniform(-0.025,0.025,jN1*2)) # th_i, phi_i of robot1, radians
-    param_ph2_gt[:jN1*2] = np.random.uniform(-0.5,0.5,jN2*2) # vi, wi of robot2, mm
-    param_ph2_gt[jN1*2:] = np.radians(np.random.uniform(-0.025,0.025,jN2*2)) # th_i, phi_i of robot2, radians
-    param_t1_gt[:3] = np.random.uniform(-1,1,3) # tool dp of robot1, mm
-    param_t1_gt[3:] = np.radians(np.random.uniform(-0.05,0.05,3)) # tool dR of robot1, radians
-    param_t2_gt[:3] = np.random.uniform(-1,1,3) # tool dp of robot2, mm
-    param_t2_gt[3:] = np.radians(np.random.uniform(-0.05,0.05,3)) # tool dR of robot2, radians
-
-    # print("robot 1 ground truth parameters:",param_ph1_gt, param_t1_gt)
-    robot1_gt, _ = get_PH_tool_from_param_minimal(param_ph1_gt, param_t1_gt, robot1, unit=using_unit)
-    # print("robot 1 ground truth PH:", robot1_gt.robot.P.T, robot1_gt.robot.H.T)
-    # print("robot 1 ground truth tool:", robot1_gt.robot.R_tool, robot1_gt.robot.p_tool)
-
-    # print("robot 2 ground truth parameters:",param_ph2_gt, param_t2_gt)
-    robot2_gt, _ = get_PH_tool_from_param_minimal(param_ph2_gt, param_t2_gt, robot2, unit=using_unit)
-    # print("robot 2 ground truth PH:", robot2_gt.robot.P.T, robot2_gt.robot.H.T)
-    # print("robot 2 ground truth tool:", robot2_gt.robot.R_tool, robot2_gt.robot.p_tool)
+    
 
     # generate the simulated dataset
     try:
         data_joints = np.loadtxt('data_joints_dual_sim.csv',delimiter=',')
         data_T_gt = np.loadtxt('data_T_gt_dual_sim.csv',delimiter=',')
+        param_ph1_gt = np.loadtxt('param_ph1_gt.csv',delimiter=',')
+        param_ph2_gt = np.loadtxt('param_ph2_gt.csv',delimiter=',')
+        param_t1_gt = np.loadtxt('param_t1_gt.csv',delimiter=',')
+        param_t2_gt = np.loadtxt('param_t2_gt.csv',delimiter=',')
+        robot1_gt, _ = get_PH_tool_from_param_minimal(param_ph1_gt, param_t1_gt, robot1, unit=using_unit)
+        robot2_gt, _ = get_PH_tool_from_param_minimal(param_ph2_gt, param_t2_gt, robot2, unit=using_unit)
         data_N = len(data_joints)
     except:
+        # generate a random ph, t, ground truth
+        param_ph1_gt = deepcopy(param_ph1)
+        param_ph2_gt = deepcopy(param_ph2)
+        param_t1_gt = deepcopy(param_t1)
+        param_t2_gt = deepcopy(param_t2)
+        param_ph1_gt[:jN1*2] = np.random.uniform(-0.5,0.5,jN1*2) # vi, wi of robot1, mm
+        param_ph1_gt[jN1*2:] = np.radians(np.random.uniform(-0.025,0.025,jN1*2)) # th_i, phi_i of robot1, radians
+        param_ph2_gt[:jN1*2] = np.random.uniform(-0.5,0.5,jN2*2) # vi, wi of robot2, mm
+        param_ph2_gt[jN1*2:] = np.radians(np.random.uniform(-0.025,0.025,jN2*2)) # th_i, phi_i of robot2, radians
+        # param_t1_gt[:3] = np.random.uniform(-1,1,3) # tool dp of robot1, mm
+        # param_t1_gt[3:] = np.radians(np.random.uniform(-0.05,0.05,3)) # tool dR of robot1, radians
+        # param_t2_gt[:3] = np.random.uniform(-1,1,3) # tool dp of robot2, mm
+        # param_t2_gt[3:] = np.radians(np.random.uniform(-0.05,0.05,3)) # tool dR of robot2, radians
+
+        np.savetxt('param_ph1_gt.csv', param_ph1_gt, delimiter=',')
+        np.savetxt('param_ph2_gt.csv', param_ph2_gt, delimiter=',')
+        np.savetxt('param_t1_gt.csv', param_t1_gt, delimiter=',')
+        np.savetxt('param_t2_gt.csv', param_t2_gt, delimiter=',')
+
+        # print("robot 1 ground truth parameters:",param_ph1_gt, param_t1_gt)
+        robot1_gt, _ = get_PH_tool_from_param_minimal(param_ph1_gt, param_t1_gt, robot1, unit=using_unit)
+        # print("robot 1 ground truth PH:", robot1_gt.robot.P.T, robot1_gt.robot.H.T)
+        # print("robot 1 ground truth tool:", robot1_gt.robot.R_tool, robot1_gt.robot.p_tool)
+
+        # print("robot 2 ground truth parameters:",param_ph2_gt, param_t2_gt)
+        robot2_gt, _ = get_PH_tool_from_param_minimal(param_ph2_gt, param_t2_gt, robot2, unit=using_unit)
+        # print("robot 2 ground truth PH:", robot2_gt.robot.P.T, robot2_gt.robot.H.T)
+        # print("robot 2 ground truth tool:", robot2_gt.robot.R_tool, robot2_gt.robot.p_tool)
+
         data_N = 100
         data_joints = []
         data_T_gt = []
@@ -198,18 +211,18 @@ def main():
     weight_H = 1
     weight_pos = 1
     weight_ori = 1641
-    alpha=0.01
-    lambda_H = 30
-    lambda_P = 2.5
-    lambda_tool_p = 2.5
-    lambda_tool_R = 15
+    alpha=0.2
+    lambda_H = 1
+    lambda_P = 1
+    lambda_tool_p = 1
+    lambda_tool_R = 1
     total_P1 = 2*jN1 # total number of P parameters to be estimated. robot 1
     total_H1 = 2*jN1 # total number of H parameters to be estimated. robot 1
     total_P2 = 2*jN2 # total number of P parameters to be estimated. robot 2
     total_H2 = 2*jN2 # total number of H parameters to be estimated. robot 2
     total_tool_p = 3 # total number of tool p parameters to be estimated, for 1 robot
     total_tool_R = 3 # total number of tool R parameters to be estimated, for 1 robot
-    max_iteration = 10
+    max_iteration = 50
     
     pos_error_norm_progress = []
     ori_error_norm_progress = []
@@ -251,16 +264,16 @@ def main():
         J_ana = np.array(J_ana)
         pos_error_norm_progress.append(np.mean(error_pos))
         ori_error_norm_progress.append(np.mean(error_ori))
-        param_p1_error_progress.append(np.linalg.norm(param_ph1[:jN1*2]-param_ph1_gt[:jN1*2]))
-        param_h1_error_progress.append(np.linalg.norm(param_ph1[jN1*2:]-param_ph1_gt[jN1*2:]))
-        param_p2_error_progress.append(np.linalg.norm(param_ph2[:jN2*2]-param_ph2_gt[:jN2*2]))
-        param_h2_error_progress.append(np.linalg.norm(param_ph2[jN2*2:]-param_ph2_gt[jN2*2:]))
-        param_t1p_error_progress.append(np.linalg.norm(robot1.robot.p_tool-robot1_gt.robot.p_tool))
-        param_t1R_error_progress.append(np.linalg.norm(R2rpy(robot1.robot.R_tool@robot1_gt.robot.R_tool.T)))
-        param_t2p_error_progress.append(np.linalg.norm(robot2.robot.p_tool-robot2_gt.robot.p_tool))
-        param_t2R_error_progress.append(np.linalg.norm(R2rpy(robot2.robot.R_tool@robot2_gt.robot.R_tool.T)))
+        param_p1_error_progress.append(param_ph1[:jN1*2]-param_ph1_gt[:jN1*2])
+        param_h1_error_progress.append(param_ph1[jN1*2:]-param_ph1_gt[jN1*2:])
+        param_p2_error_progress.append(param_ph2[:jN2*2]-param_ph2_gt[:jN2*2])
+        param_h2_error_progress.append(param_ph2[jN2*2:]-param_ph2_gt[jN2*2:])
+        param_t1p_error_progress.append(robot1.robot.p_tool-robot1_gt.robot.p_tool)
+        param_t1R_error_progress.append(R2rpy(robot1.robot.R_tool@robot1_gt.robot.R_tool.T))
+        param_t2p_error_progress.append(robot2.robot.p_tool-robot2_gt.robot.p_tool)
+        param_t2R_error_progress.append(R2rpy(robot2.robot.R_tool@robot2_gt.robot.R_tool.T))
 
-        print("Pose error, orientation error:", np.mean(error_ori), np.mean(error_pos))
+        print("Pose error, orientation error:", np.mean(error_pos), np.mean(error_ori))
         # update PH using QP
         # parameters: param_ph1, param_t1, param_ph2, param_t2
         G = J_ana
@@ -278,9 +291,9 @@ def main():
         dparam = dparam[total_P1+total_H1:]
         param_ph2 = param_ph2 - alpha*dparam[:total_P2+total_H2]
         dparam = dparam[total_P2+total_H2:]
-        param_t1 = param_t1 - alpha*dparam[:total_tool_p+total_tool_R]
-        dparam = dparam[total_tool_p+total_tool_R:]
-        param_t2 = param_t2 - alpha*dparam[:total_tool_p+total_tool_R]
+        # param_t1 = param_t1 - alpha*dparam[:total_tool_p+total_tool_R]
+        # dparam = dparam[total_tool_p+total_tool_R:]
+        # param_t2 = param_t2 - alpha*dparam[:total_tool_p+total_tool_R]
 
     # plot error progress in a 2x3 grid
     fig, axs = plt.subplots(2, 3, figsize=(15, 10))
@@ -292,32 +305,47 @@ def main():
     axs[0, 1].set_title('Orientation Error Progress')
     axs[0, 1].set_xlabel('Iteration')
     axs[0, 1].set_ylabel('Error Norm (degrees)')
-    axs[0, 2].plot(param_p1_error_progress, label='P1 Error', color='green')
-    axs[0, 2].plot(param_p2_error_progress, label='P2 Error', color='red')
+    axs[0, 2].plot(np.linalg.norm(param_p1_error_progress,axis=1), label='P1 Error', color='green')
+    axs[0, 2].plot(np.linalg.norm(param_p2_error_progress,axis=1), label='P2 Error', color='red')
     axs[0, 2].set_title('P Error Progress')
     axs[0, 2].set_xlabel('Iteration')
     axs[0, 2].set_ylabel('Error Norm (mm)')
     axs[0, 2].legend()
-    axs[1, 0].plot(param_h1_error_progress, label='H1 Error', color='purple')
-    axs[1, 0].plot(param_h2_error_progress, label='H2 Error', color='brown')
+    axs[1, 0].plot(np.linalg.norm(param_h1_error_progress,axis=1), label='H1 Error', color='purple')
+    axs[1, 0].plot(np.linalg.norm(param_h2_error_progress,axis=1), label='H2 Error', color='brown')
     axs[1, 0].set_title('H Error Progress')
     axs[1, 0].set_xlabel('Iteration')
     axs[1, 0].set_ylabel('Error Norm (degrees)')
     axs[1, 0].legend()
-    axs[1, 1].plot(param_t1p_error_progress, label='Tool P1 Error', color='pink')
-    axs[1, 1].plot(param_t2p_error_progress, label='Tool P2 Error', color='cyan')
+    axs[1, 1].plot(np.linalg.norm(param_t1p_error_progress,axis=1), label='Tool P1 Error', color='pink')
+    axs[1, 1].plot(np.linalg.norm(param_t2p_error_progress,axis=1), label='Tool P2 Error', color='cyan')
     axs[1, 1].set_title('Tool P Error Progress')
     axs[1, 1].set_xlabel('Iteration')
     axs[1, 1].set_ylabel('Error Norm (mm)')
     axs[1, 1].legend()
-    axs[1, 2].plot(param_t1R_error_progress, label='Tool R1 Error', color='gray')
-    axs[1, 2].plot(param_t2R_error_progress, label='Tool R2 Error', color='olive')
+    axs[1, 2].plot(np.linalg.norm(param_t1R_error_progress,axis=1), label='Tool R1 Error', color='gray')
+    axs[1, 2].plot(np.linalg.norm(param_t2R_error_progress,axis=1), label='Tool R2 Error', color='olive')
     axs[1, 2].set_title('Tool R Error Progress')
     axs[1, 2].set_xlabel('Iteration')
     axs[1, 2].set_ylabel('Error Norm (degrees)')
     axs[1, 2].legend()
     plt.tight_layout()
     plt.show()
+
+    fig, axs = plt.subplots(2, 2, figsize=(10, 5))
+    axs[0,0].plot(np.fabs(param_p1_error_progress)[:,:jN1],label=['v1','w1','v2','w2','v3','w3'])
+    axs[0,0].legend()
+    axs[0,1].plot(np.fabs(param_p1_error_progress)[:,jN1:],label=['v4','w4','v5','w5','v6','w6'])
+    axs[0,1].legend()
+    axs[1,0].plot(np.fabs(param_p2_error_progress)[:,:jN2],label=['v1','w1','v2','w2','v3','w3'])
+    axs[1,0].legend()
+    axs[1,1].plot(np.fabs(param_p2_error_progress)[:,jN2:],label=['v4','w4','v5','w5','v6','w6'])
+    axs[1,1].legend()
+    # axs[0].set_title('P1 Error Progress')
+    # axs[1].set_title('P2 Error Progress')
+    plt.tight_layout()
+    plt.show()
+
 
 
 if __name__ == '__main__':
