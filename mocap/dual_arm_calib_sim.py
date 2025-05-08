@@ -154,14 +154,14 @@ def main():
         param_ph2_gt = deepcopy(param_ph2)
         param_t1_gt = deepcopy(param_t1)
         param_t2_gt = deepcopy(param_t2)
-        param_ph1_gt[:jN1*2] = np.random.uniform(-0.5,0.5,jN1*2) # vi, wi of robot1, mm
-        param_ph1_gt[jN1*2:] = np.radians(np.random.uniform(-0.025,0.025,jN1*2)) # th_i, phi_i of robot1, radians
-        param_ph2_gt[:jN1*2] = np.random.uniform(-0.5,0.5,jN2*2) # vi, wi of robot2, mm
-        param_ph2_gt[jN1*2:] = np.radians(np.random.uniform(-0.025,0.025,jN2*2)) # th_i, phi_i of robot2, radians
-        # param_t1_gt[:3] = np.random.uniform(-1,1,3) # tool dp of robot1, mm
-        # param_t1_gt[3:] = np.radians(np.random.uniform(-0.05,0.05,3)) # tool dR of robot1, radians
-        # param_t2_gt[:3] = np.random.uniform(-1,1,3) # tool dp of robot2, mm
-        # param_t2_gt[3:] = np.radians(np.random.uniform(-0.05,0.05,3)) # tool dR of robot2, radians
+        # param_ph1_gt[:jN1*2] = np.random.uniform(-0.5,0.5,jN1*2) # vi, wi of robot1, mm
+        # param_ph1_gt[jN1*2:] = np.radians(np.random.uniform(-0.025,0.025,jN1*2)) # th_i, phi_i of robot1, radians
+        # param_ph2_gt[:jN1*2] = np.random.uniform(-0.5,0.5,jN2*2) # vi, wi of robot2, mm
+        # param_ph2_gt[jN1*2:] = np.radians(np.random.uniform(-0.025,0.025,jN2*2)) # th_i, phi_i of robot2, radians
+        param_t1_gt[:3] = np.random.uniform(-1,1,3) # tool dp of robot1, mm
+        param_t1_gt[3:] = np.radians(np.random.uniform(-0.05,0.05,3)) # tool dR of robot1, radians
+        param_t2_gt[:3] = np.random.uniform(-1,1,3) # tool dp of robot2, mm
+        param_t2_gt[3:] = np.radians(np.random.uniform(-0.05,0.05,3)) # tool dR of robot2, radians
 
         np.savetxt('param_ph1_gt.csv', param_ph1_gt, delimiter=',')
         np.savetxt('param_ph2_gt.csv', param_ph2_gt, delimiter=',')
@@ -210,8 +210,8 @@ def main():
     weight_P = 1
     weight_H = 1
     weight_pos = 1
-    weight_ori = 1641
-    alpha=0.2
+    weight_ori = 1624
+    alpha=0.001
     lambda_H = 1
     lambda_P = 1
     lambda_tool_p = 1
@@ -222,7 +222,7 @@ def main():
     total_H2 = 2*jN2 # total number of H parameters to be estimated. robot 2
     total_tool_p = 3 # total number of tool p parameters to be estimated, for 1 robot
     total_tool_R = 3 # total number of tool R parameters to be estimated, for 1 robot
-    max_iteration = 50
+    max_iteration = 10
     
     pos_error_norm_progress = []
     ori_error_norm_progress = []
@@ -237,6 +237,7 @@ def main():
     for iter_N in range(max_iteration):
         print("Iteration #:", iter_N)
         # get the current robots using params
+        param_t1[3:] *= -1
         robot1, param_t1 = get_PH_tool_from_param_minimal(param_ph1, param_t1, robot1, unit=using_unit)
         robot2, param_t2 = get_PH_tool_from_param_minimal(param_ph2, param_t2, robot2, unit=using_unit)
 
@@ -287,13 +288,15 @@ def main():
         f = -G.T@error_pos_ori
         dparam = solve_qp(H, f, solver='quadprog')
 
-        param_ph1 = param_ph1 - alpha*dparam[:total_P1+total_H1]
+        # param_ph1 = param_ph1 - alpha*dparam[:total_P1+total_H1]
         dparam = dparam[total_P1+total_H1:]
-        param_ph2 = param_ph2 - alpha*dparam[:total_P2+total_H2]
+        # param_ph2 = param_ph2 - alpha*dparam[:total_P2+total_H2]
         dparam = dparam[total_P2+total_H2:]
-        # param_t1 = param_t1 - alpha*dparam[:total_tool_p+total_tool_R]
-        # dparam = dparam[total_tool_p+total_tool_R:]
-        # param_t2 = param_t2 - alpha*dparam[:total_tool_p+total_tool_R]
+        param_t1 = param_t1 - alpha*dparam[:total_tool_p+total_tool_R]
+        dparam = dparam[total_tool_p+total_tool_R:]
+        param_t2 = param_t2 - alpha*dparam[:total_tool_p+total_tool_R]
+        dparam = dparam[total_tool_p+total_tool_R:]
+        print("dparam:", dparam)
 
     # plot error progress in a 2x3 grid
     fig, axs = plt.subplots(2, 3, figsize=(15, 10))

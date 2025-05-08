@@ -306,9 +306,11 @@ def get_PH_tool_from_param_minimal(param_ph,param_tool,robot_origin: robot_obj,u
     robot = get_PH_from_param_minimal(param_ph,robot,unit=unit)
     robot.robot.P[:,-1] = np.zeros(3) # the last p is in the tool transformation
     # tool transformation
-    tool_dT = Transform(rpy2R(param_tool[3:]),param_tool[:3])
+    tool_dp = param_tool[:3]
+    tool_dR = rpy2R(param_tool[3:])
     tool_origin = Transform(robot.robot.R_tool, robot.robot.p_tool)
-    tool_new = tool_origin*tool_dT
+    tool_new = Transform(tool_origin.R@tool_dR, tool_origin.p+tool_dp)
+    # tool_new = tool_origin*tool_dT
     robot.R_tool = robot.robot.R_tool = tool_new.R
     robot.p_tool = robot.robot.p_tool = tool_new.p
     param_tool = np.zeros(6)
@@ -498,8 +500,8 @@ def jacobian_param_minimal_dual(param1, theta1, robot1_origin:robot_obj, param2,
     
     return J_dual
 
-def jacobian_tool(theta, robot:robot_obj, unit='radians'):
-    robot = deepcopy(robot)
+def jacobian_tool(theta, robot_origin:robot_obj, unit='radians'):
+    robot = deepcopy(robot_origin)
     # rpy2R = Rz(y)@Ry(p)Rx(r)
     # J = [dR/dpt dR/dsi
     #      dp/dpt dp/dsi]
@@ -511,9 +513,9 @@ def jacobian_tool(theta, robot:robot_obj, unit='radians'):
     J[3:,:3]=R0n
 
     tool_rpy = R2rpy(robot.robot.R_tool)
-    rot_ex = rot(Rx,tool_rpy[2])
+    rot_ex = rot(Rx,tool_rpy[0])
     rot_ey = rot(Ry,tool_rpy[1])
-    rot_ez = rot(Rz,tool_rpy[0])
+    rot_ez = rot(Rz,tool_rpy[2])
     J[:3,3] = invhat(R0n@rot_ez@rot_ey@hat(Rx)@rot_ex)
     J[:3,4] = invhat(R0n@rot_ez@hat(Ry)@rot_ey@rot_ex)
     J[:3,5] = invhat(R0n@hat(Rz)@rot_ez@rot_ey@rot_ex)
@@ -527,6 +529,7 @@ def jacobian_tool_dual(theta1, robot1:robot_obj, theta2, robot2:robot_obj, unit=
 
     J1 = jacobian_tool(theta1, robot1, unit=unit)
     J2 = jacobian_tool(theta2, robot2, unit=unit)
+    t1 = robot1.fwd(theta1)
     t2 = robot2.fwd(theta2)
     R0t2 = t2.R
     Rt20 = np.linalg.inv(R0t2)
@@ -534,19 +537,24 @@ def jacobian_tool_dual(theta1, robot1:robot_obj, theta2, robot2:robot_obj, unit=
     J_dual = np.zeros((6, 12))
     J_dual[3:,:3] = Rt20@J1[3:,:3]
     J_dual[3:,6:9] = -Rt20@J2[3:,:3]
+    dpdsi2 = []
     dRdsi1 = []
     dRdsi2 = []
     for (dsids1, dsids2) in zip(J1[0:3,3:].T, J2[0:3,3:].T):
         dsids1_hat = hat(dsids1)
         dsids2_hat = hat(dsids2)
 
+        dpdsi2.append(Rt20@(dsids2_hat.T)@(t1.p-t2.p))
+
         dRds1 = Rt20@dsids1_hat@R0t2
         dRds2 = Rt20@(dsids2_hat.T)@R0t2
 
         dRdsi1.append(invhat(dRds1))
         dRdsi2.append(invhat(dRds2))
+    dpdsi2 = np.array(dpdsi2).T
     dRdsi1 = np.array(dRdsi1).T
     dRdsi2 = np.array(dRdsi2).T
+    J_dual[3:,9:12] = dpdsi2
     J_dual[:3,3:6] = dRdsi1
     J_dual[:3,9:12] = dRdsi2
     

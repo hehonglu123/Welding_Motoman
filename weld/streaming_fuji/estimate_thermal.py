@@ -168,6 +168,22 @@ def train_model(data, train_index, test_index, obs_delay_t, memory_t, sample_rat
     plt.grid()
     plt.show()
 
+    data_error_all = data_output_all - data_labels_all
+    data_error_all = np.abs(data_error_all)
+
+    print("Mean error:", np.mean(data_error_all))
+    
+    data_lam_hat = 1/np.mean(data_error_all)
+    data_exp_dist = stats.expon(scale=1/data_lam_hat)
+    plt.hist(data_error_all, bins=100)
+    plt.plot(data_exp_dist.pdf(np.linspace(0, 0.1, 100)), label='Exponential Distribution', color='red')
+    plt.xlabel('Error')
+    plt.ylabel('Frequency')
+    plt.title('Error Distribution')
+    plt.legend()
+    plt.grid()
+    plt.show()
+
     
 
 if __name__ == "__main__":
@@ -176,7 +192,7 @@ if __name__ == "__main__":
     logdata_dir_all = ['weld_fujiscan_2025_02_26_18_08_18/','weld_fujiscan_2025_02_26_16_24_21/']
 
     # parameters
-    obs_delay_t = 1 # sec, delay because of the fuji cam delay scanning
+    obs_delay_t = 2 # sec, delay because of the fuji cam delay scanning
     sample_rate = 30 # Hz, using the rate of ir camera
     memory_t = 4 # sec, how long the model can remember, larger than obs_delay_t
     train_test_split = 0.8 # 80% for training, 20% for testing
