@@ -204,6 +204,45 @@ def main():
         np.savetxt('data_T_gt_dual_sim.csv', data_T_gt, delimiter=',')
     input("Data generation complete. Press Enter to continue...")
 
+    ### test Jacobian accuracy using numerical jacobian
+    dP_up_range = 0.05
+    dP_low_range = 0.01
+    dab_up_range = np.radians(0.1)
+    dab_low_range = np.radians(0.03)
+    numerical_iteration=1000
+    for data_q in data_joints:
+        # randomize a set of parameters for robot1
+        param_ph1 = deepcopy(param_ph1_gt)
+        param_ph2 = deepcopy(param_ph2_gt)
+        param_t1 = deepcopy(param_t1_gt)
+        param_t2 = deepcopy(param_t2_gt)
+        param_ph1[:jN1*2] += np.random.uniform(-dP_up_range, dP_up_range, jN1*2)
+        param_ph1[jN1*2:] += np.radians(np.random.uniform(-dab_up_range, dab_up_range, jN1*2))
+        param_ph2[:jN2*2] += np.random.uniform(-dP_up_range, dP_up_range, jN2*2)
+        param_ph2[jN2*2:] += np.radians(np.random.uniform(-dab_up_range, dab_up_range, jN2*2))
+        param_t1[:3] += np.random.uniform(-dP_low_range, dP_low_range, 3)
+        param_t1[3:] += np.radians(np.random.uniform(-dab_low_range, dab_low_range, 3))
+        param_t2[:3] += np.random.uniform(-dP_low_range, dP_low_range, 3)
+        param_t2[3:] += np.radians(np.random.uniform(-dab_low_range, dab_low_range, 3))
+
+        robot1, param_t1 = get_PH_tool_from_param_minimal(param_ph1, param_t1, robot1, unit=using_unit)
+        robot2, param_t2 = get_PH_tool_from_param_minimal(param_ph2, param_t2, robot2, unit=using_unit)
+        # get J_ana
+        this_J_dual_ana = jacobian_param_minimal_dual(param_ph1, data_q[:jN1], robot1, \
+                                                  param_ph2, data_q[jN1:], robot2, unit=using_unit)
+        this_J_tool_ana = jacobian_tool_dual(data_q[:jN1], robot1, \
+                                         data_q[jN1:], robot2, unit=using_unit)
+        
+        d_T_all = [] # difference in robot T
+        d_param_all = [] # difference in param
+        for iter_i in range(numerical_iteration):
+            param_init_ph1 = np.zeros_like(param_ph1)
+            param_init_ph2 = np.zeros_like(param_ph2)
+            param_init_t1 = np.zeros_like(param_t1)
+            param_init_t2 = np.zeros_like(param_t2)
+
+            
+
     # calibration
     weight_P = 1
     weight_H = 1
