@@ -6,9 +6,7 @@ from sklearn.gaussian_process.kernels import RBF, WhiteKernel
 from matplotlib import pyplot as plt
 import torch
 import torch.nn as nn
-import pickle
-import sys
-import glob
+import sys, datetime, yaml, pathlib, glob
 sys.path.append('../')
 sys.path.append('../../mocap/')
 from Models import *
@@ -22,8 +20,16 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 def train_model(data, train_index, test_index, obs_delay_t, memory_t, sample_rate, epochs=1000, min_max_dict=None):
     
+    train_flag = True
+    model_dir = 'weld_thermal_models/'
+    # add timestamp to the model_dir
+    now = datetime.datetime.now()
+    timestamp = now.strftime("%Y%m%d_%H%M%S")
+    model_dir = model_dir + "model_"+ timestamp + '/'
+    pathlib.Path(model_dir).mkdir(parents=True, exist_ok=True)
+
     control_input_size = 2 # cmd_v and cmd_feedrate
-    observation_size = 1 # width, (height)
+    observation_size = 0 # width, (height)
 
     # Define the input size, hidden size, and output size
     input_size = int(memory_t*sample_rate*control_input_size + (memory_t-obs_delay_t)*sample_rate*observation_size) # all past control inputs and past observations
@@ -41,6 +47,12 @@ def train_model(data, train_index, test_index, obs_delay_t, memory_t, sample_rat
     num_epochs = epochs
     # Define the optimizer
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+
+    ### training hyper parameters ###
+    training_params = {'obs_delay_t': obs_delay_t, 'memory_t': memory_t, 'sample_rate': sample_rate, \
+                       'control_input_size': control_input_size, 'observation_size': observation_size, \
+                       'hidden_sizes': hidden_sizes, 'input_size': input_size, 'output_size': output_size, \
+                       'learning_rate': learning_rate, 'epochs': epochs, 'min_max_dict': min_max_dict}
 
     print("prepare training data...")
     # prepare data
@@ -76,7 +88,6 @@ def train_model(data, train_index, test_index, obs_delay_t, memory_t, sample_rat
     train_labels = np.array(train_labels, dtype=np.float32)
     test_data = np.array(test_data, dtype=np.float32)
     test_labels = np.array(test_labels, dtype=np.float32)
-    print("test label shapes:", test_labels.shape)
     train_data = torch.from_numpy(train_data).to(device)
     train_labels = torch.from_numpy(train_labels).to(device)
     train_labels = train_labels.view(-1, 1) # reshape to (N, 1)
@@ -86,51 +97,61 @@ def train_model(data, train_index, test_index, obs_delay_t, memory_t, sample_rat
 
     time_start = time.perf_counter()
     ### training loop ###
-    training_loss_all = []
-    validation_loss_all = []
-    for epoch in range(num_epochs):
-        # Forward pass
+    if train_flag:
+        # initial loss
         train_output_pred = model(train_data)
-        # Compute the loss
         loss = loss_fn(train_output_pred, train_labels)
-        # if len(training_loss_all) == 0 or loss.item() < np.min(training_loss_all):
-            # save the model
-            # torch.save(model.state_dict(), model_dir+'best_training_model.pt')
-
-        # Backward pass and optimization
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-
-        # Validation
+        # validation
         val_output_pred = model(test_data)
         val_loss = loss_fn(val_output_pred, test_labels)
-        # if len(validation_loss_all) == 0 or val_loss.item() < np.min(validation_loss_all):
-        #     # save the model
-        #     torch.save(model.state_dict(), model_dir+'best_validation_model.pt')
+        
+        training_loss_all = [loss.item()]
+        validation_loss_all = [val_loss.item()]
+        for epoch in range(num_epochs):
+            # Backward pass and optimization
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
 
-        # Store model if smaller validation loss
-        if len(validation_loss_all)==0 or val_loss.item() < np.max(validation_loss_all):
-            torch.save(model.state_dict(), 'best_validation_model.pt')
+            # Forward pass
+            train_output_pred = model(train_data)
+            # Compute the loss
+            loss = loss_fn(train_output_pred, train_labels)
 
-        # Store the losses for plotting
-        training_loss_all.append(loss.item())
-        validation_loss_all.append(val_loss.item())
+            # Validation
+            val_output_pred = model(test_data)
+            val_loss = loss_fn(val_output_pred, test_labels)
 
-        if epoch % int(epochs/10) == 0:
-            print(f'Epoch [{epoch}/{num_epochs}], Training Loss: {loss.item():.4f}, Validation Loss: {val_loss.item():.4f}')
-            print(f'Before normalization loss:', loss.item()*(min_max_dict['thermal'][1]-min_max_dict['thermal'][0]))
-    print(f'Training time: {time.perf_counter()-time_start:.2f} seconds')
-    ### plot losses ###
-    plt.plot(training_loss_all, label='Training Loss')
-    plt.plot(validation_loss_all, label='Validation Loss')
-    plt.xlabel('Epoch')
-    plt.ylabel('Loss')
-    plt.title('Training and Validation Loss')
-    plt.legend()
-    plt.title('Training and Validation Loss')
-    plt.grid()
-    plt.show()
+            # Store model if smaller validation loss
+            if len(validation_loss_all)==0 or val_loss.item() < np.min(validation_loss_all):
+                torch.save(model.state_dict(), model_dir+'best_validation_model.pt')
+                # save training parameters using yaml
+                with open(model_dir+'training_params.yml', 'w') as f:
+                    yaml.dump(training_params, f)
+
+            # Store the losses for plotting
+            training_loss_all.append(loss.item())
+            validation_loss_all.append(val_loss.item())
+
+            if epoch % int(epochs/10) == 0:
+                print(f'Epoch [{epoch}/{num_epochs}], Training Loss: {loss.item():.4f}, Validation Loss: {val_loss.item():.4f}')
+                print(f'Before normalization loss:', loss.item()*(min_max_dict['thermal'][1]-min_max_dict['thermal'][0]))
+        print(f'Training time: {time.perf_counter()-time_start:.2f} seconds')
+        ### save losses ###
+        np.save(model_dir+'losses.npy', np.vstack((training_loss_all, validation_loss_all)).T)
+        ### plot losses ###
+        plt.plot(np.log10(training_loss_all), label='Training Loss')
+        plt.plot(np.log10(validation_loss_all), label='Validation Loss')
+        plt.xlabel('Epoch')
+        plt.ylabel('Loss (log10)')
+        plt.title('Training and Validation Loss')
+        plt.legend()
+        plt.grid()
+        plt.show()
+    else:
+        # load the model
+        model.load_state_dict(torch.load(model_dir,weights_only=True))
+    model.eval()
 
     # plot the prediction of a layer vs the ground truth
     data_labels_all = []
@@ -175,20 +196,20 @@ def train_model(data, train_index, test_index, obs_delay_t, memory_t, sample_rat
     data_error_all = data_output_all - data_labels_all
     data_error_all = np.abs(data_error_all)
 
-    print("Mean error:", np.mean(data_error_all))
-    
     data_lam_hat = 1/np.mean(data_error_all)
     data_exp_dist = stats.expon(scale=1/data_lam_hat)
-    plt.hist(data_error_all, bins=100)
-    plt.plot(data_exp_dist.pdf(np.linspace(0, 0.1, 100)), label='Exponential Distribution', color='red')
+    print("Mean error:", np.mean(data_error_all))
+    print("Standard deviation of error:", np.std(data_error_all))
+    print("95% confidence interval:", data_exp_dist.interval(0.95))
+
+    plt.hist(data_error_all, density=True, bins=100)
+    plt.plot(np.linspace(0, np.max(data_error_all), 100),data_exp_dist.pdf(np.linspace(0, np.max(data_error_all), 100)), label='Exponential Distribution', color='red')
     plt.xlabel('Error')
     plt.ylabel('Frequency')
     plt.title('Error Distribution')
     plt.legend()
     plt.grid()
     plt.show()
-
-    
 
 if __name__ == "__main__":
     # load data
