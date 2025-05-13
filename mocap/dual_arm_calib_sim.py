@@ -135,8 +135,6 @@ def main():
     print("robot 1 initial parameters:", param_ph1, param_t1)
     print("robot 2 initial parameters:", param_ph2, param_t2)
 
-    
-
     # generate the simulated dataset
     try:
         data_joints = np.loadtxt('data_joints_dual_sim.csv',delimiter=',')
@@ -210,19 +208,20 @@ def main():
     weight_P = 1
     weight_H = 1
     weight_pos = 1
-    weight_ori = 1624
-    alpha=0.001
-    lambda_H = 1
+    weight_ori = 1
+    # weight_ori = 1641
+    alpha=0.1
+    lambda_H = 57
     lambda_P = 1
     lambda_tool_p = 1
-    lambda_tool_R = 1
+    lambda_tool_R = 57
     total_P1 = 2*jN1 # total number of P parameters to be estimated. robot 1
     total_H1 = 2*jN1 # total number of H parameters to be estimated. robot 1
     total_P2 = 2*jN2 # total number of P parameters to be estimated. robot 2
     total_H2 = 2*jN2 # total number of H parameters to be estimated. robot 2
     total_tool_p = 3 # total number of tool p parameters to be estimated, for 1 robot
     total_tool_R = 3 # total number of tool R parameters to be estimated, for 1 robot
-    max_iteration = 10
+    max_iteration = 50
     
     pos_error_norm_progress = []
     ori_error_norm_progress = []
@@ -260,8 +259,14 @@ def main():
             omega_d=s_err_func(t2_t1_pred.R@T_gt.R.T)
             error_pos_ori = np.append(error_pos_ori,np.append(omega_d*weight_ori,vd*weight_pos))
             error_pos.append(np.linalg.norm(vd))
-            # error_ori.append(np.degrees(omega_d))  # for plotting purpose only (unit: degrees)  
-            error_ori.append(np.linalg.norm(omega_d))  # for plotting purpose only (unit: degrees)   
+            # error_ori.append(np.degrees(omega_d))  # for plotting purpose only (unit: degrees)
+            k, ori_diff = R2rot(t2_t1_pred.R@T_gt.R.T)
+            error_ori.append(np.abs(ori_diff))  # for plotting purpose only (unit: degrees)   
+
+            # print("vd:", vd, "norm:", np.linalg.norm(vd))
+            # print("omega_d:", omega_d, "norm:", np.linalg.norm(omega_d))
+            # print("ori_diff:", np.abs(np.degrees(ori_diff)))
+            # input("Press Enter to continue...")
         J_ana = np.array(J_ana)
         pos_error_norm_progress.append(np.mean(error_pos))
         ori_error_norm_progress.append(np.mean(error_ori))
@@ -274,7 +279,7 @@ def main():
         param_t2p_error_progress.append(robot2.robot.p_tool-robot2_gt.robot.p_tool)
         param_t2R_error_progress.append(R2rpy(robot2.robot.R_tool@robot2_gt.robot.R_tool.T))
 
-        print("Pose error, orientation error:", np.mean(error_pos), np.mean(error_ori))
+        print("Pose error, orientation error:", np.mean(error_pos), np.degrees(np.mean(error_ori)))
         # update PH using QP
         # parameters: param_ph1, param_t1, param_ph2, param_t2
         G = J_ana
