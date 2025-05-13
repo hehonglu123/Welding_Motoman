@@ -420,3 +420,11 @@ data/blade0.1/auto_slice/*
 
 weld/streaming_fuji/weld_NN_models/model*
 weld/streaming_fuji/weld_NN_models/model*
+data/blade0.1/blade.stl
+data/wall_weld_test/weld_data/weld_data.csv
+mocap/data_joints_dual_sim.csv
+mocap/data_T_gt_dual_sim.csv
+mocap/param_ph1_gt.csv
+mocap/param_ph2_gt.csv
+mocap/param_t1_gt.csv
+mocap/param_t2_gt.csv

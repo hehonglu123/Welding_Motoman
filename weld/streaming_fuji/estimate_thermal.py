@@ -28,7 +28,7 @@ def train_model(data, train_index, test_index, obs_delay_t, memory_t, sample_rat
     # Define the input size, hidden size, and output size
     input_size = int(memory_t*sample_rate*control_input_size + (memory_t-obs_delay_t)*sample_rate*observation_size) # all past control inputs and past observations
     print("input size:", input_size)
-    hidden_sizes = [200,200,200] # hidden layer sizes
+    hidden_sizes = [1000,1000,1000] # hidden layer sizes
     output_size = 1 # current thermal data
     
     # Define the model
@@ -108,6 +108,10 @@ def train_model(data, train_index, test_index, obs_delay_t, memory_t, sample_rat
         # if len(validation_loss_all) == 0 or val_loss.item() < np.min(validation_loss_all):
         #     # save the model
         #     torch.save(model.state_dict(), model_dir+'best_validation_model.pt')
+
+        # Store model if smaller validation loss
+        if len(validation_loss_all)==0 or val_loss.item() < np.max(validation_loss_all):
+            torch.save(model.state_dict(), 'best_validation_model.pt')
 
         # Store the losses for plotting
         training_loss_all.append(loss.item())
@@ -196,7 +200,7 @@ if __name__ == "__main__":
     sample_rate = 30 # Hz, using the rate of ir camera
     memory_t = 4 # sec, how long the model can remember, larger than obs_delay_t
     train_test_split = 0.8 # 80% for training, 20% for testing
-    epochs = 1000 # number of epochs for training
+    epochs = 10000 # number of epochs for training
 
     thermal_min = 9500 # min thermal data, subject to changes
     thermal_max = 23000 # max thermal data, subject to changes
@@ -206,7 +210,7 @@ if __name__ == "__main__":
     v_max = 10 # max cmd_v, subject to changes
     min_max_dict = {'thermal':[thermal_min, thermal_max], 'feedrate':[feedrate_min, feedrate_max], 'v':[v_min, v_max]}
 
-    ignore_start_end = 20
+    ignore_start_end = 10
     start_x = -55 + ignore_start_end
     end_x = 55 - ignore_start_end
 
@@ -232,7 +236,7 @@ if __name__ == "__main__":
             this_layer_dir = logdata_dir+'layer'+str(layer_n)+'/'
 
             try:
-                weld_data_sample = np.loadtxt(this_layer_dir + 'profile_welding_'+str(sample_rate)+'', delimiter=',', skiprows=1)
+                weld_data_sample = np.loadtxt(this_layer_dir + 'profile_welding_'+str(sample_rate)+'.csv', delimiter=',', skiprows=1)
             except FileNotFoundError:
                 weld_data = pd.read_csv(this_layer_dir + 'profile_welding.csv', header=0)
                 weld_data = weld_data.to_dict(orient='list')
@@ -255,11 +259,11 @@ if __name__ == "__main__":
 
                 # remove index where width_data is 0
                 thermal_data = np.delete(thermal_data, np.where(width_data < 0.01)[0])
-                width_data = np.delete(width_data, np.where(width_data < 0.01)[0])
                 height_data = np.delete(height_data, np.where(width_data < 0.01)[0])
                 cmd_v = np.delete(cmd_v, np.where(width_data < 0.01)[0])
                 cmd_feedrate = np.delete(cmd_feedrate, np.where(width_data < 0.01)[0])
                 timestamps = np.delete(timestamps, np.where(width_data < 0.01)[0])
+                width_data = np.delete(width_data, np.where(width_data < 0.01)[0])
                 print("len timestamps:", len(timestamps))
 
                 timestamps_interp = np.arange(timestamps[0], timestamps[-1], 1/sample_rate)
@@ -276,7 +280,7 @@ if __name__ == "__main__":
                 for i in range(len(timestamps_interp)):
                     # window_id_start = np.where(timestamps >= timestamps_interp[i]-sample_rate/4)[0][0]
                     # window_id_end = np.where(timestamps <= timestamps_interp[i]+sample_rate/4)[0][-1]
-                    window_id_start = np.where(timestamps >= timestamps_interp[i]-sample_rate/2)[0][0]
+                    window_id_start = np.where(timestamps >= timestamps_interp[i]-1/sample_rate)[0][0]
                     window_id_end = np.where(timestamps <= timestamps_interp[i])[0][-1]
                     if window_id_end<=window_id_start:
                         print("window_id_start:", window_id_start)
@@ -284,7 +288,18 @@ if __name__ == "__main__":
                         window_id_end = window_id_start + 1
                         # plt.plot(np.diff(timestamps), label='diff time')
                         # plt.show()
+                    if window_id_end>len(timestamps) or window_id_start>=len(timestamps):
+                        print("Window id out of range")
+                        print("window_id_start:", window_id_start)
+                        print(window_id_end)
+                        window_id_start = len(timestamps)-1
+                        window_id_end = len(timestamps)
                     thermal_data_interp[i] = np.mean(thermal_data[window_id_start:window_id_end])
+                    if np.isnan(thermal_data_interp[i]):
+                        print("thermal data is nan")
+                        print("window_id_start:", window_id_start)
+                        print(window_id_end)
+                        print("thermal data len:", len(thermal_data))
                     width_data_interp[i] = np.mean(width_data[window_id_start:window_id_end])
                     height_data_interp[i] = np.mean(height_data[window_id_start:window_id_end])
                     cmd_v_interp[i] = np.mean(cmd_v[window_id_start:window_id_end])

@@ -31,9 +31,9 @@ def main():
     ################## Read geometry data ##################
     data_dir = '../../data/wall_weld_test/'
 
-    # logdata_dir_all = ['weld_fujiscan_2025_02_26_18_08_18/', 'weld_fujiscan_2025_02_26_16_24_21/', 'weld_fujiscan_2025_02_26_17_39_17/']
+    logdata_dir_all = ['weld_fujiscan_2025_02_26_18_08_18/', 'weld_fujiscan_2025_02_26_16_24_21/', 'weld_fujiscan_2025_02_26_17_39_17/']
     # logdata_dir_all = ['weld_fujiscan_2025_02_26_18_08_18/', 'weld_fujiscan_2025_02_26_16_24_21/']
-    logdata_dir_all = ['weld_fujicontrol_2025_03_12_18_27_33/']
+    # logdata_dir_all = ['weld_fujicontrol_2025_03_12_18_27_33/']
     # logdata_dir_all = ['weld_fujiscan_2025_02_26_18_08_18/']
     # logdata_dir_all = ['weld_fujiscan_2025_02_26_18_08_18/', 'weld_fujiscan_2025_02_26_16_24_21/', 'weld_fujicontrol_2025_03_12_18_27_33/']
 
@@ -65,8 +65,8 @@ def main():
             Transz0_H_even = np.loadtxt(logdata_dir+'Transz0_H_even.csv',delimiter=',')
             Transicp_H_odd2even = np.loadtxt(logdata_dir+'Trans_icp_odd2even.csv',delimiter=',')
             Transz0_H_odd = Transz0_H_odd @ Transicp_H_odd2even
-        for weld_parts in ['base','layer']:
-        # for weld_parts in ['layer']:
+        # for weld_parts in ['base','layer']:
+        for weld_parts in ['layer']:
             if weld_parts == 'base':
                 total_layers_name = glob.glob(logdata_dir+'baselayer*')
             else:
@@ -124,8 +124,9 @@ def main():
                 ############### get thermal readings ##############
                 print("Getting thermal readings...")
                 try:
-                    thermal_reading = np.loadtxt(this_layer_dir+'thermal.csv',delimiter=',')
+                    thermal_reading = np.loadtxt(this_layer_dir+'thermal',delimiter=',')
                 except FileNotFoundError:
+                    print("No thermal readings found, using IR camera to get thermal readings...")
                     with open(this_layer_dir+'ir_recording.pickle', 'rb') as f:
                         ir_exe = pickle.load(f)
                     ir_stamp = np.loadtxt(this_layer_dir+'ir_stamps.csv',delimiter=',')
@@ -141,8 +142,8 @@ def main():
                         # centroid, bbox, torch_centroid, torch_bbox=weld_detection_steel(ir_image,torch_model,tip_wire_model)
                         # find max pixel value in ir_image
                         centroid = np.unravel_index(np.argmax(ir_image, axis=None), ir_image.shape)
-                        # if ir_image[centroid] < 1e4:
-                        #     continue
+                        if ir_image[centroid] < 1e4:
+                            continue
                         # draw bbox and centroid on ir_image
                         if centroid is not None:
                             ###weighted history filter
@@ -154,7 +155,7 @@ def main():
                                 flame_centroid_history.append(centroid)
 
                             #find average pixel value 
-                            pixel_coord = (int(centroid[0]) + horizontal_offset, int(centroid[1]) + vertical_offset)
+                            pixel_coord = (int(centroid[0]) + vertical_offset, int(centroid[1]) + horizontal_offset)
                             pixel_coord = pixel_coord[::-1]
                             flame_reading=get_pixel_value(ir_image,pixel_coord,ir_pixel_window_size)
                             thermal_reading.append(flame_reading)
@@ -162,12 +163,16 @@ def main():
                             # print(flame_reading, centroid)
                             # show image
                         # plt.imshow(ir_image, cmap='inferno', aspect='auto')
+                        # plt.scatter(pixel_coord[0], pixel_coord[1], c='r', s=10)
+                        # plt.scatter(centroid[1], centroid[0], c='g', s=10)
                         # plt.colorbar(format='%.2f')
                         # plt.pause(0.1)
                         # plt.clf()
                     # save thermal readings
                     thermal_reading = np.vstack((thermal_stamp,thermal_reading)).T
                     np.savetxt(this_layer_dir+'thermal.csv',thermal_reading,delimiter=',')
+
+                # exit()
 
                 ################ get speed ##############
                 print("Getting speed...")
@@ -200,10 +205,10 @@ def main():
                     # pcd = o3d.io.read_point_cloud(this_layer_dir+'pcd.pcd')
                     pcd_denoise = o3d.io.read_point_cloud(this_layer_dir+'pcd_denoise.pcd')
 
-                    Transz0_H = deepcopy(Transz0_H_even) if layer_n_id % 2 == 0 else deepcopy(Transz0_H_odd)
-                    pcd_denoise_trans = deepcopy(pcd_denoise)
-                    pcd_denoise_trans.transform(Transz0_H)
-                    all_pcd_transform.append(pcd_denoise_trans)
+                    # Transz0_H = deepcopy(Transz0_H_even) if layer_n_id % 2 == 0 else deepcopy(Transz0_H_odd)
+                    # pcd_denoise_trans = deepcopy(pcd_denoise)
+                    # pcd_denoise_trans.transform(Transz0_H)
+                    # all_pcd_transform.append(pcd_denoise_trans)
 
                 except FileNotFoundError:
                     # processing the scans
@@ -399,22 +404,22 @@ def main():
 
     
 
-        fig, ax = plt.subplots()
-        ax.set_title('Profile height')
-        ax.set_xlabel('X')
-        ax.set_ylabel('Z')
-        for i in range(len(all_profile_height)):
-            plot_indeces = all_profile_height[i][:,1]>np.mean(all_profile_height[i][:,1])-5
-            ax.plot(all_profile_height[i][plot_indeces,0],all_profile_height[i][plot_indeces,1],label='Layer '+str(i))
-        # ax.legend()
-        plt.show()
+        # fig, ax = plt.subplots()
+        # ax.set_title('Profile height')
+        # ax.set_xlabel('X')
+        # ax.set_ylabel('Z')
+        # for i in range(len(all_profile_height)):
+        #     plot_indeces = all_profile_height[i][:,1]>np.mean(all_profile_height[i][:,1])-5
+        #     ax.plot(all_profile_height[i][plot_indeces,0],all_profile_height[i][plot_indeces,1],label='Layer '+str(i))
+        # # ax.legend()
+        # plt.show()
 
-        if len(all_pcd_transform) != 0:
-            cmap = plt.get_cmap('tab10')
-            for i in range(len(all_pcd_transform)):
-                all_pcd_transform[i].paint_uniform_color(cmap(i%10)[:3])
-            visualize_pcd(all_pcd_transform)
-            animation_mesh(all_pcd_transform)
+        # if len(all_pcd_transform) != 0:
+        #     cmap = plt.get_cmap('tab10')
+        #     for i in range(len(all_pcd_transform)):
+        #         all_pcd_transform[i].paint_uniform_color(cmap(i%10)[:3])
+        #     visualize_pcd(all_pcd_transform)
+        #     animation_mesh(all_pcd_transform)
         
 
     if run_code_again_flag:
