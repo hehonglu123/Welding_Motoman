@@ -31,7 +31,8 @@ def main():
     ################## Read geometry data ##################
     data_dir = '../../data/wall_weld_test/'
 
-    logdata_dir_all = ['weld_fujiscan_2025_02_26_18_08_18/', 'weld_fujiscan_2025_02_26_16_24_21/', 'weld_fujiscan_2025_02_26_17_39_17/']
+    # logdata_dir_all = ['weld_fujiscan_2025_02_26_18_08_18/', 'weld_fujiscan_2025_02_26_16_24_21/', 'weld_fujiscan_2025_02_26_17_39_17/']
+    logdata_dir_all = ['weld_fujiscan_2025_02_26_16_24_21/', 'weld_fujiscan_2025_02_26_18_08_18/', 'weld_fujiscan_2025_02_26_17_39_17/']
     # logdata_dir_all = ['weld_fujiscan_2025_02_26_18_08_18/', 'weld_fujiscan_2025_02_26_16_24_21/']
     # logdata_dir_all = ['weld_fujicontrol_2025_03_12_18_27_33/']
     # logdata_dir_all = ['weld_fujiscan_2025_02_26_18_08_18/']
@@ -81,6 +82,8 @@ def main():
 
             # for layer_n in [layer_nums[-1],layer_nums[-2]]:
             for layer_n_id, layer_n in enumerate(layer_nums):
+                if layer_n_id<10:
+                    continue
                 # read layer curve data
                 if weld_parts == 'base':
                     curve = np.loadtxt(data_dir+f'curve_sliced_relative/baselayer{layer_n}_0.csv',delimiter=',')
@@ -162,17 +165,18 @@ def main():
                             thermal_stamp.append(stamp)
                             # print(flame_reading, centroid)
                             # show image
+                        plt.imshow(np.clip(ir_image,1000,9200), cmap='inferno', aspect='auto')
                         # plt.imshow(ir_image, cmap='inferno', aspect='auto')
                         # plt.scatter(pixel_coord[0], pixel_coord[1], c='r', s=10)
                         # plt.scatter(centroid[1], centroid[0], c='g', s=10)
-                        # plt.colorbar(format='%.2f')
-                        # plt.pause(0.1)
-                        # plt.clf()
+                        plt.colorbar(format='%.2f')
+                        plt.pause(0.1)
+                        plt.clf()
                     # save thermal readings
                     thermal_reading = np.vstack((thermal_stamp,thermal_reading)).T
                     np.savetxt(this_layer_dir+'thermal.csv',thermal_reading,delimiter=',')
 
-                # exit()
+                exit()
 
                 ################ get speed ##############
                 print("Getting speed...")
