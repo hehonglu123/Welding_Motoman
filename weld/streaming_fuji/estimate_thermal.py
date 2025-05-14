@@ -95,6 +95,9 @@ def train_model(data, train_index, test_index, obs_delay_t, memory_t, sample_rat
     test_labels = torch.from_numpy(test_labels).to(device)
     test_labels = test_labels.view(-1, 1) # reshape to (N, 1)
 
+    print("Total training data:", train_data.shape)
+    print("Total testing data:", test_data.shape)
+
     time_start = time.perf_counter()
     ### training loop ###
     if train_flag:
