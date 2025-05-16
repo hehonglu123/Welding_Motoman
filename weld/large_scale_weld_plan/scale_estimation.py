@@ -45,8 +45,8 @@ def main():
 
     ### create a path points xyz using a circle with radius, z=0
     radius_vs_height = []
-    last_best_z = 600
-    for radius_circle in range(100,800,10):
+    last_best_z = 1300
+    for radius_circle in range(750,800,10):
         # radius_circle = 650 # mm
         print("radius circle", radius_circle)
         num_points = 360
@@ -56,6 +56,12 @@ def main():
             circle_points[i,0] = radius_circle*np.cos(theta)
             circle_points[i,1] = radius_circle*np.sin(theta)
             circle_points[i,2] = 0
+        # draw circle points
+        # plt.scatter(circle_points[:,0], circle_points[:,1])
+        # # make axes equal
+        # plt.axis('equal')
+        # plt.title("Circle points")
+        # plt.show()
 
         ### check IK results with z=0 until no solution
         z_height = last_best_z
@@ -127,14 +133,15 @@ def main():
         # plt.title("p sol all")
         # plt.show()
 
-        # # plot q sol all
-        # q_sol_qll = np.array(q_sol_qll)
-        # plt.plot(q_sol_qll)
-        # plt.legend(['q1', 'q2', 'q3', 'q4', 'q5', 'q6'])
-        # plt.title("q sol all")
-        # plt.show()
+        
         radius_vs_height.append([radius_circle, z_height])
         last_best_z = z_height
+    # plot q sol all
+    q_sol_qll = np.array(q_sol_qll)
+    plt.plot(q_sol_qll)
+    plt.legend(['q1', 'q2', 'q3', 'q4', 'q5', 'q6'])
+    plt.title("q sol all")
+    plt.show()
     plt.scatter(np.array(radius_vs_height)[:,0], np.array(radius_vs_height)[:,1])
     # color the space below the line
     plt.fill_between(np.array(radius_vs_height)[:,0], 0, np.array(radius_vs_height)[:,1], alpha=0.2)

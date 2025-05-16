@@ -100,6 +100,7 @@ def main():
                     try:
                         q_all = robot_weld.inv(p_world,R,last_joints=np.zeros(6))
                         q_sol_qll.append(q_all[0])
+                        print("q sol", np.round(np.degrees(q_all[0])))
                         break # if we found a solution, break the loop
                         # print("q sol", np.round(np.degrees(q_all[0])))
                         # print("p sol", np.round(p_world))
