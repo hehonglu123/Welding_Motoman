@@ -38,18 +38,35 @@ def main():
     dist_weld_scan = np.linalg.norm(T_weld_scan.p)
     ##############################################
 
+    base_positioner = deepcopy(positioner.base_H)
+    print("base positioner", base_positioner)
+    # move in the x direction for -200 mm
+    base_positioner[0,3] -= 200
+    # move in the y direction for 780 mm
+    base_positioner[1,3] += 780
+    base_center_pose = deepcopy(base_positioner)
+    positioner.base_H = deepcopy(base_center_pose) # This is the center of the workspace
+    print("base positioner", base_positioner)
+
+    # parameters
+    workspace_width = 3000
+    workspace_length = 2000
+
+    ##############################################
+
     table_joints = np.radians([-15,0])
-    T_table = positioner.fwd(table_joints,world=True)
 
     print("robot weld zero config", robot_weld.fwd(np.zeros(6)))
 
     ### create a path points xyz using a circle with radius, z=0
+    radius_p_sol = {}
+    radius_p_world = {}
     radius_vs_height = []
-    last_best_z = 600
-    for radius_circle in range(100,800,10):
+    last_best_z = 1240
+    for radius_circle in range(100,1100,100):
         # radius_circle = 650 # mm
         print("radius circle", radius_circle)
-        num_points = 360
+        num_points = 180
         circle_points = np.zeros((num_points,3))
         for i in range(num_points):
             theta = 2*np.pi*i/num_points
@@ -64,27 +81,35 @@ def main():
             print("z height", z_height)
             q_sol_qll = []
             # p_world_all = []
-            for p in circle_points:
-                p[2] = z_height
-                p_world = T_table.R@p + T_table.p
+            for y_rail_diff in np.append(np.arange(-(workspace_width/2-radius_circle), workspace_width/2-radius_circle, 20), workspace_width/2-radius_circle):
+                # print("y rail diff", y_rail_diff)
+                positioner.base_H = deepcopy(base_center_pose)
+                positioner.base_H[1,3] += y_rail_diff
+                T_table = positioner.fwd(table_joints,world=True)
+                for p in circle_points:
+                    p[2] = z_height
+                    p_world = T_table.R@p + T_table.p
 
-                # p_world_all.append(p_world)
+                    # p_world_all.append(p_world)
 
-                Rz = np.array([0,0,-1])
-                Rx = np.append(-p_world[:2],0)
-                Rx = Rx/np.linalg.norm(Rx)
-                Ry = np.cross(Rz, Rx)
-                R = np.array([Rx, Ry, Rz]).T
-                try:
-                    q_all = robot_weld.inv(p_world,R,last_joints=np.zeros(6))
-                    q_sol_qll.append(q_all[0])
-                    # print("q sol", np.round(np.degrees(q_all[0])))
-                    # print("p sol", np.round(p_world))
-                    # print("p sol table",np.round(p))
-                    # input("Press enter to continue")
-                except ValueError:
-                    # traceback.print_exc()
-                    pass
+                    Rz = np.array([0,0,-1])
+                    Rx = np.append(-p_world[:2],0)
+                    Rx = Rx/np.linalg.norm(Rx)
+                    Ry = np.cross(Rz, Rx)
+                    R = np.array([Rx, Ry, Rz]).T
+                    try:
+                        q_all = robot_weld.inv(p_world,R,last_joints=np.zeros(6))
+                        q_sol_qll.append(q_all[0])
+                        break # if we found a solution, break the loop
+                        # print("q sol", np.round(np.degrees(q_all[0])))
+                        # print("p sol", np.round(p_world))
+                        # print("p sol table",np.round(p))
+                        # input("Press enter to continue")
+                    except ValueError:
+                        # traceback.print_exc()
+                        pass
+                if len(q_sol_qll) > 0: # if we found a solution, break the loop
+                    break
             # p_world_all = np.array(p_world_all)
             # plt.scatter(p_world_all[:,0], p_world_all[:,1])
             # plt.axis('equal')
@@ -99,40 +124,30 @@ def main():
         q_sol_qll = []
         p_sol_all = []
         p_world_all = []
-        for p in circle_points:
-            p[2] = z_height
-            p_world = T_table.R@p + T_table.p
-            p_world_all.append(p_world)
+        # for y_rail_diff in np.append(np.arange(-(workspace_width/2-radius_circle), workspace_width/2-radius_circle, 20), workspace_width/2-radius_circle):
+        #     positioner.base_H = deepcopy(base_center_pose)
+        #     positioner.base_H[1,3] += y_rail_diff
+        #     T_table = positioner.fwd(table_joints,world=True)
+        #     for p in circle_points:
+        #         p[2] = z_height
+        #         p_world = T_table.R@p + T_table.p
+        #         p_world_all.append(p_world)
 
-            Rz = np.array([0,0,-1])
-            Rx = np.append(-p_world[:2],0)
-            Rx = Rx/np.linalg.norm(Rx)
-            Ry = np.cross(Rz, Rx)
-            R = np.array([Rx, Ry, Rz]).T
-            try:
-                q_all = robot_weld.inv(p_world,R,last_joints=np.zeros(6))
-                q_sol_qll.append(q_all[0])
-                p_sol_all.append(p_world)
-            except ValueError:
-                # traceback.print_exc()
-                pass
+        #         Rz = np.array([0,0,-1])
+        #         Rx = np.append(-p_world[:2],0)
+        #         Rx = Rx/np.linalg.norm(Rx)
+        #         Ry = np.cross(Rz, Rx)
+        #         R = np.array([Rx, Ry, Rz]).T
+        #         try:
+        #             q_all = robot_weld.inv(p_world,R,last_joints=np.zeros(6))
+        #             q_sol_qll.append(q_all[0])
+        #             p_sol_all.append(p_world)
+        #         except ValueError:
+        #             # traceback.print_exc()
+        #             pass
+        # radius_p_sol[radius_circle] = np.array(p_sol_all)
+        # radius_p_world[radius_circle] = np.array(p_world_all)
                 
-        # plot p sol all in xy plane
-        # p_sol_all = np.array(p_sol_all)
-        # p_world_all = np.array(p_world_all)
-        # plt.scatter(p_world_all[:,0], p_world_all[:,1])
-        # plt.scatter(p_sol_all[:,0], p_sol_all[:,1])
-        # # make axes equal
-        # plt.axis('equal')
-        # plt.title("p sol all")
-        # plt.show()
-
-        # # plot q sol all
-        # q_sol_qll = np.array(q_sol_qll)
-        # plt.plot(q_sol_qll)
-        # plt.legend(['q1', 'q2', 'q3', 'q4', 'q5', 'q6'])
-        # plt.title("q sol all")
-        # plt.show()
         radius_vs_height.append([radius_circle, z_height])
         last_best_z = z_height
     plt.scatter(np.array(radius_vs_height)[:,0], np.array(radius_vs_height)[:,1])
@@ -143,6 +158,22 @@ def main():
     plt.title("Radius vs Height")
     plt.grid()
     plt.show()
+
+    # # draw animation of radius vs p_sol_all
+    # while not KeyboardInterrupt:
+    #     for radius_circle in radius_p_sol:
+    #         p_sol_all = radius_p_sol[radius_circle]
+    #         p_world_all = radius_p_world[radius_circle]
+    #         # plot p sol all in xy plane
+    #         # p_sol_all = np.array(p_sol_all)
+    #         # p_world_all = np.array(p_world_all)
+    #         plt.scatter(p_world_all[:,0], p_world_all[:,1])
+    #         plt.scatter(p_sol_all[:,0], p_sol_all[:,1])
+    #         # make axes equal
+    #         plt.axis('equal')
+    #         plt.title("p sol all "+str(radius_circle))
+    #         plt.pause(0.3)
+    #         plt.clf()
 
 if __name__ == "__main__":
     main()
