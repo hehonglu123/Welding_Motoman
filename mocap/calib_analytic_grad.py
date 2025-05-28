@@ -304,7 +304,7 @@ def get_PH_tool_from_param_minimal(param_ph,param_tool,robot_origin: robot_obj,u
     # insert a dummy P jN+1
     param_ph = np.insert(param_ph,2*jN,np.zeros(3))
     robot = get_PH_from_param_minimal(param_ph,robot,unit=unit)
-    robot.robot.P[:,-1] = np.zeros(3) # the last p is in the tool transformation
+    # robot.robot.P[:,-1] = np.zeros(3) # the last p is in the tool transformation
     # tool transformation
     tool_dp = param_tool[:3]
     tool_dR = rpy2R(param_tool[3:])
