@@ -511,14 +511,24 @@ def jacobian_tool(theta, robot_origin:robot_obj, unit='radians'):
     for j, th in enumerate(theta):
         R0n = R0n@rot(robot.robot.H[:,j],th)
     J[3:,:3]=R0n
+    R0T = R0n@robot.robot.R_tool
 
     tool_rpy = R2rpy(robot.robot.R_tool)
     rot_ex = rot(Rx,tool_rpy[0])
     rot_ey = rot(Ry,tool_rpy[1])
     rot_ez = rot(Rz,tool_rpy[2])
-    J[:3,3] = invhat(R0n@rot_ez@rot_ey@hat(Rx)@rot_ex)
-    J[:3,4] = invhat(R0n@rot_ez@hat(Ry)@rot_ey@rot_ex)
-    J[:3,5] = invhat(R0n@hat(Rz)@rot_ez@rot_ey@rot_ex)
+    # J[:3,3] = invhat(R0n@rot_ez@rot_ey@hat(Rx)@rot_ex)
+    # J[:3,4] = invhat(R0n@rot_ez@hat(Ry)@rot_ey@rot_ex)
+    # J[:3,5] = invhat(R0n@hat(Rz)@rot_ez@rot_ey@rot_ex)
+    # J[:3,3] = invhat(R0n@rot_ez@rot_ey@hat(Rx)@rot_ex@R0T.T)
+    # J[:3,4] = invhat(R0n@rot_ez@hat(Ry)@rot_ey@rot_ex@R0T.T)
+    # J[:3,5] = invhat(R0n@hat(Rz)@rot_ez@rot_ey@rot_ex@R0T.T)
+    # J[:3,3] = R0n@rot_ez@rot_ey@Rx
+    # J[:3,4] = R0n@rot_ez@Ry
+    # J[:3,5] = R0n@Rz
+    J[:3,3] = R0T@Rx
+    J[:3,4] = R0T@Ry
+    J[:3,5] = R0T@Rz
 
     return J
 

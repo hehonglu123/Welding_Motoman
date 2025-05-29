@@ -138,7 +138,7 @@ def main():
 
     # generate the simulated dataset
     try:
-        data_joints = np.loadtxt('data_joints_dual_sim.csv',delimiter=',')
+        data_joints = np.loadtxt('data_joints_dual_sim',delimiter=',')
         data_T_gt = np.loadtxt('data_T_gt_dual_sim.csv',delimiter=',')
         param_ph1_gt = np.loadtxt('param_ph1_gt.csv',delimiter=',')
         param_ph2_gt = np.loadtxt('param_ph2_gt.csv',delimiter=',')
@@ -163,13 +163,13 @@ def main():
         param_ph2_gt[jN2*2:] = np.radians(np.random.normal(0.03,0.05,jN2*2)) # th_i, phi_i of robot2, radians
 
         # param_t1_gt[:3] = np.random.uniform(-1,1,3) # tool dp of robot1, mm
-        param_t1_gt[:3] = np.random.normal(1,0.1,3) # tool dp of robot1, mm
+        param_t1_gt[:3] = np.random.normal(0.5,0.1,3) # tool dp of robot1, mm
         # param_t1_gt[3:] = np.radians(np.random.uniform(-0.05,0.05,3)) # tool dR of robot1, radians
-        param_t1_gt[3:] = np.radians(np.random.normal(0.03,0.05,3))
+        param_t1_gt[3:] = np.radians(np.random.normal(0.5,0.3,3))
         #param_t2_gt[:3] = np.random.uniform(-1,1,3) # tool dp of robot2, mm
         #param_t2_gt[3:] = np.radians(np.random.uniform(-0.05,0.05,3)) # tool dR of robot2, radians
-        param_t2_gt[:3] = np.random.normal(1,0.1,3) # tool dp of robot2, mm
-        param_t2_gt[3:] = np.radians(np.random.normal(0.03,0.05,3)) # tool dR of robot2, radians
+        param_t2_gt[:3] = np.random.normal(0.5,0.1,3) # tool dp of robot2, mm
+        param_t2_gt[3:] = np.radians(np.random.normal(0.5,0.3,3)) # tool dR of robot2, radians
 
         np.savetxt('param_ph1_gt.csv', param_ph1_gt, delimiter=',')
         np.savetxt('param_ph2_gt.csv', param_ph2_gt, delimiter=',')
@@ -203,8 +203,8 @@ def main():
             t1_gt = robot1_gt.fwd(q1)
             t2_gt = robot2_gt.fwd(q2)
             t1_t2_gt = t2_gt.inv() * t1_gt
-            if np.any(t1_t2_gt.p < t1_t2_lower_limit_p) or np.any(t1_t2_gt.p > t1_t2_upper_limit_p):
-                continue
+            # if np.any(t1_t2_gt.p < t1_t2_lower_limit_p) or np.any(t1_t2_gt.p > t1_t2_upper_limit_p):
+            #     continue
             print("data #:", len(data_joints))
             # get ground truth T and joints
             data_joints.append(np.concatenate((q1, q2)))
@@ -215,145 +215,144 @@ def main():
     input("Data generation complete. Press Enter to continue...")
 
     ### test Jacobian accuracy using numerical jacobian
-    dP_up_range = 0.005
-    dP_low_range = 0.01
-    dab_up_range = np.radians(0.001)
-    dab_low_range = np.radians(0.03)
-    numerical_iteration=1000
-    for data_q in data_joints:
-        # randomize a set of parameters for robot1
-        param_ph1 = deepcopy(param_ph1_gt)
-        param_ph2 = deepcopy(param_ph2_gt)
-        param_t1 = deepcopy(param_t1_gt)
-        param_t2 = deepcopy(param_t2_gt)
+    # dP_up_range = 0.0005
+    # dP_low_range = 0.01
+    # dab_up_range = 0.0001 # degrees
+    # dab_low_range = 0.03 # degrees
+    # numerical_iteration=1000
+    # for data_q in data_joints:
+    #     # randomize a set of parameters for robot1
+    #     param_ph1 = deepcopy(param_ph1_gt)
+    #     param_ph2 = deepcopy(param_ph2_gt)
+    #     param_t1 = deepcopy(param_t1_gt)
+    #     param_t2 = deepcopy(param_t2_gt)
 
-        print("robot 1 P",robot1.robot.P.T)
-        robot1, param_t1 = get_PH_tool_from_param_minimal(param_ph1, param_t1, robot1, unit=using_unit)
-        robot2, param_t2 = get_PH_tool_from_param_minimal(param_ph2, param_t2, robot2, unit=using_unit)
-        print("robot 1 P after get_PH_tool_from_param_minimal",robot1.robot.P.T)
-        # get J_ana
-        this_J_dual_ana = jacobian_param_minimal_dual(param_ph1, data_q[:jN1], robot1, \
-                                                  param_ph2, data_q[jN1:], robot2, unit=using_unit)
-        this_J_tool_ana = jacobian_tool_dual(data_q[:jN1], robot1, \
-                                         data_q[jN1:], robot2, unit=using_unit)
-        this_J1_ana = jacobian_param_minimal(np.append(param_ph1,np.zeros(3)), robot1, data_q[:jN1], unit=using_unit)
-        this_J1_ana = np.delete(this_J1_ana,[2*jN1,2*jN1+1,2*jN1+2],axis=1)
+    #     print("robot 1 P",robot1.robot.P.T)
+    #     robot1, param_t1 = get_PH_tool_from_param_minimal(param_ph1, param_t1, robot1, unit=using_unit)
+    #     robot2, param_t2 = get_PH_tool_from_param_minimal(param_ph2, param_t2, robot2, unit=using_unit)
+    #     print("robot 1 P after get_PH_tool_from_param_minimal",robot1.robot.P.T)
+    #     # get J_ana
+    #     this_J_dual_ana = jacobian_param_minimal_dual(param_ph1, data_q[:jN1], robot1, \
+    #                                               param_ph2, data_q[jN1:], robot2, unit=using_unit)
+    #     this_J_tool_ana = jacobian_tool_dual(data_q[:jN1], robot1, \
+    #                                      data_q[jN1:], robot2, unit=using_unit)
+    #     this_J1_ana = jacobian_param_minimal(np.append(param_ph1,np.zeros(3)), robot1, data_q[:jN1], unit=using_unit)
+    #     this_J1_ana = np.delete(this_J1_ana,[2*jN1,2*jN1+1,2*jN1+2],axis=1)
 
-        t1 = robot1.fwd(data_q[:jN1]) # robot 1 forward kinematics
-        t2 = robot2.fwd(data_q[jN1:]) # robot 2 forward kinematics
-        t2_t1_init = t2.inv() * t1 # t2_t1 transformation
+    #     t1 = robot1.fwd(data_q[:jN1]) # robot 1 forward kinematics
+    #     t2 = robot2.fwd(data_q[jN1:]) # robot 2 forward kinematics
+    #     t2_t1_init = t2.inv() * t1 # t2_t1 transformation
 
-        # single robot jacobian verification
+    #     # single robot jacobian verification
         
-        d_T_all = [] # difference in robot T
-        d_param_all = [] # difference in param
-        d_T1_all = [] # difference in robot 1 T
-        d_param1_all = [] # difference in robot 1 param
-        for iter_i in range(numerical_iteration):
-            # perturb the parameters
-            d_param_ph1 = np.random.uniform(-dP_up_range, dP_up_range, jN1*2)
-            d_param_ph1 = np.append(d_param_ph1, np.radians(np.random.uniform(-dab_up_range, dab_up_range, jN1*2)))
-            d_param_ph2 = np.random.uniform(-dP_up_range, dP_up_range, jN2*2)
-            d_param_ph2 = np.append(d_param_ph2, np.radians(np.random.uniform(-dab_up_range, dab_up_range, jN2*2)))
-            d_param_t1 = np.random.uniform(-dP_up_range, dP_up_range, 3)
-            d_param_t1 = np.append(d_param_t1, np.radians(np.random.uniform(-dab_up_range, dab_up_range, 3)))
-            d_param_t2 = np.random.uniform(-dP_up_range, dP_up_range, 3)
-            d_param_t2 = np.append(d_param_t2, np.radians(np.random.uniform(-dab_up_range, dab_up_range, 3)))
-            # d_param_t1 = np.zeros_like(param_t1) # ignore the tool perturbation for now
-            # d_param_t2 = np.zeros_like(param_t2)
-            this_d_param_all = np.concatenate((d_param_ph1, d_param_ph2, d_param_t1, d_param_t2))
-            d_param_all.append(this_d_param_all) # append the difference in param
-            d_param1_all.append(d_param_ph1) # append the difference in param for robot 1
+    #     d_T_all = [] # difference in robot T
+    #     d_param_all = [] # difference in param
+    #     d_T1_all = [] # difference in robot 1 T
+    #     d_param1_all = [] # difference in robot 1 param
+    #     for iter_i in range(numerical_iteration):
+    #         # perturb the parameters
+    #         d_param_ph1 = np.random.uniform(-dP_up_range, dP_up_range, jN1*2)
+    #         d_param_ph1 = np.append(d_param_ph1, np.radians(np.random.uniform(-dab_up_range, dab_up_range, jN1*2)))
+    #         d_param_ph2 = np.random.uniform(-dP_up_range, dP_up_range, jN2*2)
+    #         d_param_ph2 = np.append(d_param_ph2, np.radians(np.random.uniform(-dab_up_range, dab_up_range, jN2*2)))
+    #         d_param_t1 = np.random.uniform(-dP_up_range, dP_up_range, 3)
+    #         d_param_t1 = np.append(d_param_t1, np.radians(np.random.uniform(-dab_up_range, dab_up_range, 3)))
+    #         d_param_t2 = np.random.uniform(-dP_up_range, dP_up_range, 3)
+    #         d_param_t2 = np.append(d_param_t2, np.radians(np.random.uniform(-dab_up_range, dab_up_range, 3)))
+    #         # d_param_t1 = np.zeros_like(param_t1) # ignore the tool perturbation for now
+    #         # d_param_t2 = np.zeros_like(param_t2)
+    #         this_d_param_all = np.concatenate((d_param_ph1, d_param_ph2, d_param_t1, d_param_t2))
+    #         d_param_all.append(this_d_param_all) # append the difference in param
+    #         d_param1_all.append(np.concatenate((d_param_ph1, d_param_t1))) # append the difference in param for robot 1
 
+    #         this_param_ph1 = param_ph1 + d_param_ph1
+    #         this_param_ph2 = param_ph2 + d_param_ph2
+    #         this_param_t1 = param_t1 + d_param_t1
+    #         this_param_t2 = param_t2 + d_param_t2
 
-            this_param_ph1 = param_ph1 + d_param_ph1
-            this_param_ph2 = param_ph2 + d_param_ph2
-            # this_param_ph1 = deepcopy(param_ph1) # deep copy to avoid modifying the original param
-            # this_param_ph2 = deepcopy(param_ph2) # deep copy to avoid modifying the original param
-            this_param_t1 = param_t1 + d_param_t1
-            this_param_t2 = param_t2 + d_param_t2
+    #         # get the new robots using perturbed params
+    #         this_robot1, _ = get_PH_tool_from_param_minimal(this_param_ph1, this_param_t1, robot1, unit=using_unit)
+    #         this_robot2, _ = get_PH_tool_from_param_minimal(this_param_ph2, this_param_t2, robot2, unit=using_unit)
 
-            # get the new robots using perturbed params
-            this_robot1, _ = get_PH_tool_from_param_minimal(this_param_ph1, this_param_t1, robot1, unit=using_unit)
-            this_robot2, _ = get_PH_tool_from_param_minimal(this_param_ph2, this_param_t2, robot2, unit=using_unit)
-
-            t1_pert = this_robot1.fwd(data_q[:jN1]) # robot 1 forward kinematics, after parameter perturbation
-            t2_pert = this_robot2.fwd(data_q[jN1:]) # robot 2 forward kinematics, after parameter perturbation
-            t2_t1_pert = t2_pert.inv() * t1_pert # t2_t1 transformation after parameter perturbation
-            dp = t2_t1_pert.p - t2_t1_init.p # position difference
-            dR = t2_t1_pert.R - t2_t1_init.R # rotation difference
-            dRRT = dR@t2_t1_init.R.T # rotation difference in the initial frame
-            ktheta = invhat(dRRT)
-            d_T = np.append(ktheta, dp) # difference in T
-            d_T_all.append(d_T) # append the difference in T
-            # robot 1 jacobian verification
-            dp1 = t1_pert.p - t1.p # position difference for robot 1
-            dR1 = t1_pert.R - t1.R # rotation difference for robot 1
-            dRRT1 = dR1@t1.R.T # rotation difference in the initial frame for robot 1
-            ktheta1 = invhat(dRRT1)
-            d_T1 = np.append(ktheta1, dp1) # difference in T for robot 1
-            d_T1_all.append(d_T1) # append the difference in T for robot 1
+    #         t1_pert = this_robot1.fwd(data_q[:jN1]) # robot 1 forward kinematics, after parameter perturbation
+    #         t2_pert = this_robot2.fwd(data_q[jN1:]) # robot 2 forward kinematics, after parameter perturbation
+    #         t2_t1_pert = t2_pert.inv() * t1_pert # t2_t1 transformation after parameter perturbation
+    #         dp = t2_t1_pert.p - t2_t1_init.p # position difference
+    #         dR = t2_t1_pert.R - t2_t1_init.R # rotation difference
+    #         dRRT = dR@t2_t1_init.R.T # rotation difference in the initial frame
+    #         ktheta = invhat(dRRT)
+    #         d_T = np.append(ktheta, dp) # difference in T
+    #         d_T_all.append(d_T) # append the difference in T
+    #         # robot 1 jacobian verification
+    #         dp1 = t1_pert.p - t1.p # position difference for robot 1
+    #         dR1 = t1_pert.R - t1.R # rotation difference for robot 1
+    #         dRRT1 = dR1@t1.R.T # rotation difference in the initial frame for robot 1
+    #         ktheta1 = invhat(dRRT1)
+    #         d_T1 = np.append(ktheta1, dp1) # difference in T for robot 1
+    #         d_T1_all.append(d_T1) # append the difference in T for robot 1
             
-        d_param_all = np.array(d_param_all).T # shape: (total_params, numerical_iteration)
-        d_T_all = np.array(d_T_all).T # shape: (6, numerical_iteration)
-        # compute the numerical jacobian
-        J_numerical = d_T_all @ np.linalg.pinv(d_param_all) # shape: (6, total_params)
-        J_ana = np.hstack((this_J_dual_ana, this_J_tool_ana)) # analytical jacobian
+    #     d_param_all = np.array(d_param_all).T # shape: (total_params, numerical_iteration)
+    #     d_T_all = np.array(d_T_all).T # shape: (6, numerical_iteration)
+    #     # compute the numerical jacobian
+    #     J_numerical = d_T_all @ np.linalg.pinv(d_param_all) # shape: (6, total_params)
+    #     J_ana = np.hstack((this_J_dual_ana, this_J_tool_ana)) # analytical jacobian
 
-        d_param1_all = np.array(d_param1_all).T # shape: (total_params_robot1, numerical_iteration)
-        d_T1_all = np.array(d_T1_all).T # shape: (6, numerical_iteration)
-        J1_numerical = d_T1_all @ np.linalg.pinv(d_param1_all) # shape: (6, total_params)
-        J1_ana = this_J1_ana # analytical jacobian for robot 1
+    #     d_param1_all = np.array(d_param1_all).T # shape: (total_params_robot1, numerical_iteration)
+    #     d_T1_all = np.array(d_T1_all).T # shape: (6, numerical_iteration)
+    #     J1_numerical = d_T1_all @ np.linalg.pinv(d_param1_all) # shape: (6, total_params)
+    #     J1_ana = this_J1_ana # analytical jacobian for robot 1
 
+    #     # show J1 numerical and J1_ana and J1 error in a 3x1 grid
+    #     # fig, axs = plt.subplots(3, 1, figsize=(10, 7.5))
+    #     # axs[0].matshow(J1_numerical[:,:jN1*4], cmap='jet', interpolation='nearest')
+    #     # axs[1].matshow(J1_ana[:,:jN1*4], cmap='jet', interpolation='nearest')
+    #     # axs[2].matshow(np.clip(np.abs(J1_numerical[:,:jN1*4]-J1_ana[:,:jN1*4]),0,1), cmap='jet', interpolation='nearest')
+    #     # # axs[0].matshow(np.clip(J1_numerical[:,:jN1*4], -1, 1), cmap='jet', interpolation='nearest')
+    #     # # axs[1].matshow(np.clip(J1_ana[:,:jN1*4], -1, 1), cmap='jet', interpolation='nearest')
+    #     # # axs[2].matshow(np.clip(np.abs(J1_numerical[:,:jN1*4]-J1_ana[:,:jN1*4]),0,1), cmap='jet', interpolation='nearest')
+    #     # axs[0].set_title("Numerical Jacobian for Robot 1")
+    #     # axs[0].set_xlabel("Parameters")
+    #     # axs[0].set_ylabel("Errors")
+    #     # axs[1].set_title("Analytical Jacobian for Robot 1")
+    #     # axs[1].set_xlabel("Parameters")
+    #     # axs[1].set_ylabel("Errors")
+    #     # axs[2].set_title("Numerical Jacobian vs Analytical Jacobian for Robot 1")
+    #     # axs[2].set_xlabel("Parameters")
+    #     # axs[2].set_ylabel("Errors")
+    #     # # plt.colorbar(ax=axs[2])
+    #     # plt.tight_layout()
+    #     # plt.show()
 
-        # show J1 numerical and J1_ana and J1 error in a 3x1 grid
-        fig, axs = plt.subplots(3, 1, figsize=(10, 7.5))
-        axs[0].matshow(np.clip(J1_numerical, -1, 1), cmap='jet', interpolation='nearest')
-        axs[0].set_title("Numerical Jacobian for Robot 1")
-        axs[0].set_xlabel("Parameters")
-        axs[0].set_ylabel("Errors")
-        axs[1].matshow(np.clip(J1_ana, -1, 1), cmap='jet', interpolation='nearest')
-        axs[1].set_title("Analytical Jacobian for Robot 1")
-        axs[1].set_xlabel("Parameters")
-        axs[1].set_ylabel("Errors")
-        axs[2].matshow(np.clip(np.abs(J1_numerical-J1_ana),0,1), cmap='jet', interpolation='nearest')
-        axs[2].set_title("Numerical Jacobian vs Analytical Jacobian for Robot 1")
-        axs[2].set_xlabel("Parameters")
-        axs[2].set_ylabel("Errors")
-        # plt.colorbar(ax=axs[2])
-        plt.tight_layout()
-        plt.show()
+    #     # show J numerical and J_ana and J error in a 3x1 grid
+    #     fig, axs = plt.subplots(3, 1, figsize=(10, 7.5))
+    #     axs[0].matshow(np.clip(J_numerical, -1, 1), cmap='jet', interpolation='nearest')
+    #     axs[0].set_title("Numerical Jacobian")
+    #     axs[0].set_xlabel("Parameters")
+    #     axs[0].set_ylabel("Errors")
+    #     axs[1].matshow(np.clip(J_ana, -1, 1), cmap='jet', interpolation='nearest')
+    #     axs[1].set_title("Analytical Jacobian")
+    #     axs[1].set_xlabel("Parameters")
+    #     axs[1].set_ylabel("Errors")
+    #     axs[2].matshow(np.clip(np.abs(J_numerical-J_ana),0,1), cmap='jet', interpolation='nearest')
+    #     axs[2].set_title("Numerical Jacobian vs Analytical Jacobian")
+    #     axs[2].set_xlabel("Parameters")
+    #     axs[2].set_ylabel("Errors")
+    #     # plt.colorbar(ax=axs[2])
+    #     plt.tight_layout()
+    #     plt.show()
 
-        # show J numerical and J_ana and J error in a 3x1 grid
-        fig, axs = plt.subplots(3, 1, figsize=(10, 7.5))
-        axs[0].matshow(np.clip(J_numerical, -1, 1), cmap='jet', interpolation='nearest')
-        axs[0].set_title("Numerical Jacobian")
-        axs[0].set_xlabel("Parameters")
-        axs[0].set_ylabel("Errors")
-        axs[1].matshow(np.clip(J_ana, -1, 1), cmap='jet', interpolation='nearest')
-        axs[1].set_title("Analytical Jacobian")
-        axs[1].set_xlabel("Parameters")
-        axs[1].set_ylabel("Errors")
-        axs[2].matshow(np.clip(np.abs(J_numerical-J_ana),0,1), cmap='jet', interpolation='nearest')
-        axs[2].set_title("Numerical Jacobian vs Analytical Jacobian")
-        axs[2].set_xlabel("Parameters")
-        axs[2].set_ylabel("Errors")
-        # plt.colorbar(ax=axs[2])
-        plt.tight_layout()
-        plt.show()
-
-    exit()
+    # exit()
 
     # calibration
     weight_P = 1
     weight_H = 1
     weight_pos = 1
-    weight_ori = 1
+    weight_ori = 57
     # weight_ori = 1641
-    alpha=0.1
-    lambda_H = 57
+    alpha=0.05
+    lambda_H = 570
     lambda_P = 1
-    lambda_tool_p = 1
+    lambda_tool_p = 0.5
     lambda_tool_R = 57
     total_P1 = 2*jN1 # total number of P parameters to be estimated. robot 1
     total_H1 = 2*jN1 # total number of H parameters to be estimated. robot 1
@@ -361,7 +360,7 @@ def main():
     total_H2 = 2*jN2 # total number of H parameters to be estimated. robot 2
     total_tool_p = 3 # total number of tool p parameters to be estimated, for 1 robot
     total_tool_R = 3 # total number of tool R parameters to be estimated, for 1 robot
-    max_iteration = 50
+    max_iteration = 100
     
     pos_error_norm_progress = []
     ori_error_norm_progress = []
@@ -373,10 +372,18 @@ def main():
     param_t1R_error_progress = []
     param_t2p_error_progress = []
     param_t2R_error_progress = []
+    param_ph1_upper = np.append(np.ones(total_P1)*0.5, np.radians(np.ones(total_H1)*0.08)) # upper limit for robot 1
+    param_ph2_upper = np.append(np.ones(total_P2)*0.5, np.radians(np.ones(total_H2)*0.08)) # upper limit for robot 2
+    param_t1_upper = np.append(np.ones(total_tool_p)*1.1, np.radians(np.ones(total_tool_R)*1.1)) # upper limit for tool 1
+    param_t2_upper = np.append(np.ones(total_tool_p)*1.1, np.radians(np.ones(total_tool_R)*1.1)) # upper limit for tool 2
+    param_t1_total = np.zeros_like(param_t1_upper) # total tool parameters for robot 1
+    param_t2_total = np.zeros_like(param_t2_upper) # total tool parameters for robot 2
     for iter_N in range(max_iteration):
+        param_t1_total += param_t1
+        param_t2_total += param_t2
+
         print("Iteration #:", iter_N)
         # get the current robots using params
-        param_t1[3:] *= -1
         robot1, param_t1 = get_PH_tool_from_param_minimal(param_ph1, param_t1, robot1, unit=using_unit)
         robot2, param_t2 = get_PH_tool_from_param_minimal(param_ph2, param_t2, robot2, unit=using_unit)
 
@@ -419,7 +426,7 @@ def main():
         param_t2p_error_progress.append(robot2.robot.p_tool-robot2_gt.robot.p_tool)
         param_t2R_error_progress.append(R2rpy(robot2.robot.R_tool@robot2_gt.robot.R_tool.T))
 
-        print("Pose error, orientation error:", np.mean(error_pos), np.degrees(np.mean(error_ori)))
+        print("position error, orientation error:", np.mean(error_pos), np.degrees(np.mean(error_ori)))
         # update PH using QP
         # parameters: param_ph1, param_t1, param_ph2, param_t2
         G = J_ana
@@ -431,12 +438,18 @@ def main():
         H=G.T@G + Kq
         H = (H + H.T) / 2
         f = -G.T@error_pos_ori
-        dparam = solve_qp(H, f, solver='quadprog')
+        upper_bounds = np.hstack((param_ph1_upper, param_ph2_upper, param_t1_upper, param_t2_upper)) - np.hstack((param_ph1, param_ph2, param_t1_total, param_t2_total))
+        lower_bounds = -np.hstack((param_ph1_upper, param_ph2_upper, param_t1_upper, param_t2_upper)) - np.hstack((param_ph1, param_ph2, param_t1_total, param_t2_total))
+        dparam = solve_qp(H, f, lb=lower_bounds, ub=upper_bounds, solver='quadprog')
 
-        # param_ph1 = param_ph1 - alpha*dparam[:total_P1+total_H1]
+        # if iter_N > max_iteration/2:
+        param_ph1 = param_ph1 - alpha*dparam[:total_P1+total_H1]
         dparam = dparam[total_P1+total_H1:]
-        # param_ph2 = param_ph2 - alpha*dparam[:total_P2+total_H2]
+        param_ph2 = param_ph2 - alpha*dparam[:total_P2+total_H2]
         dparam = dparam[total_P2+total_H2:]
+        # else:
+        #     dparam = dparam[total_P1+total_H1:]
+        #     dparam = dparam[total_P2+total_H2:]
         param_t1 = param_t1 - alpha*dparam[:total_tool_p+total_tool_R]
         dparam = dparam[total_tool_p+total_tool_R:]
         param_t2 = param_t2 - alpha*dparam[:total_tool_p+total_tool_R]
@@ -459,8 +472,8 @@ def main():
     axs[0, 2].set_xlabel('Iteration')
     axs[0, 2].set_ylabel('Error Norm (mm)')
     axs[0, 2].legend()
-    axs[1, 0].plot(np.linalg.norm(param_h1_error_progress,axis=1), label='H1 Error', color='purple')
-    axs[1, 0].plot(np.linalg.norm(param_h2_error_progress,axis=1), label='H2 Error', color='brown')
+    axs[1, 0].plot(np.degrees(np.linalg.norm(param_h1_error_progress,axis=1)), label='H1 Error', color='purple')
+    axs[1, 0].plot(np.degrees(np.linalg.norm(param_h2_error_progress,axis=1)), label='H2 Error', color='brown')
     axs[1, 0].set_title('H Error Progress')
     axs[1, 0].set_xlabel('Iteration')
     axs[1, 0].set_ylabel('Error Norm (degrees)')
@@ -471,8 +484,8 @@ def main():
     axs[1, 1].set_xlabel('Iteration')
     axs[1, 1].set_ylabel('Error Norm (mm)')
     axs[1, 1].legend()
-    axs[1, 2].plot(np.linalg.norm(param_t1R_error_progress,axis=1), label='Tool R1 Error', color='gray')
-    axs[1, 2].plot(np.linalg.norm(param_t2R_error_progress,axis=1), label='Tool R2 Error', color='olive')
+    axs[1, 2].plot(np.degrees(np.linalg.norm(param_t1R_error_progress,axis=1)), label='Tool R1 Error', color='gray')
+    axs[1, 2].plot(np.degrees(np.linalg.norm(param_t2R_error_progress,axis=1)), label='Tool R2 Error', color='olive')
     axs[1, 2].set_title('Tool R Error Progress')
     axs[1, 2].set_xlabel('Iteration')
     axs[1, 2].set_ylabel('Error Norm (degrees)')
