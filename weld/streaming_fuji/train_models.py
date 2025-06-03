@@ -221,6 +221,18 @@ def get_rmse(error_array):
 
     return np.sqrt(np.mean(error_array**2))
 
+def get_mean_std(error_array):
+
+    error_array = np.fabs(np.array(error_array).flatten())
+
+    assert error_array.ndim == 1, "Error array must be 1D"
+    assert error_array.size > 0, "Error array must not be empty"
+
+    mean_error = np.mean(error_array)
+    std_error = np.std(error_array)
+
+    return [mean_error, std_error]
+
 def train_loglog(train_input,train_output,val_input,val_output,quadratic=False):
 
     train_input = np.array(train_input)[:,:2]
@@ -504,9 +516,17 @@ def main():
     output_string_dh += '| Unit (mm) | Train RMSE dh| Test RMSE dh | Train Max dh | Test Max dh | Interval 95% |\n'
     output_string_dh += '|---|---|---|---|---|---|\n'
 
+    output_string_dh_2 = '# Error Distribution dh (Statics 2)\n'
+    output_string_dh_2 += '| Unit (mm) | Train mean dh| Test mean dh | Train std dh | Test std dh |\n'
+    output_string_dh_2 += '|---|---|---|---|---|\n'
+
     output_string_dw = '# Error Distribution dw\n'
     output_string_dw += '| Unit (mm) | Train RMSE dw| Test RMSE dw | Train Max dw | Test Max dw | Interval 95% |\n'
     output_string_dw += '|---|---|---|---|---|---|\n'
+
+    output_string_dw_2 = '# Error Distribution dw (Statics 2)\n'
+    output_string_dw_2 += '| Unit (mm) | Train mean dw| Test mean dw | Train std dw | Test std dw |\n'
+    output_string_dw_2 += '|---|---|---|---|---|\n'
 
     # log-log model. linear
     print("Training log-log linear model...")
@@ -514,40 +534,56 @@ def main():
         train_loglog(deepcopy(train_input), deepcopy(train_output), deepcopy(val_input), deepcopy(val_output),quadratic=False)
     train_rmse_dh_lnln_lin, train_rmse_dw_lnln_lin, val_rmse_dh_lnln_lin, val_rmse_dw_lnln_lin = \
         get_rmse(dh_error_train_lnln_lin), get_rmse(dw_error_train_lnln_lin), get_rmse(dh_error_val_lnln_lin), get_rmse(dw_error_val_lnln_lin)
+    train_mean_std_dh_lnln_lin, train_mean_std_dw_lnln_lin, val_mean_std_dh_lnln_lin, val_mean_std_dw_lnln_lin = \
+        get_mean_std(dh_error_train_lnln_lin), get_mean_std(dw_error_train_lnln_lin), get_mean_std(dh_error_val_lnln_lin), get_mean_std(dw_error_val_lnln_lin)
     dh_inter_95_lnln_lin, dw_inter_95_lnln_lin = plot_error_distribution(np.abs(dh_error_train_lnln_lin), np.abs(dw_error_train_lnln_lin), np.abs(dh_error_val_lnln_lin), np.abs(dw_error_val_lnln_lin), plot_title='Error distribution (log-log linear model)') # plot training and validation error distribution for dh and dw
     plot_error_heatmap(dh_error_train_lnln_lin, dw_error_train_lnln_lin, dh_error_val_lnln_lin, dw_error_val_lnln_lin, train_input, val_input, plot_title='Error heatmap (log-log linear model)') # plot training and validation error heatmap for dh and dw
     output_string_dh += f'| Linear loglog model | {train_rmse_dh_lnln_lin:.2f} | {val_rmse_dh_lnln_lin:.2f} | {np.max(np.abs(dh_error_train_lnln_lin)):.2f} | {np.max(np.abs(dh_error_val_lnln_lin)):.2f} | {dh_inter_95_lnln_lin[0]:.2f}~{dh_inter_95_lnln_lin[1]:.2f} |\n'
     output_string_dw += f'| Linear loglog model | {train_rmse_dw_lnln_lin:.2f} | {val_rmse_dw_lnln_lin:.2f} | {np.max(np.abs(dw_error_train_lnln_lin)):.2f} | {np.max(np.abs(dw_error_val_lnln_lin)):.2f} | {dw_inter_95_lnln_lin[0]:.2f}~{dw_inter_95_lnln_lin[1]:.2f} |\n'
+    output_string_dh_2 += f'| Linear loglog model | {train_mean_std_dh_lnln_lin[0]:.2f} | {val_mean_std_dh_lnln_lin[0]:.2f} | {train_mean_std_dh_lnln_lin[1]:.2f} | {val_mean_std_dh_lnln_lin[1]:.2f} |\n'
+    output_string_dw_2 += f'| Linear loglog model | {train_mean_std_dw_lnln_lin[0]:.2f} | {val_mean_std_dw_lnln_lin[0]:.2f} | {train_mean_std_dw_lnln_lin[1]:.2f} | {val_mean_std_dw_lnln_lin[1]:.2f} |\n'
     # log-log model. with quadratic term
     print("Training log-log quadratic model...")
     dh_error_train_lnln_qua, dw_error_train_lnln_qua, dh_error_val_lnln_qua, dw_error_val_lnln_qua = \
         train_loglog(deepcopy(train_input), deepcopy(train_output), deepcopy(val_input), deepcopy(val_output),quadratic=True)
     train_rmse_dh_lnln_qua, train_rmse_dw_lnln_qua, val_rmse_dh_lnln_qua, val_rmse_dw_lnln_qua = \
         get_rmse(dh_error_train_lnln_qua), get_rmse(dw_error_train_lnln_qua), get_rmse(dh_error_val_lnln_qua), get_rmse(dw_error_val_lnln_qua)
+    train_mean_std_dh_lnln_qua, train_mean_std_dw_lnln_qua, val_mean_std_dh_lnln_qua, val_mean_std_dw_lnln_qua = \
+        get_mean_std(dh_error_train_lnln_qua), get_mean_std(dw_error_train_lnln_qua), get_mean_std(dh_error_val_lnln_qua), get_mean_std(dw_error_val_lnln_qua)
     dh_inter_95_lnln_qua, dw_inter_95_lnln_qua = plot_error_distribution(np.abs(dh_error_train_lnln_qua), np.abs(dw_error_train_lnln_qua), np.abs(dh_error_val_lnln_qua), np.abs(dw_error_val_lnln_qua), plot_title='Error distribution (log-log quadratic model)') # plot training and validation error distribution for dh and dw
     plot_error_heatmap(dh_error_train_lnln_qua, dw_error_train_lnln_qua, dh_error_val_lnln_qua, dw_error_val_lnln_qua, train_input, val_input, plot_title='Error heatmap (log-log quadratic model)') # plot training and validation error heatmap for dh and dw
     output_string_dh += f'| Quadratic loglog model | {train_rmse_dh_lnln_qua:.2f} | {val_rmse_dh_lnln_qua:.2f} | {np.max(np.abs(dh_error_train_lnln_qua)):.2f} | {np.max(np.abs(dh_error_val_lnln_qua)):.2f} | {dh_inter_95_lnln_qua[0]:.2f}~{dh_inter_95_lnln_qua[1]:.2f} |\n'
     output_string_dw += f'| Quadratic loglog model | {train_rmse_dw_lnln_qua:.2f} | {val_rmse_dw_lnln_qua:.2f} | {np.max(np.abs(dw_error_train_lnln_qua)):.2f} | {np.max(np.abs(dw_error_val_lnln_qua)):.2f}  | {dw_inter_95_lnln_qua[0]:.2f}~{dw_inter_95_lnln_qua[1]:.2f} |\n'
+    output_string_dh_2 += f'| Quadratic loglog model | {train_mean_std_dh_lnln_qua[0]:.2f} | {val_mean_std_dh_lnln_qua[0]:.2f} | {train_mean_std_dh_lnln_qua[1]:.2f} | {val_mean_std_dh_lnln_qua[1]:.2f} |\n'
+    output_string_dw_2 += f'| Quadratic loglog model | {train_mean_std_dw_lnln_qua[0]:.2f} | {val_mean_std_dw_lnln_qua[0]:.2f} | {train_mean_std_dw_lnln_qua[1]:.2f} | {val_mean_std_dw_lnln_qua[1]:.2f} |\n'
     # Neural Network model. with torch height
     print("Training Neural Network model with torch height...")
     dh_error_train_nn, dw_error_train_nn, dh_error_val_nn, dw_error_val_nn = \
         train_NN(deepcopy(train_input), deepcopy(train_output), deepcopy(val_input), deepcopy(val_output), torch_height=True, layer_height=False, train_model=False, model_dir='weld_NN_models/')
     train_rmse_dh_nn, train_rmse_dw_nn, val_rmse_dh_nn, val_rmse_dw_nn = \
         get_rmse(dh_error_train_nn), get_rmse(dw_error_train_nn), get_rmse(dh_error_val_nn), get_rmse(dw_error_val_nn)
+    train_mean_std_dh_nn, train_mean_std_dw_nn, val_mean_std_dh_nn, val_mean_std_dw_nn = \
+        get_mean_std(dh_error_train_nn), get_mean_std(dw_error_train_nn), get_mean_std(dh_error_val_nn), get_mean_std(dw_error_val_nn)
     dh_inter_95_nn, dw_inter_95_nn = plot_error_distribution(np.abs(dh_error_train_nn), np.abs(dw_error_train_nn), np.abs(dh_error_val_nn), np.abs(dw_error_val_nn), plot_title='Error distribution (neural network model)') # plot training and validation error distribution for dh and dw
     plot_error_heatmap(dh_error_train_nn, dw_error_train_nn, dh_error_val_nn, dw_error_val_nn, train_input, val_input, plot_title='Error heatmap (neural network model)') # plot training and validation error heatmap for dh and dw
     output_string_dh += f'| Neural Network model | {train_rmse_dh_nn:.2f} | {val_rmse_dh_nn:.2f} | {np.max(np.abs(dh_error_train_nn)):.2f} | {np.max(np.abs(dh_error_val_nn)):.2f} | {dh_inter_95_nn[0]:.2f}~{dh_inter_95_nn[1]:.2f} |\n'
     output_string_dw += f'| Neural Network model | {train_rmse_dw_nn:.2f} | {val_rmse_dw_nn:.2f} | {np.max(np.abs(dw_error_train_nn)):.2f} | {np.max(np.abs(dw_error_val_nn)):.2f} | {dw_inter_95_nn[0]:.2f}~{dw_inter_95_nn[1]:.2f} |\n'
+    output_string_dh_2 += f'| Neural Network model | {train_mean_std_dh_nn[0]:.2f} | {val_mean_std_dh_nn[0]:.2f} | {train_mean_std_dh_nn[1]:.2f} | {val_mean_std_dh_nn[1]:.2f} |\n'
+    output_string_dw_2 += f'| Neural Network model | {train_mean_std_dw_nn[0]:.2f} | {val_mean_std_dw_nn[0]:.2f} | {train_mean_std_dw_nn[1]:.2f} | {val_mean_std_dw_nn[1]:.2f} |\n'
     # Gaussian Process model. with torch height
     print("Training Gaussian Process model with torch height...")
     dh_error_train_gp, dw_error_train_gp, dh_error_val_gp, dw_error_val_gp = \
         train_GP(deepcopy(train_input), deepcopy(train_output), deepcopy(val_input), deepcopy(val_output), torch_height=True, layer_height=False, train_model=False, model_dir='weld_GP_models/')
     train_rmse_dh_gp, train_rmse_dw_gp, val_rmse_dh_gp, val_rmse_dw_gp = \
         get_rmse(dh_error_train_gp), get_rmse(dw_error_train_gp), get_rmse(dh_error_val_gp), get_rmse(dw_error_val_gp)
+    train_mean_std_dh_gp, train_mean_std_dw_gp, val_mean_std_dh_gp, val_mean_std_dw_gp = \
+        get_mean_std(dh_error_train_gp), get_mean_std(dw_error_train_gp), get_mean_std(dh_error_val_gp), get_mean_std(dw_error_val_gp)
     dh_inter_95_gp, dw_inter_95_gp = plot_error_distribution(np.abs(dh_error_train_gp), np.abs(dw_error_train_gp), np.abs(dh_error_val_gp), np.abs(dw_error_val_gp), plot_title='Error distribution (GP model with torch height)') # plot training and validation error distribution for dh and dw
     plot_error_heatmap(dh_error_train_gp, dw_error_train_gp, dh_error_val_gp, dw_error_val_gp, train_input, val_input, plot_title='Error heatmap (GP model with torch height)') # plot training and validation error heatmap for dh and dw
     output_string_dh += f'| Gaussian Process model | {train_rmse_dh_gp:.2f} | {val_rmse_dh_gp:.2f} | {np.max(np.abs(dh_error_train_gp)):.2f} | {np.max(np.abs(dh_error_val_gp)):.2f} | {dh_inter_95_gp[0]:.2f}~{dh_inter_95_gp[1]:.2f} |\n'
     output_string_dw += f'| Gaussian Process model | {train_rmse_dw_gp:.2f} | {val_rmse_dw_gp:.2f} | {np.max(np.abs(dw_error_train_gp)):.2f} | {np.max(np.abs(dw_error_val_gp)):.2f} | {dw_inter_95_gp[0]:.2f}~{dw_inter_95_gp[1]:.2f} |\n'
+    output_string_dh_2 += f'| Gaussian Process model | {train_mean_std_dh_gp[0]:.2f} | {val_mean_std_dh_gp[0]:.2f} | {train_mean_std_dh_gp[1]:.2f} | {val_mean_std_dh_gp[1]:.2f} |\n'
+    output_string_dw_2 += f'| Gaussian Process model | {train_mean_std_dw_gp[0]:.2f} | {val_mean_std_dw_gp[0]:.2f} | {train_mean_std_dw_gp[1]:.2f} | {val_mean_std_dw_gp[1]:.2f} |\n'
 
     dh_error_all = {}
     dh_error_all['Linear loglog'] = np.abs(np.append(dh_error_train_lnln_lin, dh_error_val_lnln_lin))
@@ -563,7 +599,9 @@ def main():
 
 
     print(output_string_dh)
+    print(output_string_dh_2)
     print(output_string_dw)
+    print(output_string_dw_2)
 
     ### NN ablation study
     # dh_error_train_nn, dw_error_train_nn, dh_error_val_nn, dw_error_val_nn = \

@@ -347,12 +347,12 @@ def main():
     weight_P = 1
     weight_H = 1
     weight_pos = 1
-    weight_ori = 57
+    weight_ori = 1
     # weight_ori = 1641
-    alpha=0.05
+    alpha=0.1
     lambda_H = 570
     lambda_P = 1
-    lambda_tool_p = 0.5
+    lambda_tool_p = 1
     lambda_tool_R = 57
     total_P1 = 2*jN1 # total number of P parameters to be estimated. robot 1
     total_H1 = 2*jN1 # total number of H parameters to be estimated. robot 1
@@ -440,7 +440,8 @@ def main():
         f = -G.T@error_pos_ori
         upper_bounds = np.hstack((param_ph1_upper, param_ph2_upper, param_t1_upper, param_t2_upper)) - np.hstack((param_ph1, param_ph2, param_t1_total, param_t2_total))
         lower_bounds = -np.hstack((param_ph1_upper, param_ph2_upper, param_t1_upper, param_t2_upper)) - np.hstack((param_ph1, param_ph2, param_t1_total, param_t2_total))
-        dparam = solve_qp(H, f, lb=lower_bounds, ub=upper_bounds, solver='quadprog')
+        # dparam = solve_qp(H, f, lb=lower_bounds, ub=upper_bounds, solver='quadprog')
+        dparam = solve_qp(H, f, solver='quadprog')
 
         # if iter_N > max_iteration/2:
         param_ph1 = param_ph1 - alpha*dparam[:total_P1+total_H1]
