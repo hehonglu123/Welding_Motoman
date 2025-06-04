@@ -74,8 +74,8 @@ def main():
             Transz0_H_even = np.loadtxt(logdata_dir+'Transz0_H_even.csv',delimiter=',')
             Transicp_H_odd2even = np.loadtxt(logdata_dir+'Trans_icp_odd2even.csv',delimiter=',')
             Transz0_H_odd = Transz0_H_odd @ Transicp_H_odd2even
-        # for weld_parts in ['base','layer']:
-        for weld_parts in ['layer']:
+        for weld_parts in ['base','layer']:
+        # for weld_parts in ['layer']:
             if weld_parts == 'base':
                 total_layers_name = glob.glob(logdata_dir+'baselayer*')
             else:
@@ -90,8 +90,8 @@ def main():
 
             # for layer_n in [layer_nums[-1],layer_nums[-2]]:
             for layer_n_id, layer_n in enumerate(layer_nums):
-                if layer_n_id<10:
-                    continue
+                # if layer_n_id<10:
+                #     continue
                 # read layer curve data
                 if weld_parts == 'base':
                     curve = np.loadtxt(data_dir+f'curve_sliced_relative/baselayer{layer_n}_0.csv',delimiter=',')
@@ -221,7 +221,7 @@ def main():
 
                         # add trace pixels and thermal readings
                         if ir_image[centroid] >= 1e4:
-                            print("Total pixels:", len(thermal_pixel_trace), "current id:", ir_id)
+                            # print("Total pixels:", len(thermal_pixel_trace), "current id:", ir_id)
                             # print("T_table_torch p", T_table_torch.p)
                             if len(thermal_pixel_trace) == 0 or np.abs(T_table_torch.p[0]-thermal_workpiece_x_trace[-1][0]) > 0.5: # 1 mm away from the previous traced pixel
                                 # if stamp - last_trace_stamp > 1:
@@ -271,51 +271,59 @@ def main():
                         # plt.pause(0.1)
                         # plt.clf()
                     
-                    print("Collected thermal pixel trace:", len(thermal_pixel_trace))
-                    thermal_trace_stamp_full = []
-                    thermal_workpiece_x_trace_full = []
-                    thermal_trace_full = []
-                    for (trace_st, trace_x, trace_t) in zip(thermal_trace_stamp, thermal_workpiece_x_trace, thermal_trace):
-                        if trace_x[0] <= -35 or trace_x[0] > 45:  # only plot traces with x > 10 mm
-                            continue
-
-                        trace_t_smooth = moving_average(trace_t,n=5,padding=True)
-                        len(trace_t_smooth) == len(trace_st) == len(trace_x), "Trace length mismatch"
-                        thermal_trace_stamp_full.extend(trace_st)
-                        thermal_workpiece_x_trace_full.extend(trace_x)
-                        # thermal_trace_full.extend(trace_t)
-                        thermal_trace_full.extend(trace_t_smooth)
-
-                        # if trace_x[0]>10:
-                        #     print(trace_t)
-                        #     print(trace_t_smooth)
-                        #     plt.plot(trace_st-ir_stamp[0], trace_t, '-o')
-                        #     plt.plot(trace_st-ir_stamp[0], trace_t_smooth, '-o')
-                        #     plt.title('Pixel Value vs Time at x='+str(trace_x[0]))
-                        #     plt.xlabel('Time (s)')
-                        #     plt.ylabel('Pixel Value (Counts)')
-                        #     plt.legend()
-                        #     plt.show()
-
-                    plot_skip = 2
-                    fig = plt.figure()
-                    ax = plt.axes(projection='3d')
-                    # surf = ax.plot_trisurf(ts_all, pixel_all, counts_all, linewidth=0, antialiased=False, label='-')
-                    surf = ax.plot_trisurf(thermal_trace_stamp_full[::plot_skip]-ir_stamp[0], thermal_workpiece_x_trace_full[::plot_skip], thermal_trace_full[::plot_skip], linewidth=0, antialiased=False, label='-')
+                    # print("Collected thermal pixel trace:", len(thermal_pixel_trace))
+                    # thermal_trace_stamp_full = []
+                    # thermal_workpiece_x_trace_full = []
+                    # thermal_trace_full = []
                     # for (trace_st, trace_x, trace_t) in zip(thermal_trace_stamp, thermal_workpiece_x_trace, thermal_trace):
-                    #     if len(trace_st) > 0:
-                    #         ax.plot(trace_st, trace_x, trace_t, linewidth=1, label='-')
-                    plt.title('Pixel Value vs Time')
-                    ax.set_xlabel('Time (s)')
-                    ax.set_ylabel('x pos (mm)')
-                    ax.set_zlabel('Pixel Value (Counts)')
-                    plt.show()
+                    #     if trace_x[0] <= -35 or trace_x[0] > 45:  # only plot traces with x > 10 mm
+                    #         continue
+
+                    #     trace_t_smooth = moving_average(trace_t,n=5,padding=True)
+                    #     len(trace_t_smooth) == len(trace_st) == len(trace_x), "Trace length mismatch"
+                    #     thermal_trace_stamp_full.extend(trace_st)
+                    #     thermal_workpiece_x_trace_full.extend(trace_x)
+                    #     # thermal_trace_full.extend(trace_t)
+                    #     thermal_trace_full.extend(trace_t_smooth)
+
+                    #     # if trace_x[0]>10:
+                    #     #     print(trace_t)
+                    #     #     print(trace_t_smooth)
+                    #     #     plt.plot(trace_st-ir_stamp[0], trace_t, '-o')
+                    #     #     plt.plot(trace_st-ir_stamp[0], trace_t_smooth, '-o')
+                    #     #     plt.title('Pixel Value vs Time at x='+str(trace_x[0]))
+                    #     #     plt.xlabel('Time (s)')
+                    #     #     plt.ylabel('Pixel Value (Counts)')
+                    #     #     plt.legend()
+                    #     #     plt.show()
+
+                    # plot_skip = 2
+                    # fig = plt.figure()
+                    # ax = plt.axes(projection='3d')
+                    # # surf = ax.plot_trisurf(ts_all, pixel_all, counts_all, linewidth=0, antialiased=False, label='-')
+                    # surf = ax.plot_trisurf(thermal_trace_stamp_full[::plot_skip]-ir_stamp[0], thermal_workpiece_x_trace_full[::plot_skip], thermal_trace_full[::plot_skip], linewidth=0, antialiased=False, label='-')
+                    # # for (trace_st, trace_x, trace_t) in zip(thermal_trace_stamp, thermal_workpiece_x_trace, thermal_trace):
+                    # #     if len(trace_st) > 0:
+                    # #         ax.plot(trace_st, trace_x, trace_t, linewidth=1, label='-')
+                    # plt.title('Pixel Value vs Time')
+                    # ax.set_xlabel('Time (s)')
+                    # ax.set_ylabel('x pos (mm)')
+                    # ax.set_zlabel('Pixel Value (Counts)')
+                    # plt.show()
 
                     # save thermal readings
                     thermal_reading = np.vstack((thermal_stamp,thermal_reading)).T
-                    # np.savetxt(this_layer_dir+'thermal.csv',thermal_reading,delimiter=',')
+                    np.savetxt(this_layer_dir+'thermal.csv',thermal_reading,delimiter=',')
 
-                exit()
+                    # save thermal pixel trace
+                    trace_dict = {}
+                    for (trace_st, trace_x, trace_t) in zip(thermal_trace_stamp, thermal_workpiece_x_trace, thermal_trace):
+                        trace_dict[trace_x[0]] = {
+                            'time': trace_st,
+                            'value': trace_t
+                        }
+                    with open(this_layer_dir+'thermal_pixel_trace.pickle', 'wb') as f:
+                        pickle.dump(trace_dict, f)
 
                 ################ get speed ##############
                 print("Getting speed...")
@@ -544,8 +552,7 @@ def main():
                 last_profile_height = profile_height
 
                 print("Finished processing layer:",layer_name)
-
-    
+                print("=====================================")
 
         # fig, ax = plt.subplots()
         # ax.set_title('Profile height')
