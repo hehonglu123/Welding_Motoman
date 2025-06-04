@@ -4,6 +4,7 @@ from copy import deepcopy
 import numpy as np
 from matplotlib import pyplot as plt
 import open3d as o3d
+import cv2 as cv
 from motoman_def import *
 from robotics_utils import *
 from flir_toolbox import *
@@ -14,6 +15,11 @@ from scan_utils import *
 from scanProcess import *
 from animation_3d import *
 
+# feat_detector = cv.ORB_create()
+feat_detector = cv.SIFT_create()
+# bf_matcher = cv.BFMatcher(cv.NORM_HAMMING, crossCheck=True)
+bf_matcher = cv.BFMatcher(cv.NORM_L2, crossCheck=True)
+
 def main():
 
     ############## Robot definition ##############
@@ -23,6 +29,8 @@ def main():
         base_marker_config_file=config_dir+'MA2010_marker_config/MA2010_marker_config.yaml',tool_marker_config_file=config_dir+'weldgun_marker_config/weldgun_marker_config.yaml')
     robot_scan=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path=config_dir+'fujicam.csv',\
         pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv')
+    robot_thermal=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.yml',tool_file_path=config_dir+'flir.csv',\
+	                        pulse2deg_file_path=config_dir+'MA1440_A0_pulse2deg_real.csv',base_transformation_file=config_dir+'MA1440_pose.csv')
     positioner=positioner_obj('D500B',def_path=config_dir+'D500B_robot_extended_config.yml',tool_file_path=config_dir+'positioner_tcp.csv',\
 		pulse2deg_file_path=config_dir+'D500B_pulse2deg_real.csv',base_transformation_file=config_dir+'D500B_pose.csv')
 
@@ -102,6 +110,7 @@ def main():
                 next_layer_dir = logdata_dir+next_layer_name+'/'
                 rob_js_exe = np.loadtxt(this_layer_dir+'weld_js_exe.csv',delimiter=',')
                 # get js at index 1~6 and 13 14
+                rob2_js_exe = rob_js_exe[:,7:13]
                 rob_js_exe = rob_js_exe[:,[0,1,2,3,4,5,6,13,14]]
                 robot_stamps = rob_js_exe[:,0]
                 with open(this_layer_dir+'scan_exe.pickle', 'rb') as f:
@@ -139,42 +148,201 @@ def main():
                     flame_centroid_history=[]
                     thermal_reading = []
                     thermal_stamp = []
+
+                    thermal_pixel_trace = np.array([])
+                    thermal_workpiece_x_trace = []
+                    thermal_trace = []
+                    thermal_trace_stamp = []
+                    last_trace_stamp = 0
+                    des_pre = None
+                    last_T_thermal_cam = None
                     for (ir_image_raw,stamp) in zip(ir_exe,ir_stamp):
                         ir_image = np.rot90(ir_image_raw, k=-1)
+                        img_height, img_width = ir_image.shape
+
+                        # robot movement
+                        # find thermal camera pose
+                        closest_idx = np.argmin(np.abs(robot_stamps - stamp))
+                        T_table = positioner.fwd(rob_js_exe[closest_idx,-2:], world=True)
+                        T_thermal_cam = robot_thermal.fwd(rob2_js_exe[closest_idx,:6], world=True)
+                        T_table_thermal = T_table.inv() * T_thermal_cam
+                        T_torch = robot_weld.fwd(rob_js_exe[closest_idx,1:7], world=True)
+                        T_table_torch = T_table.inv() * T_torch
+                        if last_T_thermal_cam is not None:
+                            # Compute the relative transformation
+                            T_rel = last_T_thermal_cam.inv() * T_table_thermal
+                            # Extract the translation vector
+                            rob_translation = T_rel.p
+                            # print(f"Robot moved: {rob_translation}")
+
+                            ##### pixel tracing moving #####
+                            cam_pixel_moving_ratio = 1.77
+                            moving_dx = rob_translation[1] * cam_pixel_moving_ratio
+                            moving_dy = rob_translation[0] * cam_pixel_moving_ratio
+                        last_T_thermal_cam = T_table_thermal
+
                         # centroid, bbox, torch_centroid, torch_bbox=weld_detection_aluminum(ir_image,torch_model,percentage_threshold=0.8)
                         # centroid, bbox, torch_centroid, torch_bbox=weld_detection_steel(ir_image,torch_model,tip_wire_model)
                         # find max pixel value in ir_image
                         centroid = np.unravel_index(np.argmax(ir_image, axis=None), ir_image.shape)
-                        if ir_image[centroid] < 1e4:
+                        if centroid is None:
+                            # print(f"No flame detected in image at {stamp}")
                             continue
-                        # draw bbox and centroid on ir_image
-                        if centroid is not None:
-                            ###weighted history filter
-                            if len(flame_centroid_history) > 30:
-                                flame_centroid_history.pop(0)
-                                # Calculate the weight for the previous history values
-                                previous_weight = 0.8 / len(flame_centroid_history)
-                                centroid = 0.2 * centroid + np.sum(np.array(flame_centroid_history) * previous_weight, axis=0)
-                                flame_centroid_history.append(centroid)
 
-                            #find average pixel value 
-                            pixel_coord = (int(centroid[0]) + vertical_offset, int(centroid[1]) + horizontal_offset)
-                            pixel_coord = pixel_coord[::-1]
-                            flame_reading=get_pixel_value(ir_image,pixel_coord,ir_pixel_window_size)
-                            thermal_reading.append(flame_reading)
-                            thermal_stamp.append(stamp)
-                            # print(flame_reading, centroid)
-                            # show image
-                        plt.imshow(np.clip(ir_image,1000,9200), cmap='inferno', aspect='auto')
-                        # plt.imshow(ir_image, cmap='inferno', aspect='auto')
-                        # plt.scatter(pixel_coord[0], pixel_coord[1], c='r', s=10)
-                        # plt.scatter(centroid[1], centroid[0], c='g', s=10)
-                        plt.colorbar(format='%.2f')
-                        plt.pause(0.1)
-                        plt.clf()
+                        # if ir_image[centroid] < 1e4:
+                        #     continue
+                        # draw bbox and centroid on ir_image
+
+                        #find average pixel value 
+                        pixel_coord = (int(centroid[0]) + vertical_offset, int(centroid[1]) + horizontal_offset)
+                        pixel_coord = pixel_coord[::-1]
+                        flame_reading=get_pixel_value(ir_image,pixel_coord,ir_pixel_window_size)
+                        thermal_reading.append(flame_reading)
+                        thermal_stamp.append(stamp)
+                        # print(flame_reading, centroid)
+                        # show image
+                        
+                        # normalize ir_image to 0~255
+                        # ir_image_norm = cv.normalize(ir_image, None, 0, 255, cv.NORM_MINMAX)
+                        ir_image_norm = cv.normalize(np.clip(ir_image,7000,9000), None, 0, 255, cv.NORM_MINMAX)
+                        ir_image_norm = ir_image_norm.astype(np.uint8)
+                        # kp = feat_detector.detect(ir_image_norm, None)
+                        # kp, des = feat_detector.compute(ir_image_norm, kp)
+                        img_edges = cv.Canny(ir_image_norm, 100, 200)
+
+                        kp, des = feat_detector.detectAndCompute(ir_image_norm, None)
+                        # kp, des = feat_detector.detectAndCompute(ir_image_norm, mask=img_edges)
+                        # draw keypoints on ir_image
+                        ir_image_norm = cv.drawKeypoints(ir_image_norm, kp, None, color=(0, 255, 0), flags=cv.DRAW_MATCHES_FLAGS_DEFAULT)
+
+                        reject_xmin = 70
+                        reject_xmax = 115
+                        reject_ymin = [0,283]
+                        reject_ymax = [177,293]
+                        if des_pre is not None:
+                            matches = bf_matcher.match(des_pre, des)
+                            matches = sorted(matches, key=lambda x: x.distance)
+
+                            # Compute pixel displacements
+                            displacements = []
+                            count_pts = 0
+                            for m in matches:
+                                pt1 = kp_pre[m.queryIdx].pt  # (x1, y1)
+                                pt2 = kp[m.trainIdx].pt  # (x2, y2)
+                                # if pt2 in the box, then continue
+                                if (reject_xmin < pt2[0] < reject_xmax) and \
+                                    ((reject_ymin[0] < pt2[1] < reject_ymax[0]) or \
+                                        (reject_ymin[1] < pt2[1] < reject_ymax[1])):
+                                    # print(f"Rejecting point {pt2} in the box")
+                                    continue
+                                dx = pt2[0] - pt1[0]
+                                dy = pt2[1] - pt1[1]
+                                displacements.append((dx, dy))
+                                count_pts += 1
+                            # print(f"Number of matched points: {count_pts}")
+                            displacements = np.array(displacements)
+                            # Filter out outliers (optional): e.g. using magnitude or IQR
+                            magnitudes = np.linalg.norm(displacements, axis=1)
+                            threshold = np.percentile(magnitudes, 90)
+                            filtered_disp = displacements[magnitudes < threshold]
+                            # Estimate mean motion
+                            mean_dx, mean_dy = np.mean(filtered_disp, axis=0)
+                            mean_magnitude = np.linalg.norm([mean_dx, mean_dy])
+                            # print(f"Mean pixel movement: dx={mean_dx:.2f}, dy={mean_dy:.2f}, total={mean_magnitude:.2f} pixels")                        
+                        
+                            # draw matches on ir_image
+                            matches_image = cv.drawMatches(ir_image_norm_pre, kp_pre, ir_image_norm, kp, matches, None, flags=cv.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
+                            # plt.imshow(matches_image)
+                            # plt.imshow(ir_image_norm)
+                            # plt.show()
+
+                            # move tracing pixel and add thermal reading
+                            if len(thermal_pixel_trace) > 0:
+                                thermal_pixel_trace = thermal_pixel_trace + np.array([moving_dx, moving_dy])
+                                # add the thermal status to the traced pixel trace
+                                if stamp - last_trace_stamp > 0.1: # if more than dt second has passed since the last trace
+                                    for trace_coord_id, trace_coord in enumerate(thermal_pixel_trace):
+                                        # if pixel within the image
+                                        trace_coord_round = np.round(trace_coord).astype(int)
+                                        if 0 <= trace_coord_round[0] < img_width and 0 <= trace_coord_round[1] < img_height:
+                                            # update the thermal status
+                                            thermal_trace[trace_coord_id].append(get_pixel_value(ir_image, trace_coord_round, ir_pixel_window_size))
+                                            thermal_trace_stamp[trace_coord_id].append(stamp)
+                                            thermal_workpiece_x_trace[trace_coord_id].append(thermal_workpiece_x_trace[trace_coord_id][0])
+                                    last_trace_stamp = stamp        
+
+                            # trace pixels and thermal readings
+                            if ir_image[centroid] >= 1e4:
+                                if len(thermal_pixel_trace) == 0 or np.abs(T_table_torch.p[0]-thermal_workpiece_x_trace[-1][0]) > 1: # 1 mm away from the previous traced pixel
+                                    # if stamp - last_trace_stamp > 1:
+                                    # add pixel to the traced pixel trace
+                                    try:
+                                        thermal_pixel_trace = np.vstack((thermal_pixel_trace, pixel_coord))
+                                    except ValueError:
+                                        thermal_pixel_trace = np.array([pixel_coord])
+                                    # add the thermal status to the traced pixel trace
+                                    thermal_trace.append([flame_reading])
+                                    # add the thermal timestamp
+                                    thermal_trace_stamp.append([stamp])
+                                    # add the current torch x
+                                    thermal_workpiece_x_trace.append([T_table_torch.p[0]])
+                                    assert len(thermal_pixel_trace) == len(thermal_trace), "Thermal pixel trace and thermal trace length mismatch"
+                                    # last_trace_stamp = stamp
+                            
+                            # if stamp - last_trace_stamp > 1:
+                            #     print("Collcted thermal pixel trace:", len(thermal_pixel_trace))
+                            #     last_trace_stamp = stamp
+
+                            # plt.imshow(np.clip(ir_image,7000,9200), cmap='inferno', aspect='auto')
+                            # # plt.imshow(ir_image, cmap='inferno', aspect='auto')
+                            # # plt.scatter(pixel_coord[0], pixel_coord[1], c='r', s=10)
+                            # # plt.scatter(centroid[1], centroid[0], c='g', s=10)
+
+                            # plot tracing pixel
+                            
+                            # print(f"Image size: {img_width}x{img_height}")
+                            # cmap_trace = plt.get_cmap('tab10')
+                            # for trace_id, trace in enumerate(thermal_pixel_trace):
+                            #     # if pixel within the image
+                            #     if 0 <= trace[0] < img_width-1 and 0 <= trace[1] < img_height-1:
+                            #         plt.scatter(trace[0], trace[1], c=cmap_trace(trace_id % 10), s=20)
+
+                            # plt.colorbar(format='%.2f')
+                            # plt.show()
+                            # plt.pause(0.1)
+                            # # input("")
+                            # plt.clf()
+
+                        des_pre = deepcopy(des)
+                        kp_pre = kp
+                        ir_image_norm_pre = deepcopy(ir_image_norm)
+                        last_T_thermal_cam = deepcopy(T_table_thermal)
+
+                    thermal_trace_stamp_full = []
+                    thermal_workpiece_x_trace_full = []
+                    thermal_trace_full = []
+                    for (trace_st, trace_x, trace_t) in zip(thermal_trace_stamp, thermal_workpiece_x_trace, thermal_trace):
+                        thermal_trace_stamp_full.extend(np.append(trace_st,np.arange(30)*0.1+trace_st[-1]))
+                        thermal_workpiece_x_trace_full.extend(np.append(trace_x,np.ones(30)*trace_x[-1]))
+                        thermal_trace_full.extend(np.append(trace_t,np.ones(30)*trace_t[-1]))
+
+                    fig = plt.figure()
+                    ax = plt.axes(projection='3d')
+                    # surf = ax.plot_trisurf(ts_all, pixel_all, counts_all, linewidth=0, antialiased=False, label='-')
+                    surf = ax.plot_trisurf(thermal_trace_stamp_full, thermal_workpiece_x_trace_full, thermal_trace_full, linewidth=0, antialiased=False, label='-')
+                    # for (trace_st, trace_x, trace_t) in zip(thermal_trace_stamp, thermal_workpiece_x_trace, thermal_trace):
+                    #     if len(trace_st) > 0:
+                    #         ax.plot(trace_st, trace_x, trace_t, linewidth=1, label='-')
+
+                    plt.title('Pixel Value vs Time')
+                    ax.set_xlabel('Time (s)')
+                    ax.set_ylabel('x pos (mm)')
+                    ax.set_zlabel('Pixel Value (Counts)')
+                    plt.show()
+
                     # save thermal readings
                     thermal_reading = np.vstack((thermal_stamp,thermal_reading)).T
-                    np.savetxt(this_layer_dir+'thermal.csv',thermal_reading,delimiter=',')
+                    # np.savetxt(this_layer_dir+'thermal.csv',thermal_reading,delimiter=',')
 
                 exit()
 
