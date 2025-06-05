@@ -40,8 +40,8 @@ def main():
     data_dir = '../../data/wall_weld_test/'
 
     # logdata_dir_all = ['weld_fujiscan_2025_02_26_18_08_18/', 'weld_fujiscan_2025_02_26_16_24_21/', 'weld_fujiscan_2025_02_26_17_39_17/']
-    # logdata_dir_all = ['weld_fujiscan_2025_02_26_16_24_21/', 'weld_fujiscan_2025_02_26_18_08_18/', 'weld_fujiscan_2025_02_26_17_39_17/']
-    logdata_dir_all = ['weld_fujiscan_2025_02_26_18_08_18/', 'weld_fujiscan_2025_02_26_16_24_21/']
+    logdata_dir_all = ['weld_fujiscan_2025_02_26_16_24_21/', 'weld_fujiscan_2025_02_26_18_08_18/', 'weld_fujiscan_2025_02_26_17_39_17/']
+    # logdata_dir_all = ['weld_fujiscan_2025_02_26_18_08_18/', 'weld_fujiscan_2025_02_26_16_24_21/']
     # logdata_dir_all = ['weld_fujicontrol_2025_03_12_18_27_33/']
     # logdata_dir_all = ['weld_fujiscan_2025_02_26_18_08_18/']
     # logdata_dir_all = ['weld_fujiscan_2025_02_26_18_08_18/', 'weld_fujiscan_2025_02_26_16_24_21/', 'weld_fujicontrol_2025_03_12_18_27_33/']
@@ -74,8 +74,8 @@ def main():
             Transz0_H_even = np.loadtxt(logdata_dir+'Transz0_H_even.csv',delimiter=',')
             Transicp_H_odd2even = np.loadtxt(logdata_dir+'Trans_icp_odd2even.csv',delimiter=',')
             Transz0_H_odd = Transz0_H_odd @ Transicp_H_odd2even
-        for weld_parts in ['base','layer']:
-        # for weld_parts in ['layer']:
+        # for weld_parts in ['base','layer']:
+        for weld_parts in ['layer']:
             if weld_parts == 'base':
                 total_layers_name = glob.glob(logdata_dir+'baselayer*')
             else:
@@ -90,8 +90,8 @@ def main():
 
             # for layer_n in [layer_nums[-1],layer_nums[-2]]:
             for layer_n_id, layer_n in enumerate(layer_nums):
-                # if layer_n_id<10:
-                #     continue
+                if layer_n_id<10:
+                    continue
                 # read layer curve data
                 if weld_parts == 'base':
                     curve = np.loadtxt(data_dir+f'curve_sliced_relative/baselayer{layer_n}_0.csv',delimiter=',')
@@ -271,31 +271,31 @@ def main():
                         # plt.pause(0.1)
                         # plt.clf()
                     
-                    # print("Collected thermal pixel trace:", len(thermal_pixel_trace))
-                    # thermal_trace_stamp_full = []
-                    # thermal_workpiece_x_trace_full = []
-                    # thermal_trace_full = []
-                    # for (trace_st, trace_x, trace_t) in zip(thermal_trace_stamp, thermal_workpiece_x_trace, thermal_trace):
-                    #     if trace_x[0] <= -35 or trace_x[0] > 45:  # only plot traces with x > 10 mm
-                    #         continue
+                    print("Collected thermal pixel trace:", len(thermal_pixel_trace))
+                    thermal_trace_stamp_full = []
+                    thermal_workpiece_x_trace_full = []
+                    thermal_trace_full = []
+                    for (trace_st, trace_x, trace_t) in zip(thermal_trace_stamp, thermal_workpiece_x_trace, thermal_trace):
+                        if trace_x[0] <= -35 or trace_x[0] > 45:  # only plot traces with x > 10 mm
+                            continue
 
-                    #     trace_t_smooth = moving_average(trace_t,n=5,padding=True)
-                    #     len(trace_t_smooth) == len(trace_st) == len(trace_x), "Trace length mismatch"
-                    #     thermal_trace_stamp_full.extend(trace_st)
-                    #     thermal_workpiece_x_trace_full.extend(trace_x)
-                    #     # thermal_trace_full.extend(trace_t)
-                    #     thermal_trace_full.extend(trace_t_smooth)
+                        trace_t_smooth = moving_average(trace_t,n=5,padding=True)
+                        len(trace_t_smooth) == len(trace_st) == len(trace_x), "Trace length mismatch"
+                        thermal_trace_stamp_full.extend(trace_st)
+                        thermal_workpiece_x_trace_full.extend(trace_x)
+                        # thermal_trace_full.extend(trace_t)
+                        thermal_trace_full.extend(trace_t_smooth)
 
-                    #     # if trace_x[0]>10:
-                    #     #     print(trace_t)
-                    #     #     print(trace_t_smooth)
-                    #     #     plt.plot(trace_st-ir_stamp[0], trace_t, '-o')
-                    #     #     plt.plot(trace_st-ir_stamp[0], trace_t_smooth, '-o')
-                    #     #     plt.title('Pixel Value vs Time at x='+str(trace_x[0]))
-                    #     #     plt.xlabel('Time (s)')
-                    #     #     plt.ylabel('Pixel Value (Counts)')
-                    #     #     plt.legend()
-                    #     #     plt.show()
+                        if trace_x[0]>0:
+                            # plt.plot(trace_st-ir_stamp[0], trace_t, '-o')
+                            plt.plot(trace_st-ir_stamp[0], trace_t_smooth, '-o')
+                            plt.title('Pixel Value vs Time at x='+str(round(trace_x[0],1))+' mm', fontsize=24)
+                            plt.xlabel('Time (s)', fontsize=18)
+                            plt.ylabel('Pixel Value (Counts)', fontsize=18)
+                            plt.xticks(fontsize=16)
+                            plt.yticks(fontsize=16)
+                            plt.legend()
+                            plt.show()
 
                     # plot_skip = 2
                     # fig = plt.figure()
@@ -313,7 +313,7 @@ def main():
 
                     # save thermal readings
                     thermal_reading = np.vstack((thermal_stamp,thermal_reading)).T
-                    np.savetxt(this_layer_dir+'thermal.csv',thermal_reading,delimiter=',')
+                    # np.savetxt(this_layer_dir+'thermal.csv',thermal_reading,delimiter=',')
 
                     # save thermal pixel trace
                     trace_dict = {}
@@ -322,9 +322,10 @@ def main():
                             'time': trace_st,
                             'value': trace_t
                         }
-                    with open(this_layer_dir+'thermal_pixel_trace.pickle', 'wb') as f:
-                        pickle.dump(trace_dict, f)
+                    # with open(this_layer_dir+'thermal_pixel_trace.pickle', 'wb') as f:
+                    #     pickle.dump(trace_dict, f)
 
+                exit()
                 ################ get speed ##############
                 print("Getting speed...")
                 try:

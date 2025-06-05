@@ -1,5 +1,7 @@
 import numpy as np
 
+polyfit_coefficients_temp = np.load('../../FLIR/calibration/ER4043_IR_calibration.npy')  # Example coefficients
+
 def celcius_to_clicks(temperature, R=21106.77, B=1501.0, F=1.0, O=0.0):
     """
     Convert temperature in Celsius to FLIR raw signal (clicks).
@@ -30,6 +32,30 @@ def raw_to_temperature_with_emissivity(raw, R=21106.77, B=1501.0, F=1.0, O=0.0,
 
     return T_corrected - 273.15  # Convert K → °C
 
+def calibration_with_ml(raw):
+    """
+    Convert raw FLIR data to temperature using a polynomial fit.
+    raw: Raw thermal reading from FLIR (clicks)
+    """
+    return np.poly1d(polyfit_coefficients_temp)(raw)
 
-print(celcius_to_clicks(25))  # Example conversion from 25°C to clicks
-print(raw_to_temperature_with_emissivity(10000, emissivity=0.5))
+
+if __name__ == "__main__":
+    # Example usage
+    # print(celcius_to_clicks(25))  # Convert 25°C to clicks
+    # print(raw_to_temperature_with_emissivity(10000, emissivity=0.5))  # Example conversion with emissivity
+    # # Load coefficients from a file and use them for calibration
+    
+    # print(calibration_with_ml(np.arange(8800,20000,1000)))  # Example conversion using ML calibration
+
+    # tick_test = np.arange(8800, 17000, 10)
+    tick_test = np.array([16109.148, 16109.148 ,15692.236, 15692.238, 14837.291, 15405.782, 15405.782, 15995.254, 14923.462, 16032.09 ])
+    draw_relation = calibration_with_ml(tick_test)
+    print(tick_test[np.argmax(draw_relation)], draw_relation[np.argmax(draw_relation)])
+    from matplotlib import pyplot as plt
+    plt.plot(tick_test, draw_relation)
+    plt.xlabel('Raw Signal (Clicks)')
+    plt.ylabel('Temperature (°C)')
+    plt.title('Calibration Curve')
+    plt.grid()
+    plt.show()

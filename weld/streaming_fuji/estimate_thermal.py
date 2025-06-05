@@ -9,7 +9,20 @@ import torch.nn as nn
 import sys, datetime, yaml, pathlib, glob
 sys.path.append('../')
 sys.path.append('../../mocap/')
+sys.path.append('../../FLIR/calibration/')
 from Models import *
+
+polyfit_coefficients_temp = np.load('../../FLIR/calibration/ER4043_IR_calibration.npy')  # Example coefficients
+def calibration_with_ml(raw):
+    """
+    Convert raw FLIR data to temperature using a polynomial fit.
+    raw: Raw thermal reading from FLIR (clicks)
+    """
+    
+    return np.poly1d(polyfit_coefficients_temp)(raw)
+
+# plt.plot(np.arange(8800, 16250, 1), calibration_with_ml(np.arange(8800, 16250, 1)))
+# plt.show()
 
 # set random seed for reproducibility
 np.random.seed(0)
@@ -20,13 +33,18 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 def train_model(data, train_index, test_index, obs_delay_t, memory_t, sample_rate, epochs=1000, min_max_dict=None):
     
-    train_flag = True
+    train_flag = False
     model_dir = 'weld_thermal_models/'
-    # add timestamp to the model_dir
-    now = datetime.datetime.now()
-    timestamp = now.strftime("%Y%m%d_%H%M%S")
-    model_dir = model_dir + "model_"+ timestamp + '/'
-    pathlib.Path(model_dir).mkdir(parents=True, exist_ok=True)
+
+    if train_flag:
+        # add timestamp to the model_dir
+        now = datetime.datetime.now()
+        timestamp = now.strftime("%Y%m%d_%H%M%S")
+        model_dir = model_dir + "model_"+ timestamp + '/'
+        pathlib.Path(model_dir).mkdir(parents=True, exist_ok=True)
+    else:
+        model_dir = model_dir+ 'model_20250513_153408/' + 'best_validation_model.pt'
+
 
     control_input_size = 2 # cmd_v and cmd_feedrate
     observation_size = 0 # width, (height)
@@ -196,9 +214,9 @@ def train_model(data, train_index, test_index, obs_delay_t, memory_t, sample_rat
     plt.grid()
     plt.show()
 
+    # click error distribution
     data_error_all = data_output_all - data_labels_all
     data_error_all = np.abs(data_error_all)
-
     data_lam_hat = 1/np.mean(data_error_all)
     data_exp_dist = stats.expon(scale=1/data_lam_hat)
     print("Mean error:", np.mean(data_error_all))
@@ -210,6 +228,45 @@ def train_model(data, train_index, test_index, obs_delay_t, memory_t, sample_rat
     plt.xlabel('Error')
     plt.ylabel('Frequency')
     plt.title('Error Distribution')
+    plt.legend()
+    plt.grid()
+    plt.show()
+
+    # temperature error distribution
+    data_output_all_clip = data_output_all[data_labels_all<16250]
+    data_labels_all_clip = data_labels_all[data_labels_all<16250]
+    data_labels_all_clip = data_labels_all_clip[data_output_all_clip<16250]
+    data_output_all_clip = data_output_all_clip[data_output_all_clip<16250]
+
+    print(np.round(data_labels_all_clip[-10:]))
+    print(calibration_with_ml(np.round(data_labels_all_clip[-10:]).astype(int)))
+
+
+    data_output_all_temp = calibration_with_ml(data_output_all_clip.astype(int))
+    data_labels_all_temp = calibration_with_ml(data_labels_all_clip.astype(int))
+
+    plt.plot(data_output_all_temp, label='Prediction (Clipped)')
+    plt.plot(data_labels_all_temp, label='Ground Truth (Clipped)')
+    plt.xlabel('Sample')
+    plt.ylabel('Thermal Data (Clipped)')
+    plt.title('Clipped Thermal Data Prediction')
+    plt.legend()
+    plt.grid()
+    plt.show()
+
+    data_error_all_temp = data_output_all_temp - data_labels_all_temp
+    data_error_all_temp = np.abs(data_error_all_temp)
+    data_lam_hat_temp = 1/np.mean(data_error_all_temp)
+    data_exp_dist_temp = stats.expon(scale=1/data_lam_hat_temp)
+    print("Mean temperature error:", np.mean(data_error_all_temp))
+    print("Standard deviation of temperature error:", np.std(data_error_all_temp))
+    print("95% confidence interval:", data_exp_dist_temp.interval(0.95))
+
+    plt.hist(data_error_all_temp, density=True, bins=100)
+    plt.plot(np.linspace(0, np.max(data_error_all_temp), 100),data_exp_dist_temp.pdf(np.linspace(0, np.max(data_error_all_temp), 100)), label='Exponential Distribution', color='red')
+    plt.xlabel('Temperature Error (C)')
+    plt.ylabel('Frequency')
+    plt.title('Temperature Error Distribution')
     plt.legend()
     plt.grid()
     plt.show()

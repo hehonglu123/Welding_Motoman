@@ -429,3 +429,5 @@ mocap/param_ph1_gt.csv
 mocap/param_ph2_gt.csv
 mocap/param_t1_gt.csv
 mocap/param_t2_gt.csv
+
+FLIR/calibration/IR_calibration/*

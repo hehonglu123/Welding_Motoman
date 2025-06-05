@@ -4,8 +4,8 @@ import matplotlib.pyplot as plt
 from thermal_couple_conversion import voltage_to_temperature
 
 room_temp=23
-ir_images=np.load('../../../recorded_data/IR_calibration/ir_images.npy')
-temperature_reading=np.loadtxt('../../../recorded_data/IR_calibration/temperature_reading.csv',delimiter=',')
+ir_images=np.load('IR_calibration/ir_images.npy')
+temperature_reading=np.loadtxt('IR_calibration/temperature_reading.csv',delimiter=',')
 start_idx=130   #index of thermal couple heated up to peak
 
 temperature_bias=room_temp-voltage_to_temperature(np.average(temperature_reading[:10,1]))
