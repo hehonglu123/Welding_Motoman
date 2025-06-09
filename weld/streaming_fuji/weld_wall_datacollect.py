@@ -28,7 +28,7 @@ def welder_handler(exp):
 		print ("An error occured! " + str(exp))
 		return
 
-def welding_profile_generate(lam_split, VPD, cross_section, layer_n, v_min, v_max):
+def welding_profile_generate_random(lam_split, VPD, cross_section, layer_n, v_min, v_max):
     
     split_sections = len(lam_split)
 
@@ -46,6 +46,19 @@ def welding_profile_generate(lam_split, VPD, cross_section, layer_n, v_min, v_ma
     # VPD = cross_section*inch2mm*layer_feedrate/layer_nom_vel # volume per distance (mm^3/mm)
     feedrate_profile = VPD*vel_profile*mm2inch/cross_section
 
+    return vel_profile, feedrate_profile
+
+def welding_profile_generate_smooth(feedrate_nom, VPD, cross_section, lam_max):
+    
+    feedrate_nom = int(round(feedrate_nom/10)*10) # round to 10, make sure it is a multiple of 10
+    feedrate_min = feedrate_nom-5
+    feedrate_max = feedrate_nom+5
+    vel_nom = cross_section*inch2mm*feedrate_nom/VPD # get nominal velocity
+    vel_min = cross_section*inch2mm*feedrate_min/VPD
+    vel_max = cross_section*inch2mm*feedrate_max/VPD
+
+    vel_profile = np.linspace(vel_min, vel_max, np.round(lam_max/vel_nom).astype(int)) # velocity profile around nominal velocity
+    feedrate_profile = [feedrate_nom]*len(vel_profile) # feedrate profile is constant
     return vel_profile, feedrate_profile
 
 def main():
@@ -102,6 +115,7 @@ def main():
         fronius_client.prepare_welder()
     if welder_log and not weld_arcon:
         fronius_sub=RRN.SubscribeService('rr+tcp://192.168.55.21:60823?service=welder')
+        current_ser=RRN.SubscribeService('rr+tcp://192.168.55.21:12182?service=Current')
     
     ######################################### RR Fujicam ########################################################
     if fuji_scanon:
@@ -120,7 +134,7 @@ def main():
         flir_url = 'rr+tcp://192.168.55.10:60827/?service=camera'
         cam_ser=RRN.ConnectService(flir_url)
         if weld_arcon or welder_log:
-            rr_sensors = WeldRRSensor(weld_service=fronius_sub,cam_service=cam_ser)
+            rr_sensors = WeldRRSensor(weld_service=fronius_sub,cam_service=cam_ser,current_service=current_ser)
         else:
             rr_sensors = WeldRRSensor(cam_service=cam_ser)
         # print("Test 3 Sec.")
@@ -142,17 +156,46 @@ def main():
     path_dl = meta_data['path_dl']
     dist_weld_scan_index = np.round(dist_weld_scan/path_dl).astype(int)
 
+    #### welding parameters #####
     feedrate_update_rate=1.	#Hz
-    job_offset=200
-    # baselayer welding parameters
-    base_feedrate = 250 
-    base_nom_incre = 1
-    base_nom_vel = 5
-    # layer welding parameters
-    layer_feedrate = 100 # inch/min
-    layer_nom_height = 3 # mm
-    layer_nom_vel = 4 # mm/s
-    layer_nom_incre = int(layer_nom_height/layer_resolution)
+
+    material_name = 'ER4043'
+    material_name = 'ER316L'
+
+    if material_name == 'ER4043':
+        job_offset=200
+        # feedrate min max (based on material ER4043)
+        feedrate_min = 100 # inch/min
+        feedrate_max = 200 # inch/min
+        # baselayer welding parameters
+        base_feedrate = 250 
+        base_nom_incre = 1
+        base_nom_vel = 5
+        # layer welding parameters
+        layer_feedrate = 100 # inch/min
+        layer_nom_height = 3 # mm
+        layer_nom_vel = 4 # mm/s
+        layer_nom_incre = int(layer_nom_height/layer_resolution)
+        # wire cross section
+        cross_section = 1.2 # mm^2
+    elif material_name == 'ER316L':
+        job_offset=450
+        # feedrate min max (based on material ER316L)
+        feedrate_min = 50 # inch/min
+        feedrate_max = 200 # inch/min
+        # baselayer welding parameters
+        base_feedrate = 250 
+        base_nom_incre = 1
+        base_nom_vel = 5
+        # layer welding parameters
+        layer_feedrate = 100
+        layer_nom_height = 3 # mm
+        layer_nom_vel = 10 # mm/s
+        layer_nom_incre = int(layer_nom_height/layer_resolution)
+        # wire cross section
+        cross_section = 1.2 # mm^2
+    
+    ##### motion parameters #####
     # weld starting point sleep
     weld_start_sleep = 0.2
     # scanning parameters
@@ -163,15 +206,15 @@ def main():
     torch_ori_fix = False # torch orientation fixed
     
     # data collection parameters
-    cross_section = 1.2 # mm^2
     VPD = cross_section*inch2mm*layer_feedrate/layer_nom_vel # volume per distance (mm^3/mm)
-    split_sections = 6
-    lam_split = np.linspace(0,meta_data['layer_length'],split_sections+1)[:-1]
-    lam_split = lam_split.tolist()
-    feedrate_min = 100
-    feedrate_max = 220
+    random_velocity = True # random velocity profile
+    if not random_velocity:
+        # feedrate at all layers
+        feedrate_layers = np.arange(50,201,10).astype(int) # inch/min
+        feedrate_layers = feedrate_layers[::-1] # always start from the highest feedrate (highest velocity)
+
     v_minimum = round(cross_section*inch2mm*feedrate_min/VPD,2)
-    v_maximum = cross_section*inch2mm*feedrate_max/VPD
+    v_maximum = round(cross_section*inch2mm*feedrate_max/VPD,2)
     print("VPD:",VPD)
     print("v_minimum:",v_minimum)
     print("v_maximum:",v_maximum)
@@ -197,11 +240,12 @@ def main():
                     [ 0.00000000e+00 , 0.00000000e+00 , 0.00000000e+00,  1.00000000e+00]]
 
     weld_meta_data = {'well_arcon':weld_arcon, 'fuji_scanon':fuji_scanon, 'data_dir':data_dir, 'logdata_dir':logdata_dir\
-        ,'base_layer_num':base_layer_num, 'baselayer_resolution':baselayer_resolution, 'layer_num':layer_num, 'layer_resolution':layer_resolution\
-        ,'base_feedrate':base_feedrate, 'base_nom_incre':base_nom_incre, 'base_nom_vel':base_nom_vel\
-        , 'layer_feedrate':layer_feedrate, 'layer_nom_incre':layer_nom_incre, 'layer_nom_vel':layer_nom_vel\
-        ,'corss_section':cross_section, 'VPD':VPD, 'split_sections':split_sections, 'lam_split':lam_split\
-        ,'v_minimum':v_minimum, 'v_maximum':v_maximum, 'weld_start_sleep':weld_start_sleep}
+                      ,'material_name':material_name\
+                    ,'base_layer_num':base_layer_num, 'baselayer_resolution':baselayer_resolution, 'layer_num':layer_num, 'layer_resolution':layer_resolution\
+                    ,'base_feedrate':base_feedrate, 'base_nom_incre':base_nom_incre, 'base_nom_vel':base_nom_vel\
+                    , 'layer_feedrate':layer_feedrate, 'layer_nom_incre':layer_nom_incre, 'layer_nom_vel':layer_nom_vel\
+                    ,'cross_section':cross_section, 'VPD':VPD, 'random_velocity':random_velocity\
+                    ,'v_minimum':v_minimum, 'v_maximum':v_maximum, 'weld_start_sleep':weld_start_sleep}
 
     # get robot 2 resting pose
     q_cur = deepcopy(SS.q_cur)
@@ -267,18 +311,25 @@ def main():
                     curve_js_positioner = curve_js_positioner[::-1]
                 
                 if not read_from_file_layer:
-                
                     # random generate current layer feedrate, velocity
-                    if weld_parts == 'layer':
-                        if layer_count<4:
-                            vel_profile, feedrate_profile = welding_profile_generate(lam_split, VPD, cross_section, i, v_minimum, v_maximum*0.8)
+                    if random_velocity:
+                        if weld_parts == 'layer':
+                            if layer_count<4:
+                                vel_profile, feedrate_profile = welding_profile_generate_random(lam_split, VPD, cross_section, i, v_minimum, v_maximum*0.8)
+                            else:
+                                vel_profile, feedrate_profile = welding_profile_generate_random(lam_split, VPD, cross_section, i, v_minimum, v_maximum)
+                            assert len(vel_profile) == len(feedrate_profile)
+                            assert len(vel_profile) == len(lam_split), f'{len(vel_profile)} {len(feedrate_profile)} {len(lam_split)}'
                         else:
-                            vel_profile, feedrate_profile = welding_profile_generate(lam_split, VPD, cross_section, i, v_minimum, v_maximum)
-                        assert len(vel_profile) == len(feedrate_profile)
-                        assert len(vel_profile) == len(lam_split), f'{len(vel_profile)} {len(feedrate_profile)} {len(lam_split)}'
-                    else:
-                        vel_profile = [base_nom_vel]*len(lam_split)
-                        feedrate_profile = [base_feedrate]*len(lam_split)
+                            vel_profile = [base_nom_vel]*len(lam_split)
+                            feedrate_profile = [base_feedrate]*len(lam_split)
+                    else: # smooth velocity profile
+                        if weld_parts == 'layer': # layer
+                            vel_profile, feedrate_profile = welding_profile_generate_smooth(feedrate_layers[layer_count], VPD, cross_section, lam_relative[-1])
+                            assert len(vel_profile) == len(feedrate_profile)
+                        else: # baselayer
+                            vel_profile = [base_nom_vel]
+                            feedrate_profile = [base_feedrate]
 
                     ### information print
                     print(f'Velocity Profile: {vel_profile}')
@@ -317,6 +368,7 @@ def main():
                     # start joints recording
                     ####### welding motion ##########################
                     lam_cur=0
+                    cmd_update_cnt = 0
                     # last_update_time=time.perf_counter()+5.
                     q_cmd_all = []
                     welding_cmd_all = []
@@ -333,8 +385,7 @@ def main():
                         rr_sensors.start_all_sensors()
                     # time.sleep(3)
                     q_cur = deepcopy(SS.q_cur)
-                    # motion_start_time = time.time()
-                    # test_motion_start = True
+                    # start welding and data logging
                     while lam_cur<lam_relative[-1] - v_cmd/SS.streaming_rate:
                         loop_start=time.perf_counter()
                         # if test_motion_start and np.linalg.norm(q_cur-SS.q_cur)>1e-7:
@@ -360,15 +411,23 @@ def main():
                                 time.sleep(weld_start_sleep)
                             welding_cmd_all.append(np.hstack((time.perf_counter(),i,v_cmd,int(round(feedrate_cmd/10)*10))))
                             last_update_time=time.perf_counter()
+                            cmd_update_cnt += 1
                             arc_off=False
 
                         ###update welding param
                         if time.perf_counter()-last_update_time>1./feedrate_update_rate:
                             if weld_parts == 'layer':
-                                # find the last index smaller than lam_cur
-                                lam_idx=np.where(lam_split-v_cmd*feedrate_update_rate/2<=lam_cur)[0][-1]
-                                v_cmd = vel_profile[lam_idx]
-                                feedrate_cmd = feedrate_profile[lam_idx]
+                                if random_velocity:
+                                    # find the last index smaller than lam_cur
+                                    lam_idx=np.where(lam_split-v_cmd*feedrate_update_rate/2<=lam_cur)[0][-1]
+                                    v_cmd = vel_profile[lam_idx]
+                                    feedrate_cmd = feedrate_profile[lam_idx]
+                                else:
+                                    v_cmd = vel_profile[np.min(cmd_update_cnt, len(vel_profile)-1)]
+                                    feedrate_cmd = feedrate_profile[np.min(cmd_update_cnt, len(feedrate_profile)-1)]
+                                    cmd_update_cnt += 1
+                                    if cmd_update_cnt == len(vel_profile):
+                                        print("Welding velocity profile achieved, stop updating.")
                                 # update feedrate to welder
                                 if weld_arcon:
                                     fronius_client.async_set_job_number(int(round(feedrate_cmd/10)+job_offset), welder_handler)
@@ -437,15 +496,15 @@ def main():
                                 scan_process.accessing_key = False
                                 # get denoise scan
                                 scan_exe_noise_remove.append(scan_denoise)
-                                scan_exe_noise_remove_tcp.append(scan_denoise_tcp)
+                                # scan_exe_noise_remove_tcp.append(scan_denoise_tcp)
                                 # get lambda and record height
                                 curve_index = np.argsort(np.linalg.norm(curve[:,:2]-scan_point_location[:2],axis=1))[0]
                                 lam_scan = lam_relative[curve_index]
-                                lam_scan_i = np.where(lam_split<=lam_scan)[0][-1]
-                                if scan_delta_h<10:
-                                    lam_state_height[lam_scan_i].append(scan_delta_h)
-                                curve_shift = scan_point_location[:2]-curve[curve_index][:2]
-                                lam_curve_shift = np.vstack((lam_curve_shift,np.hstack((lam_scan,curve_shift))))
+                                # lam_scan_i = np.where(lam_split<=lam_scan)[0][-1]
+                                # if scan_delta_h<10:
+                                #     lam_state_height[lam_scan_i].append(scan_delta_h)
+                                # curve_shift = scan_point_location[:2]-curve[curve_index][:2]
+                                # lam_curve_shift = np.vstack((lam_curve_shift,np.hstack((lam_scan,curve_shift))))
                         time.sleep(1/SS.streaming_rate)
                     ########################################
 
