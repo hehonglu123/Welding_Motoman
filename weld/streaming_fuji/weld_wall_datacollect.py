@@ -63,12 +63,12 @@ def welding_profile_generate_smooth(feedrate_nom, VPD, cross_section, lam_max):
 
 def main():
     
-    weld_arcon = False
-    welder_log = False
-    fuji_scanon = False
-    scan_online_process = False
-    thermal_on = False
-    input_from_user = False
+    weld_arcon = True
+    welder_log = True
+    fuji_scanon = True
+    scan_online_process = True
+    thermal_on = True
+    input_from_user = True
 
     ############## Robot definition ##############
     config_dir='../../config/'
@@ -113,7 +113,9 @@ def main():
             exit()
         hflags_const = RRN.GetConstants("experimental.fronius", fronius_client)["WelderStateHighFlags"]
         fronius_client.prepare_welder()
+        current_ser=RRN.SubscribeService('rr+tcp://192.168.55.21:12182?service=Current')
     if welder_log and not weld_arcon:
+        print("looog")
         fronius_sub=RRN.SubscribeService('rr+tcp://192.168.55.21:60823?service=welder')
         current_ser=RRN.SubscribeService('rr+tcp://192.168.55.21:12182?service=Current')
     
@@ -141,7 +143,8 @@ def main():
         # rr_sensors.test_all_sensors()
         # print(len(rr_sensors.ir_recording))
         # rr_sensors.save_all_sensors('')
-        # fronius_client.release_welder()
+        # if weld_arcon:
+        #     fronius_client.release_welder()
         # exit()
     
     ################## Read geometry data ##################
@@ -160,7 +163,7 @@ def main():
     feedrate_update_rate=1.	#Hz
 
     material_name = 'ER4043'
-    material_name = 'ER316L'
+    # material_name = 'ER316L'
 
     if material_name == 'ER4043':
         job_offset=200
@@ -174,7 +177,7 @@ def main():
         # layer welding parameters
         layer_feedrate = 100 # inch/min
         layer_nom_height = 3 # mm
-        layer_nom_vel = 4 # mm/s
+        layer_nom_vel = 5 # mm/s
         layer_nom_incre = int(layer_nom_height/layer_resolution)
         # wire cross section
         cross_section = 1.2 # mm^2
@@ -186,7 +189,7 @@ def main():
         # baselayer welding parameters
         base_feedrate = 250 
         base_nom_incre = 1
-        base_nom_vel = 5
+        base_nom_vel = 10
         # layer welding parameters
         layer_feedrate = 100
         layer_nom_height = 3 # mm
@@ -203,14 +206,14 @@ def main():
     # collision avoidance z offset
     safety_z_offset = 50
     # direction 
-    torch_ori_fix = False # torch orientation fixed
+    torch_ori_fix = True # torch orientation fixed
     
     ##### data collection parameters #####
     VPD = cross_section*inch2mm*layer_feedrate/layer_nom_vel # volume per distance (mm^3/mm)
     random_velocity = False # random velocity profile
     if not random_velocity:
         # feedrate at all layers
-        feedrate_layers = np.arange(50,201,10).astype(int) # inch/min
+        feedrate_layers = np.arange(feedrate_min,feedrate_max+1,10).astype(int) # inch/min
         feedrate_layers = feedrate_layers[::-1] # always start from the highest feedrate (highest velocity)
 
     v_minimum = round(cross_section*inch2mm*feedrate_min/VPD,2)
@@ -262,11 +265,13 @@ def main():
     # for weld_parts in ['layer']:
         if weld_parts == 'base':
             weld_start = baselayer_start
+            # weld_start = 1
             weld_end = baselayer_end
             nom_incre = base_nom_incre
         else:
             weld_start = layer_start
             weld_end = layer_end
+            # weld_end = 36
             nom_incre = layer_nom_incre
         layer_count = 0
         i=weld_start
@@ -274,6 +279,11 @@ def main():
         print("Start layer:",weld_start,"End layer:",weld_end,"Nominal Increment:",nom_incre)
         input("Press Enter to continue...")
         while i < weld_end:
+            if weld_parts == 'layer' and not random_velocity:
+                if layer_count >= len(feedrate_layers):
+                    print("All layers are welded, stop welding.")
+                    break
+
             print("=====================================")
             print(f'Welding {weld_parts} layer {i} counting {layer_count} direction {forward}')
             try:
@@ -420,8 +430,8 @@ def main():
                                     v_cmd = vel_profile[lam_idx]
                                     feedrate_cmd = feedrate_profile[lam_idx]
                                 else:
-                                    v_cmd = vel_profile[np.min(cmd_update_cnt, len(vel_profile)-1)]
-                                    feedrate_cmd = feedrate_profile[np.min(cmd_update_cnt, len(feedrate_profile)-1)]
+                                    v_cmd = vel_profile[np.min([cmd_update_cnt, len(vel_profile)-1])]
+                                    feedrate_cmd = feedrate_profile[np.min([cmd_update_cnt, len(feedrate_profile)-1])]
                                     cmd_update_cnt += 1
                                     if cmd_update_cnt == len(vel_profile):
                                         print("Welding velocity profile achieved, stop updating.")
@@ -476,18 +486,9 @@ def main():
 
                         ### scan online processing
                         if fuji_scanon and scan_online_process:
-                            while scan_process.accessing_key:
-                                time.sleep(0.0000000000001)
-                            scan_process.accessing_key = True
                             scan_process.raw_scan_pipe.append(deepcopy(line_profile))
-                            scan_process.robot_q_pipe.append(deepcopy(weld_js_exe[-1][np.array([1,2,3,4,5,6,13,14])])) # log robot joints (robot 1 and positioner)
-                            scan_process.accessing_key = False
-                            while len(scan_process.denoise_scan_pipe)!=0:
-                                while scan_process.accessing_key:
-                                    time.sleep(0.0000000000001)
-                                scan_process.accessing_key = True
-                                scan_denoise = scan_process.denoise_scan_pipe.pop(0)
-                                scan_process.accessing_key = False
+                            while len(scan_process.denoise_pipe)!=0:
+                                scan_denoise = scan_process.denoise_pipe.pop(0)
                                 # get denoise scan
                                 scan_exe_noise_remove.append(scan_denoise)
                         time.sleep(1/SS.streaming_rate)
@@ -606,18 +607,9 @@ def main():
 
                         ### scan online processing
                         if fuji_scanon and scan_online_process:
-                            while scan_process.accessing_key:
-                                time.sleep(0.0000000000001)
-                            scan_process.accessing_key = True
                             scan_process.raw_scan_pipe.append(deepcopy(line_profile))
-                            scan_process.robot_q_pipe.append(deepcopy(weld_js_exe[-1][np.array([1,2,3,4,5,6,13,14])])) # log robot joints (robot 1 and positioner)
-                            scan_process.accessing_key = False
-                            while len(scan_process.denoise_scan_pipe)!=0:
-                                while scan_process.accessing_key:
-                                    time.sleep(0.0000000000001)
-                                scan_process.accessing_key = True
-                                scan_denoise = scan_process.denoise_scan_pipe.pop(0)
-                                scan_process.accessing_key = False
+                            while len(scan_process.denoise_pipe)!=0:
+                                scan_denoise = scan_process.denoise_pipe.pop(0)
                                 # get denoise scan
                                 scan_exe_noise_remove.append(scan_denoise)
                         time.sleep(1/SS.streaming_rate)
@@ -643,28 +635,28 @@ def main():
                         SS.jog2q(q_end_offset)
 
                     ################### for debugging ######################
-                    #### plot robot torch executed velocity vs v cmd
-                    weld_relative_exe = []
-                    for exe_i in range(len(weld_js_exe)):
-                        T_tool = robot_weld.fwd(weld_js_exe[exe_i][1:7])
-                        T_positioner = positioner.fwd(weld_js_exe[exe_i][-2:])
-                        T_tool_positioner = T_positioner.inv() * T_tool
-                        weld_relative_exe.append(T_tool_positioner.p)
-                    weld_relative_exe = np.array(weld_relative_exe)
-                    weld_relative_v_exe=np.linalg.norm(np.diff(weld_relative_exe,axis=0),2,1)/np.diff(weld_js_exe[:,0])
-                    weld_relative_v_exe=np.append(weld_relative_v_exe[0],weld_relative_v_exe)
-                    weld_relative_v_exe=moving_average(weld_relative_v_exe,padding=True)
-                    weld_relative_v_exe=moving_average(weld_relative_v_exe,padding=True) # velocity in mm/s
-                    
-                    welding_cmd_all = np.array(welding_cmd_all)
-                    plt.plot(weld_js_exe[:,0],weld_relative_v_exe,label='weld relative exe velocity')
-                    plt.plot(welding_cmd_all[:,0],welding_cmd_all[:,2],label='weld cmd velocity')
-                    plt.xlabel('Time (s)')
-                    plt.ylabel('Velocity (mm/s)')
-                    plt.title(f'Welding {weld_parts} layer {i} velocity')
-                    plt.legend()
-                    plt.grid()
-                    plt.show()
+                    # weld_js_exe = np.array(weld_js_exe)
+                    # #### plot robot torch executed velocity vs v cmd
+                    # weld_relative_exe = []
+                    # for exe_i in range(len(weld_js_exe)):
+                    #     T_tool = robot_weld.fwd(weld_js_exe[exe_i][1:7])
+                    #     T_positioner = positioner.fwd(weld_js_exe[exe_i][-2:])
+                    #     T_tool_positioner = T_positioner.inv() * T_tool
+                    #     weld_relative_exe.append(T_tool_positioner.p)
+                    # weld_relative_exe = np.array(weld_relative_exe)
+                    # weld_relative_v_exe=np.linalg.norm(np.diff(weld_relative_exe,axis=0),2,1)/np.diff(weld_js_exe[:,0])
+                    # weld_relative_v_exe=np.append(weld_relative_v_exe[0],weld_relative_v_exe)
+                    # weld_relative_v_exe=moving_average(weld_relative_v_exe,padding=True)
+                    # weld_relative_v_exe=moving_average(weld_relative_v_exe,padding=True) # velocity in mm/s
+                    # welding_cmd_all = np.array(welding_cmd_all)
+                    # plt.plot(weld_js_exe[:,0],weld_relative_v_exe,label='weld relative exe velocity')
+                    # plt.plot(welding_cmd_all[:,0],welding_cmd_all[:,2],label='weld cmd velocity')
+                    # plt.xlabel('Time (s)')
+                    # plt.ylabel('Velocity (mm/s)')
+                    # plt.title(f'Welding {weld_parts} layer {i} velocity')
+                    # plt.legend()
+                    # plt.grid()
+                    # plt.show()
 
                     ############## save data ######################
                     if not os.path.exists(logdata_dir):
@@ -699,8 +691,10 @@ def main():
                 
                 weld_js_exe = np.array(weld_js_exe)
                 stamps_exe = deepcopy(weld_js_exe[:,0])
+                # assert len(stamps_exe) == len(scan_exe), f'Length of stamps_exe {len(stamps_exe)} and scan_exe {len(scan_exe)} do not match!'
                 ################### get layer increments ############################
                 if weld_arcon:
+                # if True:
                     # single scan noise remove
                     if not scan_online_process:
                         scan_exe_noise_remove = []
@@ -712,6 +706,7 @@ def main():
                             pickle.dump(scan_exe_noise_remove, f)
                     # 3D scan registration
                     pcd = scan_process.pcd_register_mti(scan_exe_noise_remove,weld_js_exe[:,np.append(np.arange(1,7),np.arange(13,15))],stamps_exe,flip=True,scanner='fuji')
+                    # visualize_pcd([pcd])
                     curve_planned_z = np.mean(curve[:,2])
                     curve_x_end = np.min(curve[:,0])
                     curve_x_start = np.max(curve[:,0])
@@ -723,8 +718,9 @@ def main():
                     crop_max=(curve_x_start+crop_extend_x,curve_y+30,z_height_start+crop_extend_z)
                     crop_h_min=(curve_x_end-crop_extend_x,curve_y-20,-30)
                     crop_h_max=(curve_x_start+crop_extend_x,curve_y+20,z_height_start+crop_extend_z)
-                    pcd = scan_process.pcd_noise_remove(pcd,nb_neighbors=40,std_ratio=1.5,\
+                    pcd = scan_process.pcd_noise_remove(pcd,outlier_remove=False,nb_neighbors=40,std_ratio=1.5,\
                                                         min_bound=crop_min,max_bound=crop_max,cluster_based_outlier_remove=True,cluster_neighbor=1,min_points=100)
+                    visualize_pcd([pcd])
                     profile_height,Transz0_H = scan_process.pcd2height(deepcopy(pcd),z_height_start,bbox_min=crop_h_min,bbox_max=crop_h_max,Transz0_H=Transz0_H)
                     print("Transz0_H:",Transz0_H)
                     if read_from_file_layer:

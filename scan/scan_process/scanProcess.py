@@ -144,7 +144,7 @@ class ScanProcess():
     def pcd_register_mti(self,all_scan_points,rob_js_exe,rob_stamps,voxel_size=0.05,static_positioner_q=np.radians([-60,180]),flip=False,scanner='mti',use_calib=False,ph_param=None):
 
         pcd_combined = None
-        scan_N = len(rob_js_exe) ## total scans
+        scan_N = np.min([len(rob_js_exe),len(all_scan_points)]) ## total scans
         for scan_i in range(scan_N):
 
             if len(rob_js_exe[scan_i])<=6:
@@ -222,7 +222,6 @@ class ScanProcess():
 
         if outlier_remove:
             cl,ind=pcd_combined.remove_statistical_outlier(nb_neighbors=nb_neighbors,std_ratio=std_ratio)
-            # display_inlier_outlier(pcd_combined,ind)
             pcd_combined=cl
             print("Outlier Removal done.")
 
@@ -231,6 +230,13 @@ class ScanProcess():
             with o3d.utility.VerbosityContextManager(o3d.utility.VerbosityLevel.Debug) as cm:
                 labels = np.array(
                     pcd_combined.cluster_dbscan(eps=cluster_neighbor, min_points=min_points, print_progress=True))
+            # visualize the clusters
+            # max_label = labels.max()
+            # print(f"point cloud has {max_label + 1} clusters")
+            # colors = plt.get_cmap("rainbow")(np.linspace(0, 1, max_label + 1))[:, :3]
+            # colors = np.vstack((colors, np.array([0, 0, 0])))  # add black for noise
+            # pcd_combined.colors = o3d.utility.Vector3dVector(colors[labels + 1])
+            # visualize_pcd([pcd_combined])
             pcd_combined=pcd_combined.select_by_index(np.argwhere(labels>=0))
             print("Cluster based Outlier Removal done.")
         
