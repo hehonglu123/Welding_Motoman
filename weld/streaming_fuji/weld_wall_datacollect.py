@@ -193,7 +193,7 @@ def main():
         layer_nom_vel = 10 # mm/s
         layer_nom_incre = int(layer_nom_height/layer_resolution)
         # wire cross section
-        cross_section = 1.2 # mm^2
+        cross_section = 1.14 # mm^2
     
     ##### motion parameters #####
     # weld starting point sleep
