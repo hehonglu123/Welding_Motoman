@@ -161,6 +161,8 @@ def main():
                     last_T_thermal_cam = None
                     # for (ir_image_raw,stamp) in zip(ir_exe,ir_stamp):
                     for (ir_id,ir_image_raw, stamp) in zip(range(len(ir_exe)), ir_exe, ir_stamp):
+                        # plt.imshow(np.clip(ir_image_raw, 7000, 9200), cmap='inferno', aspect='equal')
+                        # plt.show()
                         ir_image = np.rot90(ir_image_raw, k=-1)
                         img_height, img_width = ir_image.shape
 
