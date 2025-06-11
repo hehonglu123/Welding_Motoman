@@ -18,8 +18,9 @@ c1=RRN.ConnectService(url)
 
 def update_focus():
     try:
+        print("update focus", focus.get())
         c1.setf_param("focus_pos", RR.VarValue(int(focus.get()),"int32"))
-        top.after(10,update_focus)
+        top.after(500,update_focus)
     except:
         traceback.print_exc()
 update_focus()

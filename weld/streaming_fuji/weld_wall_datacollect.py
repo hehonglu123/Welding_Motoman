@@ -68,7 +68,7 @@ def main():
     fuji_scanon = True
     scan_online_process = True
     thermal_on = True
-    input_from_user = True
+    input_from_user = False
 
     ############## Robot definition ##############
     config_dir='../../config/'
@@ -162,8 +162,8 @@ def main():
     #### welding parameters #####
     feedrate_update_rate=1.	#Hz
 
-    material_name = 'ER4043'
-    # material_name = 'ER316L'
+    # material_name = 'ER4043'
+    material_name = 'ER316L'
 
     if material_name == 'ER4043':
         job_offset=200
@@ -175,9 +175,9 @@ def main():
         base_nom_incre = 1
         base_nom_vel = 5
         # layer welding parameters
-        layer_feedrate = 100 # inch/min
+        layer_feedrate = 100 # inch/min 
         layer_nom_height = 3 # mm
-        layer_nom_vel = 5 # mm/s
+        layer_nom_vel = 5*np.sqrt(2) # mm/s => 1, 1/np.sqrt(2), 1/2, np.sqrt(2), 2, affecting VPD
         layer_nom_incre = int(layer_nom_height/layer_resolution)
         # wire cross section
         cross_section = 1.2 # mm^2
@@ -185,15 +185,15 @@ def main():
         job_offset=450
         # feedrate min max (based on material ER316L)
         feedrate_min = 50 # inch/min
-        feedrate_max = 200 # inch/min
+        feedrate_max = 250 # inch/min
         # baselayer welding parameters
-        base_feedrate = 250 
+        base_feedrate = 300 
         base_nom_incre = 1
-        base_nom_vel = 10
+        base_nom_vel = 5
         # layer welding parameters
         layer_feedrate = 100
         layer_nom_height = 3 # mm
-        layer_nom_vel = 10 # mm/s
+        layer_nom_vel = 10*1/(2*np.sqrt(2)) # mm/s => 1, 1/np.sqrt(2), 1/2, 1/(2*np.sqrt(2)), 1/4, affecting VPD
         layer_nom_incre = int(layer_nom_height/layer_resolution)
         # wire cross section
         cross_section = 1.14 # mm^2
@@ -202,7 +202,7 @@ def main():
     # weld starting point sleep
     weld_start_sleep = 0.2
     # scanning parameters
-    scan_nom_vel = 10
+    scan_nom_vel = 8
     # collision avoidance z offset
     safety_z_offset = 50
     # direction 
@@ -216,9 +216,10 @@ def main():
         feedrate_layers = np.arange(feedrate_min,feedrate_max+1,10).astype(int) # inch/min
         feedrate_layers = feedrate_layers[::-1] # always start from the highest feedrate (highest velocity)
 
-    v_minimum = round(cross_section*inch2mm*feedrate_min/VPD,2)
-    v_maximum = round(cross_section*inch2mm*feedrate_max/VPD,2)
+    v_minimum = float(round(cross_section*inch2mm*feedrate_min/VPD,2))
+    v_maximum = float(round(cross_section*inch2mm*feedrate_max/VPD,2))
     print("VPD:",VPD)
+    print("v nominal:",layer_nom_vel)
     print("v_minimum:",v_minimum)
     print("v_maximum:",v_maximum)
     
@@ -232,8 +233,8 @@ def main():
                       ,'material_name':material_name\
                     ,'base_layer_num':base_layer_num, 'baselayer_resolution':baselayer_resolution, 'layer_num':layer_num, 'layer_resolution':layer_resolution\
                     ,'base_feedrate':base_feedrate, 'base_nom_incre':base_nom_incre, 'base_nom_vel':base_nom_vel\
-                    , 'layer_feedrate':layer_feedrate, 'layer_nom_incre':layer_nom_incre, 'layer_nom_vel':layer_nom_vel\
-                    ,'cross_section':cross_section, 'VPD':VPD, 'random_velocity':random_velocity\
+                    , 'layer_feedrate':layer_feedrate, 'layer_nom_incre':layer_nom_incre, 'layer_nom_vel':float(round(layer_nom_vel,3))\
+                    ,'cross_section':cross_section, 'VPD':float(round(VPD,3)), 'random_velocity':random_velocity\
                     ,'v_minimum':v_minimum, 'v_maximum':v_maximum, 'weld_start_sleep':weld_start_sleep}
 
     ##### Parameters to chose where to start welding #####
@@ -255,6 +256,7 @@ def main():
 
     ##### Welding ready to start #####
     print("Logged Data Dir:",logdata_dir)
+    print("Material Name:",material_name)
     input("Ready to start? Press Enter to continue...")
     ################## print layers ##################
     arc_off=True
@@ -465,6 +467,7 @@ def main():
                             SS.position_cmd(q_cmd,loop_start)
                         else:
                             SS.position_cmd(q_cmd,loop_start)
+                    ##################################################
 
                     ### welding end
                     if weld_arcon:
@@ -720,7 +723,7 @@ def main():
                     crop_h_max=(curve_x_start+crop_extend_x,curve_y+20,z_height_start+crop_extend_z)
                     pcd = scan_process.pcd_noise_remove(pcd,outlier_remove=False,nb_neighbors=40,std_ratio=1.5,\
                                                         min_bound=crop_min,max_bound=crop_max,cluster_based_outlier_remove=True,cluster_neighbor=1,min_points=100)
-                    visualize_pcd([pcd])
+                    # visualize_pcd([pcd])
                     profile_height,Transz0_H = scan_process.pcd2height(deepcopy(pcd),z_height_start,bbox_min=crop_h_min,bbox_max=crop_h_max,Transz0_H=Transz0_H)
                     print("Transz0_H:",Transz0_H)
                     if read_from_file_layer:
