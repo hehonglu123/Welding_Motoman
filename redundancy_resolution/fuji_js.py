@@ -122,7 +122,7 @@ def main():
                 all_cases = ['forward']
             else:
                 all_cases = ['backward']
-            all_cases = ['backward']
+            all_cases = ['forward','backward']
 
             for cases in all_cases:
                 ### forward case (+x direction)
@@ -165,7 +165,7 @@ def main():
                 positioner_js.extend(q_out2)
                 # solve ik for robot with thermal when torch part is done
                 rr_thermal = redundancy_resolution(robot_weld,positioner,curve)
-                rThermal_js = rr_thermal.rob2_flir_resolution([[rWeld_js]],robot_thermal,measure_distance=thermal_distance,rotate_angle=np.radians(30),y_direction=np.array([0,0,-1]))[0][0]
+                rThermal_js = rr_thermal.rob2_flir_resolution([[rWeld_js]],robot_thermal,measure_distance=thermal_distance,rotate_angle=np.radians(15),y_direction=np.array([0,0,-1]))[0][0]
                 ## solve ik when the torch is NOT on the layer (leaving the layer)
                 curve_part = deepcopy(curve[-dist_weld_scan_index-1:])
                 curve_part = curve_part[:,:3]

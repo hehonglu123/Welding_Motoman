@@ -17,8 +17,23 @@ def main():
     url='rr+tcp://localhost:60827/?service=camera'
 
     c1=RRN.ConnectService(url)
-    c1.setf_param("current_case", RR.VarValue(2,"int32"))
-    global image_consts, ts
+    # c1.setf_param("current_case", RR.VarValue(2,"int32"))
+
+    # c1.setf_param("focus_pos", RR.VarValue(int(2000),"int32"))
+    # c1.setf_param("object_distance", RR.VarValue(0.4,"double"))
+    # c1.setf_param("reflected_temperature", RR.VarValue(291.15,"double"))
+    # c1.setf_param("atmospheric_temperature", RR.VarValue(293.15,"double"))
+    # c1.setf_param("relative_humidity", RR.VarValue(50,"double"))
+    # c1.setf_param("ext_optics_temperature", RR.VarValue(293.15,"double"))
+    # c1.setf_param("ext_optics_transmission", RR.VarValue(0.99,"double"))
+    # c1.setf_param("current_case", RR.VarValue(2,"int32"))
+    # c1.setf_param("ir_format", RR.VarValue("radiometric","string"))
+    # c1.setf_param("object_emissivity", RR.VarValue(0.13,"double"))
+    # c1.setf_param("scale_limit_low", RR.VarValue(293.15,"double"))
+    # c1.setf_param("scale_limit_upper", RR.VarValue(5000,"double"))
+
+
+    global image_consts, ts, current_mat
     ts=0
     image_consts = RRN.GetConstants('com.robotraconteur.image', c1)
 
@@ -38,9 +53,12 @@ def main():
                 # print(1/(time.time()-now))
                 # now=time.time()
                 # current_mat[current_mat>10000]=10000
+                # current_mat = np.clip(current_mat, 7000, 9200)  # Clip values to avoid overflow in display
+                current_mat = np.log10(current_mat)  # Apply logarithmic scaling for better visibility
                 ir_normalized = ((current_mat - np.min(current_mat)) / (np.max(current_mat) - np.min(current_mat))) * 255
                 ir_bgr = cv2.applyColorMap(ir_normalized.astype(np.uint8), cv2.COLORMAP_INFERNO)
-                cv2.imshow("IR Recording", cv2.resize(ir_bgr,(int(320*3),int(240*3))))
+                # cv2.imshow("IR Recording", cv2.resize(ir_bgr,(int(320*3),int(240*3))))
+                cv2.imshow("IR Recording", ir_bgr)
                 if cv2.waitKey(1) == 27: 
                     break  # esc to quit
     finally:
@@ -49,9 +67,6 @@ def main():
             cv2.destroyAllWindows()
 
         except: pass
-
-
-current_mat = None
 
 def new_frame(pipe_ep):
     global current_mat, ts
@@ -83,4 +98,5 @@ def new_frame(pipe_ep):
         
 
 if __name__ == "__main__":
+    current_mat = None
     main()
