@@ -40,7 +40,8 @@ def main():
     data_dir = '../../data/wall_weld_test/'
 
     # logdata_dir_all = ['weld_fujiscan_2025_02_26_18_08_18/', 'weld_fujiscan_2025_02_26_16_24_21/', 'weld_fujiscan_2025_02_26_17_39_17/']
-    logdata_dir_all = ['weld_fujiscan_2025_02_26_16_24_21/', 'weld_fujiscan_2025_02_26_18_08_18/', 'weld_fujiscan_2025_02_26_17_39_17/']
+    # logdata_dir_all = ['weld_fujiscan_2025_02_26_16_24_21/', 'weld_fujiscan_2025_02_26_18_08_18/', 'weld_fujiscan_2025_02_26_17_39_17/']
+    logdata_dir_all = ['weld_fujiscan_2025_06_10_17_42_42/'] # new camera pose
     # logdata_dir_all = ['weld_fujiscan_2025_02_26_18_08_18/', 'weld_fujiscan_2025_02_26_16_24_21/']
     # logdata_dir_all = ['weld_fujicontrol_2025_03_12_18_27_33/']
     # logdata_dir_all = ['weld_fujiscan_2025_02_26_18_08_18/']
@@ -90,8 +91,8 @@ def main():
 
             # for layer_n in [layer_nums[-1],layer_nums[-2]]:
             for layer_n_id, layer_n in enumerate(layer_nums):
-                if layer_n_id<10:
-                    continue
+                # if layer_n_id<10:
+                #     continue
                 # read layer curve data
                 if weld_parts == 'base':
                     curve = np.loadtxt(data_dir+f'curve_sliced_relative/baselayer{layer_n}_0.csv',delimiter=',')
@@ -163,7 +164,8 @@ def main():
                     for (ir_id,ir_image_raw, stamp) in zip(range(len(ir_exe)), ir_exe, ir_stamp):
                         # plt.imshow(np.clip(ir_image_raw, 7000, 9200), cmap='inferno', aspect='equal')
                         # plt.show()
-                        ir_image = np.rot90(ir_image_raw, k=-1)
+                        # ir_image = np.rot90(ir_image_raw, k=-1)
+                        ir_image = deepcopy(ir_image_raw)
                         img_height, img_width = ir_image.shape
 
                         # robot movement from the last collected thermal reading
@@ -261,17 +263,17 @@ def main():
                                         thermal_trace_stamp[-1].insert(0, move_stamp)
                                         thermal_workpiece_x_trace[-1].insert(0, thermal_workpiece_x_trace[-1][0])
 
-                        # plt.imshow(np.clip(ir_image,7000,9200), cmap='inferno', aspect='auto')
-                        # # plot tracing pixel
+                        plt.imshow(np.clip(ir_image,7000,15000), cmap='inferno', aspect='equal')
+                        # plot tracing pixel
                         # cmap_trace = plt.get_cmap('tab10')
                         # for trace_id, trace in enumerate(thermal_pixel_trace):
                         #     if trace_id % 10 == 0:
                         #         # if pixel within the image
                         #         if 0 <= trace[0] < img_width-1 and 0 <= trace[1] < img_height-1:
                         #             plt.scatter(trace[0], trace[1], c=cmap_trace(trace_id % 10), s=20)
-                        # plt.colorbar(format='%.2f')
-                        # plt.pause(0.1)
-                        # plt.clf()
+                        plt.colorbar(format='%.2f')
+                        plt.pause(0.1)
+                        plt.clf()
                     
                     print("Collected thermal pixel trace:", len(thermal_pixel_trace))
                     thermal_trace_stamp_full = []

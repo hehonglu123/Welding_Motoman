@@ -27,12 +27,15 @@ VPD = cross_section*inch2mm*layer_feedrate/layer_nom_vel # volume per distance (
 feedrate_layers = np.arange(50,201,10).astype(int) # inch/min
 feedrate_layers = feedrate_layers[::-1] # always start from the highest feedrate (highest velocity)
 
+VPD_start = VPD * 0.5 # starting VPD for the first layer
+
 feedrate_samples_all = []
 vel_samples_all = []
-for vpd_sample_ratio in np.arange(0.75, 1.5, 0.1):
+for vpd_sample_ratio in np.arange(0,9,1):
+    print(f'VPD sample ratio: {vpd_sample_ratio}')
     feedrate_samples=[]
     vel_samples=[]
-    this_VPD = VPD * vpd_sample_ratio
+    this_VPD = VPD_start * (np.sqrt(np.sqrt(2))**vpd_sample_ratio)
     for fdr in feedrate_layers:
         vel_profile, feedrate_profile = welding_profile_generate_smooth(fdr, this_VPD, cross_section, lam_max)
         feedrate_samples.extend(feedrate_profile)
