@@ -55,11 +55,21 @@ def main():
     logdata_dir_all = ['weld_fujiscan_2025_06_11_16_27_41/','weld_fujiscan_2025_06_11_16_52_36/','weld_fujiscan_2025_06_11_17_16_48/',\
                        'weld_fujiscan_2025_06_11_17_49_27/','weld_fujiscan_2025_06_11_18_14_56/','weld_fujiscan_2025_06_12_17_33_24/',\
                        'weld_fujiscan_2025_06_12_16_59_09/','weld_fujiscan_2025_06_12_15_33_03/','weld_fujiscan_2025_06_12_15_03_27/']
+    
+    skip_data_dir_all = ['weld_fujiscan_2025_06_11_16_27_41/','weld_fujiscan_2025_06_11_16_52_36/','weld_fujiscan_2025_06_11_17_16_48/']
+
+    # to increase robustness of capturing thermal reading
+    # since the camera is following the torch
+    # if the torch is not detected, use the last few frames' centroid
+    thermal_centroid_record = []
 
     run_code_again_flag = True # For scanner leading case, need to generate all profile height before actually get dh.
     create_transform = False
     for logdata_dir_name in logdata_dir_all:
         print('Processing:',logdata_dir_name)
+        if logdata_dir_name in skip_data_dir_all:
+            print("Skipping...")
+            continue
 
         ## determine if the scanner is leading or lagging
         scanner_lagging= False
@@ -167,6 +177,8 @@ def main():
                 print("Getting thermal readings...")
                 try:
                     thermal_reading = np.loadtxt(this_layer_dir+'thermal',delimiter=',')
+                    with open(this_layer_dir+'thermal_pixel_trace.pickle', 'rb') as f:
+                        pass
                 except FileNotFoundError:
                     print("No thermal readings found, using IR camera to get thermal readings...")
                     with open(this_layer_dir+'ir_recording.pickle', 'rb') as f:
@@ -186,7 +198,6 @@ def main():
                     thermal_trace_stamp = []
                     trace_stamps = []
                     trace_dxdy = []
-                    centroid_record = []
                     last_trace_stamp = 0
                     des_pre = None
                     last_T_thermal_cam = None
@@ -254,7 +265,7 @@ def main():
                         # find max pixel value in ir_image
                         # centroid = np.unravel_index(np.argmax(ir_image, axis=None), ir_image.shape)
                         if centroid is None:
-                            if len(centroid_record) == 0:
+                            if len(thermal_centroid_record) == 0:
                                 print(f"No flame detected in image at {stamp}")
                                 # plt.clf()
                                 # plt.imshow(ir_image, cmap='inferno', aspect='equal')
@@ -262,9 +273,9 @@ def main():
                                 continue
                             else:
                                 # use the last N recorded centroid
-                                centroid = np.mean(centroid_record[-5:], axis=0)
+                                centroid = np.mean(thermal_centroid_record[-5:], axis=0)
 
-                        centroid_record.append(centroid) # record centroid for debugging
+                        thermal_centroid_record.append(centroid) # record centroid for debugging
 
                         # plt.clf()
                         # plt.imshow(ir_image, cmap='inferno', aspect='equal')
@@ -286,7 +297,7 @@ def main():
                         # if ir_image[centroid] >= 1e4:
                         # print("Total pixels:", len(thermal_pixel_trace), "current id:", ir_id)
                         # print("T_table_torch p", T_table_torch.p)
-                        if len(thermal_pixel_trace) == 0 or np.abs(T_table_torch.p[0]-thermal_workpiece_x_trace[-1][0]) > 0.5: # 1 mm away from the previous traced pixel
+                        if len(thermal_pixel_trace) == 0 or np.abs(T_table_torch.p[0]-thermal_workpiece_x_trace[-1][0]) > 0.001: # 1 mm away from the previous traced pixel
                             # if stamp - last_trace_stamp > 1:
                             # add pixel to the traced pixel trace
                             try:
@@ -337,9 +348,9 @@ def main():
                         # plt.colorbar(format='%.2f')
                         # plt.pause(0.1)
                     
-                    # print("Centroid mean:", np.mean(centroid_record, axis=0))
-                    # print("Centroid x pixel min max:", np.min(centroid_record, axis=0)[0], np.max(centroid_record, axis=0)[0])
-                    # print("Centroid y pixel min max:", np.min(centroid_record, axis=0)[1], np.max(centroid_record, axis=0)[1])
+                    # print("Centroid mean:", np.mean(thermal_centroid_record, axis=0))
+                    # print("Centroid x pixel min max:", np.min(thermal_centroid_record, axis=0)[0], np.max(thermal_centroid_record, axis=0)[0])
+                    # print("Centroid y pixel min max:", np.min(thermal_centroid_record, axis=0)[1], np.max(thermal_centroid_record, axis=0)[1])
 
                     # print("Collected thermal pixel trace:", len(thermal_pixel_trace))
                     thermal_trace_stamp_full = []
@@ -393,8 +404,8 @@ def main():
                             'time': trace_st,
                             'value': trace_t
                         }
-                    # with open(this_layer_dir+'thermal_pixel_trace.pickle', 'wb') as f:
-                    #     pickle.dump(trace_dict, f)
+                    with open(this_layer_dir+'thermal_pixel_trace.pickle', 'wb') as f:
+                        pickle.dump(trace_dict, f)
 
                 ################ get speed ##############
                 print("Getting speed...")
