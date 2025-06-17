@@ -56,7 +56,9 @@ def main():
                        'weld_fujiscan_2025_06_11_17_49_27/','weld_fujiscan_2025_06_11_18_14_56/','weld_fujiscan_2025_06_12_17_33_24/',\
                        'weld_fujiscan_2025_06_12_16_59_09/','weld_fujiscan_2025_06_12_15_33_03/','weld_fujiscan_2025_06_12_15_03_27/']
     
-    skip_data_dir_all = ['weld_fujiscan_2025_06_11_16_27_41/','weld_fujiscan_2025_06_11_16_52_36/','weld_fujiscan_2025_06_11_17_16_48/']
+    ### skip data directories
+    skip_data_dir_all = []
+    #skip_data_dir_all = ['weld_fujiscan_2025_06_11_16_27_41/','weld_fujiscan_2025_06_11_16_52_36/']
 
     # to increase robustness of capturing thermal reading
     # since the camera is following the torch
@@ -110,7 +112,7 @@ def main():
 
             # for layer_n in [layer_nums[-1],layer_nums[-2]]:
             for layer_n_id, layer_n in enumerate(layer_nums):
-                # if layer_n_id<9:
+                # if layer_n_id<7:
                 #     continue
                 # read layer curve data
                 if weld_parts == 'base':
@@ -156,6 +158,7 @@ def main():
                 ############### get welding current status ########
                 print("Getting welding current status...")
                 welding_current_exe = np.loadtxt(this_layer_dir+'current.csv',delimiter=',',skiprows=1)
+                # print(welding_current_exe)
                 # plt.plot(welding_current_exe[:,0]-welding_current_exe[0,0], welding_current_exe[:,1], label='Welding Current')
                 # plt.title('Welding Current vs Time')
                 # plt.xlabel('Time (s)')
@@ -163,20 +166,23 @@ def main():
                 # plt.grid()
                 # plt.show()
 
-                # Find peaks
-                peaks, _ = find_peaks(welding_current_exe[:,1], height=75)  # height=0 filters out very low peaks
-                # find the timestamp of the first peak
-                first_strike_time = welding_current_exe[peaks[0], 0]
-                print(f"First peak time: {first_strike_time:.2f} seconds")
-                # plt.plot(welding_current_exe[:,0]-welding_current_exe[0,0], welding_current_exe[:,1], label='Welding Current')
-                # plt.plot(welding_current_exe[peaks,0]-welding_current_exe[0,0], welding_current_exe[peaks,1], "x")
-                # plt.title("Detected Peaks")
-                # plt.show()
+                if len(welding_current_exe) > 0:
+                    # Find peaks
+                    peaks, _ = find_peaks(welding_current_exe[:,1], height=75)  # height=0 filters out very low peaks
+                    # find the timestamp of the first peak
+                    first_strike_time = welding_current_exe[peaks[0], 0]
+                    print(f"First peak time: {first_strike_time:.2f} seconds")
+                    # plt.plot(welding_current_exe[:,0]-welding_current_exe[0,0], welding_current_exe[:,1], label='Welding Current')
+                    # plt.plot(welding_current_exe[peaks,0]-welding_current_exe[0,0], welding_current_exe[peaks,1], "x")
+                    # plt.title("Detected Peaks")
+                    # plt.show()
+                else:
+                    print("No welding current data found.")
 
                 ############### get thermal readings ##############
                 print("Getting thermal readings...")
                 try:
-                    thermal_reading = np.loadtxt(this_layer_dir+'thermal',delimiter=',')
+                    thermal_reading = np.loadtxt(this_layer_dir+'thermal.csv',delimiter=',')
                     with open(this_layer_dir+'thermal_pixel_trace.pickle', 'rb') as f:
                         pass
                 except FileNotFoundError:
@@ -395,7 +401,7 @@ def main():
 
                     # save thermal readings
                     thermal_reading = np.vstack((thermal_stamp,thermal_reading)).T
-                    # np.savetxt(this_layer_dir+'thermal.csv',thermal_reading,delimiter=',')
+                    np.savetxt(this_layer_dir+'thermal.csv',thermal_reading,delimiter=',')
 
                     # save thermal pixel trace
                     trace_dict = {}
