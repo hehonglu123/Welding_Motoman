@@ -291,14 +291,19 @@ def main():
         dh_sample = []
         width_sample = []
 
-        test_dir = ['weld_fujiscan_2025_06_11_16_27_41/','weld_fujiscan_2025_06_11_16_52_36/','weld_fujiscan_2025_06_11_17_16_48/',\
-                       'weld_fujiscan_2025_06_11_17_49_27/','weld_fujiscan_2025_06_11_18_14_56/','weld_fujiscan_2025_06_12_17_33_24/',\
-                       'weld_fujiscan_2025_06_12_16_59_09/','weld_fujiscan_2025_06_12_15_33_03/','weld_fujiscan_2025_06_12_15_03_27/']
-        # test_dir = ['weld_fujiscan_2025_06_11_16_27_41/']
-        for logdata_dir_name in test_dir:
+        # test_dir = ['weld_fujiscan_2025_06_11_16_27_41/','weld_fujiscan_2025_06_11_16_52_36/','weld_fujiscan_2025_06_11_17_16_48/',\
+        #                'weld_fujiscan_2025_06_11_17_49_27/','weld_fujiscan_2025_06_11_18_14_56/','weld_fujiscan_2025_06_12_17_33_24/',\
+        #                'weld_fujiscan_2025_06_12_16_59_09/','weld_fujiscan_2025_06_12_15_33_03/','weld_fujiscan_2025_06_12_15_03_27/']
+        test_dir = ['weld_fujiscan_2025_06_11_14_12_44/','weld_fujiscan_2025_06_11_16_27_41/']
+        height_viz = []
+        for dir_cnt,logdata_dir_name in enumerate(test_dir):
+            ## data to visualize
+            
+
+            ## directory to process
             print(f"Processing directory: {logdata_dir_name}")
             logdata_dir = data_dir + logdata_dir_name
-            total_layers_name = glob.glob(logdata_dir+'layer*')
+            total_layers_name = glob.glob(logdata_dir+'baselayer*')
             # get printed layer number
             layer_nums = []
             for layer_name in total_layers_name:
@@ -313,32 +318,50 @@ def main():
                 #     continue
                 # if layer_n != 129:
                 #     continue
-                this_layer_dir = logdata_dir + 'layer' + str(layer_n) + '/'
-                profile_welding = np.loadtxt(this_layer_dir+'profile_welding.csv',delimiter=',',skiprows=1)
-                # exclude the first and last edge_exclude mm of the profile
-                if profile_welding[0,1] < profile_welding[-1,1]:
-                    profile_welding = profile_welding[profile_welding[:,1] >= start_x + edge_exclude]
-                    profile_welding = profile_welding[profile_welding[:,1] <= end_x - edge_exclude]
-                else:
-                    profile_welding = profile_welding[profile_welding[:,1] <= end_x - edge_exclude]
-                    profile_welding = profile_welding[profile_welding[:,1] >= start_x + edge_exclude]
+                this_layer_dir = logdata_dir + 'baselayer' + str(layer_n) + '/'
+
+                # profile_welding = np.loadtxt(this_layer_dir+'profile_welding.csv',delimiter=',',skiprows=1)
+                # # exclude the first and last edge_exclude mm of the profile
+                # if profile_welding[0,1] < profile_welding[-1,1]:
+                #     profile_welding = profile_welding[profile_welding[:,1] >= start_x + edge_exclude]
+                #     profile_welding = profile_welding[profile_welding[:,1] <= end_x - edge_exclude]
+                # else:
+                #     profile_welding = profile_welding[profile_welding[:,1] <= end_x - edge_exclude]
+                #     profile_welding = profile_welding[profile_welding[:,1] >= start_x + edge_exclude]
                 
-                try:
-                    timestamps_sample = np.arange(profile_welding[0,0], profile_welding[-1,0], 1/sample_rate)
-                except IndexError:
-                    print(f"Skipping layer {layer_n} due to empty profile_welding")
-                    continue
-                for stamp_i, stamp in enumerate(timestamps_sample):
-                    # find the closest timestamp in profile_welding smaller than the current timestamp
-                    time_id_last = np.where(profile_welding[:,0] <= stamp)[0][-1]+1
-                    time_id_first = np.where(profile_welding[:,0] > stamp-1/sample_rate)[0][0]
+                # try:
+                #     timestamps_sample = np.arange(profile_welding[0,0], profile_welding[-1,0], 1/sample_rate)
+                # except IndexError:
+                #     print(f"Skipping layer {layer_n} due to empty profile_welding")
+                #     continue
+                # for stamp_i, stamp in enumerate(timestamps_sample):
+                #     # find the closest timestamp in profile_welding smaller than the current timestamp
+                #     time_id_last = np.where(profile_welding[:,0] <= stamp)[0][-1]+1
+                #     time_id_first = np.where(profile_welding[:,0] > stamp-1/sample_rate)[0][0]
 
-                    if time_id_first >= time_id_last:
-                        print(f"Skipping timestamp {stamp} at layer {layer_n} due to no valid data")
-                        continue
+                #     if time_id_first >= time_id_last:
+                #         print(f"Skipping timestamp {stamp} at layer {layer_n} due to no valid data")
+                #         continue
 
-                    dh_sample.append(np.mean(profile_welding[time_id_first:time_id_last,5]))
-                    width_sample.append(np.mean(profile_welding[time_id_first:time_id_last,7]))
+                #     dh_sample.append(np.mean(profile_welding[time_id_first:time_id_last,5]))
+                #     width_sample.append(np.mean(profile_welding[time_id_first:time_id_last,7]))
+                
+                ## height in lambda
+                this_height = np.loadtxt(this_layer_dir+'profile_height.csv',delimiter=',',skiprows=1)
+                height_viz.append(this_height)
+            
+            # visualize the height
+            # for profile_cnt,height_profile in enumerate(height_viz):
+            #     # if profile_cnt not in [0,1,11,12]:
+            #     #     continue
+            #     if profile_cnt < 2:
+            #         plt.plot(height_profile[:,0], height_profile[:,1], '-o', color='tab:blue', label='Height Profile')
+            #     else:
+            #         plt.plot(height_profile[:,0], height_profile[:,1], '-o', color='tab:orange', label='Height Profile')
+            # plt.xlabel('X Position (mm)')
+            # plt.ylabel('Height (mm)')
+            # plt.grid()
+            # plt.show()
 
         dh_sample = np.array(dh_sample)
         width_sample = np.array(width_sample)
