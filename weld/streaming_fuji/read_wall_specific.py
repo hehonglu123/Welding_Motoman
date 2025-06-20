@@ -214,21 +214,21 @@ def main():
                         thermal_trace_stamp[-1].insert(0, move_stamp)
                         thermal_workpiece_x_trace[-1].insert(0, thermal_workpiece_x_trace[-1][0])
 
-            # plt.clf()
-            # # plt.imshow(np.clip(ir_image,7000,15000), cmap='inferno', aspect='equal')
-            # # plt.imshow(np.log10(ir_image), cmap='inferno', aspect='equal')
+            plt.clf()
+            # plt.imshow(np.clip(ir_image,7000,10000), cmap='hot', aspect='equal')
+            plt.imshow(np.log10(ir_image), cmap='hot', aspect='equal')
             # plt.imshow(ir_image, cmap='hot', aspect='equal')
-            # plt.scatter(pixel_coord[0], pixel_coord[1], c='r', s=7, label='Flame centroid')
-            # # plot tracing pixel
-            # # cmap_trace = plt.get_cmap('tab10')
-            # # for trace_id, trace in enumerate(thermal_pixel_trace):
-            # #     if trace_id % 4 == 0:
-            # #         # if pixel within the image
-            # #         if 0 <= trace[0] < img_width-1 and 0 <= trace[1] < img_height-1:
-            # #             plt.scatter(trace[0], trace[1], c=cmap_trace(trace_id % 10), s=10)
-            # plt.scatter(thermal_pixel_trace[::4,0], thermal_pixel_trace[::4,1], c='b', s=5, label='Traced pixels')
-            # # plt.colorbar(format='%.2f')
-            # plt.pause(0.000001)
+            plt.scatter(pixel_coord[0], pixel_coord[1], c='r', s=7, label='Flame centroid')
+            # plot tracing pixel
+            # cmap_trace = plt.get_cmap('tab10')
+            # for trace_id, trace in enumerate(thermal_pixel_trace):
+            #     if trace_id % 4 == 0:
+            #         # if pixel within the image
+            #         if 0 <= trace[0] < img_width-1 and 0 <= trace[1] < img_height-1:
+            #             plt.scatter(trace[0], trace[1], c=cmap_trace(trace_id % 10), s=10)
+            plt.scatter(thermal_pixel_trace[::4,0], thermal_pixel_trace[::4,1], c='b', s=5, label='Traced pixels')
+            # plt.colorbar(format='%.2f')
+            plt.pause(0.000001)
 
             # input('')
 
@@ -287,23 +287,27 @@ def main():
         start_x = -60 # mm
         end_x = 50
         sample_rate = 30
+        shift_x = 5.685
 
         dh_sample = []
         width_sample = []
 
-        # test_dir = ['weld_fujiscan_2025_06_11_16_27_41/','weld_fujiscan_2025_06_11_16_52_36/','weld_fujiscan_2025_06_11_17_16_48/',\
-        #                'weld_fujiscan_2025_06_11_17_49_27/','weld_fujiscan_2025_06_11_18_14_56/','weld_fujiscan_2025_06_12_17_33_24/',\
-        #                'weld_fujiscan_2025_06_12_16_59_09/','weld_fujiscan_2025_06_12_15_33_03/','weld_fujiscan_2025_06_12_15_03_27/']
-        test_dir = ['weld_fujiscan_2025_06_11_14_12_44/','weld_fujiscan_2025_06_11_16_27_41/']
+        test_dir = ['weld_fujiscan_2025_06_11_16_27_41/','weld_fujiscan_2025_06_11_16_52_36/','weld_fujiscan_2025_06_11_17_16_48/',\
+                       'weld_fujiscan_2025_06_11_17_49_27/','weld_fujiscan_2025_06_11_18_14_56/','weld_fujiscan_2025_06_12_17_33_24/',\
+                       'weld_fujiscan_2025_06_12_16_59_09/','weld_fujiscan_2025_06_12_15_33_03/','weld_fujiscan_2025_06_12_15_03_27/']
+        # test_dir = ['weld_fujiscan_2025_06_11_14_12_44/','weld_fujiscan_2025_06_11_16_27_41/']
+        # test_dir = ['weld_fujiscan_2025_06_11_16_52_36/']
         height_viz = []
+        profile_welding_viz = []
+        color_viz = []
+        color_map = plt.get_cmap('tab10')
         for dir_cnt,logdata_dir_name in enumerate(test_dir):
             ## data to visualize
-            
 
             ## directory to process
             print(f"Processing directory: {logdata_dir_name}")
             logdata_dir = data_dir + logdata_dir_name
-            total_layers_name = glob.glob(logdata_dir+'baselayer*')
+            total_layers_name = glob.glob(logdata_dir+'layer*')
             # get printed layer number
             layer_nums = []
             for layer_name in total_layers_name:
@@ -318,9 +322,10 @@ def main():
                 #     continue
                 # if layer_n != 129:
                 #     continue
-                this_layer_dir = logdata_dir + 'baselayer' + str(layer_n) + '/'
+                this_layer_dir = logdata_dir + 'layer' + str(layer_n) + '/'
 
-                # profile_welding = np.loadtxt(this_layer_dir+'profile_welding.csv',delimiter=',',skiprows=1)
+                profile_welding = np.loadtxt(this_layer_dir+'profile_welding.csv',delimiter=',',skiprows=1)
+                profile_welding_viz.append(profile_welding[:,[1,4]])
                 # # exclude the first and last edge_exclude mm of the profile
                 # if profile_welding[0,1] < profile_welding[-1,1]:
                 #     profile_welding = profile_welding[profile_welding[:,1] >= start_x + edge_exclude]
@@ -349,19 +354,16 @@ def main():
                 ## height in lambda
                 this_height = np.loadtxt(this_layer_dir+'profile_height.csv',delimiter=',',skiprows=1)
                 height_viz.append(this_height)
+                color_viz.append(color_map(dir_cnt/len(test_dir)))
             
             # visualize the height
-            # for profile_cnt,height_profile in enumerate(height_viz):
-            #     # if profile_cnt not in [0,1,11,12]:
-            #     #     continue
-            #     if profile_cnt < 2:
-            #         plt.plot(height_profile[:,0], height_profile[:,1], '-o', color='tab:blue', label='Height Profile')
-            #     else:
-            #         plt.plot(height_profile[:,0], height_profile[:,1], '-o', color='tab:orange', label='Height Profile')
-            # plt.xlabel('X Position (mm)')
-            # plt.ylabel('Height (mm)')
-            # plt.grid()
-            # plt.show()
+            for profile_cnt,height_profile in enumerate(height_viz):
+                plt.plot(height_profile[:,0], height_profile[:,1], '-o', color=color_viz[profile_cnt], label='Height Profile')
+                plt.plot(profile_welding_viz[profile_cnt][:,0], profile_welding_viz[profile_cnt][:,1], '-o', color='red', label='Welding Profile')
+            plt.xlabel('X Position (mm)')
+            plt.ylabel('Height (mm)')
+            plt.grid()
+            plt.show()
 
         dh_sample = np.array(dh_sample)
         width_sample = np.array(width_sample)

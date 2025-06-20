@@ -569,6 +569,11 @@ def main():
                     o3d.io.write_point_cloud(this_layer_dir+'pcd_denoise.pcd',pcd_denoise)
                     #############################################
 
+                # compensating the observed shifting
+                shift_x = 5.685
+                profile_height[:,0] = profile_height[:,0] + shift_x
+                profile_width[:,0] = profile_width[:,0] + shift_x
+
                 ################ combine everything in one array ##############
                 if not scanner_lagging:
                     if layer_n_id == len(layer_nums)-1 and weld_parts == 'layer':
