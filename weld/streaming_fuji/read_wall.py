@@ -598,11 +598,11 @@ def main():
                     # time at the same x
                     this_t = weld_js_exe[js_id,0]
                     # weld command right before this time
-                    cmd_idx = np.where(weld_cmd[:,0]>=this_t)[0]
+                    cmd_idx = np.where(weld_cmd[:,0]<=this_t)[0]
                     if len(cmd_idx) == 0:
                         cmd_idx = 0
                     else:
-                        cmd_idx = cmd_idx[0]
+                        cmd_idx = cmd_idx[-1]
                     this_cmd_v = weld_cmd[cmd_idx,2]
                     this_cmd_fr = weld_cmd[cmd_idx,3]
                     # velocity at the same x
