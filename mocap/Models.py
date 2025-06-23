@@ -130,7 +130,6 @@ class FourierNetwork(nn.Module):
                                 torch.sin(2*x),torch.cos(2*x),torch.sin(2*sum_input),torch.cos(2*sum_input)))
         return x
 
-
 class NeuralFourierNetwork(nn.Module):
     def __init__(self, input_size, output_size, hidden_sizes=[20,20]):
         super(NeuralFourierNetwork, self).__init__()
@@ -213,3 +212,20 @@ class TransformationLoss(nn.Module):
         # Use the custom autograd function for the forward pass
         loss, p_error_all, ori_error_all = TransformationLossFunction.apply(predict_PH, target, joint_angles, robot, param_nominal, weight_pos, weight_ori)
         return loss, p_error_all, ori_error_all
+
+
+# LSTM model
+class LSTMModel(nn.Module):
+    def __init__(self, input_size, hidden_size, output_size, num_layers=1):
+        super(LSTMModel, self).__init__()
+        self.hidden_size = hidden_size
+        self.num_layers = num_layers
+        self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
+        self.fc = nn.Linear(hidden_size, output_size)
+
+    def forward(self, x):
+        h0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(x.device)
+        c0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(x.device)
+        out, _ = self.lstm(x, (h0, c0))
+        out = self.fc(out[:, -1, :])  # Get the last time step's output
+        return out
