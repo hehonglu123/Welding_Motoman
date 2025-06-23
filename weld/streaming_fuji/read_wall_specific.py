@@ -297,12 +297,14 @@ def main():
                        'weld_fujiscan_2025_06_12_16_59_09/','weld_fujiscan_2025_06_12_15_33_03/','weld_fujiscan_2025_06_12_15_03_27/']
         # test_dir = ['weld_fujiscan_2025_06_11_14_12_44/','weld_fujiscan_2025_06_11_16_27_41/']
         # test_dir = ['weld_fujiscan_2025_06_11_16_52_36/']
-        height_viz = []
-        profile_welding_viz = []
+        
+        
         color_viz = []
         color_map = plt.get_cmap('tab10')
         for dir_cnt,logdata_dir_name in enumerate(test_dir):
             ## data to visualize
+            profile_welding_viz = []
+            height_viz = []
 
             ## directory to process
             print(f"Processing directory: {logdata_dir_name}")
@@ -358,8 +360,8 @@ def main():
             
             # visualize the height
             for profile_cnt,height_profile in enumerate(height_viz):
-                plt.plot(height_profile[:,0], height_profile[:,1], '-o', color=color_viz[profile_cnt], label='Height Profile')
-                plt.plot(profile_welding_viz[profile_cnt][:,0], profile_welding_viz[profile_cnt][:,1], '-o', color='red', label='Welding Profile')
+                # plt.plot(height_profile[:,0], height_profile[:,1]+40, '-o', color=color_viz[profile_cnt], label='Height Profile')
+                plt.plot(profile_welding_viz[profile_cnt][:,0], profile_welding_viz[profile_cnt][:,1], 'o', label='Welding Profile')
             plt.xlabel('X Position (mm)')
             plt.ylabel('Height (mm)')
             plt.grid()

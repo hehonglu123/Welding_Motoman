@@ -56,6 +56,7 @@ def main():
     logdata_dir_all = ['weld_fujiscan_2025_06_11_16_27_41/','weld_fujiscan_2025_06_11_16_52_36/','weld_fujiscan_2025_06_11_17_16_48/',\
                        'weld_fujiscan_2025_06_11_17_49_27/','weld_fujiscan_2025_06_11_18_14_56/','weld_fujiscan_2025_06_12_17_33_24/',\
                        'weld_fujiscan_2025_06_12_16_59_09/','weld_fujiscan_2025_06_12_15_33_03/','weld_fujiscan_2025_06_12_15_03_27/']
+    # logdata_dir_all = ['weld_fujiscan_2025_06_11_18_14_56/']
     
     ### skip data directories
     skip_data_dir_all = []
@@ -145,7 +146,14 @@ def main():
                 weld_cmd = np.loadtxt(this_layer_dir+'weld_cmd.csv',delimiter=',')
 
                 ############### get welding js ####################
-                weld_split_id = np.argmax(np.diff(robot_stamps))
+                stamps_diff_sorted = np.argsort(np.diff(robot_stamps))[::-1]
+                for stamp_diff_id in stamps_diff_sorted:
+                    # make sure to find the time jump after the welding command
+                    if robot_stamps[stamp_diff_id] > weld_cmd[-1,0] and robot_stamps[stamp_diff_id] < weld_cmd[-1,0]+3:
+                        weld_split_id = stamp_diff_id
+                        break
+
+                # weld_split_id = np.argmax(np.diff(robot_stamps))
                 scan_js_exe = deepcopy(rob_js_exe)
                 if scanner_lagging:
                     weld_js_exe = rob_js_exe[:weld_split_id+1,:]
@@ -417,7 +425,7 @@ def main():
                 ################ get speed ##############
                 print("Getting speed...")
                 try:
-                    weld_relative_exe = np.loadtxt(this_layer_dir+'weld_relative_exe.csv',delimiter=',')
+                    weld_relative_exe = np.loadtxt(this_layer_dir+'weld_relative_exe',delimiter=',')
                     weld_relative_v_exe = np.loadtxt(this_layer_dir+'weld_relative_v_exe.csv',delimiter=',')
                 except FileNotFoundError:
                     weld_relative_exe = []
