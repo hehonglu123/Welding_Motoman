@@ -213,16 +213,33 @@ class TransformationLoss(nn.Module):
         loss, p_error_all, ori_error_all = TransformationLossFunction.apply(predict_PH, target, joint_angles, robot, param_nominal, weight_pos, weight_ori)
         return loss, p_error_all, ori_error_all
 
-
 # LSTM model
 class LSTMModel(nn.Module):
-    def __init__(self, input_size, hidden_size, output_size, num_layers=1):
+    def __init__(self, input_size, hidden_size, output_size, num_layers=1, device='cpu'):
         super(LSTMModel, self).__init__()
         self.hidden_size = hidden_size
         self.num_layers = num_layers
-        # self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
-        self.lstm = nn.LSTMCell(input_size, hidden_size)
+        self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
         self.fc = nn.Linear(hidden_size, output_size)
+        self.device = device
+
+    def forward(self, x_true, u):
+        h0 = torch.zeros(self.num_layers, u.size(0), self.hidden_size).to(self.device)
+        c0 = torch.zeros(self.num_layers, u.size(0), self.hidden_size).to(self.device)
+        out, _ = self.lstm(u, (h0, c0))
+        out = self.fc(out)  # Get the last time step's output
+        return out
+
+# LSTM model for autoregression
+class LSTMAutoRegressionModel(nn.Module):
+    def __init__(self, input_size, hidden_size, output_size, num_layers=1, device='cpu'):
+        super(LSTMAutoRegressionModel, self).__init__()
+        self.hidden_size = hidden_size
+        self.num_layers = num_layers
+        # self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
+        self.lstm_cell = nn.LSTMCell(input_size, hidden_size)
+        self.fc = nn.Linear(hidden_size, output_size)
+        self.device = device
 
     # def forward(self, x):
     #     h0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(x.device)
@@ -233,23 +250,23 @@ class LSTMModel(nn.Module):
 
     def forward(self, x_true, u):
         batch_size, seq_len, _ = x_true.size()
-        device = x_true.device
 
         # Initial hidden states
-        h_t = torch.zeros(batch_size, self.hidden_size, device=device)
-        c_t = torch.zeros(batch_size, self.hidden_size, device=device)
-
-        y_pred = x_true[:, 0, :]  # initial prediction using ground truth at t=0
+        h_t = torch.zeros(batch_size, self.hidden_size, device=self.device)
+        c_t = torch.zeros(batch_size, self.hidden_size, device=self.device)
+        # Initial error is zero
+        error = torch.zeros_like(x_true[:, 0, :])  
         predictions = []
 
-        for t in range(seq_len - 1):
-            error = x_true[:, t, :] - y_pred
+        for t in range(seq_len):
             u_t = u[:, t, :]
             input_t = torch.cat([error, u_t], dim=1)  # (batch, 4)
 
             h_t, c_t = self.lstm_cell(input_t, (h_t, c_t))
             y_pred = self.fc(h_t)
             predictions.append(y_pred)
+
+            error = x_true[:, t, :] - y_pred
 
         predictions = torch.stack(predictions, dim=1)
         return predictions

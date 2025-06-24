@@ -9,31 +9,53 @@ import torch.nn as nn
 import sys, datetime, yaml, pathlib, glob, os
 sys.path.append('../../mocap/')
 from Models import *
+from model_train_utils import *
 
 np.random.seed(42) # for reproducibility
 torch.manual_seed(42) # for reproducibility
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-def train(data_dir, input_size, hidden_size, output_size, num_layers, epochs, batch_size, learning_rate):
+def train(train_data_input:torch.tensor, train_data_labels:torch.tensor, test_data_input:torch.tensor, test_data_labels:torch.tensor, model:nn.Module, epochs, learning_rate):
     
-    # load data
-    train_data_dir = data_dir[:-1]
-    test_data_dir = data_dir[:-1]
-    train_data = []
-    for dir_name in train_data_dir:
-        train_data.append(np.loadtxt(dir_name+'profile_welding_10_dhdw.csv', delimiter=',', skiprows=1))
-    test_data = []
-    for dir_name in test_data_dir:
-        test_data.append(np.loadtxt(dir_name+'profile_welding_10_dhdw.csv', delimiter=',', skiprows=1))
-    
-
-    # model
-    model = LSTMModel(input_size=input_size, hidden_size=hidden_size, output_size=output_size, num_layers=num_layers).to(device)
     # loss function
     loss_fn = nn.MSELoss()
     # optimizer
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+
+    # Training
+    training_losses = []
+    testing_losses = []
+    for epoch in range(epochs):
+        # get the testing loss
+        model.eval()
+        with torch.no_grad():
+            test_predictions = model(test_data_labels, test_data_input)
+            test_loss = loss_fn(test_predictions, test_data_labels)
+            testing_losses.append(test_loss.item())
+        
+        # save best testing loss model
+        if epoch == 0 or test_loss.item() < min(testing_losses):
+            best_model = model.state_dict()
+            torch.save(best_model, 'weld_LSTM_models/best_model.pth')
+
+        # train the model
+        model.train()
+        optimizer.zero_grad()
+
+        predictions = model(train_data_labels, train_data_input)
+        loss = loss_fn(predictions, train_data_labels)
+        training_losses.append(loss.item())
+
+        # print training progress
+        if epoch % 10 == 0:
+            print(f"Epoch {epoch}/{epochs}, Training Loss: {loss.item():.4f}, Testing Loss: {test_loss.item():.4f}")
+
+        # backpropagation
+        loss.backward()
+        optimizer.step()
+
+    return model, training_losses, testing_losses
 
 if __name__ == "__main__":
 
@@ -46,15 +68,25 @@ if __name__ == "__main__":
     # parameters
     sample_rate = 10 # Hz, using the rate of ir camera
     train_test_split = 0.8 # 80% for training, 20% for testing
-    epochs = 10000 # number of epochs for training
-    batch_size = 50 # batch size for training
+    epochs = 1000 # number of epochs for training
+    sequence_length = 40 # sequence length for training
+    sample_sequence_overlap = 0.5 # overlap between sequences, 0.5 means 50% overlap
     learning_rate = 0.001 # learning rate for training
 
     # model parameters
     model_input_size = 4 # cmd_v, cmd_fd, dh, dw
+    # model_input_size = 2 # cmd_v, cmd_fd
     model_hidden_size = 64 # hidden size of the LSTM
     lstm_num_layers = 1 # number of layers in the LSTM
     model_output_size = 2 # dh, dw
+
+    # model initialization
+    if model_input_size == 4:
+        model = LSTMAutoRegressionModel(input_size=model_input_size, hidden_size=model_hidden_size, output_size=model_output_size, num_layers=lstm_num_layers, device=device).to(device)
+    elif model_input_size == 2:
+        model = LSTMModel(input_size=model_input_size, hidden_size=model_hidden_size, output_size=model_output_size, num_layers=lstm_num_layers, device=device).to(device)
+    else:
+        raise ValueError("model_input_size must be 2 or 4")
 
     ignore_start_end = 5
     start_x = -55 + ignore_start_end
@@ -62,7 +94,6 @@ if __name__ == "__main__":
 
     ### data processing
     data_dirs = []
-    train_data = []
     train_data_batch_len = []
     for i, logdata_dir in enumerate(logdata_dir_all):
         total_layers_name = glob.glob(geo_data_dir+logdata_dir+'layer*')
@@ -78,8 +109,8 @@ if __name__ == "__main__":
             this_layer_dir = geo_data_dir + logdata_dir + layer_name + '/'
             if os.path.exists(this_layer_dir+'profile_welding_'+str(sample_rate)+'_dhdw.csv'):
                 data_dirs.append(this_layer_dir)
-                train_data.append(np.loadtxt(this_layer_dir+'profile_welding_'+str(sample_rate)+'_dhdw.csv', delimiter=',', skiprows=1))
-                train_data_batch_len.append(len(train_data[-1]))
+                this_layer = np.loadtxt(this_layer_dir+'profile_welding_'+str(sample_rate)+'_dhdw.csv', delimiter=',', skiprows=1)
+                train_data_batch_len.append(len(this_layer))
             else:
                 print("Processing layer "+str(layer_n)+" in "+logdata_dir)
                 print('No data for layer '+str(layer_n)+' in '+logdata_dir)
@@ -128,15 +159,14 @@ if __name__ == "__main__":
                 # save the interpolated data
                 interp_data = np.column_stack((timestamps_interp, cmd_v_interp, cmd_fd_interp, dh_interp, dw_interp))
                 np.savetxt(this_layer_dir+'profile_welding_'+str(sample_rate)+'_dhdw.csv', interp_data, delimiter=',', header='timestamp,cmd_v,cmd_fd,dh,dw')
-                train_data.append(interp_data)
                 train_data_batch_len.append(len(interp_data))
                     
     # total amount of data
-    print("Total amount of data: ", len(train_data))
+    print("Total amount of data: ", len(data_dirs))
     print("Total amount of data batch: ", np.sum(train_data_batch_len))
     # spread the data randomly into 5 totes but with almost equal amount of data
     # spread_epsilon = 0.8
-    train_data_split = [[] for _ in range(5)]
+    train_data_split_dir = [[] for _ in range(5)]
     train_data_split_len = np.array([0 for _ in range(5)])
     for dir_i, data_dir in enumerate(data_dirs):
         if np.any(train_data_split_len==0):
@@ -148,11 +178,72 @@ if __name__ == "__main__":
             choice_p = 1/train_data_split_len
             choice_p /= np.sum(choice_p)  # normalize to sum to 1
             chosen_tote = np.random.choice(np.arange(5), p=choice_p)
-        train_data_split[chosen_tote].append(train_data[dir_i])
+        train_data_split_dir[chosen_tote].append(data_dir)
         train_data_split_len[chosen_tote] += train_data_batch_len[dir_i]
     print("Total amount of data in each tote: ", train_data_split_len)
     print("min ratio:", np.min(train_data_split_len)/np.sum(train_data_split_len))
     print("max ratio:", np.max(train_data_split_len)/np.sum(train_data_split_len))
 
+    ###### load data ######
+    def load_data_from_tote(data_dir_tote):
+        data_all = []
+        for dir_tote in data_dir_tote:
+            for dir_name in dir_tote:
+                this_layer = np.loadtxt(dir_name+'profile_welding_'+str(sample_rate)+'_dhdw.csv', delimiter=',', skiprows=1)
+                for in_layer_id in range(0,len(this_layer)-sequence_length, int(sequence_length*(1-sample_sequence_overlap))):
+                    if in_layer_id+sequence_length >= len(this_layer):
+                        continue
+                    data_all.append(this_layer[in_layer_id:in_layer_id+sequence_length, :])
+                if np.all(data_all[-1]!=this_layer[-sequence_length:, :]):
+                    data_all.append(this_layer[-sequence_length:, :])
+        return np.array(data_all)
+
+    train_data_dir_tote = train_data_split_dir[:-1]
+    test_data_dir_tote = train_data_split_dir[-1:]
+    train_data = load_data_from_tote(train_data_dir_tote)
+    test_data = load_data_from_tote(test_data_dir_tote)
+    print("Train data shape: ", train_data.shape, "Total samples:", train_data.shape[0]* train_data.shape[1])
+    print("Test data shape: ", test_data.shape, "Total samples:", test_data.shape[0]* test_data.shape[1])
+
+    # normalization 
+    max_feedrate = np.max(np.append(train_data[:, :, 2], test_data[:, :, 2]))
+    min_feedrate = np.min(np.append(train_data[:, :, 2], test_data[:, :, 2]))
+    max_v = np.max(np.append(train_data[:, :, 1], test_data[:, :, 1]))
+    min_v = np.min(np.append(train_data[:, :, 1], test_data[:, :, 1]))
+    train_data[:, :, 1] = (train_data[:, :, 1] - min_v) / (max_v - min_v)
+    train_data[:, :, 2] = (train_data[:, :, 2] - min_feedrate) / (max_feedrate - min_feedrate)
+    test_data[:, :, 1] = (test_data[:, :, 1] - min_v) / (max_v - min_v)
+    test_data[:, :, 2] = (test_data[:, :, 2] - min_feedrate) / (max_feedrate - min_feedrate)
+
+    # prepare data for training
+    train_data_input = torch.tensor(train_data[:, :-1, 1:3], dtype=torch.float32).to(device)  # cmd_v, cmd_fd
+    train_data_labels = torch.tensor(train_data[:, 1:, 3:5], dtype=torch.float32).to(device)  # dh, dw
+    test_data_input = torch.tensor(test_data[:, :-1, 1:3], dtype=torch.float32).to(device)  # cmd_v, cmd_fd
+    test_data_labels = torch.tensor(test_data[:, 1:, 3:5], dtype=torch.float32).to(device)  # dh, dw
+
     # training loop
-    train
+    model, training_loss, testing_loss = train(train_data_input, train_data_labels, test_data_input, test_data_labels, model, epochs, learning_rate)
+
+    # plot training and testing loss
+    plt.figure(figsize=(10, 5))
+    plt.plot(training_loss, label='Training Loss')
+    plt.plot(testing_loss, label='Testing Loss')
+    plt.xlabel('Epochs')
+    plt.ylabel('Loss')
+    plt.grid()
+    plt.legend()
+    plt.title('Training and Testing Loss')
+    plt.show()
+
+    # plot dh and w error distribution
+    model.eval()
+    with torch.no_grad():
+        train_predictions = model(train_data_labels, train_data_input)
+        test_predictions = model(test_data_labels, test_data_input)
+        train_dh_error = np.abs((train_predictions[:, :, 0] - train_data_labels[:, :, 0]).cpu().numpy().flatten())
+        train_dw_error = np.abs((train_predictions[:, :, 1] - train_data_labels[:, :, 1]).cpu().numpy().flatten())
+        test_dh_error = np.abs((test_predictions[:, :, 0] - test_data_labels[:, :, 0]).cpu().numpy().flatten())
+        test_dw_error = np.abs((test_predictions[:, :, 1] - test_data_labels[:, :, 1]).cpu().numpy().flatten())
+    # dh_error = np.concatenate((train_dh_error, test_dh_error))
+    # dw_error = np.concatenate((train_dw_error, test_dw_error))
+    plot_error_distribution(train_dh_error, train_dw_error, test_dh_error, test_dw_error)
