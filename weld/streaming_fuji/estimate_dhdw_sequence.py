@@ -16,7 +16,8 @@ torch.manual_seed(42) # for reproducibility
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-def train(train_data_input:torch.tensor, train_data_labels:torch.tensor, test_data_input:torch.tensor, test_data_labels:torch.tensor, model:nn.Module, epochs, learning_rate):
+def train(train_data_input:torch.tensor, train_data_labels:torch.tensor, test_data_input:torch.tensor, test_data_labels:torch.tensor, model:nn.Module, \
+          history_length, epochs, learning_rate, model_dir='weld_LSTM_models/'):
     
     # loss function
     loss_fn = nn.MSELoss()
@@ -31,20 +32,20 @@ def train(train_data_input:torch.tensor, train_data_labels:torch.tensor, test_da
         model.eval()
         with torch.no_grad():
             test_predictions = model(test_data_labels, test_data_input)
-            test_loss = loss_fn(test_predictions, test_data_labels)
+            test_loss = loss_fn(test_predictions, test_data_labels[:, history_length:, :]) # skip the history length for loss calculation
             testing_losses.append(test_loss.item())
         
         # save best testing loss model
         if epoch == 0 or test_loss.item() < min(testing_losses):
             best_model = model.state_dict()
-            torch.save(best_model, 'weld_LSTM_models/best_model.pth')
+            torch.save(best_model, model_dir+'best_model.pth')
 
         # train the model
         model.train()
         optimizer.zero_grad()
 
         predictions = model(train_data_labels, train_data_input)
-        loss = loss_fn(predictions, train_data_labels)
+        loss = loss_fn(predictions, train_data_labels[:, history_length:, :])  # skip the history length for loss calculation
         training_losses.append(loss.item())
 
         # print training progress
@@ -64,24 +65,64 @@ if __name__ == "__main__":
     logdata_dir_all = ['weld_fujiscan_2025_06_11_16_27_41/','weld_fujiscan_2025_06_11_16_52_36/','weld_fujiscan_2025_06_11_17_16_48/',\
                        'weld_fujiscan_2025_06_11_17_49_27/','weld_fujiscan_2025_06_11_18_14_56/','weld_fujiscan_2025_06_12_17_33_24/',\
                        'weld_fujiscan_2025_06_12_16_59_09/','weld_fujiscan_2025_06_12_15_33_03/','weld_fujiscan_2025_06_12_15_03_27/']
+    
+    train_flag = True # set to False to use the pre-trained model
+    model_dir = 'weld_LSTM_models/' # directory to save the model
+    # model directory
+    if train_flag:
+        # add timestamp to the model_dir
+        now = datetime.datetime.now()
+        timestamp = now.strftime("%Y%m%d_%H%M%S")
+        model_dir = model_dir + "model_"+ timestamp + '/'
+        pathlib.Path(model_dir).mkdir(parents=True, exist_ok=True)
 
-    # parameters
-    sample_rate = 10 # Hz, using the rate of ir camera
-    train_test_split = 0.8 # 80% for training, 20% for testing
-    epochs = 1000 # number of epochs for training
-    sequence_length = 40 # sequence length for training
-    sample_sequence_overlap = 0.5 # overlap between sequences, 0.5 means 50% overlap
-    learning_rate = 0.001 # learning rate for training
+        # parameters
+        sample_rate = 10 # Hz, using the rate of ir camera
+        train_test_split = 0.8 # 80% for training, 20% for testing
+        epochs = 1000 # number of epochs for training
+        sequence_length = 40 # sequence length for training
+        sample_sequence_overlap = 0.5 # overlap between sequences, 0.5 means 50% overlap
+        learning_rate = 0.001 # learning rate for training
 
-    # model parameters
-    model_input_size = 4 # cmd_v, cmd_fd, dh, dw
-    # model_input_size = 2 # cmd_v, cmd_fd
-    model_hidden_size = 64 # hidden size of the LSTM
-    lstm_num_layers = 1 # number of layers in the LSTM
-    model_output_size = 2 # dh, dw
+        # model parameters
+        # model_input_size = 14 # (cmd_v, cmd_fd)_(t,t-1,t-2), (dh,dw)_(t,t-1,t-2), (dh dw error)_(t-1)
+        # model_input_size = 4 # cmd_v, cmd_fd, dh error, dw error
+        model_input_size = 2 # cmd_v, cmd_fd
+        history_length = max(0,int(model_input_size/4-0.5)) # how many previous time steps to consider, only used for LSTMAutoRegressionModel
+        model_hidden_size = 64 # hidden size of the LSTM
+        lstm_num_layers = 1 # number of layers in the LSTM
+        model_output_size = 2 # dh, dw
+
+        training_params = {
+            'sample_rate': sample_rate, 'train_test_split': train_test_split, 'epochs': epochs,
+            'sequence_length': sequence_length, 'sample_sequence_overlap': sample_sequence_overlap,
+            'learning_rate': learning_rate, 'model_input_size': model_input_size,
+            'history_length': history_length, 'model_hidden_size': model_hidden_size,
+            'lstm_num_layers': lstm_num_layers, 'model_output_size': model_output_size}
+        # save the training parameters
+        with open(model_dir+'training_params.yaml', 'w') as f:
+            yaml.dump(training_params, f, default_flow_style=False)
+    else:
+        model_dir = model_dir+ 'model_20250513_153408/'
+        # load the training parameters
+        with open(model_dir+'training_params.yaml', 'r') as f:
+            training_params = yaml.safe_load(f)
+        sample_rate = training_params['sample_rate']
+        train_test_split = training_params['train_test_split']
+        epochs = training_params['epochs']
+        sequence_length = training_params['sequence_length']
+        sample_sequence_overlap = training_params['sample_sequence_overlap']
+        learning_rate = training_params['learning_rate']
+        model_input_size = training_params['model_input_size']
+        history_length = training_params['history_length']
+        model_hidden_size = training_params['model_hidden_size']
+        lstm_num_layers = training_params['lstm_num_layers']
+        model_output_size = training_params['model_output_size']
 
     # model initialization
-    if model_input_size == 4:
+    if model_input_size == 14:
+        model = LSTMAutoRegressionModel(input_size=model_input_size, hidden_size=model_hidden_size, output_size=model_output_size, num_layers=lstm_num_layers, history_length=history_length, device=device).to(device)
+    elif model_input_size == 4:
         model = LSTMAutoRegressionModel(input_size=model_input_size, hidden_size=model_hidden_size, output_size=model_output_size, num_layers=lstm_num_layers, device=device).to(device)
     elif model_input_size == 2:
         model = LSTMModel(input_size=model_input_size, hidden_size=model_hidden_size, output_size=model_output_size, num_layers=lstm_num_layers, device=device).to(device)
@@ -216,13 +257,38 @@ if __name__ == "__main__":
     test_data[:, :, 2] = (test_data[:, :, 2] - min_feedrate) / (max_feedrate - min_feedrate)
 
     # prepare data for training
-    train_data_input = torch.tensor(train_data[:, :-1, 1:3], dtype=torch.float32).to(device)  # cmd_v, cmd_fd
-    train_data_labels = torch.tensor(train_data[:, 1:, 3:5], dtype=torch.float32).to(device)  # dh, dw
-    test_data_input = torch.tensor(test_data[:, :-1, 1:3], dtype=torch.float32).to(device)  # cmd_v, cmd_fd
-    test_data_labels = torch.tensor(test_data[:, 1:, 3:5], dtype=torch.float32).to(device)  # dh, dw
+    train_data_input = torch.tensor(train_data[:, :, 1:3], dtype=torch.float32).to(device)  # cmd_v, cmd_fd
+    train_data_labels = torch.tensor(train_data[:, :, 3:5], dtype=torch.float32).to(device)  # dh, dw
+    test_data_input = torch.tensor(test_data[:, :, 1:3], dtype=torch.float32).to(device)  # cmd_v, cmd_fd
+    test_data_labels = torch.tensor(test_data[:, :, 3:5], dtype=torch.float32).to(device)  # dh, dw
 
-    # training loop
-    model, training_loss, testing_loss = train(train_data_input, train_data_labels, test_data_input, test_data_labels, model, epochs, learning_rate)
+    # padd history length at the beginning of the input data
+    if history_length > 0:
+        # repeat the first input for history length times and pad
+        print("Padding history length: ", history_length)
+        print("Train data input shape: ", train_data_input.shape)
+        train_data_input = torch.cat((train_data_input[:,0:1,:].repeat(1,history_length,1), train_data_input), dim=1)
+        test_data_input = torch.cat((test_data_input[:,0:1,:].repeat(1,history_length,1), test_data_input), dim=1)
+        # padd zeros to the labels
+        train_data_labels = torch.cat((torch.zeros((train_data_labels.shape[0], history_length, train_data_labels.shape[2]), dtype=torch.float32).to(device), train_data_labels), dim=1)
+        test_data_labels = torch.cat((torch.zeros((test_data_labels.shape[0], history_length, test_data_labels.shape[2]), dtype=torch.float32).to(device), test_data_labels), dim=1)
+
+    print("Train data input shape: ", train_data_input.shape)
+    print("Train data labels shape: ", train_data_labels.shape)
+    
+    if train_flag:
+        # training loop
+        model, training_loss, testing_loss = train(train_data_input, train_data_labels, test_data_input, test_data_labels, model,\
+                                               history_length, epochs, learning_rate, model_dir=model_dir)
+        # save loss
+        np.savetxt(model_dir+'training_loss.csv', training_loss, delimiter=',')
+        np.savetxt(model_dir+'testing_loss.csv', testing_loss, delimiter=',')
+    else:
+        # load the pre-trained model
+        model.load_state_dict(torch.load(model_dir+'best_model.pth'))
+        print("Loaded pre-trained model from: ", model_dir+'best_model.pth')
+        training_loss = np.loadtxt(model_dir+'training_loss.csv', delimiter=',')
+        testing_loss = np.loadtxt(model_dir+'testing_loss.csv', delimiter=',')
 
     # plot training and testing loss
     plt.figure(figsize=(10, 5))
@@ -240,10 +306,10 @@ if __name__ == "__main__":
     with torch.no_grad():
         train_predictions = model(train_data_labels, train_data_input)
         test_predictions = model(test_data_labels, test_data_input)
-        train_dh_error = np.abs((train_predictions[:, :, 0] - train_data_labels[:, :, 0]).cpu().numpy().flatten())
-        train_dw_error = np.abs((train_predictions[:, :, 1] - train_data_labels[:, :, 1]).cpu().numpy().flatten())
-        test_dh_error = np.abs((test_predictions[:, :, 0] - test_data_labels[:, :, 0]).cpu().numpy().flatten())
-        test_dw_error = np.abs((test_predictions[:, :, 1] - test_data_labels[:, :, 1]).cpu().numpy().flatten())
+        train_dh_error = np.abs((train_predictions[:, :, 0] - train_data_labels[:, history_length:, 0]).cpu().numpy().flatten())
+        train_dw_error = np.abs((train_predictions[:, :, 1] - train_data_labels[:, history_length:, 1]).cpu().numpy().flatten())
+        test_dh_error = np.abs((test_predictions[:, :, 0] - test_data_labels[:, history_length:, 0]).cpu().numpy().flatten())
+        test_dw_error = np.abs((test_predictions[:, :, 1] - test_data_labels[:, history_length:, 1]).cpu().numpy().flatten())
     # dh_error = np.concatenate((train_dh_error, test_dh_error))
     # dw_error = np.concatenate((train_dw_error, test_dw_error))
     plot_error_distribution(train_dh_error, train_dw_error, test_dh_error, test_dw_error)
