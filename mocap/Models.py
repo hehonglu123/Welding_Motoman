@@ -220,12 +220,36 @@ class LSTMModel(nn.Module):
         super(LSTMModel, self).__init__()
         self.hidden_size = hidden_size
         self.num_layers = num_layers
-        self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
+        # self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
+        self.lstm = nn.LSTMCell(input_size, hidden_size)
         self.fc = nn.Linear(hidden_size, output_size)
 
-    def forward(self, x):
-        h0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(x.device)
-        c0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(x.device)
-        out, _ = self.lstm(x, (h0, c0))
-        out = self.fc(out[:, -1, :])  # Get the last time step's output
-        return out
+    # def forward(self, x):
+    #     h0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(x.device)
+    #     c0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(x.device)
+    #     out, _ = self.lstm(x, (h0, c0))
+    #     out = self.fc(out[:, -1, :])  # Get the last time step's output
+    #     return out
+
+    def forward(self, x_true, u):
+        batch_size, seq_len, _ = x_true.size()
+        device = x_true.device
+
+        # Initial hidden states
+        h_t = torch.zeros(batch_size, self.hidden_size, device=device)
+        c_t = torch.zeros(batch_size, self.hidden_size, device=device)
+
+        y_pred = x_true[:, 0, :]  # initial prediction using ground truth at t=0
+        predictions = []
+
+        for t in range(seq_len - 1):
+            error = x_true[:, t, :] - y_pred
+            u_t = u[:, t, :]
+            input_t = torch.cat([error, u_t], dim=1)  # (batch, 4)
+
+            h_t, c_t = self.lstm_cell(input_t, (h_t, c_t))
+            y_pred = self.fc(h_t)
+            predictions.append(y_pred)
+
+        predictions = torch.stack(predictions, dim=1)
+        return predictions
