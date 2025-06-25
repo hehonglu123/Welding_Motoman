@@ -79,14 +79,9 @@ if __name__ == "__main__":
     model_dir = 'weld_Seq_models/' # directory to save the model
     # model directory
     if train_flag:
-        # add timestamp to the model_dir
-        now = datetime.datetime.now()
-        timestamp = now.strftime("%Y%m%d_%H%M%S")
-        model_dir = model_dir + "model_"+ timestamp + '/'
-        pathlib.Path(model_dir).mkdir(parents=True, exist_ok=True)
 
         # parameters
-        model_type = 'RNN' # 'LSTM', 'RNN', 'GRU'
+        model_type = 'NARMA' # 'LSTM', 'RNN', 'GRU', 'NARMA'
         sample_rate = 10 # Hz, using the rate of ir camera
         train_test_split = 0.8 # 80% for training, 20% for testing
         epochs = 5000 # number of epochs for training
@@ -95,7 +90,8 @@ if __name__ == "__main__":
         learning_rate = 0.001 # learning rate for training
 
         # model parameters
-        model_input_size = 14 # (cmd_v, cmd_fd)_(t,t-1,t-2), (dh,dw)_(t,t-1,t-2), (dh dw error)_(t-1)
+        # model_input_size = 14 # (cmd_v, cmd_fd)_(t,t-1,t-2), (dh,dw)_(t,t-1,t-2), (dh dw error)_(t-1)
+        model_input_size = 12 # (cmd_v, cmd_fd)_(t,t-1,t-2), (dh,dw)_(t,t-1,t-2)
         # model_input_size = 4 # cmd_v, cmd_fd, dh error, dw error
         # model_input_size = 2 # cmd_v, cmd_fd
         model_hidden_size = 64 # hidden size of the LSTM
@@ -106,21 +102,25 @@ if __name__ == "__main__":
         # the first argument is model type, the second argument is model_input_size
         for i in range(len(sys.argv)):
             if i == 0:
-                model_type = sys.argv[1]
-                if model_type not in ['LSTM', 'RNN', 'GRU']:
-                    print("Invalid model type. Please choose from 'LSTM', 'RNN', or 'GRU'.")
-                    sys.exit(1)
+                continue
             if i == 1:
+                model_type = sys.argv[1]
+                if model_type not in ['LSTM', 'RNN', 'GRU', 'NARMA']:
+                    print("Invalid model type. Please choose from 'LSTM', 'RNN', 'GRU', or 'NARMA'.")
+                    sys.exit(1)
+            if i == 2:
                 model_input_size = int(sys.argv[2])
                 if model_input_size < 2:
                     print("Invalid model input size. Please provide a value greater than or equal to 2.")
                     sys.exit(1)
-            if i == 2:
+            if i == 3:
                 model_hidden_size = int(sys.argv[3])
                 if model_hidden_size < 1:
                     print("Invalid model hidden size. Please provide a value greater than or equal to 1.")
                     sys.exit(1)
-        history_length = max(0,int(model_input_size/4-0.5)) # how many previous time steps to consider, only used for LSTMAutoRegressionModel
+        history_length = max(0,int(model_input_size/4-0.5)) if model_type!= 'NARMA' else max(0,int(model_input_size/4)) # how many previous time steps to consider, only used for LSTMAutoRegressionModel
+        if model_type == 'NARMA':
+            model_hidden_size = [model_hidden_size,model_hidden_size] # NARMA model hidden size is a list of two elements, [first hidden, second hidden]
 
         training_params = {
             'geo_data_dir': geo_data_dir, 'logdata_dir_all': logdata_dir_all,
@@ -131,6 +131,11 @@ if __name__ == "__main__":
             'history_length': history_length, 'model_hidden_size': model_hidden_size,
             'lstm_num_layers': lstm_num_layers, 'model_output_size': model_output_size}
         # save the training parameters
+        # add timestamp to the model_dir
+        now = datetime.datetime.now()
+        timestamp = now.strftime("%Y%m%d_%H%M%S")
+        model_dir = model_dir + "model_"+ timestamp + '/'
+        pathlib.Path(model_dir).mkdir(parents=True, exist_ok=True)
         with open(model_dir+'training_params.yaml', 'w') as f:
             yaml.dump(training_params, f, default_flow_style=False)
     else:
@@ -173,12 +178,15 @@ if __name__ == "__main__":
             modelClass = GRUModel
         else:
             modelClass = GRUAutoRegressionModel
+    elif model_type == 'NARMA':
+        modelClass = ARMANeuralNetwork
 
     # model initialization
-    if model_input_size == 2:
+    if model_input_size == 2 and model_type != 'NARMA':
         model = modelClass(input_size=model_input_size, hidden_size=model_hidden_size, output_size=model_output_size, num_layers=lstm_num_layers, device=device).to(device)
     else:
         model = modelClass(input_size=model_input_size, hidden_size=model_hidden_size, output_size=model_output_size, num_layers=lstm_num_layers, history_length=history_length, device=device).to(device)
+    print("Model trainable parameters:",count_parameters(model))
 
     ignore_start_end = 5
     start_x = -55 + ignore_start_end
@@ -317,7 +325,6 @@ if __name__ == "__main__":
     if history_length > 0:
         # repeat the first input for history length times and pad
         print("Padding history length: ", history_length)
-        print("Train data input shape: ", train_data_input.shape)
         train_data_input = torch.cat((train_data_input[:,0:1,:].repeat(1,history_length,1), train_data_input), dim=1)
         test_data_input = torch.cat((test_data_input[:,0:1,:].repeat(1,history_length,1), test_data_input), dim=1)
         # padd zeros to the labels

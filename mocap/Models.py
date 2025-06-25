@@ -4,6 +4,9 @@ from torch.autograd import Function
 from calib_analytic_grad import *
 from robotics_utils import *
 
+def count_parameters(model):
+    return sum(p.numel() for p in model.parameters() if p.requires_grad)
+
 # Custom Weighted MSE Loss for element-wise weighting
 class WeightedMSELoss(nn.Module):
     def __init__(self):
@@ -212,6 +215,40 @@ class TransformationLoss(nn.Module):
         # Use the custom autograd function for the forward pass
         loss, p_error_all, ori_error_all = TransformationLossFunction.apply(predict_PH, target, joint_angles, robot, param_nominal, weight_pos, weight_ori)
         return loss, p_error_all, ori_error_all
+
+# Neural Network with Tanh activation function for ARMA
+class ARMANeuralNetwork(nn.Module):
+    def __init__(self, input_size, output_size, hidden_size=[20,20], num_layers=1, history_length=1, device='cpu'):
+        super(ARMANeuralNetwork, self).__init__()
+        self.history_length = history_length
+
+        self.hiddenLayers = nn.ModuleList()
+        self.tanh = nn.ModuleList()
+        for k in range(len(hidden_size)):
+            if k == 0:
+                self.hiddenLayers.append(nn.Linear(input_size, hidden_size[k]))
+            else:
+                self.hiddenLayers.append(nn.Linear(hidden_size[k-1], hidden_size[k]))
+            self.tanh.append(nn.Tanh())
+        self.output = nn.Linear(hidden_size[-1], output_size)
+
+    def forward(self, x_true, u):
+        batch_size, seq_len, _ = x_true.size()
+        predictions = []
+        
+        for t in range(self.history_length,seq_len):
+            u_t = torch.flatten(u[:, t-self.history_length+1:t, :], start_dim=1)  # (batch, history_length * input_size)
+            u_t = torch.cat([u[:, t, :], u_t], dim=1)
+            y_t = torch.flatten(x_true[:, t-self.history_length:t, :], start_dim=1)
+            # Concatenate error and inputs
+            x = torch.cat([y_t, u_t], dim=1) # (batch, history_length * output_size + current_input + history_length * input_size + error)
+            for k in range(len(self.hiddenLayers)):
+                x = self.hiddenLayers[k](x)
+                x = self.tanh[k](x)
+            x = self.output(x)
+            predictions.append(x)
+        predictions = torch.stack(predictions, dim=1)  # (batch, seq_len - history_length, output_size)
+        return predictions
 
 # LSTM model
 class LSTMModel(nn.Module):

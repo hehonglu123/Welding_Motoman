@@ -1,7 +1,10 @@
 # Arrays of candidate inputs
-$firstInputs = @("RNN", "GRU", "LSTM")
-$secondInputs = @("2", "4", "14")
-$thirdInputs = @("3", "8", "16")
+# $firstInputs = @("RNN", "GRU", "LSTM", "NARMA")
+# $secondInputs = @("2", "4", "14")
+# $thirdInputs = @("3", "8", "16", "64")
+$firstInputs = @("NARMA")
+$secondInputs = @("2")
+$thirdInputs = @("3", "8", "16", "64")
 
 # Path to the Python script
 $pythonScript = ".\estimate_dhdw_sequence.py"
