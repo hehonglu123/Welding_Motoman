@@ -90,7 +90,7 @@ def plot_error_distribution_all(dh_error_all, dw_error_all, plot_title='Error Di
     plt.tight_layout()
     plt.show()
 
-def plot_error_distribution(dh_train_error, dw_train_error, dh_val_error, dw_val_error, plot_title='Error Distribution'):
+def plot_error_distribution(dh_train_error, dw_train_error, dh_val_error, dw_val_error, plot_title='Error Distribution', save_dir=None):
 
     # fit distribution with exponential distribution
     dh_lambda_hat_train = 1 / np.mean(dh_train_error)
@@ -139,7 +139,11 @@ def plot_error_distribution(dh_train_error, dw_train_error, dh_val_error, dw_val
     ax[1].tick_params(axis='y', labelsize=xy_tick_size)
     plt.suptitle(plot_title, fontsize=sup_title_size)
     plt.tight_layout()
-    plt.show()
+
+    if save_dir is not None:
+        plt.savefig(f'{save_dir}/error_distribution.png', dpi=300, bbox_inches='tight')
+    else:
+        plt.show()
 
     return dh_exp_dist_train.interval(0.95), dw_exp_dist_train.interval(0.95)
 

@@ -11,6 +11,13 @@ sys.path.append('../../mocap/')
 from Models import *
 from model_train_utils import *
 
+# for plotting
+xy_label_size = 14
+xy_tick_size = 12
+legend_size = 12
+title_size = 16
+sup_title_size = 18
+
 np.random.seed(42) # for reproducibility
 torch.manual_seed(42) # for reproducibility
 
@@ -49,7 +56,7 @@ def train(train_data_input:torch.tensor, train_data_labels:torch.tensor, test_da
         training_losses.append(loss.item())
 
         # print training progress
-        if epoch % 10 == 0:
+        if epoch % (epochs//10) == 0:
             print(f"Epoch {epoch}/{epochs}, Training Loss: {loss.item():.4f}, Testing Loss: {test_loss.item():.4f}")
 
         # backpropagation
@@ -66,8 +73,10 @@ if __name__ == "__main__":
                        'weld_fujiscan_2025_06_11_17_49_27/','weld_fujiscan_2025_06_11_18_14_56/','weld_fujiscan_2025_06_12_17_33_24/',\
                        'weld_fujiscan_2025_06_12_16_59_09/','weld_fujiscan_2025_06_12_15_33_03/','weld_fujiscan_2025_06_12_15_03_27/']
     
+    
+    
     train_flag = True # set to False to use the pre-trained model
-    model_dir = 'weld_LSTM_models/' # directory to save the model
+    model_dir = 'weld_Seq_models/' # directory to save the model
     # model directory
     if train_flag:
         # add timestamp to the model_dir
@@ -77,23 +86,45 @@ if __name__ == "__main__":
         pathlib.Path(model_dir).mkdir(parents=True, exist_ok=True)
 
         # parameters
+        model_type = 'RNN' # 'LSTM', 'RNN', 'GRU'
         sample_rate = 10 # Hz, using the rate of ir camera
         train_test_split = 0.8 # 80% for training, 20% for testing
-        epochs = 1000 # number of epochs for training
+        epochs = 5000 # number of epochs for training
         sequence_length = 40 # sequence length for training
         sample_sequence_overlap = 0.5 # overlap between sequences, 0.5 means 50% overlap
         learning_rate = 0.001 # learning rate for training
 
         # model parameters
-        # model_input_size = 14 # (cmd_v, cmd_fd)_(t,t-1,t-2), (dh,dw)_(t,t-1,t-2), (dh dw error)_(t-1)
+        model_input_size = 14 # (cmd_v, cmd_fd)_(t,t-1,t-2), (dh,dw)_(t,t-1,t-2), (dh dw error)_(t-1)
         # model_input_size = 4 # cmd_v, cmd_fd, dh error, dw error
-        model_input_size = 2 # cmd_v, cmd_fd
-        history_length = max(0,int(model_input_size/4-0.5)) # how many previous time steps to consider, only used for LSTMAutoRegressionModel
+        # model_input_size = 2 # cmd_v, cmd_fd
         model_hidden_size = 64 # hidden size of the LSTM
         lstm_num_layers = 1 # number of layers in the LSTM
         model_output_size = 2 # dh, dw
 
+        # pass system arguments
+        # the first argument is model type, the second argument is model_input_size
+        for i in range(len(sys.argv)):
+            if i == 0:
+                model_type = sys.argv[1]
+                if model_type not in ['LSTM', 'RNN', 'GRU']:
+                    print("Invalid model type. Please choose from 'LSTM', 'RNN', or 'GRU'.")
+                    sys.exit(1)
+            if i == 1:
+                model_input_size = int(sys.argv[2])
+                if model_input_size < 2:
+                    print("Invalid model input size. Please provide a value greater than or equal to 2.")
+                    sys.exit(1)
+            if i == 2:
+                model_hidden_size = int(sys.argv[3])
+                if model_hidden_size < 1:
+                    print("Invalid model hidden size. Please provide a value greater than or equal to 1.")
+                    sys.exit(1)
+        history_length = max(0,int(model_input_size/4-0.5)) # how many previous time steps to consider, only used for LSTMAutoRegressionModel
+
         training_params = {
+            'geo_data_dir': geo_data_dir, 'logdata_dir_all': logdata_dir_all,
+            'model_type': model_type,
             'sample_rate': sample_rate, 'train_test_split': train_test_split, 'epochs': epochs,
             'sequence_length': sequence_length, 'sample_sequence_overlap': sample_sequence_overlap,
             'learning_rate': learning_rate, 'model_input_size': model_input_size,
@@ -107,6 +138,9 @@ if __name__ == "__main__":
         # load the training parameters
         with open(model_dir+'training_params.yaml', 'r') as f:
             training_params = yaml.safe_load(f)
+        geo_data_dir = training_params['geo_data_dir']
+        logdata_dir_all = training_params['logdata_dir_all']
+        model_type = training_params['model_type']
         sample_rate = training_params['sample_rate']
         train_test_split = training_params['train_test_split']
         epochs = training_params['epochs']
@@ -119,15 +153,32 @@ if __name__ == "__main__":
         lstm_num_layers = training_params['lstm_num_layers']
         model_output_size = training_params['model_output_size']
 
+    print("=============================================")
+    print("Training parameters:")
+    print("Model type:", model_type, "Model input size:", model_input_size, "Model hidden size:", model_hidden_size)
+
+    # Model types
+    if model_type == 'LSTM':
+        if model_input_size == 2:
+            modelClass = LSTMModel
+        else:
+            modelClass = LSTMAutoRegressionModel
+    elif model_type == 'RNN':
+        if model_input_size == 2:
+            modelClass = RNNModel
+        else:
+            modelClass = RNNAutoRegressionModel
+    elif model_type == 'GRU':
+        if model_input_size == 2:
+            modelClass = GRUModel
+        else:
+            modelClass = GRUAutoRegressionModel
+
     # model initialization
-    if model_input_size == 14:
-        model = LSTMAutoRegressionModel(input_size=model_input_size, hidden_size=model_hidden_size, output_size=model_output_size, num_layers=lstm_num_layers, history_length=history_length, device=device).to(device)
-    elif model_input_size == 4:
-        model = LSTMAutoRegressionModel(input_size=model_input_size, hidden_size=model_hidden_size, output_size=model_output_size, num_layers=lstm_num_layers, device=device).to(device)
-    elif model_input_size == 2:
-        model = LSTMModel(input_size=model_input_size, hidden_size=model_hidden_size, output_size=model_output_size, num_layers=lstm_num_layers, device=device).to(device)
+    if model_input_size == 2:
+        model = modelClass(input_size=model_input_size, hidden_size=model_hidden_size, output_size=model_output_size, num_layers=lstm_num_layers, device=device).to(device)
     else:
-        raise ValueError("model_input_size must be 2 or 4")
+        model = modelClass(input_size=model_input_size, hidden_size=model_hidden_size, output_size=model_output_size, num_layers=lstm_num_layers, history_length=history_length, device=device).to(device)
 
     ignore_start_end = 5
     start_x = -55 + ignore_start_end
@@ -294,12 +345,16 @@ if __name__ == "__main__":
     plt.figure(figsize=(10, 5))
     plt.plot(training_loss, label='Training Loss')
     plt.plot(testing_loss, label='Testing Loss')
-    plt.xlabel('Epochs')
-    plt.ylabel('Loss')
+    plt.xlabel('Epochs', fontsize=xy_label_size)
+    plt.ylabel('Loss', fontsize=xy_label_size)
+    plt.xticks(fontsize=xy_tick_size)
+    plt.yticks(fontsize=xy_tick_size)
     plt.grid()
-    plt.legend()
-    plt.title('Training and Testing Loss')
-    plt.show()
+    plt.legend(fontsize=legend_size)
+    plt.title('Training and Testing Loss', fontsize=title_size)
+    plt.tight_layout()
+    plt.savefig(model_dir+'training_testing_loss.png')
+    # plt.show()
 
     # plot dh and w error distribution
     model.eval()
@@ -312,4 +367,4 @@ if __name__ == "__main__":
         test_dw_error = np.abs((test_predictions[:, :, 1] - test_data_labels[:, history_length:, 1]).cpu().numpy().flatten())
     # dh_error = np.concatenate((train_dh_error, test_dh_error))
     # dw_error = np.concatenate((train_dw_error, test_dw_error))
-    plot_error_distribution(train_dh_error, train_dw_error, test_dh_error, test_dw_error)
+    plot_error_distribution(train_dh_error, train_dw_error, test_dh_error, test_dw_error,save_dir=model_dir)
