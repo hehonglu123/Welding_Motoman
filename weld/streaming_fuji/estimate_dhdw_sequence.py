@@ -91,11 +91,11 @@ if __name__ == "__main__":
 
         # model parameters
         # model_input_size = 14 # (cmd_v, cmd_fd)_(t,t-1,t-2), (dh,dw)_(t,t-1,t-2), (dh dw error)_(t-1)
-        model_input_size = 12 # (cmd_v, cmd_fd)_(t,t-1,t-2), (dh,dw)_(t,t-1,t-2)
+        model_input_size = 18 # (cmd_v, cmd_fd)_(t,t-1,t-2), (dh,dw)_(t-1,t-2,t-3), (dh dw error)_(t-1,t-2,t-3)
         # model_input_size = 4 # cmd_v, cmd_fd, dh error, dw error
         # model_input_size = 2 # cmd_v, cmd_fd
-        model_hidden_size = 64 # hidden size of the LSTM
-        lstm_num_layers = 1 # number of layers in the LSTM
+        model_hidden_size = 3 # hidden size of the LSTM
+        num_layers = 1 # number of layers in the LSTM
         model_output_size = 2 # dh, dw
 
         # pass system arguments
@@ -118,7 +118,7 @@ if __name__ == "__main__":
                 if model_hidden_size < 1:
                     print("Invalid model hidden size. Please provide a value greater than or equal to 1.")
                     sys.exit(1)
-        history_length = max(0,int(model_input_size/4-0.5)) if model_type!= 'NARMA' else max(0,int(model_input_size/4)) # how many previous time steps to consider, only used for LSTMAutoRegressionModel
+        history_length = max(0,int(model_input_size/4-0.5)) if model_type!= 'NARMA' else max(0,int(model_input_size/6)) # how many previous time steps to consider, only used for LSTMAutoRegressionModel
         if model_type == 'NARMA':
             model_hidden_size = [model_hidden_size,model_hidden_size] # NARMA model hidden size is a list of two elements, [first hidden, second hidden]
 
@@ -129,15 +129,15 @@ if __name__ == "__main__":
             'sequence_length': sequence_length, 'sample_sequence_overlap': sample_sequence_overlap,
             'learning_rate': learning_rate, 'model_input_size': model_input_size,
             'history_length': history_length, 'model_hidden_size': model_hidden_size,
-            'lstm_num_layers': lstm_num_layers, 'model_output_size': model_output_size}
+            'num_layers': num_layers, 'model_output_size': model_output_size}
         # save the training parameters
         # add timestamp to the model_dir
-        # now = datetime.datetime.now()
-        # timestamp = now.strftime("%Y%m%d_%H%M%S")
-        # model_dir = model_dir + "model_"+ timestamp + '/'
-        # pathlib.Path(model_dir).mkdir(parents=True, exist_ok=True)
-        # with open(model_dir+'training_params.yaml', 'w') as f:
-        #     yaml.dump(training_params, f, default_flow_style=False)
+        now = datetime.datetime.now()
+        timestamp = now.strftime("%Y%m%d_%H%M%S")
+        model_dir = model_dir + "model_"+ timestamp + '/'
+        pathlib.Path(model_dir).mkdir(parents=True, exist_ok=True)
+        with open(model_dir+'training_params.yaml', 'w') as f:
+            yaml.dump(training_params, f, default_flow_style=False)
     else:
         model_dir = model_dir+ 'model_20250513_153408/'
         # load the training parameters
@@ -155,7 +155,7 @@ if __name__ == "__main__":
         model_input_size = training_params['model_input_size']
         history_length = training_params['history_length']
         model_hidden_size = training_params['model_hidden_size']
-        lstm_num_layers = training_params['lstm_num_layers']
+        num_layers = training_params['num_layers']
         model_output_size = training_params['model_output_size']
 
     print("=============================================")
@@ -183,11 +183,11 @@ if __name__ == "__main__":
 
     # model initialization
     if model_input_size == 2 and model_type != 'NARMA':
-        model = modelClass(input_size=model_input_size, hidden_size=model_hidden_size, output_size=model_output_size, num_layers=lstm_num_layers, device=device).to(device)
+        model = modelClass(input_size=model_input_size, hidden_size=model_hidden_size, output_size=model_output_size, num_layers=num_layers, device=device).to(device)
     else:
-        model = modelClass(input_size=model_input_size, hidden_size=model_hidden_size, output_size=model_output_size, num_layers=lstm_num_layers, history_length=history_length, device=device).to(device)
+        model = modelClass(input_size=model_input_size, hidden_size=model_hidden_size, output_size=model_output_size, num_layers=num_layers, history_length=history_length, device=device).to(device)
     print("Model trainable parameters:",count_parameters(model))
-    exit()
+    # exit()
 
     ignore_start_end = 5
     start_x = -55 + ignore_start_end
