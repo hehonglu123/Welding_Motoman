@@ -132,12 +132,12 @@ if __name__ == "__main__":
             'lstm_num_layers': lstm_num_layers, 'model_output_size': model_output_size}
         # save the training parameters
         # add timestamp to the model_dir
-        now = datetime.datetime.now()
-        timestamp = now.strftime("%Y%m%d_%H%M%S")
-        model_dir = model_dir + "model_"+ timestamp + '/'
-        pathlib.Path(model_dir).mkdir(parents=True, exist_ok=True)
-        with open(model_dir+'training_params.yaml', 'w') as f:
-            yaml.dump(training_params, f, default_flow_style=False)
+        # now = datetime.datetime.now()
+        # timestamp = now.strftime("%Y%m%d_%H%M%S")
+        # model_dir = model_dir + "model_"+ timestamp + '/'
+        # pathlib.Path(model_dir).mkdir(parents=True, exist_ok=True)
+        # with open(model_dir+'training_params.yaml', 'w') as f:
+        #     yaml.dump(training_params, f, default_flow_style=False)
     else:
         model_dir = model_dir+ 'model_20250513_153408/'
         # load the training parameters
@@ -187,6 +187,7 @@ if __name__ == "__main__":
     else:
         model = modelClass(input_size=model_input_size, hidden_size=model_hidden_size, output_size=model_output_size, num_layers=lstm_num_layers, history_length=history_length, device=device).to(device)
     print("Model trainable parameters:",count_parameters(model))
+    exit()
 
     ignore_start_end = 5
     start_x = -55 + ignore_start_end
