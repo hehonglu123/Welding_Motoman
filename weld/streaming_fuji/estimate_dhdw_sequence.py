@@ -90,7 +90,7 @@ if __name__ == "__main__":
         sample_sequence_overlap = 0.5 # overlap between sequences, 0.5 means 50% overlap
         learning_rate = 0.001 # learning rate for training
 
-        # model parameters)
+        # model parameters
         # model_input_size = 18 # (cmd_v, cmd_fd)_(t,t-1,t-2), (dh,dw)_(t-1,t-2,t-3), (dh dw error)_(t-1,t-2,t-3)
         model_input_size = 12 # (cmd_v, cmd_fd)_(t,t-1,t-2), (dh,dw)_(t-1,t-2,t-3), (dh dw error)_(t-1,t-2,t-3)
         # model_input_size = 4 # cmd_v, cmd_fd, dh error, dw error
