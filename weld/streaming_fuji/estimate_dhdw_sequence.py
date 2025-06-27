@@ -22,6 +22,7 @@ np.random.seed(42) # for reproducibility
 torch.manual_seed(42) # for reproducibility
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+print("Using device:", device)
 
 def train(train_data_input:torch.tensor, train_data_labels:torch.tensor, test_data_input:torch.tensor, test_data_labels:torch.tensor, model:nn.Module, \
           history_length, epochs, learning_rate, model_dir='weld_LSTM_models/'):
@@ -81,7 +82,7 @@ if __name__ == "__main__":
     if train_flag:
 
         # parameters
-        model_type = 'NARMA' # 'LSTM', 'RNN', 'GRU', 'NARMA'
+        model_type = 'NARMA' # 'LSTM', 'RNN', 'GRU', 'NARMA', 'DTRNN'
         sample_rate = 10 # Hz, using the rate of ir camera
         train_test_split = 0.8 # 80% for training, 20% for testing
         epochs = 5000 # number of epochs for training
@@ -89,14 +90,15 @@ if __name__ == "__main__":
         sample_sequence_overlap = 0.5 # overlap between sequences, 0.5 means 50% overlap
         learning_rate = 0.001 # learning rate for training
 
-        # model parameters
-        # model_input_size = 14 # (cmd_v, cmd_fd)_(t,t-1,t-2), (dh,dw)_(t,t-1,t-2), (dh dw error)_(t-1)
-        model_input_size = 18 # (cmd_v, cmd_fd)_(t,t-1,t-2), (dh,dw)_(t-1,t-2,t-3), (dh dw error)_(t-1,t-2,t-3)
+        # model parameters)
+        # model_input_size = 18 # (cmd_v, cmd_fd)_(t,t-1,t-2), (dh,dw)_(t-1,t-2,t-3), (dh dw error)_(t-1,t-2,t-3)
+        model_input_size = 12 # (cmd_v, cmd_fd)_(t,t-1,t-2), (dh,dw)_(t-1,t-2,t-3), (dh dw error)_(t-1,t-2,t-3)
         # model_input_size = 4 # cmd_v, cmd_fd, dh error, dw error
         # model_input_size = 2 # cmd_v, cmd_fd
-        model_hidden_size = 3 # hidden size of the LSTM
-        num_layers = 1 # number of layers in the LSTM
+        model_hidden_size = 3 # hidden size
+        num_layers = 1 # number of layers
         model_output_size = 2 # dh, dw
+        open_loop = True
 
         # pass system arguments
         # the first argument is model type, the second argument is model_input_size
@@ -105,7 +107,7 @@ if __name__ == "__main__":
                 continue
             if i == 1:
                 model_type = sys.argv[1]
-                if model_type not in ['LSTM', 'RNN', 'GRU', 'NARMA']:
+                if model_type not in ['LSTM', 'RNN', 'GRU', 'NARMA', 'DTRNN']:
                     print("Invalid model type. Please choose from 'LSTM', 'RNN', 'GRU', or 'NARMA'.")
                     sys.exit(1)
             if i == 2:
@@ -113,14 +115,30 @@ if __name__ == "__main__":
                 if model_input_size < 2:
                     print("Invalid model input size. Please provide a value greater than or equal to 2.")
                     sys.exit(1)
+                if model_type == 'NARMA':
+                    model_input_size = (model_input_size+2)*3
             if i == 3:
                 model_hidden_size = int(sys.argv[3])
                 if model_hidden_size < 1:
                     print("Invalid model hidden size. Please provide a value greater than or equal to 1.")
                     sys.exit(1)
-        history_length = max(0,int(model_input_size/4-0.5)) if model_type!= 'NARMA' else max(0,int(model_input_size/6)) # how many previous time steps to consider, only used for LSTMAutoRegressionModel
+            if i == 4:
+                open_loop = sys.argv[4].lower() == 'true'
+
+        # how many previous time steps to consider, only used for AutoRegression
+        if model_type!= 'NARMA':
+            history_length = max(0,int(model_input_size/4-0.5))
+            open_loop = True if model_input_size == 2 else False # if model_input_size is 2, then it is an open loop model (RNN, LSTM, GRU)
+        else:
+            if open_loop:
+                history_length = max(0,int(model_input_size/4)) 
+            else:
+                history_length = max(0,int(model_input_size/6))
+
         if model_type == 'NARMA':
             model_hidden_size = [model_hidden_size,model_hidden_size] # NARMA model hidden size is a list of two elements, [first hidden, second hidden]
+        if model_type == 'DTRNN':
+            num_layers = 2
 
         training_params = {
             'geo_data_dir': geo_data_dir, 'logdata_dir_all': logdata_dir_all,
@@ -129,7 +147,9 @@ if __name__ == "__main__":
             'sequence_length': sequence_length, 'sample_sequence_overlap': sample_sequence_overlap,
             'learning_rate': learning_rate, 'model_input_size': model_input_size,
             'history_length': history_length, 'model_hidden_size': model_hidden_size,
-            'num_layers': num_layers, 'model_output_size': model_output_size}
+            'num_layers': num_layers, 'model_output_size': model_output_size,
+            'open_loop': open_loop
+        }
         # save the training parameters
         # add timestamp to the model_dir
         now = datetime.datetime.now()
@@ -157,6 +177,7 @@ if __name__ == "__main__":
         model_hidden_size = training_params['model_hidden_size']
         num_layers = training_params['num_layers']
         model_output_size = training_params['model_output_size']
+        open_loop = training_params['open_loop']
 
     print("=============================================")
     print("Training parameters:")
@@ -168,8 +189,8 @@ if __name__ == "__main__":
             modelClass = LSTMModel
         else:
             modelClass = LSTMAutoRegressionModel
-    elif model_type == 'RNN':
-        if model_input_size == 2:
+    elif model_type == 'RNN' or model_type == 'DTRNN':
+        if model_input_size == 2 and model_type == 'RNN':
             modelClass = RNNModel
         else:
             modelClass = RNNAutoRegressionModel
@@ -182,10 +203,10 @@ if __name__ == "__main__":
         modelClass = ARMANeuralNetwork
 
     # model initialization
-    if model_input_size == 2 and model_type != 'NARMA':
+    if model_input_size == 2 and model_type not in ['NARMA', 'DTRNN']:
         model = modelClass(input_size=model_input_size, hidden_size=model_hidden_size, output_size=model_output_size, num_layers=num_layers, device=device).to(device)
     else:
-        model = modelClass(input_size=model_input_size, hidden_size=model_hidden_size, output_size=model_output_size, num_layers=num_layers, history_length=history_length, device=device).to(device)
+        model = modelClass(input_size=model_input_size, hidden_size=model_hidden_size, output_size=model_output_size, num_layers=num_layers, history_length=history_length, open_loop=open_loop, device=device).to(device)
     print("Model trainable parameters:",count_parameters(model))
     # exit()
 
@@ -326,8 +347,8 @@ if __name__ == "__main__":
     if history_length > 0:
         # repeat the first input for history length times and pad
         print("Padding history length: ", history_length)
-        train_data_input = torch.cat((train_data_input[:,0:1,:].repeat(1,history_length,1), train_data_input), dim=1)
-        test_data_input = torch.cat((test_data_input[:,0:1,:].repeat(1,history_length,1), test_data_input), dim=1)
+        train_data_input = torch.cat((train_data_input[:,0:1,:].repeat(1,history_length,1), train_data_input), dim=1).to(device)
+        test_data_input = torch.cat((test_data_input[:,0:1,:].repeat(1,history_length,1), test_data_input), dim=1).to(device)
         # padd zeros to the labels
         train_data_labels = torch.cat((torch.zeros((train_data_labels.shape[0], history_length, train_data_labels.shape[2]), dtype=torch.float32).to(device), train_data_labels), dim=1)
         test_data_labels = torch.cat((torch.zeros((test_data_labels.shape[0], history_length, test_data_labels.shape[2]), dtype=torch.float32).to(device), test_data_labels), dim=1)

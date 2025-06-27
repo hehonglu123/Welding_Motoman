@@ -246,7 +246,11 @@ class ARMANeuralNetwork(nn.Module):
             this_error = torch.flatten(x_true[:, t-self.history_length:t, :]-predictions_input, start_dim=1)  # (batch, history_length * output_size)
             # y_t = torch.flatten(x_true[:, t-self.history_length:t, :], start_dim=1)
             # Concatenate error and inputs
-            x = torch.cat([this_pred, u_t, this_error], dim=1) # (batch, history_length * output_size + current_input + history_length * input_size + error)
+            if not self.open_loop:
+                x = torch.cat([this_pred, u_t, this_error], dim=1) # (batch, history_length * output_size + current_input + history_length * input_size + error)
+            else:
+                x = torch.cat([this_pred, u_t], dim=1) # (batch, history_length * output_size + current_input + history_length * input_size)
+                
             for k in range(len(self.hiddenLayers)):
                 x = self.hiddenLayers[k](x)
                 x = self.tanh[k](x)
@@ -275,7 +279,7 @@ class LSTMModel(nn.Module):
 
 # LSTM model for autoregression
 class LSTMAutoRegressionModel(nn.Module):
-    def __init__(self, input_size, hidden_size, output_size, num_layers=1, history_length=0, device='cpu'):
+    def __init__(self, input_size, hidden_size, output_size, num_layers=1, history_length=0, open_loop=False, device='cpu'):
         super(LSTMAutoRegressionModel, self).__init__()
         self.hidden_size = hidden_size
         self.num_layers = num_layers
@@ -326,14 +330,41 @@ class RNNModel(nn.Module):
         out = self.fc(out)  # Get the last time step's output
         return out
 
+
+class DeepTransitionRNNCell(nn.Module):
+    def __init__(self, input_size, hidden_size, depth=2):
+        super().__init__()
+        self.depth = depth
+        self.input_size = input_size
+        self.hidden_size = hidden_size
+
+        # First layer takes input + hidden
+        self.in_layer = nn.Linear(input_size + hidden_size, hidden_size)
+
+        # Additional transition layers (hidden -> hidden)
+        self.transition_layers = nn.ModuleList([
+            nn.Linear(hidden_size, hidden_size) for _ in range(depth - 1)
+        ])
+
+    def forward(self, x_t, h_prev):
+        h = torch.cat([x_t, h_prev], dim=1)
+        h = torch.tanh(self.in_layer(h))
+        for layer in self.transition_layers:
+            h = torch.tanh(layer(h))
+        return h
+
 # RNN Model for autoregression
 class RNNAutoRegressionModel(nn.Module):
-    def __init__(self, input_size, hidden_size, output_size, num_layers=1, history_length=0, device='cpu'):
+    def __init__(self, input_size, hidden_size, output_size, num_layers=1, history_length=0, open_loop=False, device='cpu'):
         super(RNNAutoRegressionModel, self).__init__()
         self.hidden_size = hidden_size
         self.num_layers = num_layers
         self.history_length = history_length
+        self.open_loop = open_loop
         self.rnn_cell = nn.RNNCell(input_size, hidden_size)
+        if num_layers > 1:
+            self.rnn_cell = DeepTransitionRNNCell(input_size, hidden_size, depth=num_layers)
+        
         self.fc = nn.Linear(hidden_size, output_size)
         self.device = device
     
@@ -343,15 +374,18 @@ class RNNAutoRegressionModel(nn.Module):
         # Initial hidden states
         h_t = torch.zeros(batch_size, self.hidden_size, device=self.device)
         # Initial error is zero
-        error = torch.zeros_like(x_true[:, 0, :])  
+        error = torch.zeros_like(x_true[:, 0, :],device=self.device)
         predictions = []
 
         for t in range(self.history_length, seq_len):
-            u_t = torch.flatten(u[:, t-self.history_length+1:t, :], start_dim=1)  # (batch, history_length * input_size)
-            u_t = torch.cat([u[:, t, :], u_t], dim=1)
-            y_t = torch.flatten(x_true[:, t-self.history_length:t, :], start_dim=1)  # (batch, history_length * output_size)
-            # Concatenate error and inputs
-            input_t = torch.cat([y_t, u_t, error], dim=1)  # (batch, history_length * output_size + current_input + history_length * input_size +
+            if not self.open_loop:
+                u_t = torch.flatten(u[:, t-self.history_length+1:t, :], start_dim=1)  # (batch, history_length * input_size)
+                u_t = torch.cat([u[:, t, :], u_t], dim=1)
+                y_t = torch.flatten(x_true[:, t-self.history_length:t, :], start_dim=1)  # (batch, history_length * output_size)
+                # Concatenate error and inputs
+                input_t = torch.cat([y_t, u_t, error], dim=1)  # (batch, history_length * output_size + current_input + history_length * input_size + error)
+            else:
+                input_t = u[:, t, :]  # (batch, input_size)
 
             h_t = self.rnn_cell(input_t, h_t)
             y_pred = self.fc(h_t)
@@ -380,7 +414,7 @@ class GRUModel(nn.Module):
 
 # GRU Model for autoregression
 class GRUAutoRegressionModel(nn.Module):
-    def __init__(self, input_size, hidden_size, output_size, num_layers=1, history_length=0, device='cpu'):
+    def __init__(self, input_size, hidden_size, output_size, num_layers=1, history_length=0, open_loop=False, device='cpu'):
         super(GRUAutoRegressionModel, self).__init__()
         self.hidden_size = hidden_size
         self.num_layers = num_layers
