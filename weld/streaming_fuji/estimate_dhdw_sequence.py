@@ -216,7 +216,6 @@ if __name__ == "__main__":
     else:
         model = modelClass(input_size=model_input_size, hidden_size=model_hidden_size, output_size=model_output_size, num_layers=num_layers, history_length=history_length, open_loop=open_loop, device=device).to(device)
     print("Model trainable parameters:",count_parameters(model))
-    # exit()
 
     ignore_start_end = 5
     start_x = -55 + ignore_start_end
@@ -364,20 +363,20 @@ if __name__ == "__main__":
     print("Train data input shape: ", train_data_input.shape)
     print("Train data labels shape: ", train_data_labels.shape)
     
-    # if train_flag:
-    # training loop
-    _, training_loss, testing_loss = train(train_data_input, train_data_labels, test_data_input, test_data_labels, model,\
-                                            history_length, epochs, learning_rate, model_dir=model_dir)
-    model.load_state_dict(torch.load(model_dir+'best_model.pth',weights_only=True)) # load the best model for evaluation
-    # save loss
-    np.savetxt(model_dir+'training_loss.csv', training_loss, delimiter=',')
-    np.savetxt(model_dir+'testing_loss.csv', testing_loss, delimiter=',')
-    # else:
-        # # load the pre-trained model
-        # model.load_state_dict(torch.load(model_dir+'best_model.pth',weights_only=True))
-        # print("Loaded pre-trained model from: ", model_dir+'best_model.pth')
-        # training_loss = np.loadtxt(model_dir+'training_loss.csv', delimiter=',')
-        # testing_loss = np.loadtxt(model_dir+'testing_loss.csv', delimiter=',')
+    if train_flag:
+        # training loop
+        _, training_loss, testing_loss = train(train_data_input, train_data_labels, test_data_input, test_data_labels, model,\
+                                                history_length, epochs, learning_rate, model_dir=model_dir)
+        model.load_state_dict(torch.load(model_dir+'best_model.pth',weights_only=True)) # load the best model for evaluation
+        # save loss
+        np.savetxt(model_dir+'training_loss.csv', training_loss, delimiter=',')
+        np.savetxt(model_dir+'testing_loss.csv', testing_loss, delimiter=',')
+    else:
+        # load the pre-trained model
+        model.load_state_dict(torch.load(model_dir+'best_model.pth',weights_only=True))
+        print("Loaded pre-trained model from: ", model_dir+'best_model.pth')
+        training_loss = np.loadtxt(model_dir+'training_loss.csv', delimiter=',')
+        testing_loss = np.loadtxt(model_dir+'testing_loss.csv', delimiter=',')
 
     # plot training and testing loss
     plt.figure(figsize=(10, 5))
