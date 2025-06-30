@@ -21,7 +21,7 @@ foreach ($first in $firstInputs) {
                     $fourth = "False"
                 }
             }
-            python $pythonScript $first $second $third $fourth
+            python $pythonScript "True" $first $second $third $fourth # train_flag, model_type, model_input_size, model_hidden_size, open_loop
         }
     }
 }

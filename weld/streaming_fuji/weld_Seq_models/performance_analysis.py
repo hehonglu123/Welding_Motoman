@@ -5,12 +5,12 @@ import os, glob
 # find all directories in the current directory starting with "model_*"
 model_dirs = glob.glob("model_*")
 
-model_performance = {"RNN": {}, "GRU": {}, "LSTM": {}, "NARMA": {}}
-model_dir_names = {"RNN":{}, "GRU":{}, "LSTM":{}, "NARMA":{}}
-model_close_loop_inputsize = {"RNN": 4, "GRU": 4, "LSTM": 4, "NARMA": 12}
-model_performance_openloop = {"RNN": {}, "GRU": {}, "LSTM": {}, "NARMA": {}}
-model_dir_names_openloop = {"RNN":{}, "GRU":{}, "LSTM":{}, "NARMA":{}}
-model_open_loop_inputsize = 2
+model_performance = {"RNN": {}, 'DTRNN': {}, "GRU": {}, "LSTM": {}, "NARMA": {}}
+model_dir_names = {"RNN":{}, "DTRNN": {}, "GRU":{}, "LSTM":{}, "NARMA":{}}
+model_close_loop_inputsize = {"RNN": 4, "DTRNN": 4, "GRU": 4, "LSTM": 4, "NARMA": 18}
+model_performance_openloop = {"RNN": {}, "DTRNN": {}, "GRU": {}, "LSTM": {}, "NARMA": {}}
+model_dir_names_openloop = {"RNN":{}, "DTRNN": {}, "GRU":{}, "LSTM":{}, "NARMA":{}}
+model_open_loop_inputsize = {"RNN": 2, "DTRNN": 2, "GRU": 2, "LSTM": 2, "NARMA": 12}
 # loop through each model directory and analyze the YAML files
 for model_dir in model_dirs:
     # read the yaml file traininig_params.yaml
@@ -27,17 +27,22 @@ for model_dir in model_dirs:
     model_input_size = params['model_input_size']
     # get the hidden size
     model_hidden_size = params['model_hidden_size']
+    # get closed loop or open loop
+    if 'open_loop' in params and params['open_loop']:
+        model_open_loop = True
+    else:
+        model_open_loop = False
     if type(model_hidden_size) is list:
         model_hidden_size = model_hidden_size[0]
     if model_input_size==model_close_loop_inputsize[model_type]:
         model_performance[model_type][model_hidden_size] = np.min(testing_loss)
         model_dir_names[model_type][model_hidden_size] = model_dir
-    elif model_input_size==model_open_loop_inputsize:
+    elif model_input_size==model_open_loop_inputsize[model_type] or model_open_loop:
         model_performance_openloop[model_type][model_hidden_size] = np.min(testing_loss)
         model_dir_names_openloop[model_type][model_hidden_size] = model_dir
     else:
         continue
-    
+
 # print out the table in a markdown format
 # the columns are the model types and the rows are the hidden sizes, hidden sizes sorted from 3,8,16,64
 print("# Model Performance Analysis")
@@ -60,7 +65,7 @@ for hidden_size in hidden_sizes:
     row = f"| {hidden_size:<11} | "
     for model_type in model_dir_names.keys():
         if hidden_size in model_dir_names[model_type]:
-            row += f"{model_dir_names[model_type][hidden_size]:<20} | "
+            row += f"{model_dir_names[model_type][hidden_size][6:]:<15} | "
         else:
             row += "N/A                   | "
     print(row)
@@ -84,7 +89,7 @@ for hidden_size in hidden_sizes:
     row = f"| {hidden_size:<11} | "
     for model_type in model_dir_names_openloop.keys():
         if hidden_size in model_dir_names_openloop[model_type]:
-            row += f"{model_dir_names_openloop[model_type][hidden_size]:<20} | "
+            row += f"{model_dir_names_openloop[model_type][hidden_size][6:]:<15} | "
         else:
             row += "N/A                   | "
     print(row)

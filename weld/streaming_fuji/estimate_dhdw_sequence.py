@@ -44,7 +44,7 @@ def train(train_data_input:torch.tensor, train_data_labels:torch.tensor, test_da
             testing_losses.append(test_loss.item())
         
         # save best testing loss model
-        if epoch == 0 or test_loss.item() < min(testing_losses):
+        if epoch == 0 or test_loss.item() <= min(testing_losses):
             best_model = model.state_dict()
             torch.save(best_model, model_dir+'best_model.pth')
 
@@ -74,9 +74,10 @@ if __name__ == "__main__":
                        'weld_fujiscan_2025_06_11_17_49_27/','weld_fujiscan_2025_06_11_18_14_56/','weld_fujiscan_2025_06_12_17_33_24/',\
                        'weld_fujiscan_2025_06_12_16_59_09/','weld_fujiscan_2025_06_12_15_33_03/','weld_fujiscan_2025_06_12_15_03_27/']
     
-    
-    
     train_flag = True # set to False to use the pre-trained model
+    if len(sys.argv) > 1:
+        train_flag = True if sys.argv[1].lower() == 'true' else False  # first argument is train flag, if not provided, default to True
+
     model_dir = 'weld_Seq_models/' # directory to save the model
     # model directory
     if train_flag:
@@ -103,26 +104,26 @@ if __name__ == "__main__":
         # pass system arguments
         # the first argument is model type, the second argument is model_input_size
         for i in range(len(sys.argv)):
-            if i == 0:
+            if i < 2:
                 continue
-            if i == 1:
+            if i == 2:
                 model_type = sys.argv[1]
                 if model_type not in ['LSTM', 'RNN', 'GRU', 'NARMA', 'DTRNN']:
                     print("Invalid model type. Please choose from 'LSTM', 'RNN', 'GRU', or 'NARMA'.")
                     sys.exit(1)
-            if i == 2:
+            if i == 3:
                 model_input_size = int(sys.argv[2])
                 if model_input_size < 2:
                     print("Invalid model input size. Please provide a value greater than or equal to 2.")
                     sys.exit(1)
                 if model_type == 'NARMA':
                     model_input_size = (model_input_size+2)*3
-            if i == 3:
+            if i == 4:
                 model_hidden_size = int(sys.argv[3])
                 if model_hidden_size < 1:
                     print("Invalid model hidden size. Please provide a value greater than or equal to 1.")
                     sys.exit(1)
-            if i == 4:
+            if i == 5:
                 open_loop = sys.argv[4].lower() == 'true'
 
         # how many previous time steps to consider, only used for AutoRegression
@@ -159,7 +160,12 @@ if __name__ == "__main__":
         with open(model_dir+'training_params.yaml', 'w') as f:
             yaml.dump(training_params, f, default_flow_style=False)
     else:
-        model_dir = model_dir+ 'model_20250513_153408/'
+        if len(sys.argv) < 2:
+            model_dir = model_dir+ 'model_20250513_153408/'
+        else:
+            model_dir = model_dir + sys.argv[2] + '/'
+                    
+        print("Using pre-trained model directory: ", model_dir)
         # load the training parameters
         with open(model_dir+'training_params.yaml', 'r') as f:
             training_params = yaml.safe_load(f)
@@ -175,11 +181,13 @@ if __name__ == "__main__":
         model_input_size = training_params['model_input_size']
         history_length = training_params['history_length']
         model_hidden_size = training_params['model_hidden_size']
-        num_layers = training_params['num_layers']
+        num_layers = training_params['num_layers'] if 'num_layers' in training_params else 1
         model_output_size = training_params['model_output_size']
-        open_loop = training_params['open_loop']
+        if 'open_loop' in training_params:
+            open_loop = training_params['open_loop']
+        else:
+            open_loop = True if model_input_size == 2 else False
 
-    print("=============================================")
     print("Training parameters:")
     print("Model type:", model_type, "Model input size:", model_input_size, "Model hidden size:", model_hidden_size)
 
@@ -356,19 +364,20 @@ if __name__ == "__main__":
     print("Train data input shape: ", train_data_input.shape)
     print("Train data labels shape: ", train_data_labels.shape)
     
-    if train_flag:
-        # training loop
-        model, training_loss, testing_loss = train(train_data_input, train_data_labels, test_data_input, test_data_labels, model,\
-                                               history_length, epochs, learning_rate, model_dir=model_dir)
-        # save loss
-        np.savetxt(model_dir+'training_loss.csv', training_loss, delimiter=',')
-        np.savetxt(model_dir+'testing_loss.csv', testing_loss, delimiter=',')
-    else:
-        # load the pre-trained model
-        model.load_state_dict(torch.load(model_dir+'best_model.pth'))
-        print("Loaded pre-trained model from: ", model_dir+'best_model.pth')
-        training_loss = np.loadtxt(model_dir+'training_loss.csv', delimiter=',')
-        testing_loss = np.loadtxt(model_dir+'testing_loss.csv', delimiter=',')
+    # if train_flag:
+    # training loop
+    _, training_loss, testing_loss = train(train_data_input, train_data_labels, test_data_input, test_data_labels, model,\
+                                            history_length, epochs, learning_rate, model_dir=model_dir)
+    model.load_state_dict(torch.load(model_dir+'best_model.pth',weights_only=True)) # load the best model for evaluation
+    # save loss
+    np.savetxt(model_dir+'training_loss.csv', training_loss, delimiter=',')
+    np.savetxt(model_dir+'testing_loss.csv', testing_loss, delimiter=',')
+    # else:
+        # # load the pre-trained model
+        # model.load_state_dict(torch.load(model_dir+'best_model.pth',weights_only=True))
+        # print("Loaded pre-trained model from: ", model_dir+'best_model.pth')
+        # training_loss = np.loadtxt(model_dir+'training_loss.csv', delimiter=',')
+        # testing_loss = np.loadtxt(model_dir+'testing_loss.csv', delimiter=',')
 
     # plot training and testing loss
     plt.figure(figsize=(10, 5))
@@ -390,10 +399,16 @@ if __name__ == "__main__":
     with torch.no_grad():
         train_predictions = model(train_data_labels, train_data_input)
         test_predictions = model(test_data_labels, test_data_input)
-        train_dh_error = np.abs((train_predictions[:, :, 0] - train_data_labels[:, history_length:, 0]).cpu().numpy().flatten())
-        train_dw_error = np.abs((train_predictions[:, :, 1] - train_data_labels[:, history_length:, 1]).cpu().numpy().flatten())
-        test_dh_error = np.abs((test_predictions[:, :, 0] - test_data_labels[:, history_length:, 0]).cpu().numpy().flatten())
-        test_dw_error = np.abs((test_predictions[:, :, 1] - test_data_labels[:, history_length:, 1]).cpu().numpy().flatten())
-    # dh_error = np.concatenate((train_dh_error, test_dh_error))
-    # dw_error = np.concatenate((train_dw_error, test_dw_error))
-    plot_error_distribution(train_dh_error, train_dw_error, test_dh_error, test_dw_error,save_dir=model_dir)
+        train_dh_error = (train_predictions[:, :, 0] - train_data_labels[:, history_length:, 0]).cpu().numpy().flatten()
+        train_dw_error = (train_predictions[:, :, 1] - train_data_labels[:, history_length:, 1]).cpu().numpy().flatten()
+        test_dh_error = (test_predictions[:, :, 0] - test_data_labels[:, history_length:, 0]).cpu().numpy().flatten()
+        test_dw_error = (test_predictions[:, :, 1] - test_data_labels[:, history_length:, 1]).cpu().numpy().flatten()
+    # save the errors
+    np.savetxt(model_dir+'train_dh_error.csv', train_dh_error, delimiter=',')
+    np.savetxt(model_dir+'train_dw_error.csv', train_dw_error, delimiter=',')
+    np.savetxt(model_dir+'test_dh_error.csv', test_dh_error, delimiter=',')
+    np.savetxt(model_dir+'test_dw_error.csv', test_dw_error, delimiter=',')
+    # plot the error distribution
+    plot_error_distribution(np.abs(train_dh_error), np.abs(train_dw_error), np.abs(test_dh_error), np.abs(test_dw_error), save_dir=model_dir)
+    # print test error statistics
+    print(f"Test dh Error: Mean = {np.mean(np.abs(test_dh_error)):.4f}, width Error = {np.mean(np.abs(test_dw_error)):.4f}")
