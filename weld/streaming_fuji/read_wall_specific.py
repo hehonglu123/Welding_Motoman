@@ -306,9 +306,17 @@ def main():
         thermal_reading_full = np.array(thermal_reading_full)
         thermal_sample_t = np.sort(np.array(thermal_sample_t))
 
+        
+        # Define radial basis functions (Gaussians)
+        centers = np.linspace(-70, 70, 35)  # 10 basis functions
+        width = 4.0  # width of each RBF
+        rbf = lambda x, c, w: np.exp(-((x - c) ** 2) / (2 * w ** 2))
+        
+        
         for viz_t in thermal_sample_t:
             if viz_t < profile_welding[0,0]:
                 continue
+
             # find the closest timestamp in profile_welding
             time_id = np.where(profile_welding[:,0] <= viz_t)[0][-1]
             profile_welding_x = profile_welding[time_id,1]
@@ -320,8 +328,19 @@ def main():
             this_reading = this_reading[x_sorted_id]
             # viz in inertial frame
             this_x = this_x - profile_welding_x
+
+            # Solve least squares to find projection coefficients
+            # Construct RBF matrix
+            Phi = np.array([rbf(this_x, c, width) for c in centers]).T  # shape: (len(x), num_centers)
+            coeffs, _, _, _ = np.linalg.lstsq(Phi, this_reading, rcond=None)
+
+            # Reconstruct the projected signal
+            projection = Phi @ coeffs
+
+
             plt.clf()
             plt.plot(this_x, this_reading, 'o')
+            plt.plot(this_x, projection, label="RBF Projection", linestyle="--")
             plt.title(f'Thermal Reading at {viz_t-profile_welding[0,0]:.2f} s')
             plt.xlim(-57, 57)
             plt.ylim(8000, 25000)
