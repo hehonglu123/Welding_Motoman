@@ -262,6 +262,7 @@ if __name__ == "__main__":
                 cmd_fd_interp = np.zeros_like(timestamps_interp)
                 dh_interp = np.zeros_like(timestamps_interp)
                 dw_interp = np.zeros_like(timestamps_interp)
+                thermal_interp = np.zeros_like(timestamps_interp)
                 for interp_id, interp_time in enumerate(timestamps_interp):
                     window_id_start = np.where(timestamp_welding >= interp_time-1/sample_rate)[0][0]
                     window_id_end = np.where(timestamp_welding <= interp_time)[0][-1]+1
@@ -275,6 +276,7 @@ if __name__ == "__main__":
                     cmd_fd_interp[interp_id] = np.mean(profile_welding[window_id_start:window_id_end, 3])
                     dh_interp[interp_id] = np.mean(profile_welding[window_id_start:window_id_end, 5])
                     dw_interp[interp_id] = np.mean(profile_welding[window_id_start:window_id_end, 7])
+                    thermal_interp[interp_id] = np.mean(profile_welding[window_id_start:window_id_end, 9])
                 if np.any(cmd_v_interp==0):
                     # plt.plot(timestamps_interp, cmd_v_interp, 'o', label='cmd_v_interp')
                     # plt.grid()
@@ -284,6 +286,7 @@ if __name__ == "__main__":
                     cmd_fd_interp = np.interp(timestamps_interp, timestamps_interp[cmd_fd_interp!=0], cmd_fd_interp[cmd_fd_interp!=0])
                     dh_interp = np.interp(timestamps_interp, timestamps_interp[dh_interp!=0], dh_interp[dh_interp!=0])
                     dw_interp = np.interp(timestamps_interp, timestamps_interp[dw_interp!=0], dw_interp[dw_interp!=0])
+                    thermal_interp = np.interp(timestamps_interp, timestamps_interp[thermal_interp!=0], thermal_interp[thermal_interp!=0])
 
                 # save the interpolated data
                 interp_data = np.column_stack((timestamps_interp, cmd_v_interp, cmd_fd_interp, dh_interp, dw_interp))

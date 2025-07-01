@@ -23,7 +23,8 @@ def main():
 
     test_current = False
     test_thermal = False
-    test_geometry = True
+    test_thermal_collected = True
+    test_geometry = False
 
     ############## Robot definition ##############
     config_dir='../../config/'
@@ -108,7 +109,7 @@ def main():
 
                 ##### pixel tracing moving #####
                 moving_dx = -rob_translation[0] * cam_pixel_moving_ratio
-                moving_dy = rob_translation[1] * cam_pixel_moving_ratio
+                moving_dy = rob_translation[2] * cam_pixel_moving_ratio
                 # add trace dxdy and stamp to the list
                 trace_dxdy.append(np.array([moving_dx, moving_dy]))
                 trace_stamps.append(stamp)
@@ -214,6 +215,14 @@ def main():
                         thermal_trace_stamp[-1].insert(0, move_stamp)
                         thermal_workpiece_x_trace[-1].insert(0, thermal_workpiece_x_trace[-1][0])
 
+            
+            # find the thermal distribution at the same z level
+            thermal_dist_torch_pixel_x = np.arange(0, img_width, 1)
+            thermal_dist_torch_table_x = -1*(thermal_dist_torch_pixel_x-pixel_coord[0])*(1/cam_pixel_moving_ratio) + T_table_torch.p[0]
+            # only keep the pixels with x >= -55 mm, <= 55 mm
+            thermal_dist_torch_pixel_x = thermal_dist_torch_pixel_x[(thermal_dist_torch_table_x >= -55)&(thermal_dist_torch_table_x <= 55)]
+            thermal_dist_torch_pixel = np.vstack((thermal_dist_torch_pixel_x, np.full_like(thermal_dist_torch_pixel_x, pixel_coord[1]))).T
+
             plt.clf()
             # plt.imshow(np.clip(ir_image,7000,10000), cmap='hot', aspect='equal')
             plt.imshow(np.log10(ir_image), cmap='hot', aspect='equal')
@@ -226,11 +235,12 @@ def main():
             #         # if pixel within the image
             #         if 0 <= trace[0] < img_width-1 and 0 <= trace[1] < img_height-1:
             #             plt.scatter(trace[0], trace[1], c=cmap_trace(trace_id % 10), s=10)
-            plt.scatter(thermal_pixel_trace[::4,0], thermal_pixel_trace[::4,1], c='b', s=5, label='Traced pixels')
+            # plt.scatter(thermal_pixel_trace[::4,0], thermal_pixel_trace[::4,1], c='b', s=5, label='Traced pixels')
+            plt.scatter(thermal_dist_torch_pixel[:,0], thermal_dist_torch_pixel[:,1], c='b', s=5, label='Thermal distribution at torch x')
             # plt.colorbar(format='%.2f')
             plt.pause(0.000001)
 
-            # input('')
+            input('')
 
         thermal_trace_stamp_full = []
         thermal_workpiece_x_trace_full = []
@@ -275,6 +285,52 @@ def main():
         ax.set_zlabel('Pixel Value (Counts)')
         plt.show()
 
+    ###### viz thermal collected ####
+    if test_thermal_collected:
+        profile_welding = np.loadtxt(this_layer_dir+'profile_welding.csv',delimiter=',',skiprows=1)
+        with open(this_layer_dir+'thermal_pixel_trace.pickle', 'rb') as f:
+            thermal_dist = pickle.load(f)
+        
+        thermal_sample_x = thermal_dist.keys()
+        thermal_sample_t = []
+        thermal_sample_x_full = []
+        thermal_sample_t_full = []
+        thermal_reading_full = []
+        for thermal_x in thermal_sample_x:
+            thermal_sample_x_full.extend(np.repeat(thermal_x, len(thermal_dist[thermal_x]['time'])))
+            thermal_sample_t_full.extend(thermal_dist[thermal_x]['time'])
+            thermal_reading_full.extend(thermal_dist[thermal_x]['value'])
+            thermal_sample_t.extend(np.setdiff1d(thermal_dist[thermal_x]['time'], thermal_sample_t))
+        thermal_sample_x_full = np.array(thermal_sample_x_full)
+        thermal_sample_t_full = np.array(thermal_sample_t_full)
+        thermal_reading_full = np.array(thermal_reading_full)
+        thermal_sample_t = np.sort(np.array(thermal_sample_t))
+
+        for viz_t in thermal_sample_t:
+            if viz_t < profile_welding[0,0]:
+                continue
+            # find the closest timestamp in profile_welding
+            time_id = np.where(profile_welding[:,0] <= viz_t)[0][-1]
+            profile_welding_x = profile_welding[time_id,1]
+            # find all thermal readings and x
+            this_x = thermal_sample_x_full[thermal_sample_t_full == viz_t]
+            this_reading = thermal_reading_full[thermal_sample_t_full == viz_t]
+            x_sorted_id = np.argsort(this_x)
+            this_x = this_x[x_sorted_id]
+            this_reading = this_reading[x_sorted_id]
+            # viz in inertial frame
+            this_x = this_x - profile_welding_x
+            plt.clf()
+            plt.plot(this_x, this_reading, 'o')
+            plt.title(f'Thermal Reading at {viz_t-profile_welding[0,0]:.2f} s')
+            plt.xlim(-57, 57)
+            plt.ylim(8000, 25000)
+            plt.xlabel('X Position (mm)')
+            plt.ylabel('Pixel Value (Counts)')
+            plt.grid()
+            plt.pause(0.1)
+
+    ###### viz geometry #####
     if test_geometry:
         # profile_welding = np.loadtxt(this_layer_dir+'profile_welding.csv',delimiter=',',skiprows=1)
         # last_profile_welding = np.loadtxt(last_layer_dir+'profile_welding.csv',delimiter=',',skiprows=1)

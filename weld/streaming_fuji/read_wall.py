@@ -241,7 +241,7 @@ def main():
 
                             ##### pixel tracing moving #####
                             moving_dx = -rob_translation[0] * cam_pixel_moving_ratio
-                            moving_dy = rob_translation[1] * cam_pixel_moving_ratio
+                            moving_dy = rob_translation[2] * cam_pixel_moving_ratio
                             # add trace dxdy and stamp to the list
                             trace_dxdy.append(np.array([moving_dx, moving_dy]))
                             trace_stamps.append(stamp)
