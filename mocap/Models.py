@@ -273,8 +273,13 @@ class LSTMModel(nn.Module):
     def forward(self, x_true, u):
         h0 = torch.zeros(self.num_layers, u.size(0), self.hidden_size).to(self.device)
         c0 = torch.zeros(self.num_layers, u.size(0), self.hidden_size).to(self.device)
+        out_0 = self.fc(h0.squeeze(0))  # shape: (batch, output_size)
+        out_0 = out_0.unsqueeze(1)
         out, _ = self.lstm(u, (h0, c0))
         out = self.fc(out)  # Get the last time step's output
+        out = torch.cat([out_0, out], dim=1)  # Concatenate initial output with the rest
+        out = out[:, :-1, :]  # Remove the last time step to match the
+        out = out.contiguous()  # Ensure the output is contiguous in memory
         return out
 
 # LSTM model for autoregression
@@ -291,14 +296,17 @@ class LSTMAutoRegressionModel(nn.Module):
     def forward(self, x_true, u):
         batch_size, seq_len, _ = x_true.size()
 
+        predictions = []
         # Initial hidden states
         h_t = torch.zeros(batch_size, self.hidden_size, device=self.device)
         c_t = torch.zeros(batch_size, self.hidden_size, device=self.device)
-        # Initial error is zero
-        error = torch.zeros_like(x_true[:, 0, :])  
-        predictions = []
+        y_pred = self.fc(h_t)  # Initial output
+        predictions.append(y_pred)
+        # Initial error
+        error = x_true[:, self.history_length, :] - y_pred
+        
 
-        for t in range(self.history_length,seq_len):
+        for t in range(self.history_length,seq_len-1):
             u_t = torch.flatten(u[:, t-self.history_length+1:t, :],start_dim=1)  # (batch, history_length * input_size)
             u_t = torch.cat([u[:, t, :], u_t], dim=1)  # (batch, current_input + history_length * input_size)
             y_t = torch.flatten(x_true[:, t-self.history_length:t, :], start_dim=1)  # (batch, history_length * output_size)
@@ -309,7 +317,7 @@ class LSTMAutoRegressionModel(nn.Module):
             y_pred = self.fc(h_t)
             predictions.append(y_pred)
 
-            error = x_true[:, t, :] - y_pred
+            error = x_true[:, t+1, :] - y_pred
 
         predictions = torch.stack(predictions, dim=1)
         return predictions
@@ -326,8 +334,14 @@ class RNNModel(nn.Module):
 
     def forward(self, x_true, u):
         h0 = torch.zeros(self.num_layers, u.size(0), self.hidden_size).to(self.device)
+        out_0 = self.fc(h0.squeeze(0))  # shape: (batch, output_size)
+        out_0 = out_0.unsqueeze(1)
         out, _ = self.rnn(u, h0)
         out = self.fc(out)  # Get the last time step's output
+        # Concatenate initial output with the rest
+        out = torch.cat([out_0, out], dim=1)
+        out = out[:, :-1, :]  # Remove the last time step to match the input sequence length
+        out = out.contiguous()  # Ensure the output is contiguous in memory
         return out
 
 
@@ -371,13 +385,16 @@ class RNNAutoRegressionModel(nn.Module):
     def forward(self, x_true, u):
         batch_size, seq_len, _ = x_true.size()
 
-        # Initial hidden states
-        h_t = torch.zeros(batch_size, self.hidden_size, device=self.device)
-        # Initial error is zero
-        error = torch.zeros_like(x_true[:, 0, :],device=self.device)
         predictions = []
 
-        for t in range(self.history_length, seq_len):
+        # Initial hidden states
+        h_t = torch.zeros(batch_size, self.hidden_size, device=self.device)
+        # Initial error is x_true[:, self.history_length, :] - fc(h_t)
+        y_pred = self.fc(h_t)
+        predictions.append(y_pred)
+        error = x_true[:, self.history_length, :] - y_pred
+
+        for t in range(self.history_length, seq_len-1):
             if not self.open_loop:
                 u_t = torch.flatten(u[:, t-self.history_length+1:t, :], start_dim=1)  # (batch, history_length * input_size)
                 u_t = torch.cat([u[:, t, :], u_t], dim=1)
@@ -391,7 +408,7 @@ class RNNAutoRegressionModel(nn.Module):
             y_pred = self.fc(h_t)
             predictions.append(y_pred)
 
-            error = x_true[:, t, :] - y_pred
+            error = x_true[:, t+1, :] - y_pred
 
         predictions = torch.stack(predictions, dim=1)
         return predictions
@@ -408,8 +425,14 @@ class GRUModel(nn.Module):
 
     def forward(self, x_true, u):
         h0 = torch.zeros(self.num_layers, u.size(0), self.hidden_size).to(self.device)
+        out_0 = self.fc(h0.squeeze(0))  # shape: (batch, output_size)
+        out_0 = out_0.unsqueeze(1)
         out, _ = self.gru(u, h0)
         out = self.fc(out)  # Get the last time step's output
+        # Concatenate initial output with the rest
+        out = torch.cat([out_0, out], dim=1)
+        out = out[:, :-1, :]  # Remove the last time step to match the input sequence length
+        out = out.contiguous()  # Ensure the output is contiguous in memory
         return out
 
 # GRU Model for autoregression
@@ -426,13 +449,16 @@ class GRUAutoRegressionModel(nn.Module):
     def forward(self, x_true, u):
         batch_size, seq_len, _ = x_true.size()
 
+        predictions = []
         # Initial hidden states
         h_t = torch.zeros(batch_size, self.hidden_size, device=self.device)
-        # Initial error is zero
-        error = torch.zeros_like(x_true[:, 0, :])  
-        predictions = []
+        # Initial output
+        y_pred = self.fc(h_t)
+        predictions.append(y_pred)
+        # Initial error
+        error = x_true[:, self.history_length, :] - y_pred
 
-        for t in range(self.history_length, seq_len):
+        for t in range(self.history_length, seq_len-1):
             u_t = torch.flatten(u[:, t-self.history_length+1:t, :], start_dim=1)  # (batch, history_length * input_size)
             u_t = torch.cat([u[:, t, :], u_t], dim=1)
             y_t = torch.flatten(x_true[:, t-self.history_length:t, :], start_dim=1)
@@ -443,7 +469,7 @@ class GRUAutoRegressionModel(nn.Module):
             y_pred = self.fc(h_t)
             predictions.append(y_pred)
 
-            error = x_true[:, t, :] - y_pred
-        
+            error = x_true[:, t+1, :] - y_pred
+
         predictions = torch.stack(predictions, dim=1)
         return predictions
