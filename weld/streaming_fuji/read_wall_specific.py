@@ -308,12 +308,11 @@ def main():
 
         
         # Define radial basis functions (Gaussians)
-        centers = np.linspace(-70, 70, 35)  # 10 basis functions
-        width = 4.0  # width of each RBF
+        centers = np.linspace(-60, 60, 20)  # 10 basis functions
+        width = np.diff(centers)[0]/np.sqrt(2*np.log(2))  # width of each RBF
         rbf = lambda x, c, w: np.exp(-((x - c) ** 2) / (2 * w ** 2))
-        
-        
-        for viz_t in thermal_sample_t:
+
+        for vix_i,viz_t in enumerate(thermal_sample_t):
             if viz_t < profile_welding[0,0]:
                 continue
 
@@ -328,6 +327,9 @@ def main():
             this_reading = this_reading[x_sorted_id]
             # viz in inertial frame
             this_x = this_x - profile_welding_x
+            
+            this_reading = this_reading[(this_x >= -55) & (this_x <= 55)]  # limit to the range of interest
+            this_x = this_x[(this_x >= -55) & (this_x <= 55)]  # limit to the range of interest
 
             # Solve least squares to find projection coefficients
             # Construct RBF matrix
@@ -337,13 +339,12 @@ def main():
             # Reconstruct the projected signal
             projection = Phi @ coeffs
 
-
             plt.clf()
             plt.plot(this_x, this_reading, 'o')
             plt.plot(this_x, projection, label="RBF Projection", linestyle="--")
             plt.title(f'Thermal Reading at {viz_t-profile_welding[0,0]:.2f} s')
             plt.xlim(-57, 57)
-            plt.ylim(8000, 25000)
+            plt.ylim(8000, 26500)
             plt.xlabel('X Position (mm)')
             plt.ylabel('Pixel Value (Counts)')
             plt.grid()
