@@ -189,8 +189,8 @@ if __name__ == "__main__":
         else:
             open_loop = True if model_input_size == 2 else False
         
-        if model_type == 'NARMA':
-            exit("Skip  training ")
+        # if model_type == 'NARMA':
+        #     exit("Skip  training ")
 
     print("Training parameters:")
     print("Model type:", model_type, "Model input size:", model_input_size, "Model hidden size:", model_hidden_size)
