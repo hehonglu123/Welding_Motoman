@@ -176,7 +176,6 @@ if __name__ == "__main__":
         sample_rate = training_params['sample_rate']
         train_test_split = training_params['train_test_split']
         epochs = training_params['epochs']
-        epochs=10 # for testing, set to 10 epochs
         sequence_length = training_params['sequence_length']
         sample_sequence_overlap = training_params['sample_sequence_overlap']
         learning_rate = training_params['learning_rate']
