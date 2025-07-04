@@ -162,7 +162,7 @@ if __name__ == "__main__":
             yaml.dump(training_params, f, default_flow_style=False)
     else:
         if len(sys.argv) < 2:
-            model_dir = model_dir+ 'model_20250625_132020/' # 20250625_132020, 20250625_131520, 20250625_131753, 20250625_131507
+            model_dir = model_dir+ 'model_20250625_131753/' # 20250625_132020, 20250625_131520, 20250625_131753, 20250625_131507
         else:
             model_dir = model_dir + sys.argv[2] + '/'
                     
@@ -370,143 +370,155 @@ if __name__ == "__main__":
     print("Train data input shape: ", train_data_input.shape)
     print("Train data labels shape: ", train_data_labels.shape)
     
-    # if train_flag:
-    #     # training loop
-    start_time = time.time()
-    _, training_loss, testing_loss = train(train_data_input, train_data_labels, test_data_input, test_data_labels, model,\
-                                            history_length, epochs, learning_rate, model_dir=model_dir)
-    end_time = time.time()
-    print(f"Training completed in {end_time - start_time:.2f} seconds.")
-    model.load_state_dict(torch.load(model_dir+'best_model.pth',weights_only=True)) # load the best model for evaluation
-    # save loss
-    np.savetxt(model_dir+'training_loss.csv', training_loss, delimiter=',')
-    np.savetxt(model_dir+'testing_loss.csv', testing_loss, delimiter=',')
-    np.savetxt(model_dir+'training_time.csv', np.array([end_time - start_time]), delimiter=',')
-    # else:
-    #     # load the pre-trained model
-    #     model.load_state_dict(torch.load(model_dir+'best_model.pth',weights_only=True))
+    if train_flag:
+        # training loop
+        start_time = time.time()
+        _, training_loss, testing_loss = train(train_data_input, train_data_labels, test_data_input, test_data_labels, model,\
+                                                history_length, epochs, learning_rate, model_dir=model_dir)
+        end_time = time.time()
+        print(f"Training completed in {end_time - start_time:.2f} seconds.")
+        model.load_state_dict(torch.load(model_dir+'best_model.pth',weights_only=True)) # load the best model for evaluation
+        # save loss
+        np.savetxt(model_dir+'training_loss.csv', training_loss, delimiter=',')
+        np.savetxt(model_dir+'testing_loss.csv', testing_loss, delimiter=',')
+        np.savetxt(model_dir+'training_time.csv', np.array([end_time - start_time]), delimiter=',')
+    else:
+        # load the pre-trained model
+        model.load_state_dict(torch.load(model_dir+'best_model.pth',weights_only=True))
 
-    #     # test_u = np.zeros((1,1000,2))
-    #     # test_u = torch.tensor(test_u, dtype=torch.float32).to(device)
-    #     # test_x = np.ones((1,1000,2))*2 # 1 sample, 1000 time steps, model_input_size features
-    #     # test_x = torch.tensor(test_x, dtype=torch.float32).to(device)
-    #     # model.eval()
-    #     # with torch.no_grad():
-    #     #     test_y = model(test_x, test_u)
-    #     # test_y = test_y.cpu().numpy().astype(np.float64)
-    #     # plt.plot(test_y[0,:,0], label='dh prediction')
-    #     # plt.plot(test_y[0,:,1], label='dw prediction')
-    #     # plt.xlabel('Time Step', fontsize=xy_label_size)
-    #     # plt.ylabel('Prediction', fontsize=xy_label_size)
-    #     # plt.title('Model Prediction', fontsize=title_size)
-    #     # plt.legend(fontsize=legend_size)
-    #     # plt.show()
+        # test_u = np.zeros((1,1000,2))
+        # test_u = torch.tensor(test_u, dtype=torch.float32).to(device)
+        # test_x = np.ones((1,1000,2))*2 # 1 sample, 1000 time steps, model_input_size features
+        # test_x = torch.tensor(test_x, dtype=torch.float32).to(device)
+        # model.eval()
+        # with torch.no_grad():
+        #     test_y = model(test_x, test_u)
+        # test_y = test_y.cpu().numpy().astype(np.float64)
+        # plt.plot(test_y[0,:,0], label='dh prediction')
+        # plt.plot(test_y[0,:,1], label='dw prediction')
+        # plt.xlabel('Time Step', fontsize=xy_label_size)
+        # plt.ylabel('Prediction', fontsize=xy_label_size)
+        # plt.title('Model Prediction', fontsize=title_size)
+        # plt.legend(fontsize=legend_size)
+        # plt.show()
 
-    #     print("Loaded pre-trained model from: ", model_dir+'best_model.pth')
-    #     training_loss = np.loadtxt(model_dir+'training_loss.csv', delimiter=',')
-    #     testing_loss = np.loadtxt(model_dir+'testing_loss.csv', delimiter=',')
+        print("Loaded pre-trained model from: ", model_dir+'best_model.pth')
+        training_loss = np.loadtxt(model_dir+'training_loss.csv', delimiter=',')
+        testing_loss = np.loadtxt(model_dir+'testing_loss.csv', delimiter=',')
 
-    #     # visualize the parameters
-    #     if model_type == 'RNN':
-    #         open_loop_string = 'Open Loop' if open_loop else 'Closed Loop'
-    #         if open_loop:
-    #             Whh = model.rnn.weight_hh_l0.detach().cpu().numpy().astype(np.float64)
-    #             Wih = model.rnn.weight_ih_l0.detach().cpu().numpy().astype(np.float64)
-    #             bh = model.rnn.bias_hh_l0.detach().cpu().numpy().astype(np.float64)
-    #             bi = model.rnn.bias_ih_l0.detach().cpu().numpy().astype(np.float64)
-    #         else:
-    #             Whh = model.rnn_cell.weight_hh.detach().cpu().numpy().astype(np.float64)
-    #             Wih = model.rnn_cell.weight_ih.detach().cpu().numpy().astype(np.float64)
-    #             bh = model.rnn_cell.bias_hh.detach().cpu().numpy().astype(np.float64)
-    #             bi = model.rnn_cell.bias_ih.detach().cpu().numpy().astype(np.float64)
-    #         Woh = model.fc.weight.detach().cpu().numpy().astype(np.float64)
-    #         bo = model.fc.bias.detach().cpu().numpy().astype(np.float64)
+        # visualize the parameters
+        if model_type == 'RNN':
+            open_loop_string = 'Open Loop' if open_loop else 'Closed Loop'
+            if open_loop:
+                Whh = model.rnn.weight_hh_l0.detach().cpu().numpy().astype(np.float64)
+                Wih = model.rnn.weight_ih_l0.detach().cpu().numpy().astype(np.float64)
+                bh = model.rnn.bias_hh_l0.detach().cpu().numpy().astype(np.float64)
+                bi = model.rnn.bias_ih_l0.detach().cpu().numpy().astype(np.float64)
+            else:
+                Whh = model.rnn_cell.weight_hh.detach().cpu().numpy().astype(np.float64)
+                Wih = model.rnn_cell.weight_ih.detach().cpu().numpy().astype(np.float64)
+                bh = model.rnn_cell.bias_hh.detach().cpu().numpy().astype(np.float64)
+                bi = model.rnn_cell.bias_ih.detach().cpu().numpy().astype(np.float64)
+            Woh = model.fc.weight.detach().cpu().numpy().astype(np.float64)
+            bo = model.fc.bias.detach().cpu().numpy().astype(np.float64)
 
-    #         print("Whh shape:", Whh.shape, "Wih shape:", Wih.shape, "bh shape:", bh.shape, "bi shape:", bi.shape)
-    #         print("Woh shape:", Woh.shape, "bo shape:", bo.shape)
+            print("Whh shape:", Whh.shape, "Wih shape:", Wih.shape, "bh shape:", bh.shape, "bi shape:", bi.shape)
+            print("Woh shape:", Woh.shape, "bo shape:", bo.shape)
 
-    #         # find the equilibrium point of the RNN
-    #         x_eq = np.linalg.pinv(Whh)@(-bh-bi)
-    #         # verify the equilibrium point
-    #         x_eq_check = np.tanh(Whh@x_eq + bi + bh)
-    #         if not np.allclose(x_eq_check, 0, atol=1e-6):
-    #             assert False, "Equilibrium point verification failed, check the RNN parameters."
-    #         A_lin = np.diag(1-(np.tanh(Whh@x_eq + bi + bh)**2)) @ Whh
-    #         print("A_lin, Whh diff:", A_lin - Whh) # A_lin is the same as Whh at the equilibrium point
+            # find the equilibrium point of the RNN
 
-    #         # find the matrix elimited the parameter redundancy
-    #         W_hh_min = Whh + Wih[:,-2:]@Woh
+            # find the matrix elimited the parameter redundancy
+            W_hh_min = Whh + Wih[:,-2:]@Woh
 
-    #         # plot Whh and Wih
-    #         plt.figure(figsize=(12, 6))
-    #         plt.subplot(1, 4, 1)
-    #         plt.imshow(Whh, cmap='viridis', aspect='equal')
-    #         plt.colorbar()
-    #         plt.title(f'RNN $W_{{hh}}$ Matrix', fontsize=title_size)
-    #         plt.xlabel('Hidden Units', fontsize=xy_label_size)
-    #         plt.ylabel('Hidden Units', fontsize=xy_label_size)
-    #         plt.xticks(fontsize=xy_tick_size)
-    #         plt.yticks(fontsize=xy_tick_size)
-    #         plt.subplot(1, 4, 2)
-    #         plt.imshow(Wih, cmap='viridis', aspect='equal')
-    #         plt.colorbar()
-    #         plt.title(f'RNN $W_{{ih}}$ Matrix', fontsize=title_size)
-    #         plt.xlabel('Input Features', fontsize=xy_label_size)
-    #         plt.ylabel('Hidden Units', fontsize=xy_label_size)
-    #         plt.xticks(fontsize=xy_tick_size)
-    #         plt.yticks(fontsize=xy_tick_size)
-    #         plt.suptitle(f'RNN Weight Matrices {open_loop_string}', fontsize=sup_title_size)
-    #         plt.subplot(1, 4, 3)
-    #         plt.imshow(W_hh_min, cmap='viridis', aspect='equal')
-    #         plt.colorbar()
-    #         plt.title(f'RNN $W_{{hh,min}}$ Matrix', fontsize=title_size)
-    #         plt.xlabel('Hidden Units', fontsize=xy_label_size)
-    #         plt.ylabel('Hidden Units', fontsize=xy_label_size)
-    #         plt.xticks(fontsize=xy_tick_size)
-    #         plt.yticks(fontsize=xy_tick_size)
-    #         # plt.subplot(1, 4, 3)
-    #         # plt.imshow(bh.reshape(-1, 1), cmap='viridis', aspect='equal')
-    #         # plt.colorbar()
-    #         # plt.title(f'RNN $b_{{h}}$ Vector', fontsize=title_size)
-    #         # plt.xlabel('Hidden Units', fontsize=xy_label_size)
-    #         # plt.ylabel('Bias', fontsize=xy_label_size)
-    #         # plt.xticks(fontsize=xy_tick_size)
-    #         # plt.yticks(fontsize=xy_tick_size)
-    #         # plt.subplot(1, 4, 4)
-    #         # plt.imshow(bi.reshape(-1, 1), cmap='viridis', aspect='equal')
-    #         # plt.colorbar()
-    #         # plt.title(f'RNN $b_{{i}}$ Vector', fontsize=title_size)
-    #         # plt.xlabel('Input Features', fontsize=xy_label_size)
-    #         # plt.ylabel('Bias', fontsize=xy_label_size)
-    #         # plt.xticks(fontsize=xy_tick_size)
-    #         # plt.yticks(fontsize=xy_tick_size)
-    #         plt.tight_layout()
-    #         plt.show()
+            if not open_loop:
+                prediction,zt = model.forward_linear_mat(test_data_labels, test_data_input)
+                prediction_true = model(test_data_labels, test_data_input)
 
-    #         # eigenvalue decomposition
-    #         eigenvalues, eigenvectors = np.linalg.eig(Whh)
-    #         plt.plot(np.sort(np.abs(eigenvalues))[::-1], 'o')
-    #         plt.title(f'Eigenvalues of RNN $W_{{hh}}$ Matrix ({open_loop_string})', fontsize=title_size)
-    #         plt.xlabel('Index', fontsize=xy_label_size)
-    #         plt.ylabel('Eigenvalue Magnitude', fontsize=xy_label_size)
-    #         plt.xticks(fontsize=xy_tick_size)
-    #         plt.yticks(fontsize=xy_tick_size)
-    #         plt.grid()
-    #         plt.tight_layout()
-    #         plt.show()
+                # make sure prediction and prediction_true are the same
+                assert np.allclose(prediction.detach().cpu().numpy(), prediction_true.detach().cpu().numpy()), "Prediction and prediction_true are not the same!"
 
-    #         eigenvalues, eigenvectors = np.linalg.eig(W_hh_min)
-    #         plt.plot(np.sort(np.abs(eigenvalues))[::-1], 'o')
-    #         plt.title(f'Eigenvalues of RNN $W_{{hh}}$ Matrix ({open_loop_string})', fontsize=title_size)
-    #         plt.xlabel('Index', fontsize=xy_label_size)
-    #         plt.ylabel('Eigenvalue Magnitude', fontsize=xy_label_size)
-    #         plt.xticks(fontsize=xy_tick_size)
-    #         plt.yticks(fontsize=xy_tick_size)
-    #         plt.grid()
-    #         plt.tight_layout()
-    #         plt.show()
+                zt_flatten = zt.view(-1).detach().cpu().numpy()
+                zt_tanh_derivative = 1 - np.tanh(zt_flatten)**2
+                # plot zt_tanh_derivative distribution
+                plt.figure(figsize=(10, 5))
+                plt.hist(zt_tanh_derivative, bins=100, density=True, alpha=0.7, color='blue')
+                plt.title('Distribution of $z_t$ Tanh Derivative', fontsize=title_size)
+                plt.xlabel('$z_t$ Tanh Derivative', fontsize=xy_label_size)
+                plt.ylabel('Density', fontsize=xy_label_size)
+                plt.xticks(fontsize=xy_tick_size)
+                plt.yticks(fontsize=xy_tick_size)
+                plt.grid()
+                plt.tight_layout()
+                plt.show()
 
-    #     exit()
+            # plot Whh and Wih
+            plt.figure(figsize=(12, 6))
+            plt.subplot(1, 4, 1)
+            plt.imshow(Whh, cmap='viridis', aspect='equal')
+            plt.colorbar()
+            plt.title(f'RNN $W_{{hh}}$ Matrix', fontsize=title_size)
+            plt.xlabel('Hidden Units', fontsize=xy_label_size)
+            plt.ylabel('Hidden Units', fontsize=xy_label_size)
+            plt.xticks(fontsize=xy_tick_size)
+            plt.yticks(fontsize=xy_tick_size)
+            plt.subplot(1, 4, 2)
+            plt.imshow(Wih, cmap='viridis', aspect='equal')
+            plt.colorbar()
+            plt.title(f'RNN $W_{{ih}}$ Matrix', fontsize=title_size)
+            plt.xlabel('Input Features', fontsize=xy_label_size)
+            plt.ylabel('Hidden Units', fontsize=xy_label_size)
+            plt.xticks(fontsize=xy_tick_size)
+            plt.yticks(fontsize=xy_tick_size)
+            plt.suptitle(f'RNN Weight Matrices {open_loop_string}', fontsize=sup_title_size)
+            plt.subplot(1, 4, 3)
+            plt.imshow(W_hh_min, cmap='viridis', aspect='equal')
+            plt.colorbar()
+            plt.title(f'RNN $W_{{hh,min}}$ Matrix', fontsize=title_size)
+            plt.xlabel('Hidden Units', fontsize=xy_label_size)
+            plt.ylabel('Hidden Units', fontsize=xy_label_size)
+            plt.xticks(fontsize=xy_tick_size)
+            plt.yticks(fontsize=xy_tick_size)
+            # plt.subplot(1, 4, 3)
+            # plt.imshow(bh.reshape(-1, 1), cmap='viridis', aspect='equal')
+            # plt.colorbar()
+            # plt.title(f'RNN $b_{{h}}$ Vector', fontsize=title_size)
+            # plt.xlabel('Hidden Units', fontsize=xy_label_size)
+            # plt.ylabel('Bias', fontsize=xy_label_size)
+            # plt.xticks(fontsize=xy_tick_size)
+            # plt.yticks(fontsize=xy_tick_size)
+            # plt.subplot(1, 4, 4)
+            # plt.imshow(bi.reshape(-1, 1), cmap='viridis', aspect='equal')
+            # plt.colorbar()
+            # plt.title(f'RNN $b_{{i}}$ Vector', fontsize=title_size)
+            # plt.xlabel('Input Features', fontsize=xy_label_size)
+            # plt.ylabel('Bias', fontsize=xy_label_size)
+            # plt.xticks(fontsize=xy_tick_size)
+            # plt.yticks(fontsize=xy_tick_size)
+            plt.tight_layout()
+            plt.show()
+
+            # eigenvalue decomposition
+            eigenvalues, eigenvectors = np.linalg.eig(Whh)
+            plt.plot(np.sort(np.abs(eigenvalues))[::-1], 'o')
+            plt.title(f'Eigenvalues of RNN $W_{{hh}}$ Matrix ({open_loop_string})', fontsize=title_size)
+            plt.xlabel('Index', fontsize=xy_label_size)
+            plt.ylabel('Eigenvalue Magnitude', fontsize=xy_label_size)
+            plt.xticks(fontsize=xy_tick_size)
+            plt.yticks(fontsize=xy_tick_size)
+            plt.grid()
+            plt.tight_layout()
+            plt.show()
+
+            eigenvalues, eigenvectors = np.linalg.eig(W_hh_min)
+            plt.plot(np.sort(np.abs(eigenvalues))[::-1], 'o')
+            plt.title(f'Eigenvalues of RNN $W_{{hh}}$ Matrix ({open_loop_string})', fontsize=title_size)
+            plt.xlabel('Index', fontsize=xy_label_size)
+            plt.ylabel('Eigenvalue Magnitude', fontsize=xy_label_size)
+            plt.xticks(fontsize=xy_tick_size)
+            plt.yticks(fontsize=xy_tick_size)
+            plt.grid()
+            plt.tight_layout()
+            plt.show()
 
     # plot training and testing loss
     plt.figure(figsize=(10, 5))
@@ -532,6 +544,53 @@ if __name__ == "__main__":
         train_dw_error = (train_predictions[:, :, 1] - train_data_labels[:, history_length:, 1]).cpu().numpy().flatten()
         test_dh_error = (test_predictions[:, :, 0] - test_data_labels[:, history_length:, 0]).cpu().numpy().flatten()
         test_dw_error = (test_predictions[:, :, 1] - test_data_labels[:, history_length:, 1]).cpu().numpy().flatten()
+    # plot test data prediction dh dw vs ground truth dh dw of four sequences, using a 2x2 grid
+    layer_dir_chosen = np.random.choice(test_data_dir_tote[0], size=4, replace=False)
+    dh_prediction_gt = []
+    dw_prediction_gt = []
+    timstamps_layer = []
+    for i, dir_name in enumerate(layer_dir_chosen):
+        this_layer = np.loadtxt(dir_name+'profile_welding_'+str(sample_rate)+'_dhdw.csv', delimiter=',', skiprows=1)
+        gt_labels = this_layer[:, 3:5]  # dh, dw
+        control_inputs = this_layer[:, 1:3]  # cmd_v, cmd_fd
+        control_inputs[:, 0] = (control_inputs[:, 0] - min_v) / (max_v - min_v)  # normalize cmd_v
+        control_inputs[:, 1] = (control_inputs[:, 1] - min_feedrate) / (max_feedrate - min_feedrate)  # normalize cmd_fd
+        # to tensor with shape (1, sequence_length, 2)
+        gt_labels = torch.tensor(gt_labels, dtype=torch.float32).unsqueeze(0).to(device)
+        control_inputs = torch.tensor(control_inputs, dtype=torch.float32).unsqueeze(0).to(device)
+        model.eval()
+        with torch.no_grad():
+            predictions = model(gt_labels, control_inputs)
+            predictions = predictions.cpu().numpy().astype(np.float64).squeeze(0)
+            gt_labels = gt_labels.cpu().numpy().astype(np.float64).squeeze(0)
+        dh_prediction_gt.append(np.vstack((predictions[:, 0], gt_labels[:, 0])))
+        dw_prediction_gt.append(np.vstack((predictions[:, 1], gt_labels[:, 1])))
+        timstamps_layer.append(this_layer[:, 0])
+
+    fig, axs = plt.subplots(2, 2, figsize=(12, 8))
+    for i, dh in enumerate(dh_prediction_gt):
+        axs[i//2, i%2].plot(timstamps_layer[i], dh[0], label='Predicted dh', color='tab:blue')
+        axs[i//2, i%2].plot(timstamps_layer[i], dh[1], label='Ground Truth dh', color='tab:orange')
+        axs[i//2, i%2].set_title(f'Sequence {i+1} - dh Prediction', fontsize=title_size)
+        axs[i//2, i%2].set_xlabel('Time Step', fontsize=xy_label_size)
+        axs[i//2, i%2].set_ylabel('dh', fontsize=xy_label_size)
+        axs[i//2, i%2].legend(fontsize=legend_size)
+        axs[i//2, i%2].grid()
+    plt.suptitle('Test Data dh Prediction vs Ground Truth, ' + open_loop_string, fontsize=sup_title_size)
+    plt.show()
+
+    fig, axs = plt.subplots(2, 2, figsize=(12, 8))
+    for i, dw in enumerate(dw_prediction_gt):
+        axs[i//2, i%2].plot(timstamps_layer[i], dw[0], label='Predicted dw', color='tab:blue')
+        axs[i//2, i%2].plot(timstamps_layer[i], dw[1], label='Ground Truth dw', color='tab:orange')
+        axs[i//2, i%2].set_title(f'Sequence {i+1} - dw Prediction', fontsize=title_size)
+        axs[i//2, i%2].set_xlabel('Time Step', fontsize=xy_label_size)
+        axs[i//2, i%2].set_ylabel('dw', fontsize=xy_label_size)
+        axs[i//2, i%2].legend(fontsize=legend_size)
+        axs[i//2, i%2].grid()
+    plt.suptitle('Test Data dw Prediction vs Ground Truth, ' + open_loop_string, fontsize=sup_title_size)
+    plt.show()
+    
     # save the errors
     np.savetxt(model_dir+'train_dh_error.csv', train_dh_error, delimiter=',')
     np.savetxt(model_dir+'train_dw_error.csv', train_dw_error, delimiter=',')
