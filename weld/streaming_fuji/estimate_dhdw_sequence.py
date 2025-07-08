@@ -84,18 +84,19 @@ if __name__ == "__main__":
     if train_flag:
 
         # parameters
-        model_type = 'NARMA' # 'LSTM', 'RNN', 'GRU', 'NARMA', 'DTRNN'
+        model_type = 'RNN' # 'LSTM', 'RNN', 'GRU', 'NARMA', 'DTRNN'
         sample_rate = 10 # Hz, using the rate of ir camera
         train_test_split = 0.8 # 80% for training, 20% for testing
         epochs = 5000 # number of epochs for training
         sequence_length = 40 # sequence length for training
         sample_sequence_overlap = 0.5 # overlap between sequences, 0.5 means 50% overlap
         learning_rate = 0.001 # learning rate for training
+        # latency = 1
 
         # model parameters
         # model_input_size = 18 # (cmd_v, cmd_fd)_(t,t-1,t-2), (dh,dw)_(t-1,t-2,t-3), (dh dw error)_(t-1,t-2,t-3)
-        model_input_size = 12 # (cmd_v, cmd_fd)_(t,t-1,t-2), (dh,dw)_(t-1,t-2,t-3), (dh dw error)_(t-1,t-2,t-3)
-        # model_input_size = 4 # cmd_v, cmd_fd, dh error, dw error
+        # model_input_size = 12 # (cmd_v, cmd_fd)_(t,t-1,t-2), (dh,dw)_(t-1,t-2,t-3), (dh dw error)_(t-1,t-2,t-3)
+        model_input_size = 4 # cmd_v, cmd_fd, dh error, dw error
         # model_input_size = 2 # cmd_v, cmd_fd
         model_hidden_size = 3 # hidden size
         num_layers = 1 # number of layers
@@ -545,12 +546,19 @@ if __name__ == "__main__":
         test_dh_error = (test_predictions[:, :, 0] - test_data_labels[:, history_length:, 0]).cpu().numpy().flatten()
         test_dw_error = (test_predictions[:, :, 1] - test_data_labels[:, history_length:, 1]).cpu().numpy().flatten()
     # plot test data prediction dh dw vs ground truth dh dw of four sequences, using a 2x2 grid
-    layer_dir_chosen = np.random.choice(test_data_dir_tote[0], size=4, replace=False)
+    layer_dir_chosen = np.random.choice(test_data_dir_tote[0], size=8, replace=False)
+    layer_dir_chosen = layer_dir_chosen[[0,3,5,7]]  # choose 4 layers for visualization
+    chosen_VPD_feedrate = []
     dh_prediction_gt = []
     dw_prediction_gt = []
-    timstamps_layer = []
+    timestamps_layer = []
     for i, dir_name in enumerate(layer_dir_chosen):
         this_layer = np.loadtxt(dir_name+'profile_welding_'+str(sample_rate)+'_dhdw.csv', delimiter=',', skiprows=1)
+        with open(dir_name+'../weld_meta_data.yml', 'r') as f:
+            meta_data = yaml.safe_load(f)
+            this_vpd = meta_data['VPD']
+        this_feedrate = this_layer[0, 2]
+        chosen_VPD_feedrate.append((this_vpd, this_feedrate))
         gt_labels = this_layer[:, 3:5]  # dh, dw
         control_inputs = this_layer[:, 1:3]  # cmd_v, cmd_fd
         control_inputs[:, 0] = (control_inputs[:, 0] - min_v) / (max_v - min_v)  # normalize cmd_v
@@ -565,30 +573,34 @@ if __name__ == "__main__":
             gt_labels = gt_labels.cpu().numpy().astype(np.float64).squeeze(0)
         dh_prediction_gt.append(np.vstack((predictions[:, 0], gt_labels[:, 0])))
         dw_prediction_gt.append(np.vstack((predictions[:, 1], gt_labels[:, 1])))
-        timstamps_layer.append(this_layer[:, 0])
+        timestamps_layer.append(this_layer[:, 0])
 
     fig, axs = plt.subplots(2, 2, figsize=(12, 8))
     for i, dh in enumerate(dh_prediction_gt):
-        axs[i//2, i%2].plot(timstamps_layer[i], dh[0], label='Predicted dh', color='tab:blue')
-        axs[i//2, i%2].plot(timstamps_layer[i], dh[1], label='Ground Truth dh', color='tab:orange')
-        axs[i//2, i%2].set_title(f'Sequence {i+1} - dh Prediction', fontsize=title_size)
+        axs[i//2, i%2].plot(timestamps_layer[i]-timestamps_layer[i][0], dh[0], label=f'Predicted $\Delta h$', color='tab:blue')
+        axs[i//2, i%2].plot(timestamps_layer[i]-timestamps_layer[i][0], dh[1], label=f'Ground Truth $\Delta h$', color='tab:orange')
+        axs[i//2, i%2].set_title(f'Sequence {i+1} - VPD: {round(chosen_VPD_feedrate[i][0])}, Feedrate: {round(chosen_VPD_feedrate[i][1])}', fontsize=title_size)
         axs[i//2, i%2].set_xlabel('Time Step', fontsize=xy_label_size)
-        axs[i//2, i%2].set_ylabel('dh', fontsize=xy_label_size)
+        axs[i//2, i%2].set_ylabel(f'$\Delta h$', fontsize=xy_label_size)
+        axs[i//2, i%2].tick_params(axis='x', labelsize=xy_tick_size)
+        axs[i//2, i%2].tick_params(axis='y', labelsize=xy_tick_size)
         axs[i//2, i%2].legend(fontsize=legend_size)
         axs[i//2, i%2].grid()
-    plt.suptitle('Test Data dh Prediction vs Ground Truth, ' + open_loop_string, fontsize=sup_title_size)
+    plt.suptitle(f'Test Data $\Delta h$ Prediction vs Ground Truth, ' + open_loop_string, fontsize=sup_title_size)
     plt.show()
 
     fig, axs = plt.subplots(2, 2, figsize=(12, 8))
     for i, dw in enumerate(dw_prediction_gt):
-        axs[i//2, i%2].plot(timstamps_layer[i], dw[0], label='Predicted dw', color='tab:blue')
-        axs[i//2, i%2].plot(timstamps_layer[i], dw[1], label='Ground Truth dw', color='tab:orange')
-        axs[i//2, i%2].set_title(f'Sequence {i+1} - dw Prediction', fontsize=title_size)
+        axs[i//2, i%2].plot(timestamps_layer[i]-timestamps_layer[i][0], dw[0], label='Predicted $width$', color='tab:blue')
+        axs[i//2, i%2].plot(timestamps_layer[i]-timestamps_layer[i][0], dw[1], label='Ground Truth $width$', color='tab:orange')
+        axs[i//2, i%2].set_title(f'Sequence {i+1} - VPD: {round(chosen_VPD_feedrate[i][0])}, Feedrate: {round(chosen_VPD_feedrate[i][1])}', fontsize=title_size)
         axs[i//2, i%2].set_xlabel('Time Step', fontsize=xy_label_size)
-        axs[i//2, i%2].set_ylabel('dw', fontsize=xy_label_size)
+        axs[i//2, i%2].set_ylabel('$width$', fontsize=xy_label_size)
+        axs[i//2, i%2].tick_params(axis='x', labelsize=xy_tick_size)
+        axs[i//2, i%2].tick_params(axis='y', labelsize=xy_tick_size)
         axs[i//2, i%2].legend(fontsize=legend_size)
         axs[i//2, i%2].grid()
-    plt.suptitle('Test Data dw Prediction vs Ground Truth, ' + open_loop_string, fontsize=sup_title_size)
+    plt.suptitle(f'Test Data $width$ Prediction vs Ground Truth, ' + open_loop_string, fontsize=sup_title_size)
     plt.show()
     
     # save the errors

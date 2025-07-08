@@ -26,6 +26,9 @@ for model_dir in model_dirs:
     test_dh_error = np.loadtxt(os.path.join(model_dir, "test_dh_error.csv"), delimiter=',')
     # load test_dw_error
     test_dw_error = np.loadtxt(os.path.join(model_dir, "test_dw_error.csv"), delimiter=',')
+    # load training time elapsed
+    training_time_elapsed = np.loadtxt(os.path.join(model_dir, "training_time.csv"), delimiter=',')
+    training_time_elapsed = float(training_time_elapsed)
     # get the model type
     model_type = params['model_type']
     # get the input size
@@ -48,6 +51,9 @@ for model_dir in model_dirs:
         model_performance[model_type][model_hidden_size]['test_dw_error'] = np.mean(np.abs(test_dw_error))
         model_performance[model_type][model_hidden_size]['test_dh_error_95'] = stats.expon(scale=np.std(test_dh_error)).interval(0.95)[1]
         model_performance[model_type][model_hidden_size]['test_dw_error_95'] = stats.expon(scale=np.std(test_dw_error)).interval(0.95)[1]
+        model_performance[model_type][model_hidden_size]['test_dh_error_max'] = np.max(np.abs(test_dh_error))
+        model_performance[model_type][model_hidden_size]['test_dw_error_max'] = np.max(np.abs(test_dw_error))
+        model_performance[model_type][model_hidden_size]['training_time_elapsed'] = round(training_time_elapsed)
         model_dir_names[model_type][model_hidden_size] = model_dir
     elif model_input_size==model_open_loop_inputsize[model_type] or model_open_loop:
         if model_hidden_size not in model_performance_openloop[model_type]:
@@ -57,6 +63,9 @@ for model_dir in model_dirs:
         model_performance_openloop[model_type][model_hidden_size]['test_dw_error'] = np.mean(np.abs(test_dw_error))
         model_performance_openloop[model_type][model_hidden_size]['test_dh_error_95'] = stats.expon(scale=np.std(test_dh_error)).interval(0.95)[1]
         model_performance_openloop[model_type][model_hidden_size]['test_dw_error_95'] = stats.expon(scale=np.std(test_dw_error)).interval(0.95)[1]
+        model_performance_openloop[model_type][model_hidden_size]['test_dh_error_max'] = np.max(np.abs(test_dh_error))
+        model_performance_openloop[model_type][model_hidden_size]['test_dw_error_max'] = np.max(np.abs(test_dw_error))
+        model_performance_openloop[model_type][model_hidden_size]['training_time_elapsed'] = round(training_time_elapsed)
         model_dir_names_openloop[model_type][model_hidden_size] = model_dir
     else:
         continue
@@ -74,8 +83,14 @@ table_string["Closed loop dh 95 error"] = "| Hidden Size | " + " | ".join(model_
 table_string["Closed loop dh 95 error"] += "|-------------|" + " | ".join(["---"] * len(model_performance.keys())) + " |\n"
 table_string["Closed loop dw 95 error"] = "| Hidden Size | " + " | ".join(model_performance.keys()) + " |\n"
 table_string["Closed loop dw 95 error"] += "|-------------|" + " | ".join(["---"] * len(model_performance.keys())) + " |\n"
+table_string["Closed loop dh max error"] = "| Hidden Size | " + " | ".join(model_performance.keys()) + " |\n"
+table_string["Closed loop dh max error"] += "|-------------|" + " | ".join(["---"] * len(model_performance.keys())) + " |\n"
+table_string["Closed loop dw max error"] = "| Hidden Size | " + " | ".join(model_performance.keys()) + " |\n"
+table_string["Closed loop dw max error"] += "|-------------|" + " | ".join(["---"] * len(model_performance.keys())) + " |\n"
 table_string["Closed loop dir"] = "| Hidden Size | " + " | ".join(model_performance.keys()) + " |\n"
 table_string["Closed loop dir"] += "|-------------|" + " | ".join(["---"] * len(model_performance.keys())) + " |\n"
+table_string["Closed loop training time"] = "| Hidden Size | " + " | ".join(model_performance.keys()) + " |\n"
+table_string["Closed loop training time"] += "|-------------|" + " | ".join(["---"] * len(model_performance.keys())) + " |\n"
 table_string["Open loop testing loss"] = "| Hidden Size | " + " | ".join(model_performance_openloop.keys()) + " |\n"
 table_string["Open loop testing loss"] += "|-------------|" + " | ".join(["---"] * len(model_performance_openloop.keys())) + " |\n"
 table_string["Open loop dh mean error"] = "| Hidden Size | " + " | ".join(model_performance_openloop.keys()) + " |\n"
@@ -86,6 +101,12 @@ table_string["Open loop dh 95 error"] = "| Hidden Size | " + " | ".join(model_pe
 table_string["Open loop dh 95 error"] += "|-------------|" + " | ".join(["---"] * len(model_performance_openloop.keys())) + " |\n"
 table_string["Open loop dw 95 error"] = "| Hidden Size | " + " | ".join(model_performance_openloop.keys()) + " |\n"
 table_string["Open loop dw 95 error"] += "|-------------|" + " | ".join(["---"] * len(model_performance_openloop.keys())) + " |\n"
+table_string["Open loop dh max error"] = "| Hidden Size | " + " | ".join(model_performance_openloop.keys()) + " |\n"
+table_string["Open loop dh max error"] += "|-------------|" + " | ".join(["---"] * len(model_performance_openloop.keys())) + " |\n"
+table_string["Open loop dw max error"] = "| Hidden Size | " + " | ".join(model_performance_openloop.keys()) + " |\n"
+table_string["Open loop dw max error"] += "|-------------|" + " | ".join(["---"] * len(model_performance_openloop.keys())) + " |\n"
+table_string["Open loop training time"] = "| Hidden Size | " + " | ".join(model_performance_openloop.keys()) + " |\n"
+table_string["Open loop training time"] += "|-------------|" + " | ".join(["---"] * len(model_performance_openloop.keys())) + " |\n"
 table_string["Open loop dir"] = "| Hidden Size | " + " | ".join(model_performance_openloop.keys()) + " |\n"
 table_string["Open loop dir"] += "|-------------|" + " | ".join(["---"] * len(model_performance_openloop.keys())) + " |\n"
 
@@ -101,26 +122,38 @@ for hidden_size in hidden_sizes:
             table_string["Closed loop dw mean error"] += f"{model_performance[model_type][hidden_size]['test_dw_error']:<7.4f} | "
             table_string["Closed loop dh 95 error"] += f"{model_performance[model_type][hidden_size]['test_dh_error_95']:<7.4f} | "
             table_string["Closed loop dw 95 error"] += f"{model_performance[model_type][hidden_size]['test_dw_error_95']:<7.4f} | "
+            table_string["Closed loop dh max error"] += f"{model_performance[model_type][hidden_size]['test_dh_error_max']:<7.4f} | "
+            table_string["Closed loop dw max error"] += f"{model_performance[model_type][hidden_size]['test_dw_error_max']:<7.4f} | "
             table_string["Closed loop dir"] += f"{model_dir_names[model_type][hidden_size][6:]:<15} | "
+            table_string["Closed loop training time"] += f"{model_performance[model_type][hidden_size]['training_time_elapsed']:<7.2f} | "
             table_string["Open loop testing loss"] += f"{model_performance_openloop[model_type][hidden_size]['testing_loss']:<7.4f} | "
             table_string["Open loop dh mean error"] += f"{model_performance_openloop[model_type][hidden_size]['test_dh_error']:<7.4f} | "
             table_string["Open loop dw mean error"] += f"{model_performance_openloop[model_type][hidden_size]['test_dw_error']:<7.4f} | "
             table_string["Open loop dh 95 error"] += f"{model_performance_openloop[model_type][hidden_size]['test_dh_error_95']:<7.4f} | "
             table_string["Open loop dw 95 error"] += f"{model_performance_openloop[model_type][hidden_size]['test_dw_error_95']:<7.4f} | "
+            table_string["Open loop dh max error"] += f"{model_performance_openloop[model_type][hidden_size]['test_dh_error_max']:<7.4f} | "
+            table_string["Open loop dw max error"] += f"{model_performance_openloop[model_type][hidden_size]['test_dw_error_max']:<7.4f} | "
             table_string["Open loop dir"] += f"{model_dir_names_openloop[model_type][hidden_size][6:]:<15} | "
+            table_string["Open loop training time"] += f"{model_performance_openloop[model_type][hidden_size]['training_time_elapsed']:<7.2f} | "
         else:
             table_string["Closed loop testing loss"] += "N/A       | "
             table_string["Closed loop dh mean error"] += "N/A       | "
             table_string["Closed loop dw mean error"] += "N/A       | "
             table_string["Closed loop dh 95 error"] += "N/A       | "
             table_string["Closed loop dw 95 error"] += "N/A       | "
+            table_string["Closed loop dh max error"] += "N/A       | "
+            table_string["Closed loop dw max error"] += "N/A       | "
             table_string["Closed loop dir"] += "N/A                   | "
+            table_string["Closed loop training time"] += "N/A       | "
             table_string["Open loop testing loss"] += "N/A       | "
             table_string["Open loop dh mean error"] += "N/A       | "
             table_string["Open loop dw mean error"] += "N/A       | "
             table_string["Open loop dh 95 error"] += "N/A       | "
             table_string["Open loop dw 95 error"] += "N/A       | "
+            table_string["Open loop dh max error"] += "N/A       | "
+            table_string["Open loop dw max error"] += "N/A       | "
             table_string["Open loop dir"] += "N/A                   | "
+            table_string["Open loop training time"] += "N/A       | "
     for stat_key in table_string.keys():
         table_string[stat_key] += "\n"
 
@@ -135,8 +168,7 @@ import pandas as pd
 model_performance = {k: dict(sorted(v.items())) for k, v in model_performance.items()}
 model_performance_openloop = {k: dict(sorted(v.items())) for k, v in model_performance_openloop.items()}
 
-for stats_key in ['testing_loss', 'test_dh_error', 'test_dw_error', 'test_dh_error_95', 'test_dw_error_95']:
-    
+for stats_key in ['testing_loss', 'training_time_elapsed', 'test_dh_error', 'test_dw_error', 'test_dh_error_95', 'test_dw_error_95', 'test_dh_error_max', 'test_dw_error_max']:
     this_closed_loop_table = {}
     this_open_loop_table = {}
     for model_type in model_performance.keys():
@@ -160,9 +192,13 @@ for training_type in ['close_loop', 'open_loop']:
     for geometry in ['test_dh', 'test_dw']:
         error_file = pd.read_csv(f"{training_type}_{geometry}_error.csv", index_col=0)
         error_95_file = pd.read_csv(f"{training_type}_{geometry}_error_95.csv", index_col=0)
+        error_max_file = pd.read_csv(f"{training_type}_{geometry}_error_max.csv", index_col=0)
 
         # Combine the two dataframes into one with tuple strings
         combined = error_file.combine(error_95_file, lambda x, y: x.map(str) + ", " + y.map(str))
+
+        # Combine with max error
+        combined = combined.combine(error_max_file, lambda x, y: x + ", " + y.map(str))
 
         # Add parentheses around the combined values
         combined = combined.map(lambda x: f"({x})")
@@ -174,3 +210,4 @@ for training_type in ['close_loop', 'open_loop']:
         # delete the csv files
         os.remove(f"{training_type}_{geometry}_error.csv")
         os.remove(f"{training_type}_{geometry}_error_95.csv")
+        os.remove(f"{training_type}_{geometry}_error_max.csv")
