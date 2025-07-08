@@ -568,7 +568,8 @@ if __name__ == "__main__":
         control_inputs = torch.tensor(control_inputs, dtype=torch.float32).unsqueeze(0).to(device)
         model.eval()
         with torch.no_grad():
-            predictions = model(gt_labels, control_inputs)
+            # predictions = model(gt_labels, control_inputs)
+            predictions = model.forward_half_obs(gt_labels, control_inputs)
             predictions = predictions.cpu().numpy().astype(np.float64).squeeze(0)
             gt_labels = gt_labels.cpu().numpy().astype(np.float64).squeeze(0)
         dh_prediction_gt.append(np.vstack((predictions[:, 0], gt_labels[:, 0])))
@@ -602,6 +603,8 @@ if __name__ == "__main__":
         axs[i//2, i%2].grid()
     plt.suptitle(f'Test Data $width$ Prediction vs Ground Truth, ' + open_loop_string, fontsize=sup_title_size)
     plt.show()
+
+    exit()
     
     # save the errors
     np.savetxt(model_dir+'train_dh_error.csv', train_dh_error, delimiter=',')

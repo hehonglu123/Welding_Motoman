@@ -2,6 +2,7 @@ import numpy as np
 from scipy import stats
 import yaml
 import os, glob
+from matplotlib import pyplot as plt
 
 # find all directories in the current directory starting with "model_*"
 model_dirs = glob.glob("model_*")
@@ -55,6 +56,10 @@ for model_dir in model_dirs:
         model_performance[model_type][model_hidden_size]['test_dw_error_max'] = np.max(np.abs(test_dw_error))
         model_performance[model_type][model_hidden_size]['training_time_elapsed'] = round(training_time_elapsed)
         model_dir_names[model_type][model_hidden_size] = model_dir
+        # test_dh_error = np.reshape(test_dh_error, (40,-1))  # ensure it's a 2D array
+        # plt.plot(np.abs(test_dh_error), '-o')
+        # plt.title(f"{model_type} - {model_hidden_size} hidden size - Closed Loop DH Error")
+        # plt.show()
     elif model_input_size==model_open_loop_inputsize[model_type] or model_open_loop:
         if model_hidden_size not in model_performance_openloop[model_type]:
             model_performance_openloop[model_type][model_hidden_size] = {}

@@ -438,6 +438,45 @@ class RNNAutoRegressionModel(nn.Module):
         predictions = torch.stack(predictions, dim=1)
         return predictions, hidden_linear_zt
     
+    def forward_half_obs(self, x_true, u):
+        batch_size, seq_len, _ = x_true.size()
+
+        with torch.no_grad():
+            fc_hh = nn.Linear(self.hidden_size, self.hidden_size).to(self.device)
+            fc_ih = nn.Linear(2, self.hidden_size).to(self.device)
+            fc_hh.weight.copy_(self.rnn_cell.weight_hh)
+            fc_hh.bias.copy_(self.rnn_cell.bias_hh)
+            fc_ih.weight.copy_(self.rnn_cell.weight_ih[:, :2])  # Use only the first two input features
+            fc_ih.bias.copy_(self.rnn_cell.bias_ih)
+
+        # Initial hidden states
+        h_t = torch.zeros(batch_size, self.hidden_size, device=self.device)
+        # Initial error is zero
+        error = torch.zeros_like(x_true[:, 0, :],device=self.device)
+        predictions = []
+
+        for t in range(self.history_length, seq_len):
+            if not self.open_loop:
+                u_t = torch.flatten(u[:, t-self.history_length+1:t, :], start_dim=1)  # (batch, history_length * input_size)
+                u_t = torch.cat([u[:, t, :], u_t], dim=1)
+                y_t = torch.flatten(x_true[:, t-self.history_length:t, :], start_dim=1)  # (batch, history_length * output_size)
+                # Concatenate error and inputs
+                input_t = torch.cat([y_t, u_t, error], dim=1)  # (batch, history_length * output_size + current_input + history_length * input_size + error)
+            else:
+                input_t = u[:, t, :]  # (batch, input_size)
+
+            if t<= int((seq_len-self.history_length)/2):
+                h_t = self.rnn_cell(input_t, h_t)
+            else:
+                h_t = torch.tanh(fc_ih(u_t) + fc_hh(h_t))  # Apply tanh activation
+            y_pred = self.fc(h_t)
+            predictions.append(y_pred)
+
+            error = x_true[:, t, :] - y_pred
+
+        predictions = torch.stack(predictions, dim=1)
+        return predictions
+    
 # GRU Model
 class GRUModel(nn.Module):
     def __init__(self, input_size, hidden_size, output_size, num_layers=1, device='cpu'):
