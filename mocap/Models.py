@@ -397,7 +397,7 @@ class RNNAutoRegressionModel(nn.Module):
         predictions = torch.stack(predictions, dim=1)
         return predictions
 
-    def forward_linear_mat(self, x_true, u, h_t=None):
+    def forward_linear_mat(self, x_true, u):
         batch_size, seq_len, _ = x_true.size()
 
         with torch.no_grad():
@@ -438,7 +438,7 @@ class RNNAutoRegressionModel(nn.Module):
         predictions = torch.stack(predictions, dim=1)
         return predictions, hidden_linear_zt
     
-    def forward_half_obs(self, x_true, u):
+    def forward_half_obs(self, x_true, u, h_t=None):
         batch_size, x_true_len, _ = x_true.size()
         _, u_len, _ = u.size()
 
@@ -456,7 +456,8 @@ class RNNAutoRegressionModel(nn.Module):
             h_t = torch.zeros(batch_size, self.hidden_size, device=self.device)
 
         # Initial error is zero
-        error = torch.zeros_like(x_true[:, 0, :],device=self.device)
+        if x_true_len > 0:
+            error = torch.zeros_like(x_true[:, 0, :],device=self.device)
         predictions = []
 
         for t in range(self.history_length, u_len):
