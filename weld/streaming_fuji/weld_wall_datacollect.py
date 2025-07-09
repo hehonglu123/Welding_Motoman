@@ -473,8 +473,6 @@ def main():
                     if weld_arcon:
                         fronius_client.stop_weld()
                     arc_off=True
-                    if thermal_on:
-                        rr_sensors.stop_all_sensors()
                     fuji_scan_time = 0.5 # stay for a while for scanning, and robot to move to the final position
                     fuji_scan_start = time.perf_counter()
                     while time.perf_counter()-fuji_scan_start<fuji_scan_time:
@@ -660,6 +658,10 @@ def main():
                     # plt.legend()
                     # plt.grid()
                     # plt.show()
+
+                    ## end thermal logging at the very end to collect more thermal data
+                    if thermal_on:
+                        rr_sensors.stop_all_sensors()
 
                     ############## save data ######################
                     if not os.path.exists(logdata_dir):

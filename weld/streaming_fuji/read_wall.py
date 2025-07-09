@@ -2,6 +2,7 @@ import time, os, copy, sys, yaml, inspect
 import glob
 from copy import deepcopy
 import numpy as np
+from scipy.signal import find_peaks
 from matplotlib import pyplot as plt
 import open3d as o3d
 import cv2 as cv
@@ -15,10 +16,13 @@ from scan_utils import *
 from scanProcess import *
 from animation_3d import *
 
-# feat_detector = cv.ORB_create()
-feat_detector = cv.SIFT_create()
-# bf_matcher = cv.BFMatcher(cv.NORM_HAMMING, crossCheck=True)
-bf_matcher = cv.BFMatcher(cv.NORM_L2, crossCheck=True)
+# # feat_detector = cv.ORB_create()
+# feat_detector = cv.SIFT_create()
+# # bf_matcher = cv.BFMatcher(cv.NORM_HAMMING, crossCheck=True)
+# bf_matcher = cv.BFMatcher(cv.NORM_L2, crossCheck=True)
+
+torch_model = YOLO(os.path.dirname(inspect.getfile(flir_toolbox))+"/torch.pt")
+tip_wire_model = YOLO(os.path.dirname(inspect.getfile(flir_toolbox))+"/tip_wire.pt")
 
 def main():
 
@@ -41,16 +45,35 @@ def main():
 
     # logdata_dir_all = ['weld_fujiscan_2025_02_26_18_08_18/', 'weld_fujiscan_2025_02_26_16_24_21/', 'weld_fujiscan_2025_02_26_17_39_17/']
     # logdata_dir_all = ['weld_fujiscan_2025_02_26_16_24_21/', 'weld_fujiscan_2025_02_26_18_08_18/', 'weld_fujiscan_2025_02_26_17_39_17/']
-    logdata_dir_all = ['weld_fujiscan_2025_06_10_17_42_42/'] # new camera pose
     # logdata_dir_all = ['weld_fujiscan_2025_02_26_18_08_18/', 'weld_fujiscan_2025_02_26_16_24_21/']
     # logdata_dir_all = ['weld_fujicontrol_2025_03_12_18_27_33/']
     # logdata_dir_all = ['weld_fujiscan_2025_02_26_18_08_18/']
     # logdata_dir_all = ['weld_fujiscan_2025_02_26_18_08_18/', 'weld_fujiscan_2025_02_26_16_24_21/', 'weld_fujicontrol_2025_03_12_18_27_33/']
+    # logdata_dir_all = ['weld_fujiscan_2025_06_11_14_12_44/']
 
-    run_code_again_flag = False # For scanner leading case, need to generate all profile height before actually get dh.
+    # material ER316L (stainless steel)
+    # logdata_dir_all = ['weld_fujiscan_2025_06_11_16_27_41/']
+    logdata_dir_all = ['weld_fujiscan_2025_06_11_16_27_41/','weld_fujiscan_2025_06_11_16_52_36/','weld_fujiscan_2025_06_11_17_16_48/',\
+                       'weld_fujiscan_2025_06_11_17_49_27/','weld_fujiscan_2025_06_11_18_14_56/','weld_fujiscan_2025_06_12_17_33_24/',\
+                       'weld_fujiscan_2025_06_12_16_59_09/','weld_fujiscan_2025_06_12_15_33_03/','weld_fujiscan_2025_06_12_15_03_27/']
+    # logdata_dir_all = ['weld_fujiscan_2025_06_11_18_14_56/']
+    
+    ### skip data directories
+    skip_data_dir_all = []
+    #skip_data_dir_all = ['weld_fujiscan_2025_06_11_16_27_41/','weld_fujiscan_2025_06_11_16_52_36/']
+
+    # to increase robustness of capturing thermal reading
+    # since the camera is following the torch
+    # if the torch is not detected, use the last few frames' centroid
+    thermal_centroid_record = []
+
+    run_code_again_flag = True # For scanner leading case, need to generate all profile height before actually get dh.
     create_transform = False
     for logdata_dir_name in logdata_dir_all:
         print('Processing:',logdata_dir_name)
+        if logdata_dir_name in skip_data_dir_all:
+            print("Skipping...")
+            continue
 
         ## determine if the scanner is leading or lagging
         scanner_lagging= False
@@ -75,8 +98,8 @@ def main():
             Transz0_H_even = np.loadtxt(logdata_dir+'Transz0_H_even.csv',delimiter=',')
             Transicp_H_odd2even = np.loadtxt(logdata_dir+'Trans_icp_odd2even.csv',delimiter=',')
             Transz0_H_odd = Transz0_H_odd @ Transicp_H_odd2even
-        # for weld_parts in ['base','layer']:
-        for weld_parts in ['layer']:
+        for weld_parts in ['base','layer']:
+        # for weld_parts in ['layer']:
             if weld_parts == 'base':
                 total_layers_name = glob.glob(logdata_dir+'baselayer*')
             else:
@@ -91,7 +114,7 @@ def main():
 
             # for layer_n in [layer_nums[-1],layer_nums[-2]]:
             for layer_n_id, layer_n in enumerate(layer_nums):
-                # if layer_n_id<10:
+                # if layer_n_id<7:
                 #     continue
                 # read layer curve data
                 if weld_parts == 'base':
@@ -123,7 +146,14 @@ def main():
                 weld_cmd = np.loadtxt(this_layer_dir+'weld_cmd.csv',delimiter=',')
 
                 ############### get welding js ####################
-                weld_split_id = np.argmax(np.diff(robot_stamps))
+                stamps_diff_sorted = np.argsort(np.diff(robot_stamps))[::-1]
+                for stamp_diff_id in stamps_diff_sorted:
+                    # make sure to find the time jump after the welding command
+                    if robot_stamps[stamp_diff_id] > weld_cmd[-1,0] and robot_stamps[stamp_diff_id] < weld_cmd[-1,0]+3:
+                        weld_split_id = stamp_diff_id
+                        break
+
+                # weld_split_id = np.argmax(np.diff(robot_stamps))
                 scan_js_exe = deepcopy(rob_js_exe)
                 if scanner_lagging:
                     weld_js_exe = rob_js_exe[:weld_split_id+1,:]
@@ -134,10 +164,36 @@ def main():
                 print("Getting welding status...")
                 welding_status = np.loadtxt(this_layer_dir+'welding.csv',delimiter=',',skiprows=1)
 
+                ############### get welding current status ########
+                print("Getting welding current status...")
+                welding_current_exe = np.loadtxt(this_layer_dir+'current.csv',delimiter=',',skiprows=1)
+                # print(welding_current_exe)
+                # plt.plot(welding_current_exe[:,0]-welding_current_exe[0,0], welding_current_exe[:,1], label='Welding Current')
+                # plt.title('Welding Current vs Time')
+                # plt.xlabel('Time (s)')
+                # plt.ylabel('Welding Current (A)')
+                # plt.grid()
+                # plt.show()
+
+                if len(welding_current_exe) > 0:
+                    # Find peaks
+                    peaks, _ = find_peaks(welding_current_exe[:,1], height=75)  # height=0 filters out very low peaks
+                    # find the timestamp of the first peak
+                    first_strike_time = welding_current_exe[peaks[0], 0]
+                    print(f"First peak time: {first_strike_time:.2f} seconds")
+                    # plt.plot(welding_current_exe[:,0]-welding_current_exe[0,0], welding_current_exe[:,1], label='Welding Current')
+                    # plt.plot(welding_current_exe[peaks,0]-welding_current_exe[0,0], welding_current_exe[peaks,1], "x")
+                    # plt.title("Detected Peaks")
+                    # plt.show()
+                else:
+                    print("No welding current data found.")
+
                 ############### get thermal readings ##############
                 print("Getting thermal readings...")
                 try:
-                    thermal_reading = np.loadtxt(this_layer_dir+'thermal',delimiter=',')
+                    thermal_reading = np.loadtxt(this_layer_dir+'thermal.csv',delimiter=',')
+                    with open(this_layer_dir+'thermal_pixel_trace.pickle', 'rb') as f:
+                        pass
                 except FileNotFoundError:
                     print("No thermal readings found, using IR camera to get thermal readings...")
                     with open(this_layer_dir+'ir_recording.pickle', 'rb') as f:
@@ -184,8 +240,8 @@ def main():
                             # print(f"Robot moved: {rob_translation}")
 
                             ##### pixel tracing moving #####
-                            moving_dx = rob_translation[1] * cam_pixel_moving_ratio
-                            moving_dy = rob_translation[0] * cam_pixel_moving_ratio
+                            moving_dx = -rob_translation[0] * cam_pixel_moving_ratio
+                            moving_dy = rob_translation[2] * cam_pixel_moving_ratio
                             # add trace dxdy and stamp to the list
                             trace_dxdy.append(np.array([moving_dx, moving_dy]))
                             trace_stamps.append(stamp)
@@ -207,75 +263,111 @@ def main():
                             last_trace_stamp = stamp    
 
                         # centroid, bbox, torch_centroid, torch_bbox=weld_detection_aluminum(ir_image,torch_model,percentage_threshold=0.8)
-                        # centroid, bbox, torch_centroid, torch_bbox=weld_detection_steel(ir_image,torch_model,tip_wire_model)
+                        centroid, bbox, torch_centroid, torch_bbox=weld_detection_steel(ir_image,torch_model,tip_wire_model)
+
+                        # plt.imshow(ir_image, cmap='inferno', aspect='equal')
+                        # plt.show()
+                        # plt.plot(welding_current_exe[:,0]-welding_current_exe[0,0], welding_current_exe[:,1], label='Welding Current')
+                        # # draw a vertical line at the current time
+                        # plt.axvline(x=stamp-welding_current_exe[0,0], color='r', linestyle='--', label='Current Time')
+                        # plt.title('Welding Current vs Time')
+                        # plt.xlabel('Time (s)')
+                        # plt.ylabel('Welding Current (A)')
+                        # plt.xlim(-0.1,0.5)
+                        # plt.grid()
+                        # plt.show()
+
                         # find max pixel value in ir_image
-                        centroid = np.unravel_index(np.argmax(ir_image, axis=None), ir_image.shape)
+                        # centroid = np.unravel_index(np.argmax(ir_image, axis=None), ir_image.shape)
                         if centroid is None:
-                            print(f"No flame detected in image at {stamp}")
-                            continue
+                            if len(thermal_centroid_record) == 0:
+                                print(f"No flame detected in image at {stamp}")
+                                # plt.clf()
+                                # plt.imshow(ir_image, cmap='inferno', aspect='equal')
+                                # plt.pause(0.1)
+                                continue
+                            else:
+                                # use the last N recorded centroid
+                                centroid = np.mean(thermal_centroid_record[-5:], axis=0)
+
+                        thermal_centroid_record.append(centroid) # record centroid for debugging
+
+                        # plt.clf()
+                        # plt.imshow(ir_image, cmap='inferno', aspect='equal')
+                        # plt.scatter(centroid[0], centroid[1], c='r', s=5, label='Flame centroid')
+                        # plt.show()
 
                         #find average pixel value 
-                        if ir_image[centroid] >= 1e4:
-                            pixel_coord = (int(centroid[0]) + vertical_offset, int(centroid[1]) + horizontal_offset)
-                            pixel_coord = pixel_coord[::-1]
-                            flame_reading=get_pixel_value(ir_image,pixel_coord,ir_pixel_window_size)
-                            thermal_reading.append(flame_reading)
-                            thermal_stamp.append(stamp)
+                        centroid = np.round(centroid).astype(int)
+                        # if ir_image[centroid] >= 1e4:
+                        # if stamp > first_strike_time # only collect thermal reading after the first strike
+                        pixel_coord = (int(centroid[0]) + horizontal_offset, int(centroid[1]) + vertical_offset)
+                        # pixel_coord = pixel_coord[::-1]
+                        flame_reading=get_pixel_value(ir_image,pixel_coord,ir_pixel_window_size)
+                        thermal_reading.append(flame_reading)
+                        thermal_stamp.append(stamp)
                         # print(flame_reading, centroid)    
 
                         # add trace pixels and thermal readings
-                        if ir_image[centroid] >= 1e4:
-                            # print("Total pixels:", len(thermal_pixel_trace), "current id:", ir_id)
-                            # print("T_table_torch p", T_table_torch.p)
-                            if len(thermal_pixel_trace) == 0 or np.abs(T_table_torch.p[0]-thermal_workpiece_x_trace[-1][0]) > 0.5: # 1 mm away from the previous traced pixel
-                                # if stamp - last_trace_stamp > 1:
-                                # add pixel to the traced pixel trace
-                                try:
-                                    thermal_pixel_trace = np.vstack((thermal_pixel_trace, pixel_coord))
-                                except ValueError:
-                                    thermal_pixel_trace = np.array([pixel_coord])
-                                # add the thermal status to the traced pixel trace
-                                thermal_trace.append([flame_reading])
-                                # add the thermal timestamp
-                                thermal_trace_stamp.append([stamp])
-                                # add the current torch x
-                                thermal_workpiece_x_trace.append([T_table_torch.p[0]])
-                                assert len(thermal_pixel_trace) == len(thermal_trace), "Thermal pixel trace and thermal trace length mismatch"
-                                # last_trace_stamp = stamp
+                        # if ir_image[centroid] >= 1e4:
+                        # print("Total pixels:", len(thermal_pixel_trace), "current id:", ir_id)
+                        # print("T_table_torch p", T_table_torch.p)
+                        if len(thermal_pixel_trace) == 0 or np.abs(T_table_torch.p[0]-thermal_workpiece_x_trace[-1][0]) > 0.001: # 1 mm away from the previous traced pixel
+                            # if stamp - last_trace_stamp > 1:
+                            # add pixel to the traced pixel trace
+                            try:
+                                thermal_pixel_trace = np.vstack((thermal_pixel_trace, pixel_coord))
+                            except ValueError:
+                                thermal_pixel_trace = np.array([pixel_coord])
+                            # add the thermal status to the traced pixel trace
+                            thermal_trace.append([flame_reading])
+                            # add the thermal timestamp
+                            thermal_trace_stamp.append([stamp])
+                            # add the current torch x
+                            thermal_workpiece_x_trace.append([T_table_torch.p[0]])
+                            assert len(thermal_pixel_trace) == len(thermal_trace), "Thermal pixel trace and thermal trace length mismatch"
+                            # last_trace_stamp = stamp
 
-                                # add thermal status and stamp backward in earlier images (before the welding command)
-                                tracing_xy = np.array(pixel_coord)
+                            # add thermal status and stamp backward in earlier images (before the welding command)
+                            tracing_xy = np.array(pixel_coord)
 
-                                # print("weld point temperature:", flame_reading, "at time", stamp-ir_stamp[0])
-                                for (backward_id, move_dxdy, move_stamp) in zip(range(ir_id-1,-1,-1), trace_dxdy[::-1], trace_stamps[::-1]):
-                                    assert ir_stamp[backward_id+1] == move_stamp, "Trace stamp mismatch"
-                                    tracing_xy = tracing_xy - move_dxdy
-                                    tracing_xy_round = np.round(tracing_xy).astype(int)
+                            # print("weld point temperature:", flame_reading, "at time", stamp-ir_stamp[0])
+                            for (backward_id, move_dxdy, move_stamp) in zip(range(ir_id-1,-1,-1), trace_dxdy[::-1], trace_stamps[::-1]):
+                                assert ir_stamp[backward_id+1] == move_stamp, "Trace stamp mismatch"
+                                tracing_xy = tracing_xy - move_dxdy
+                                tracing_xy_round = np.round(tracing_xy).astype(int)
 
-                                    # if pixel within the image
-                                    if 0+ir_pixel_window_size//2 <= tracing_xy_round[0] < img_width- ir_pixel_window_size//2 and 0 <= tracing_xy_round[1] < img_height:
-                                        this_image = np.rot90(ir_exe[backward_id], k=-1)
-                                        thermal_reading_at_stamp = get_pixel_value(this_image, tracing_xy_round, ir_pixel_window_size)
-                                        if np.isnan(thermal_reading_at_stamp):
-                                            print("NaN thermal reading at stamp", move_stamp, "for pixel", tracing_xy_round)
-                                            input("Press Enter to continue...")
-                                        thermal_trace[-1].insert(0, thermal_reading_at_stamp)
-                                        thermal_trace_stamp[-1].insert(0, move_stamp)
-                                        thermal_workpiece_x_trace[-1].insert(0, thermal_workpiece_x_trace[-1][0])
+                                # if pixel within the image
+                                if 0+ir_pixel_window_size//2 <= tracing_xy_round[0] < img_width- ir_pixel_window_size//2 and 0 <= tracing_xy_round[1] < img_height:
+                                    # this_image = np.rot90(ir_exe[backward_id], k=-1)
+                                    this_image = ir_exe[backward_id]
+                                    thermal_reading_at_stamp = get_pixel_value(this_image, tracing_xy_round, ir_pixel_window_size)
+                                    if np.isnan(thermal_reading_at_stamp):
+                                        print("NaN thermal reading at stamp", move_stamp, "for pixel", tracing_xy_round)
+                                        input("Press Enter to continue...")
+                                    thermal_trace[-1].insert(0, thermal_reading_at_stamp)
+                                    thermal_trace_stamp[-1].insert(0, move_stamp)
+                                    thermal_workpiece_x_trace[-1].insert(0, thermal_workpiece_x_trace[-1][0])
 
-                        plt.imshow(np.clip(ir_image,7000,15000), cmap='inferno', aspect='equal')
-                        # plot tracing pixel
+                        # plt.clf()
+                        # # plt.imshow(np.clip(ir_image,7000,15000), cmap='inferno', aspect='equal')
+                        # plt.imshow(np.log10(ir_image), cmap='inferno', aspect='equal')
+                        # plt.scatter(pixel_coord[0], pixel_coord[1], c='r', s=7, label='Flame centroid')
+                        # # plot tracing pixel
                         # cmap_trace = plt.get_cmap('tab10')
                         # for trace_id, trace in enumerate(thermal_pixel_trace):
                         #     if trace_id % 10 == 0:
                         #         # if pixel within the image
                         #         if 0 <= trace[0] < img_width-1 and 0 <= trace[1] < img_height-1:
-                        #             plt.scatter(trace[0], trace[1], c=cmap_trace(trace_id % 10), s=20)
-                        plt.colorbar(format='%.2f')
-                        plt.pause(0.1)
-                        plt.clf()
+                        #             plt.scatter(trace[0], trace[1], c=cmap_trace(trace_id % 10), s=10)
+                        # plt.colorbar(format='%.2f')
+                        # plt.pause(0.1)
                     
-                    print("Collected thermal pixel trace:", len(thermal_pixel_trace))
+                    # print("Centroid mean:", np.mean(thermal_centroid_record, axis=0))
+                    # print("Centroid x pixel min max:", np.min(thermal_centroid_record, axis=0)[0], np.max(thermal_centroid_record, axis=0)[0])
+                    # print("Centroid y pixel min max:", np.min(thermal_centroid_record, axis=0)[1], np.max(thermal_centroid_record, axis=0)[1])
+
+                    # print("Collected thermal pixel trace:", len(thermal_pixel_trace))
                     thermal_trace_stamp_full = []
                     thermal_workpiece_x_trace_full = []
                     thermal_trace_full = []
@@ -290,18 +382,19 @@ def main():
                         # thermal_trace_full.extend(trace_t)
                         thermal_trace_full.extend(trace_t_smooth)
 
-                        if trace_x[0]>0:
-                            # plt.plot(trace_st-ir_stamp[0], trace_t, '-o')
-                            plt.plot(trace_st-ir_stamp[0], trace_t_smooth, '-o')
-                            plt.title('Pixel Value vs Time at x='+str(round(trace_x[0],1))+' mm', fontsize=24)
-                            plt.xlabel('Time (s)', fontsize=18)
-                            plt.ylabel('Pixel Value (Counts)', fontsize=18)
-                            plt.xticks(fontsize=16)
-                            plt.yticks(fontsize=16)
-                            plt.legend()
-                            plt.show()
+                        # if trace_x[0]>-25:
+                        #     # plt.plot(trace_st-ir_stamp[0], trace_t, '-o')
+                        #     plt.plot(trace_st-ir_stamp[0], trace_t_smooth, '-o')
+                        #     plt.title('Pixel Value vs Time at x='+str(round(trace_x[0],1))+' mm', fontsize=24)
+                        #     plt.xlabel('Time (s)', fontsize=18)
+                        #     plt.ylabel('Pixel Value (Counts)', fontsize=18)
+                        #     plt.xticks(fontsize=16)
+                        #     plt.yticks(fontsize=16)
+                        #     plt.legend()
+                        #     plt.show()
 
                     # plot_skip = 2
+                    # plt.clf()
                     # fig = plt.figure()
                     # ax = plt.axes(projection='3d')
                     # # surf = ax.plot_trisurf(ts_all, pixel_all, counts_all, linewidth=0, antialiased=False, label='-')
@@ -317,7 +410,7 @@ def main():
 
                     # save thermal readings
                     thermal_reading = np.vstack((thermal_stamp,thermal_reading)).T
-                    # np.savetxt(this_layer_dir+'thermal.csv',thermal_reading,delimiter=',')
+                    np.savetxt(this_layer_dir+'thermal.csv',thermal_reading,delimiter=',')
 
                     # save thermal pixel trace
                     trace_dict = {}
@@ -326,14 +419,13 @@ def main():
                             'time': trace_st,
                             'value': trace_t
                         }
-                    # with open(this_layer_dir+'thermal_pixel_trace.pickle', 'wb') as f:
-                    #     pickle.dump(trace_dict, f)
+                    with open(this_layer_dir+'thermal_pixel_trace.pickle', 'wb') as f:
+                        pickle.dump(trace_dict, f)
 
-                exit()
                 ################ get speed ##############
                 print("Getting speed...")
                 try:
-                    weld_relative_exe = np.loadtxt(this_layer_dir+'weld_relative_exe.csv',delimiter=',')
+                    weld_relative_exe = np.loadtxt(this_layer_dir+'weld_relative_exe',delimiter=',')
                     weld_relative_v_exe = np.loadtxt(this_layer_dir+'weld_relative_v_exe.csv',delimiter=',')
                 except FileNotFoundError:
                     weld_relative_exe = []
@@ -422,7 +514,8 @@ def main():
                     crop_h_max=(curve_x_start+crop_extend_x,curve_y+20,z_height_start+crop_extend_z)
                     # profile_height_noise, profile_width_noise,Transz0_H = scan_process.pcd2height(deepcopy(pcd),z_height_start,bbox_min=crop_h_min,bbox_max=crop_h_max,Transz0_H=Transz0_H,return_width=True)
                     pcd = scan_process.pcd_noise_remove(pcd,min_bound=crop_min,max_bound=crop_max,outlier_remove=False,cluster_based_outlier_remove=False)
-                    pcd_denoise = scan_process.pcd_noise_remove(pcd,crop_flag=False,nb_neighbors=40,std_ratio=1.5,min_bound=crop_min,max_bound=crop_max,cluster_based_outlier_remove=True,cluster_neighbor=1,min_points=100)
+                    pcd_denoise = scan_process.pcd_noise_remove(pcd,crop_flag=False,outlier_remove=False,nb_neighbors=40,std_ratio=1.5,min_bound=crop_min,max_bound=crop_max,cluster_based_outlier_remove=True,cluster_neighbor=1,min_points=100)
+                    # visualize_pcd([pcd])
                     # Transz0_H = None
                     Transz0_H = deepcopy(Transz0_H_even) if layer_n_id % 2 == 0 else deepcopy(Transz0_H_odd)
                     if last_profile_height is None:
@@ -462,8 +555,6 @@ def main():
                                         o3d.pipelines.registration.TransformationEstimationPointToPoint(),
                                         o3d.pipelines.registration.ICPConvergenceCriteria(max_iteration=2000))
                             np.savetxt(logdata_dir+'Trans_icp_odd2even.csv',reg_p2p.transformation,delimiter=',')
-                    
-                    
 
                     # visualize_pcd([pcd_denoise_trans])
                     # plt.plot(profile_height[:,0],profile_height[:,1],'-o')
@@ -485,6 +576,11 @@ def main():
                     o3d.io.write_point_cloud(this_layer_dir+'pcd.pcd',pcd)
                     o3d.io.write_point_cloud(this_layer_dir+'pcd_denoise.pcd',pcd_denoise)
                     #############################################
+
+                # compensating the observed shifting
+                shift_x = 5.685
+                profile_height[:,0] = profile_height[:,0] + shift_x
+                profile_width[:,0] = profile_width[:,0] + shift_x
 
                 ################ combine everything in one array ##############
                 if not scanner_lagging:
@@ -510,11 +606,11 @@ def main():
                     # time at the same x
                     this_t = weld_js_exe[js_id,0]
                     # weld command right before this time
-                    cmd_idx = np.where(weld_cmd[:,0]>=this_t)[0]
+                    cmd_idx = np.where(weld_cmd[:,0]<=this_t)[0]
                     if len(cmd_idx) == 0:
                         cmd_idx = 0
                     else:
-                        cmd_idx = cmd_idx[0]
+                        cmd_idx = cmd_idx[-1]
                     this_cmd_v = weld_cmd[cmd_idx,2]
                     this_cmd_fr = weld_cmd[cmd_idx,3]
                     # velocity at the same x
