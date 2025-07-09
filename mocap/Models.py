@@ -397,7 +397,7 @@ class RNNAutoRegressionModel(nn.Module):
         predictions = torch.stack(predictions, dim=1)
         return predictions
 
-    def forward_linear_mat(self, x_true, u):
+    def forward_linear_mat(self, x_true, u, h_t=None):
         batch_size, seq_len, _ = x_true.size()
 
         with torch.no_grad():
@@ -439,7 +439,8 @@ class RNNAutoRegressionModel(nn.Module):
         return predictions, hidden_linear_zt
     
     def forward_half_obs(self, x_true, u):
-        batch_size, seq_len, _ = x_true.size()
+        batch_size, x_true_len, _ = x_true.size()
+        _, u_len, _ = u.size()
 
         with torch.no_grad():
             fc_hh = nn.Linear(self.hidden_size, self.hidden_size).to(self.device)
@@ -450,32 +451,37 @@ class RNNAutoRegressionModel(nn.Module):
             fc_ih.bias.copy_(self.rnn_cell.bias_ih)
 
         # Initial hidden states
-        h_t = torch.zeros(batch_size, self.hidden_size, device=self.device)
+        if h_t is None:
+            # If h_t is not provided, initialize it
+            h_t = torch.zeros(batch_size, self.hidden_size, device=self.device)
+
         # Initial error is zero
         error = torch.zeros_like(x_true[:, 0, :],device=self.device)
         predictions = []
 
-        for t in range(self.history_length, seq_len):
+        for t in range(self.history_length, u_len):
             if not self.open_loop:
                 u_t = torch.flatten(u[:, t-self.history_length+1:t, :], start_dim=1)  # (batch, history_length * input_size)
                 u_t = torch.cat([u[:, t, :], u_t], dim=1)
-                y_t = torch.flatten(x_true[:, t-self.history_length:t, :], start_dim=1)  # (batch, history_length * output_size)
-                # Concatenate error and inputs
-                input_t = torch.cat([y_t, u_t, error], dim=1)  # (batch, history_length * output_size + current_input + history_length * input_size + error)
+                if t < x_true_len:
+                    y_t = torch.flatten(x_true[:, t-self.history_length:t, :], start_dim=1)  # (batch, history_length * output_size)
+                    # Concatenate error and inputs
+                    input_t = torch.cat([y_t, u_t, error], dim=1)  # (batch, history_length * output_size + current_input + history_length * input_size + error)
             else:
                 input_t = u[:, t, :]  # (batch, input_size)
 
-            if t<= int((seq_len-self.history_length)/2):
+            if t < x_true_len or self.open_loop:
                 h_t = self.rnn_cell(input_t, h_t)
             else:
                 h_t = torch.tanh(fc_ih(u_t) + fc_hh(h_t))  # Apply tanh activation
             y_pred = self.fc(h_t)
             predictions.append(y_pred)
 
-            error = x_true[:, t, :] - y_pred
+            if t < x_true_len:
+                error = x_true[:, t, :] - y_pred
 
         predictions = torch.stack(predictions, dim=1)
-        return predictions
+        return predictions, h_t
     
 # GRU Model
 class GRUModel(nn.Module):

@@ -569,8 +569,14 @@ if __name__ == "__main__":
         model.eval()
         with torch.no_grad():
             # predictions = model(gt_labels, control_inputs)
-            predictions = model.forward_half_obs(gt_labels, control_inputs)
-            predictions = predictions.cpu().numpy().astype(np.float64).squeeze(0)
+            predictions_all=[]
+            latency_t = 20 # latency in time steps, 20 time steps = 2 seconds
+            for step_t in range(len(gt_labels[0])-latency_t):
+                predictions = model.forward_half_obs(gt_labels[:step_t], control_inputs[:step_t+latency_t])
+                predictions = predictions.cpu().numpy().astype(np.float64).squeeze(0)
+                predictions_all.append(predictions.cpu().numpy().astype(np.float64).squeeze(0))
+            # predictions = model.forward_half_obs(gt_labels, control_inputs)
+            # predictions = predictions.cpu().numpy().astype(np.float64).squeeze(0)
             gt_labels = gt_labels.cpu().numpy().astype(np.float64).squeeze(0)
         dh_prediction_gt.append(np.vstack((predictions[:, 0], gt_labels[:, 0])))
         dw_prediction_gt.append(np.vstack((predictions[:, 1], gt_labels[:, 1])))
