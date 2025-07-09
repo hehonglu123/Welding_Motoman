@@ -193,7 +193,7 @@ def main():
         # layer welding parameters
         layer_feedrate = 100
         layer_nom_height = 3 # mm
-        layer_nom_vel = 10*1/(np.power(2,1.75)) # mm/s => 1, 1/np.sqrt(2), 1/2, 1/(2*np.sqrt(2)), 1/4, affecting VPD
+        layer_nom_vel = 10*1/np.sqrt(2) # mm/s => 1, 1/np.sqrt(2), 1/2, 1/(2*np.sqrt(2)), 1/4, affecting VPD
         layer_nom_incre = int(layer_nom_height/layer_resolution)
         # wire cross section
         cross_section = 1.14 # mm^2
@@ -659,10 +659,6 @@ def main():
                     # plt.grid()
                     # plt.show()
 
-                    ## end thermal logging at the very end to collect more thermal data
-                    if thermal_on:
-                        rr_sensors.stop_all_sensors()
-
                     ############## save data ######################
                     if not os.path.exists(logdata_dir):
                         os.makedirs(logdata_dir)
@@ -682,6 +678,7 @@ def main():
                         with open(logdata_dir+layer_name+f'/scan_exe.pickle', 'wb') as file: # save scanning logged data
                             pickle.dump(scan_exe, file)
                     if thermal_on:
+                        rr_sensors.stop_all_sensors() ## end thermal logging at the very end to collect more thermal data
                         rr_sensors.save_all_sensors(logdata_dir+layer_name+'/') # save thermal data
                     ##########################################
                 else:
