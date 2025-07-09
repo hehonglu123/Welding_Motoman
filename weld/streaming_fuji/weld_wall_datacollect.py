@@ -193,7 +193,7 @@ def main():
         # layer welding parameters
         layer_feedrate = 100
         layer_nom_height = 3 # mm
-        layer_nom_vel = 10*1/(2*np.sqrt(2)) # mm/s => 1, 1/np.sqrt(2), 1/2, 1/(2*np.sqrt(2)), 1/4, affecting VPD
+        layer_nom_vel = 10*1/(np.power(2,1.75)) # mm/s => 1, 1/np.sqrt(2), 1/2, 1/(2*np.sqrt(2)), 1/4, affecting VPD
         layer_nom_incre = int(layer_nom_height/layer_resolution)
         # wire cross section
         cross_section = 1.14 # mm^2
