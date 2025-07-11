@@ -27,6 +27,10 @@ for model_dir in model_dirs:
     test_dh_error = np.loadtxt(os.path.join(model_dir, "test_dh_error.csv"), delimiter=',')
     # load test_dw_error
     test_dw_error = np.loadtxt(os.path.join(model_dir, "test_dw_error.csv"), delimiter=',')
+    # load test_cmd_v_feedrate
+    test_cmd_v_feedrate = np.loadtxt("test_cmd_v_feedrate.csv", delimiter=',', skiprows=1)
+    test_cmd_v_feedrate[:,0]=np.round(test_cmd_v_feedrate[:,0], 2)  # round cmd_v to 2 decimal places
+    test_cmd_v_feedrate[:,1]=np.round(test_cmd_v_feedrate[:,1])  # round cmd_feedrate to integer
     # load training time elapsed
     training_time_elapsed = np.loadtxt(os.path.join(model_dir, "training_time.csv"), delimiter=',')
     training_time_elapsed = float(training_time_elapsed)
@@ -54,6 +58,12 @@ for model_dir in model_dirs:
         model_performance[model_type][model_hidden_size]['test_dw_error_95'] = stats.expon(scale=np.std(test_dw_error)).interval(0.95)[1]
         model_performance[model_type][model_hidden_size]['test_dh_error_max'] = np.max(np.abs(test_dh_error))
         model_performance[model_type][model_hidden_size]['test_dw_error_max'] = np.max(np.abs(test_dw_error))
+        arg_max_error_dh = np.argmax(np.abs(test_dh_error))
+        arg_max_error_dw = np.argmax(np.abs(test_dw_error))
+        model_performance[model_type][model_hidden_size]['test_dh_error_argmax'] = (arg_max_error_dh//40, arg_max_error_dh%40)
+        model_performance[model_type][model_hidden_size]['test_dw_error_argmax'] = (arg_max_error_dw//40, arg_max_error_dw%40)
+        model_performance[model_type][model_hidden_size]['cmd_v_feedrate_dh_max_error'] = test_cmd_v_feedrate[arg_max_error_dh]
+        model_performance[model_type][model_hidden_size]['cmd_v_feedrate_dw_max_error'] = test_cmd_v_feedrate[arg_max_error_dw]
         model_performance[model_type][model_hidden_size]['training_time_elapsed'] = round(training_time_elapsed)
         model_dir_names[model_type][model_hidden_size] = model_dir
         # test_dh_error = np.reshape(test_dh_error, (40,-1))  # ensure it's a 2D array
@@ -70,6 +80,12 @@ for model_dir in model_dirs:
         model_performance_openloop[model_type][model_hidden_size]['test_dw_error_95'] = stats.expon(scale=np.std(test_dw_error)).interval(0.95)[1]
         model_performance_openloop[model_type][model_hidden_size]['test_dh_error_max'] = np.max(np.abs(test_dh_error))
         model_performance_openloop[model_type][model_hidden_size]['test_dw_error_max'] = np.max(np.abs(test_dw_error))
+        arg_max_error_dh = np.argmax(np.abs(test_dh_error))
+        arg_max_error_dw = np.argmax(np.abs(test_dw_error))
+        model_performance_openloop[model_type][model_hidden_size]['test_dh_error_argmax'] = (arg_max_error_dh//40, arg_max_error_dh%40)
+        model_performance_openloop[model_type][model_hidden_size]['test_dw_error_argmax'] = (arg_max_error_dw//40, arg_max_error_dw%40)
+        model_performance_openloop[model_type][model_hidden_size]['cmd_v_feedrate_dh_max_error'] = test_cmd_v_feedrate[arg_max_error_dh]
+        model_performance_openloop[model_type][model_hidden_size]['cmd_v_feedrate_dw_max_error'] = test_cmd_v_feedrate[arg_max_error_dw]
         model_performance_openloop[model_type][model_hidden_size]['training_time_elapsed'] = round(training_time_elapsed)
         model_dir_names_openloop[model_type][model_hidden_size] = model_dir
     else:
@@ -92,6 +108,14 @@ table_string["Closed loop dh max error"] = "| Hidden Size | " + " | ".join(model
 table_string["Closed loop dh max error"] += "|-------------|" + " | ".join(["---"] * len(model_performance.keys())) + " |\n"
 table_string["Closed loop dw max error"] = "| Hidden Size | " + " | ".join(model_performance.keys()) + " |\n"
 table_string["Closed loop dw max error"] += "|-------------|" + " | ".join(["---"] * len(model_performance.keys())) + " |\n"
+table_string["Closed loop dh argmax error"] = "| Hidden Size | " + " | ".join(model_performance.keys()) + " |\n"
+table_string["Closed loop dh argmax error"] += "|-------------|" + " | ".join(["---"] * len(model_performance.keys())) + " |\n"
+table_string["Closed loop dw argmax error"] = "| Hidden Size | " + " | ".join(model_performance.keys()) + " |\n"
+table_string["Closed loop dw argmax error"] += "|-------------|" + " | ".join(["---"] * len(model_performance.keys())) + " |\n"
+table_string["Closed loop dh cmd_v_feedrate max error"] = "| Hidden Size | " + " | ".join(model_performance.keys()) + " |\n"
+table_string["Closed loop dh cmd_v_feedrate max error"] += "|-------------|" + " | ".join(["---"] * len(model_performance.keys())) + " |\n"
+table_string["Closed loop dw cmd_v_feedrate max error"] = "| Hidden Size | " + " | ".join(model_performance.keys()) + " |\n"
+table_string["Closed loop dw cmd_v_feedrate max error"] += "|-------------|" + " | ".join(["---"] * len(model_performance.keys())) + " |\n"
 table_string["Closed loop dir"] = "| Hidden Size | " + " | ".join(model_performance.keys()) + " |\n"
 table_string["Closed loop dir"] += "|-------------|" + " | ".join(["---"] * len(model_performance.keys())) + " |\n"
 table_string["Closed loop training time"] = "| Hidden Size | " + " | ".join(model_performance.keys()) + " |\n"
@@ -110,6 +134,14 @@ table_string["Open loop dh max error"] = "| Hidden Size | " + " | ".join(model_p
 table_string["Open loop dh max error"] += "|-------------|" + " | ".join(["---"] * len(model_performance_openloop.keys())) + " |\n"
 table_string["Open loop dw max error"] = "| Hidden Size | " + " | ".join(model_performance_openloop.keys()) + " |\n"
 table_string["Open loop dw max error"] += "|-------------|" + " | ".join(["---"] * len(model_performance_openloop.keys())) + " |\n"
+table_string["Open loop dh argmax error"] = "| Hidden Size | " + " | ".join(model_performance_openloop.keys()) + " |\n"
+table_string["Open loop dh argmax error"] += "|-------------|" + " | ".join(["---"] * len(model_performance_openloop.keys())) + " |\n"
+table_string["Open loop dw argmax error"] = "| Hidden Size | " + " | ".join(model_performance_openloop.keys()) + " |\n"
+table_string["Open loop dw argmax error"] += "|-------------|" + " | ".join(["---"] * len(model_performance_openloop.keys())) + " |\n"
+table_string["Open loop dh cmd_v_feedrate max error"] = "| Hidden Size | " + " | ".join(model_performance_openloop.keys()) + " |\n"
+table_string["Open loop dh cmd_v_feedrate max error"] += "|-------------|" + " | ".join(["---"] * len(model_performance_openloop.keys())) + " |\n"
+table_string["Open loop dw cmd_v_feedrate max error"] = "| Hidden Size | " + " | ".join(model_performance_openloop.keys()) + " |\n"
+table_string["Open loop dw cmd_v_feedrate max error"] += "|-------------|" + " | ".join(["---"] * len(model_performance_openloop.keys())) + " |\n"
 table_string["Open loop training time"] = "| Hidden Size | " + " | ".join(model_performance_openloop.keys()) + " |\n"
 table_string["Open loop training time"] += "|-------------|" + " | ".join(["---"] * len(model_performance_openloop.keys())) + " |\n"
 table_string["Open loop dir"] = "| Hidden Size | " + " | ".join(model_performance_openloop.keys()) + " |\n"
@@ -129,6 +161,10 @@ for hidden_size in hidden_sizes:
             table_string["Closed loop dw 95 error"] += f"{model_performance[model_type][hidden_size]['test_dw_error_95']:<7.4f} | "
             table_string["Closed loop dh max error"] += f"{model_performance[model_type][hidden_size]['test_dh_error_max']:<7.4f} | "
             table_string["Closed loop dw max error"] += f"{model_performance[model_type][hidden_size]['test_dw_error_max']:<7.4f} | "
+            table_string["Closed loop dh argmax error"] += f"({model_performance[model_type][hidden_size]['test_dh_error_argmax'][0]:<4},{model_performance[model_type][hidden_size]['test_dh_error_argmax'][1]:<3}) | "
+            table_string["Closed loop dw argmax error"] += f"({model_performance[model_type][hidden_size]['test_dw_error_argmax'][0]:<4},{model_performance[model_type][hidden_size]['test_dw_error_argmax'][1]:<3}) | "
+            table_string["Closed loop dh cmd_v_feedrate max error"] += f"({model_performance[model_type][hidden_size]['cmd_v_feedrate_dh_max_error'][0]:<3},{model_performance[model_type][hidden_size]['cmd_v_feedrate_dh_max_error'][1]:<4}) | "
+            table_string["Closed loop dw cmd_v_feedrate max error"] += f"({model_performance[model_type][hidden_size]['cmd_v_feedrate_dw_max_error'][0]:<3},{model_performance[model_type][hidden_size]['cmd_v_feedrate_dw_max_error'][1]:<4}) | "
             table_string["Closed loop dir"] += f"{model_dir_names[model_type][hidden_size][6:]:<15} | "
             table_string["Closed loop training time"] += f"{model_performance[model_type][hidden_size]['training_time_elapsed']:<7.2f} | "
             table_string["Open loop testing loss"] += f"{model_performance_openloop[model_type][hidden_size]['testing_loss']:<7.4f} | "
@@ -138,6 +174,10 @@ for hidden_size in hidden_sizes:
             table_string["Open loop dw 95 error"] += f"{model_performance_openloop[model_type][hidden_size]['test_dw_error_95']:<7.4f} | "
             table_string["Open loop dh max error"] += f"{model_performance_openloop[model_type][hidden_size]['test_dh_error_max']:<7.4f} | "
             table_string["Open loop dw max error"] += f"{model_performance_openloop[model_type][hidden_size]['test_dw_error_max']:<7.4f} | "
+            table_string["Open loop dh argmax error"] += f"({model_performance_openloop[model_type][hidden_size]['test_dh_error_argmax'][0]:<4},{model_performance_openloop[model_type][hidden_size]['test_dh_error_argmax'][1]:<3}) | "
+            table_string["Open loop dw argmax error"] += f"({model_performance_openloop[model_type][hidden_size]['test_dw_error_argmax'][0]:<4},{model_performance_openloop[model_type][hidden_size]['test_dw_error_argmax'][1]:<3}) | "
+            table_string["Open loop dh cmd_v_feedrate max error"] += f"({model_performance_openloop[model_type][hidden_size]['cmd_v_feedrate_dh_max_error'][0]:<3},{model_performance_openloop[model_type][hidden_size]['cmd_v_feedrate_dh_max_error'][1]:<4}) | "
+            table_string["Open loop dw cmd_v_feedrate max error"] += f"({model_performance_openloop[model_type][hidden_size]['cmd_v_feedrate_dw_max_error'][0]:<3},{model_performance_openloop[model_type][hidden_size]['cmd_v_feedrate_dw_max_error'][1]:<4}) | "
             table_string["Open loop dir"] += f"{model_dir_names_openloop[model_type][hidden_size][6:]:<15} | "
             table_string["Open loop training time"] += f"{model_performance_openloop[model_type][hidden_size]['training_time_elapsed']:<7.2f} | "
         else:

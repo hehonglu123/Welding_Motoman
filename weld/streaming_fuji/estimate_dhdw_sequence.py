@@ -347,6 +347,15 @@ if __name__ == "__main__":
     min_feedrate = np.min(np.append(train_data[:, :, 2], test_data[:, :, 2]))
     max_v = np.max(np.append(train_data[:, :, 1], test_data[:, :, 1]))
     min_v = np.min(np.append(train_data[:, :, 1], test_data[:, :, 1]))
+
+    # save input cmd_v cmd_feedrate
+    train_cmd_v = train_data[:, :, 1].flatten()
+    train_cmd_feedrate = train_data[:, :, 2].flatten()
+    test_cmd_v = test_data[:, :, 1].flatten()
+    test_cmd_feedrate = test_data[:, :, 2].flatten()
+    np.savetxt(model_dir+'../train_cmd_v_feedrate.csv', np.vstack((train_cmd_v, train_cmd_feedrate)).T, delimiter=',', header='cmd_v,cmd_fd')
+    np.savetxt(model_dir+'../test_cmd_v_feedrate.csv', np.vstack((test_cmd_v, test_cmd_feedrate)).T, delimiter=',', header='cmd_v,cmd_fd')
+
     train_data[:, :, 1] = (train_data[:, :, 1] - min_v) / (max_v - min_v)
     train_data[:, :, 2] = (train_data[:, :, 2] - min_feedrate) / (max_feedrate - min_feedrate)
     test_data[:, :, 1] = (test_data[:, :, 1] - min_v) / (max_v - min_v)
@@ -545,6 +554,7 @@ if __name__ == "__main__":
         train_dw_error = (train_predictions[:, :, 1] - train_data_labels[:, history_length:, 1]).cpu().numpy().flatten()
         test_dh_error = (test_predictions[:, :, 0] - test_data_labels[:, history_length:, 0]).cpu().numpy().flatten()
         test_dw_error = (test_predictions[:, :, 1] - test_data_labels[:, history_length:, 1]).cpu().numpy().flatten()
+
     # plot test data prediction dh dw vs ground truth dh dw of four sequences, using a 2x2 grid
     layer_dir_chosen = np.random.choice(test_data_dir_tote[0], size=8, replace=False)
     layer_dir_chosen = layer_dir_chosen[[0,3,6,7]]  # choose 4 layers for visualization

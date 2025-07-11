@@ -23,8 +23,8 @@ def main():
 
     test_current = False
     test_thermal = False
-    test_thermal_collected = True
-    test_geometry = False
+    test_thermal_collected = False
+    test_geometry = True
 
     ############## Robot definition ##############
     config_dir='../../config/'
@@ -372,7 +372,7 @@ def main():
                        'weld_fujiscan_2025_06_11_17_49_27/','weld_fujiscan_2025_06_11_18_14_56/','weld_fujiscan_2025_06_12_17_33_24/',\
                        'weld_fujiscan_2025_06_12_16_59_09/','weld_fujiscan_2025_06_12_15_33_03/','weld_fujiscan_2025_06_12_15_03_27/']
         # test_dir = ['weld_fujiscan_2025_06_11_14_12_44/','weld_fujiscan_2025_06_11_16_27_41/']
-        # test_dir = ['weld_fujiscan_2025_06_11_16_52_36/']
+        test_dir = ['weld_fujiscan_2025_06_11_16_52_36/']
         
         
         color_viz = []
@@ -403,7 +403,17 @@ def main():
                 this_layer_dir = logdata_dir + 'layer' + str(layer_n) + '/'
 
                 profile_welding = np.loadtxt(this_layer_dir+'profile_welding.csv',delimiter=',',skiprows=1)
-                profile_welding_viz.append(profile_welding[:,[1,4]])
+                # profile_welding_viz.append(profile_welding[:,[1,4]])
+                profile_welding_viz.append(profile_welding[:,[0,4]])
+
+                profile_welding_cut = profile_welding[(profile_welding[:,1] >= -55) & (profile_welding[:,1] <= 45)]
+                plt.plot(profile_welding_cut[:,0]-profile_welding[0,0], profile_welding_cut[:,5]-np.mean(profile_welding_cut[:,5]), '-o', label='dh')
+                plt.plot(profile_welding_cut[:,0]-profile_welding[0,0], profile_welding_cut[:,6]-np.mean(profile_welding_cut[:,6]), '-o', label='torch height')
+                plt.title(f'Welding Profile at Layer {layer_n}')
+                plt.legend()
+                plt.grid()
+                plt.show()
+
                 # # exclude the first and last edge_exclude mm of the profile
                 # if profile_welding[0,1] < profile_welding[-1,1]:
                 #     profile_welding = profile_welding[profile_welding[:,1] >= start_x + edge_exclude]
@@ -437,7 +447,7 @@ def main():
             # visualize the height
             for profile_cnt,height_profile in enumerate(height_viz):
                 # plt.plot(height_profile[:,0], height_profile[:,1]+40, '-o', color=color_viz[profile_cnt], label='Height Profile')
-                plt.plot(profile_welding_viz[profile_cnt][:,0], profile_welding_viz[profile_cnt][:,1], 'o', label='Welding Profile')
+                plt.plot(profile_welding_viz[profile_cnt][:,0]-profile_welding_viz[profile_cnt][0,0], profile_welding_viz[profile_cnt][:,1], 'o', label='Welding Profile')
             plt.xlabel('X Position (mm)')
             plt.ylabel('Height (mm)')
             plt.grid()
