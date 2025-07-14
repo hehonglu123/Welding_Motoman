@@ -25,13 +25,22 @@ torch.manual_seed(42) # for reproducibility
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print("Using device:", device)
 
+# Define hook to freeze half of W_ih
+def freeze_half_weight(param: torch.Tensor, freeze_cols=[0,1]):
+    mask = torch.zeros_like(param)
+    mask[:, freeze_cols] = 1.0  # Freeze left half
+    def hook(grad):
+        return grad * (1 - mask)
+    param.register_hook(hook)
+
 def train(train_data_input:torch.tensor, train_data_labels:torch.tensor, test_data_input:torch.tensor, test_data_labels:torch.tensor, model:nn.Module, \
           history_length, epochs, learning_rate, model_dir='weld_LSTM_models/'):
     
     # loss function
     loss_fn = nn.MSELoss()
     # optimizer
-    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+    # optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+    optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=learning_rate)
 
     # Training
     training_losses = []
@@ -75,13 +84,15 @@ if __name__ == "__main__":
                        'weld_fujiscan_2025_06_11_17_49_27/','weld_fujiscan_2025_06_11_18_14_56/','weld_fujiscan_2025_06_12_17_33_24/',\
                        'weld_fujiscan_2025_06_12_16_59_09/','weld_fujiscan_2025_06_12_15_33_03/','weld_fujiscan_2025_06_12_15_03_27/']
     
-    train_flag = False # set to False to use the pre-trained model
+    train_flag = True # set to False to use the pre-trained model
+    load_pretrained = True
+    
     if len(sys.argv) > 1:
         train_flag = True if sys.argv[1].lower() == 'true' else False  # first argument is train flag, if not provided, default to True
 
     model_dir = 'weld_Seq_models/' # directory to save the model
     # model directory
-    if train_flag:
+    if train_flag and not load_pretrained:
 
         # parameters
         model_type = 'RNN' # 'LSTM', 'RNN', 'GRU', 'NARMA', 'DTRNN'
@@ -162,12 +173,14 @@ if __name__ == "__main__":
         with open(model_dir+'training_params.yaml', 'w') as f:
             yaml.dump(training_params, f, default_flow_style=False)
     else:
+        # RNN 8 hidden close/open: 20250625_131753/20250625_131507
+        # RNN 16 hidden close/open: 20250625_132020/20250625_131520
+        pre_trained_model_dir = model_dir+'model_20250625_131507/'
         if len(sys.argv) < 2:
-            model_dir = model_dir+ 'model_20250625_131753/' # 20250625_132020, 20250625_131520, 20250625_131753, 20250625_131507
+            model_dir = deepcopy(pre_trained_model_dir)
         else:
             model_dir = model_dir + sys.argv[2] + '/'
                     
-        print("Using pre-trained model directory: ", model_dir)
         # load the training parameters
         with open(model_dir+'training_params.yaml', 'r') as f:
             training_params = yaml.safe_load(f)
@@ -190,10 +203,33 @@ if __name__ == "__main__":
         else:
             open_loop = True if model_input_size == 2 else False
         
-        # if model_type == 'NARMA':
-        #     exit("Skip  training ")
+        if train_flag:
+            # using the pre-trained model directory to train a new model
+            model_input_size = 4
+            if model_input_size > 2:
+                open_loop = False
+            # epochs = 100 # for testing purpose, reduce the epochs to 100
+            epochs = 1000 # only 1000 epochs for training with pre-trained model
+
+            training_params['model_input_size'] = model_input_size
+            training_params['open_loop'] = open_loop
+            training_params['epochs'] = epochs
+            training_params['pre_trained_model_dir'] = pre_trained_model_dir
+
+            # save the training parameters
+            # add timestamp to the model_dir
+            now = datetime.datetime.now()
+            timestamp = now.strftime("%Y%m%d_%H%M%S")
+            model_dir = "weld_Seq_models/model_"+ timestamp + '/'
+            pathlib.Path(model_dir).mkdir(parents=True, exist_ok=True)
+            with open(model_dir+'training_params.yaml', 'w') as f:
+                yaml.dump(training_params, f, default_flow_style=False)
 
     print("Training parameters:")
+    print("Train flag:", train_flag)
+    print("Model directory:", model_dir)
+    if (not train_flag) or load_pretrained:
+        print("Using pre-trained model:", pre_trained_model_dir)
     print("Model type:", model_type, "Model input size:", model_input_size, "Model hidden size:", model_hidden_size)
 
     # Model types
@@ -381,12 +417,44 @@ if __name__ == "__main__":
     print("Train data labels shape: ", train_data_labels.shape)
     
     if train_flag:
+        if load_pretrained:
+            print("Loading pre-trained model from: ", pre_trained_model_dir+'best_model.pth')
+            parameter_dict = torch.load(pre_trained_model_dir+'best_model.pth', weights_only=True)
+            try:
+                model.load_state_dict(parameter_dict)
+            except RuntimeError as e:
+                print("Train closed loop from open loop pre-trained model.")
+                with torch.no_grad():
+                    model.rnn_cell.weight_hh.data.copy_(parameter_dict['rnn.weight_hh_l0'])
+                    model.rnn_cell.bias_hh.data.copy_(parameter_dict['rnn.bias_hh_l0'])
+                    model.rnn_cell.weight_ih[:, :2].data.copy_(parameter_dict['rnn.weight_ih_l0'])
+                    model.rnn_cell.bias_ih.data.copy_(parameter_dict['rnn.bias_ih_l0'])
+                    model.fc.weight.data.copy_(parameter_dict['fc.weight'])
+                    model.rnn_cell.weight_hh.requires_grad = False
+                    model.rnn_cell.bias_hh.requires_grad = False
+                    freeze_half_weight(model.rnn_cell.weight_ih, freeze_cols=[0,1]) # freeze the first two columns of weight_ih
+                    model.rnn_cell.bias_ih.requires_grad = False
+                    model.fc.weight.requires_grad = False
+                    pre_train_weight_hh = model.rnn_cell.weight_hh.detach().cpu().numpy()
+                    pre_train_weight_ih = model.rnn_cell.weight_ih.detach().cpu().numpy()
         # training loop
         start_time = time.time()
         _, training_loss, testing_loss = train(train_data_input, train_data_labels, test_data_input, test_data_labels, model,\
                                                 history_length, epochs, learning_rate, model_dir=model_dir)
         end_time = time.time()
         print(f"Training completed in {end_time - start_time:.2f} seconds.")
+
+        # plot pre-trained and after training model parameters differences
+        # if load_pretrained:
+        #     plt.matshow(pre_train_weight_hh-model.rnn_cell.weight_hh.detach().cpu().numpy(), cmap='viridis', aspect='equal')
+        #     plt.title("Weight HH Difference")
+        #     plt.colorbar()
+        #     plt.show()
+        #     plt.matshow(pre_train_weight_ih-model.rnn_cell.weight_ih.detach().cpu().numpy(), cmap='viridis', aspect='equal')
+        #     plt.title("Weight IH Difference")
+        #     plt.colorbar()
+        #     plt.show()
+
         model.load_state_dict(torch.load(model_dir+'best_model.pth',weights_only=True)) # load the best model for evaluation
         # save loss
         np.savetxt(model_dir+'training_loss.csv', training_loss, delimiter=',')
