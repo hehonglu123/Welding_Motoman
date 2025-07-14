@@ -109,10 +109,14 @@ if __name__ == "__main__":
         # model_input_size = 12 # (cmd_v, cmd_fd)_(t,t-1,t-2), (dh,dw)_(t-1,t-2,t-3), (dh dw error)_(t-1,t-2,t-3)
         model_input_size = 4 # cmd_v, cmd_fd, dh error, dw error
         # model_input_size = 2 # cmd_v, cmd_fd
+        # model_input_size = 5 # cmd_v, cmd_fd, stickout, dh error, dw error
+        # model_input_size = 3 # cmd_v, cmd_fd, stickout
+        use_stickout_length = True if model_input_size in [3,5] else False
+
         model_hidden_size = 3 # hidden size
         num_layers = 1 # number of layers
         model_output_size = 2 # dh, dw
-        open_loop = True
+        open_loop = False
 
         # pass system arguments
         # the first argument is model type, the second argument is model_input_size
@@ -142,7 +146,7 @@ if __name__ == "__main__":
         # how many previous time steps to consider, only used for AutoRegression
         if model_type!= 'NARMA':
             history_length = max(0,int(model_input_size/4-0.5))
-            open_loop = True if model_input_size == 2 else False # if model_input_size is 2, then it is an open loop model (RNN, LSTM, GRU)
+            open_loop = True if model_input_size in [2,3] else False # if model_input_size is 2, then it is an open loop model (RNN, LSTM, GRU)
         else:
             if open_loop:
                 history_length = max(0,int(model_input_size/4)) 
@@ -162,7 +166,7 @@ if __name__ == "__main__":
             'learning_rate': learning_rate, 'model_input_size': model_input_size,
             'history_length': history_length, 'model_hidden_size': model_hidden_size,
             'num_layers': num_layers, 'model_output_size': model_output_size,
-            'open_loop': open_loop
+            'open_loop': open_loop, 'use_stickout_length': use_stickout_length
         }
         # save the training parameters
         # add timestamp to the model_dir
@@ -204,9 +208,13 @@ if __name__ == "__main__":
             open_loop = True if model_input_size == 2 else False
         
         if train_flag:
+            try:
+                use_stickout_length = training_params['use_stickout_length']
+            except KeyError:
+                use_stickout_length = False
             # using the pre-trained model directory to train a new model
-            model_input_size = 4
-            if model_input_size > 2:
+            model_input_size = 5 if use_stickout_length else 4
+            if model_input_size > 3:
                 open_loop = False
             # epochs = 100 # for testing purpose, reduce the epochs to 100
             epochs = 1000 # only 1000 epochs for training with pre-trained model
@@ -303,6 +311,7 @@ if __name__ == "__main__":
                 cmd_fd_interp = np.zeros_like(timestamps_interp)
                 dh_interp = np.zeros_like(timestamps_interp)
                 dw_interp = np.zeros_like(timestamps_interp)
+                stickout_interp = np.zeros_like(timestamps_interp)
                 thermal_interp = np.zeros_like(timestamps_interp)
                 for interp_id, interp_time in enumerate(timestamps_interp):
                     window_id_start = np.where(timestamp_welding >= interp_time-1/sample_rate)[0][0]
@@ -317,6 +326,7 @@ if __name__ == "__main__":
                     cmd_fd_interp[interp_id] = np.mean(profile_welding[window_id_start:window_id_end, 3])
                     dh_interp[interp_id] = np.mean(profile_welding[window_id_start:window_id_end, 5])
                     dw_interp[interp_id] = np.mean(profile_welding[window_id_start:window_id_end, 7])
+                    stickout_interp[interp_id] = np.mean(profile_welding[window_id_start:window_id_end, 6])
                     thermal_interp[interp_id] = np.mean(profile_welding[window_id_start:window_id_end, 9])
                 if np.any(cmd_v_interp==0):
                     # plt.plot(timestamps_interp, cmd_v_interp, 'o', label='cmd_v_interp')
@@ -327,11 +337,12 @@ if __name__ == "__main__":
                     cmd_fd_interp = np.interp(timestamps_interp, timestamps_interp[cmd_fd_interp!=0], cmd_fd_interp[cmd_fd_interp!=0])
                     dh_interp = np.interp(timestamps_interp, timestamps_interp[dh_interp!=0], dh_interp[dh_interp!=0])
                     dw_interp = np.interp(timestamps_interp, timestamps_interp[dw_interp!=0], dw_interp[dw_interp!=0])
+                    stickout_interp = np.interp(timestamps_interp, timestamps_interp[stickout_interp!=0], stickout_interp[stickout_interp!=0])
                     thermal_interp = np.interp(timestamps_interp, timestamps_interp[thermal_interp!=0], thermal_interp[thermal_interp!=0])
 
                 # save the interpolated data
-                interp_data = np.column_stack((timestamps_interp, cmd_v_interp, cmd_fd_interp, dh_interp, dw_interp))
-                np.savetxt(this_layer_dir+'profile_welding_'+str(sample_rate)+'_dhdw.csv', interp_data, delimiter=',', header='timestamp,cmd_v,cmd_fd,dh,dw')
+                interp_data = np.column_stack((timestamps_interp, cmd_v_interp, cmd_fd_interp, dh_interp, dw_interp, stickout_interp, thermal_interp))
+                np.savetxt(this_layer_dir+'profile_welding_'+str(sample_rate)+'_dhdw.csv', interp_data, delimiter=',', header='timestamp,cmd_v,cmd_fd,dh,dw,stickout,thermal')
                 train_data_batch_len.append(len(interp_data))
                     
     # total amount of data
@@ -387,10 +398,13 @@ if __name__ == "__main__":
     # save input cmd_v cmd_feedrate
     train_cmd_v = train_data[:, :, 1].flatten()
     train_cmd_feedrate = train_data[:, :, 2].flatten()
+    train_stickout_length = train_data[:, :, 5].flatten()
     test_cmd_v = test_data[:, :, 1].flatten()
     test_cmd_feedrate = test_data[:, :, 2].flatten()
-    np.savetxt(model_dir+'../train_cmd_v_feedrate.csv', np.vstack((train_cmd_v, train_cmd_feedrate)).T, delimiter=',', header='cmd_v,cmd_fd')
-    np.savetxt(model_dir+'../test_cmd_v_feedrate.csv', np.vstack((test_cmd_v, test_cmd_feedrate)).T, delimiter=',', header='cmd_v,cmd_fd')
+    test_stickout_length = test_data[:, :, 5].flatten()
+
+    np.savetxt(model_dir+'../train_cmd_v_feedrate.csv', np.vstack((train_cmd_v, train_cmd_feedrate, train_stickout_length)).T, delimiter=',', header='cmd_v,cmd_fd,stickout')
+    np.savetxt(model_dir+'../test_cmd_v_feedrate.csv', np.vstack((test_cmd_v, test_cmd_feedrate, test_stickout_length)).T, delimiter=',', header='cmd_v,cmd_fd,stickout')
 
     train_data[:, :, 1] = (train_data[:, :, 1] - min_v) / (max_v - min_v)
     train_data[:, :, 2] = (train_data[:, :, 2] - min_feedrate) / (max_feedrate - min_feedrate)
@@ -398,9 +412,13 @@ if __name__ == "__main__":
     test_data[:, :, 2] = (test_data[:, :, 2] - min_feedrate) / (max_feedrate - min_feedrate)
 
     # prepare data for training
-    train_data_input = torch.tensor(train_data[:, :, 1:3], dtype=torch.float32).to(device)  # cmd_v, cmd_fd
+    if use_stickout_length:
+        train_data_input = torch.tensor(train_data[:, :, [1,2,5]], dtype=torch.float32).to(device)  # cmd_v, cmd_fd, stickout
+        test_data_input = torch.tensor(test_data[:, :, [1,2,5]], dtype=torch.float32).to(device)  # cmd_v, cmd_fd, stickout
+    else:
+        train_data_input = torch.tensor(train_data[:, :, 1:3], dtype=torch.float32).to(device)  # cmd_v, cmd_fd
+        test_data_input = torch.tensor(test_data[:, :, 1:3], dtype=torch.float32).to(device)  # cmd_v, cmd_fd
     train_data_labels = torch.tensor(train_data[:, :, 3:5], dtype=torch.float32).to(device)  # dh, dw
-    test_data_input = torch.tensor(test_data[:, :, 1:3], dtype=torch.float32).to(device)  # cmd_v, cmd_fd
     test_data_labels = torch.tensor(test_data[:, :, 3:5], dtype=torch.float32).to(device)  # dh, dw
 
     # padd history length at the beginning of the input data
@@ -599,18 +617,18 @@ if __name__ == "__main__":
             plt.show()
 
     # plot training and testing loss
-    # plt.figure(figsize=(10, 5))
-    # plt.plot(training_loss, label='Training Loss')
-    # plt.plot(testing_loss, label='Testing Loss')
-    # plt.xlabel('Epochs', fontsize=xy_label_size)
-    # plt.ylabel('Loss', fontsize=xy_label_size)
-    # plt.xticks(fontsize=xy_tick_size)
-    # plt.yticks(fontsize=xy_tick_size)
-    # plt.grid()
-    # plt.legend(fontsize=legend_size)
-    # plt.title('Training and Testing Loss', fontsize=title_size)
-    # plt.tight_layout()
-    # plt.savefig(model_dir+'training_testing_loss.png')
+    plt.figure(figsize=(10, 5))
+    plt.plot(training_loss, label='Training Loss')
+    plt.plot(testing_loss, label='Testing Loss')
+    plt.xlabel('Epochs', fontsize=xy_label_size)
+    plt.ylabel('Loss', fontsize=xy_label_size)
+    plt.xticks(fontsize=xy_tick_size)
+    plt.yticks(fontsize=xy_tick_size)
+    plt.grid()
+    plt.legend(fontsize=legend_size)
+    plt.title('Training and Testing Loss', fontsize=title_size)
+    plt.tight_layout()
+    plt.savefig(model_dir+'training_testing_loss.png')
     # plt.show()
 
     # plot dh and w error distribution
@@ -622,6 +640,19 @@ if __name__ == "__main__":
         train_dw_error = (train_predictions[:, :, 1] - train_data_labels[:, history_length:, 1]).cpu().numpy().flatten()
         test_dh_error = (test_predictions[:, :, 0] - test_data_labels[:, history_length:, 0]).cpu().numpy().flatten()
         test_dw_error = (test_predictions[:, :, 1] - test_data_labels[:, history_length:, 1]).cpu().numpy().flatten()
+    
+    # save the errors
+    np.savetxt(model_dir+'train_dh_error.csv', train_dh_error, delimiter=',')
+    np.savetxt(model_dir+'train_dw_error.csv', train_dw_error, delimiter=',')
+    np.savetxt(model_dir+'test_dh_error.csv', test_dh_error, delimiter=',')
+    np.savetxt(model_dir+'test_dw_error.csv', test_dw_error, delimiter=',')
+    # plot the error distribution
+    plot_error_distribution(np.abs(train_dh_error), np.abs(train_dw_error), np.abs(test_dh_error), np.abs(test_dw_error), save_dir=model_dir)
+    # print test error statistics
+    print(f"Test dh Error: Mean = {np.mean(np.abs(test_dh_error)):.4f}, width Error = {np.mean(np.abs(test_dw_error)):.4f}")
+
+    # if no plotting
+    exit()
 
     # plot test data prediction dh dw vs ground truth dh dw of four sequences, using a 2x2 grid
     layer_dir_chosen = np.random.choice(test_data_dir_tote[0], size=8, replace=False)
@@ -749,15 +780,3 @@ if __name__ == "__main__":
         if t_id==0:
             input("Press Enter to continue...")
             time.sleep(3)
-
-    exit()
-    
-    # save the errors
-    np.savetxt(model_dir+'train_dh_error.csv', train_dh_error, delimiter=',')
-    np.savetxt(model_dir+'train_dw_error.csv', train_dw_error, delimiter=',')
-    np.savetxt(model_dir+'test_dh_error.csv', test_dh_error, delimiter=',')
-    np.savetxt(model_dir+'test_dw_error.csv', test_dw_error, delimiter=',')
-    # plot the error distribution
-    plot_error_distribution(np.abs(train_dh_error), np.abs(train_dw_error), np.abs(test_dh_error), np.abs(test_dw_error), save_dir=model_dir)
-    # print test error statistics
-    print(f"Test dh Error: Mean = {np.mean(np.abs(test_dh_error)):.4f}, width Error = {np.mean(np.abs(test_dw_error)):.4f}")
