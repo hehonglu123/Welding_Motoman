@@ -14,6 +14,13 @@ model_inputsize = {"RNN Open": 2, 'RNN Closed Pre-Trained Open': 4, "RNN Closed"
 model_pretrained = {"RNN Open": False, 'RNN Closed Pre-Trained Open': True, "RNN Closed": False}
 model_openloop = {"RNN Open": True, 'RNN Closed Pre-Trained Open': False, "RNN Closed": False}
 
+# model_performance = {"Open w.o. d": {}, 'Open w. d': {}, "Closed w.o. d": {}, "Closed w. d": {}}
+# model_dir_names = {"Open w.o. d": {}, 'Open w. d': {}, "Closed w.o. d": {}, "Closed w. d": {}}
+# model_types = {"Open w.o. d": "RNN", 'Open w. d': "RNN", "Closed w.o. d": "RNN", "Closed w. d": "RNN"}
+# model_inputsize = {"Open w.o. d": 2, 'Open w. d': 3, "Closed w.o. d": 4, "Closed w. d": 5}
+# model_pretrained = {"Open w.o. d": False, 'Open w. d': False, "Closed w.o. d": False, "Closed w. d": False}
+# model_openloop = {"Open w.o. d": True, 'Open w. d': True, "Closed w.o. d": False, "Closed w. d": False}
+
 # loop through each model directory and analyze the YAML files
 for model_dir in model_dirs:
     # read the yaml file traininig_params.yaml

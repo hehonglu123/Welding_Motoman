@@ -91,7 +91,7 @@ if __name__ == "__main__":
                        'weld_fujiscan_2025_06_12_16_59_09/','weld_fujiscan_2025_06_12_15_33_03/','weld_fujiscan_2025_06_12_15_03_27/']
     
     train_flag = True # set to False to use the pre-trained model
-    load_pretrained = False
+    load_pretrained = True
     
     if len(sys.argv) > 1:
         train_flag = True if sys.argv[1].lower() == 'true' else False  # first argument is train flag, if not provided, default to True
@@ -467,6 +467,7 @@ if __name__ == "__main__":
                     freeze_half_weight(model.rnn_cell.weight_ih, freeze_cols=[0,1]) # freeze the first two columns of weight_ih
                     model.rnn_cell.bias_ih.requires_grad = False
                     model.fc.weight.requires_grad = False
+                    model.fc.bias.requires_grad = False
                     pre_train_weight_hh = model.rnn_cell.weight_hh.detach().cpu().numpy()
                     pre_train_weight_ih = model.rnn_cell.weight_ih.detach().cpu().numpy()
         # training loop
