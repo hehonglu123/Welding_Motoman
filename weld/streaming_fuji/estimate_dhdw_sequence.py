@@ -184,6 +184,7 @@ if __name__ == "__main__":
             model_dir = deepcopy(pre_trained_model_dir)
         else:
             model_dir = model_dir + sys.argv[2] + '/'
+            pre_trained_model_dir = deepcopy(model_dir)
                     
         # load the training parameters
         with open(model_dir+'training_params.yaml', 'r') as f:
@@ -206,6 +207,10 @@ if __name__ == "__main__":
             open_loop = training_params['open_loop']
         else:
             open_loop = True if model_input_size == 2 else False
+
+        if model_type != 'RNN' or not open_loop:
+            print("Skip:",model_type, "model with input size", model_input_size, "and open loop:", open_loop)
+            exit() # only trained the closed loop from open loop RNN
         
         if train_flag:
             try:
@@ -217,7 +222,7 @@ if __name__ == "__main__":
             if model_input_size > 3:
                 open_loop = False
             # epochs = 100 # for testing purpose, reduce the epochs to 100
-            epochs = 1000 # only 1000 epochs for training with pre-trained model
+            epochs = 5000 # only 5000 epochs for training with pre-trained model
 
             training_params['model_input_size'] = model_input_size
             training_params['open_loop'] = open_loop
@@ -343,6 +348,7 @@ if __name__ == "__main__":
                 # save the interpolated data
                 interp_data = np.column_stack((timestamps_interp, cmd_v_interp, cmd_fd_interp, dh_interp, dw_interp, stickout_interp, thermal_interp))
                 np.savetxt(this_layer_dir+'profile_welding_'+str(sample_rate)+'_dhdw.csv', interp_data, delimiter=',', header='timestamp,cmd_v,cmd_fd,dh,dw,stickout,thermal')
+                data_dirs.append(this_layer_dir)
                 train_data_batch_len.append(len(interp_data))
                     
     # total amount of data
