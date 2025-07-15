@@ -423,6 +423,7 @@ weld/streaming_fuji/weld_thermal_models/model*
 weld/streaming_fuji/weld_Seq_models/model*
 weld/streaming_fuji/weld_Seq_models/close*
 weld/streaming_fuji/weld_Seq_models/open*
+weld/streaming_fuji/weld_Seq_models/stats*
 weld/streaming_fuji/weld_Seq_models/test_cmd_v_feedrate.csv
 weld/streaming_fuji/weld_Seq_models/train_cmd_v_feedrate.csv
 

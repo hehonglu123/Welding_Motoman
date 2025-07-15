@@ -13,6 +13,8 @@ model_close_loop_inputsize = {"RNN": 4, "DTRNN": 4, "GRU": 4, "LSTM": 4, "NARMA"
 model_performance_openloop = {"RNN": {}, "DTRNN": {}, "GRU": {}, "LSTM": {}, "NARMA": {}}
 model_dir_names_openloop = {"RNN":{}, "DTRNN": {}, "GRU":{}, "LSTM":{}, "NARMA":{}}
 model_open_loop_inputsize = {"RNN": 2, "DTRNN": 2, "GRU": 2, "LSTM": 2, "NARMA": 12}
+
+
 # loop through each model directory and analyze the YAML files
 for model_dir in model_dirs:
     # read the yaml file traininig_params.yaml
