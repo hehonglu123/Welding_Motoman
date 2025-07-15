@@ -42,6 +42,12 @@ def train(train_data_input:torch.tensor, train_data_labels:torch.tensor, test_da
     # optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
     optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=learning_rate)
 
+    # print all trainable parameters
+    print("Trainable parameters:")
+    for name, param in model.named_parameters():
+        if param.requires_grad:
+            print(f"{name}: {param.data.shape}")
+
     # Training
     training_losses = []
     testing_losses = []
