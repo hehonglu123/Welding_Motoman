@@ -85,7 +85,7 @@ if __name__ == "__main__":
                        'weld_fujiscan_2025_06_12_16_59_09/','weld_fujiscan_2025_06_12_15_33_03/','weld_fujiscan_2025_06_12_15_03_27/']
     
     train_flag = True # set to False to use the pre-trained model
-    load_pretrained = True
+    load_pretrained = False
     
     if len(sys.argv) > 1:
         train_flag = True if sys.argv[1].lower() == 'true' else False  # first argument is train flag, if not provided, default to True
@@ -107,11 +107,10 @@ if __name__ == "__main__":
         # model parameters
         # model_input_size = 18 # (cmd_v, cmd_fd)_(t,t-1,t-2), (dh,dw)_(t-1,t-2,t-3), (dh dw error)_(t-1,t-2,t-3)
         # model_input_size = 12 # (cmd_v, cmd_fd)_(t,t-1,t-2), (dh,dw)_(t-1,t-2,t-3), (dh dw error)_(t-1,t-2,t-3)
-        model_input_size = 4 # cmd_v, cmd_fd, dh error, dw error
+        # model_input_size = 4 # cmd_v, cmd_fd, dh error, dw error
         # model_input_size = 2 # cmd_v, cmd_fd
         # model_input_size = 5 # cmd_v, cmd_fd, stickout, dh error, dw error
-        # model_input_size = 3 # cmd_v, cmd_fd, stickout
-        use_stickout_length = True if model_input_size in [3,5] else False
+        model_input_size = 3 # cmd_v, cmd_fd, stickout
 
         model_hidden_size = 3 # hidden size
         num_layers = 1 # number of layers
@@ -124,24 +123,27 @@ if __name__ == "__main__":
             if i < 2:
                 continue
             if i == 2:
-                model_type = sys.argv[1]
+                model_type = sys.argv[i]
                 if model_type not in ['LSTM', 'RNN', 'GRU', 'NARMA', 'DTRNN']:
-                    print("Invalid model type. Please choose from 'LSTM', 'RNN', 'GRU', or 'NARMA'.")
+                    print("Invalid model type:", model_type, ". Please choose from 'LSTM', 'RNN', 'GRU', 'NARMA', or 'DTRNN'.")
                     sys.exit(1)
             if i == 3:
-                model_input_size = int(sys.argv[2])
+                model_input_size = int(sys.argv[i])
                 if model_input_size < 2:
                     print("Invalid model input size. Please provide a value greater than or equal to 2.")
                     sys.exit(1)
                 if model_type == 'NARMA':
                     model_input_size = (model_input_size+2)*3
             if i == 4:
-                model_hidden_size = int(sys.argv[3])
+                model_hidden_size = int(sys.argv[i])
                 if model_hidden_size < 1:
                     print("Invalid model hidden size. Please provide a value greater than or equal to 1.")
                     sys.exit(1)
             if i == 5:
-                open_loop = sys.argv[4].lower() == 'true'
+                open_loop = sys.argv[i].lower() == 'true'
+
+        # if include stickout length as the input feature
+        use_stickout_length = True if model_input_size in [3,5] else False
 
         # how many previous time steps to consider, only used for AutoRegression
         if model_type!= 'NARMA':

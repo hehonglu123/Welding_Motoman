@@ -1,9 +1,9 @@
 # Arrays of candidate inputs
-# $firstInputs = @("RNN", "GRU", "LSTM", "NARMA")
+# $firstInputs = @("RNN", "GRU", "LSTM", "NARMA","DTRNN")
 # $secondInputs = @("2", "4", "14")
 # $thirdInputs = @("3", "8", "16", "64")
-$firstInputs = @("DTRNN","NARMA")
-$secondInputs = @("2","4")
+$firstInputs = @("RNN")
+$secondInputs = @("3","5")
 $thirdInputs = @("3", "8", "16", "64")
 
 # Path to the Python script
@@ -22,6 +22,7 @@ foreach ($first in $firstInputs) {
                 }
             }
             python $pythonScript "True" $first $second $third $fourth # train_flag, model_type, model_input_size, model_hidden_size, open_loop
+            Write-Host "==========================================="
         }
     }
 }
