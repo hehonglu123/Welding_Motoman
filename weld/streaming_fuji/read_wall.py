@@ -581,7 +581,7 @@ def main():
                     #############################################
 
                 # compensating the observed shifting
-                shift_x = 5.685
+                shift_x = 5.9
                 profile_height[:,0] = profile_height[:,0] + shift_x
                 profile_width[:,0] = profile_width[:,0] + shift_x
 

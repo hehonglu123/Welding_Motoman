@@ -86,12 +86,15 @@ if __name__ == "__main__":
 
     # load data
     geo_data_dir = '../../data/wall_weld_test/'
-    logdata_dir_all = ['weld_fujiscan_2025_06_11_16_27_41/','weld_fujiscan_2025_06_11_16_52_36/','weld_fujiscan_2025_06_11_17_16_48/',\
-                       'weld_fujiscan_2025_06_11_17_49_27/','weld_fujiscan_2025_06_11_18_14_56/','weld_fujiscan_2025_06_12_17_33_24/',\
-                       'weld_fujiscan_2025_06_12_16_59_09/','weld_fujiscan_2025_06_12_15_33_03/','weld_fujiscan_2025_06_12_15_03_27/']
+    # logdata_dir_all = ['weld_fujiscan_2025_06_11_16_27_41/','weld_fujiscan_2025_06_11_16_52_36/','weld_fujiscan_2025_06_11_17_16_48/',\
+    #                    'weld_fujiscan_2025_06_11_17_49_27/','weld_fujiscan_2025_06_11_18_14_56/','weld_fujiscan_2025_06_12_17_33_24/',\
+    #                    'weld_fujiscan_2025_06_12_16_59_09/','weld_fujiscan_2025_06_12_15_33_03/','weld_fujiscan_2025_06_12_15_03_27/']
+    logdata_dir_all = ['weld_fujiscan_2025_07_09_14_52_42/','weld_fujiscan_2025_07_09_15_21_35/','weld_fujiscan_2025_07_09_16_16_40/']
     
     train_flag = True # set to False to use the pre-trained model
     load_pretrained = True
+    viz_weightings = False # set to True to visualize the weightings of the model
+    use_all_data_for_testing = True # set to True to use all data for testing, otherwise use the last tote for testing
     
     if len(sys.argv) > 1:
         train_flag = True if sys.argv[1].lower() == 'true' else False  # first argument is train flag, if not provided, default to True
@@ -215,16 +218,16 @@ if __name__ == "__main__":
             open_loop = training_params['open_loop']
         else:
             open_loop = True if model_input_size == 2 else False
+        try:
+            use_stickout_length = training_params['use_stickout_length']
+        except KeyError:
+            use_stickout_length = False
 
-        if model_type != 'RNN' or not open_loop:
+        if model_type != 'RNN':
             print("Skip:",model_type, "model with input size", model_input_size, "and open loop:", open_loop)
             exit() # only trained the closed loop from open loop RNN
         
         if train_flag:
-            try:
-                use_stickout_length = training_params['use_stickout_length']
-            except KeyError:
-                use_stickout_length = False
             # using the pre-trained model directory to train a new model
             model_input_size = 5 if use_stickout_length else 4
             if model_input_size > 3:
@@ -397,7 +400,10 @@ if __name__ == "__main__":
         return np.array(data_all)
 
     train_data_dir_tote = train_data_split_dir[:-1]
-    test_data_dir_tote = train_data_split_dir[-1:]
+    if not use_all_data_for_testing:
+        test_data_dir_tote = train_data_split_dir[-1:]
+    else:
+        test_data_dir_tote = deepcopy(train_data_split_dir)
     train_data = load_data_from_tote(train_data_dir_tote)
     test_data = load_data_from_tote(test_data_dir_tote)
     print("Train data shape: ", train_data.shape, "Total samples:", train_data.shape[0]* train_data.shape[1])
@@ -518,7 +524,7 @@ if __name__ == "__main__":
         testing_loss = np.loadtxt(model_dir+'testing_loss.csv', delimiter=',')
 
         # visualize the parameters
-        if model_type == 'RNN':
+        if viz_weightings and model_type == 'RNN':
             open_loop_string = 'Open Loop' if open_loop else 'Closed Loop'
             if open_loop:
                 Whh = model.rnn.weight_hh_l0.detach().cpu().numpy().astype(np.float64)
