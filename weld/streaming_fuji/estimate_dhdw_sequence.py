@@ -34,7 +34,7 @@ def freeze_half_weight(param: torch.Tensor, freeze_cols=[0,1]):
     param.register_hook(hook)
 
 def train(train_data_input:torch.tensor, train_data_labels:torch.tensor, test_data_input:torch.tensor, test_data_labels:torch.tensor, model:nn.Module, \
-          history_length, epochs, learning_rate, model_dir='weld_LSTM_models/'):
+          history_length, latency_steps, epochs, learning_rate, model_dir='weld_LSTM_models/'):
     
     # loss function
     loss_fn = nn.MSELoss()
@@ -86,15 +86,15 @@ if __name__ == "__main__":
 
     # load data
     geo_data_dir = '../../data/wall_weld_test/'
-    # logdata_dir_all = ['weld_fujiscan_2025_06_11_16_27_41/','weld_fujiscan_2025_06_11_16_52_36/','weld_fujiscan_2025_06_11_17_16_48/',\
-    #                    'weld_fujiscan_2025_06_11_17_49_27/','weld_fujiscan_2025_06_11_18_14_56/','weld_fujiscan_2025_06_12_17_33_24/',\
-    #                    'weld_fujiscan_2025_06_12_16_59_09/','weld_fujiscan_2025_06_12_15_33_03/','weld_fujiscan_2025_06_12_15_03_27/']
-    logdata_dir_all = ['weld_fujiscan_2025_07_09_14_52_42/','weld_fujiscan_2025_07_09_15_21_35/','weld_fujiscan_2025_07_09_16_16_40/']
+    logdata_dir_all = ['weld_fujiscan_2025_06_11_16_27_41/','weld_fujiscan_2025_06_11_16_52_36/','weld_fujiscan_2025_06_11_17_16_48/',\
+                       'weld_fujiscan_2025_06_11_17_49_27/','weld_fujiscan_2025_06_11_18_14_56/','weld_fujiscan_2025_06_12_17_33_24/',\
+                       'weld_fujiscan_2025_06_12_16_59_09/','weld_fujiscan_2025_06_12_15_33_03/','weld_fujiscan_2025_06_12_15_03_27/']
+    # logdata_dir_all = ['weld_fujiscan_2025_07_09_14_52_42/','weld_fujiscan_2025_07_09_15_21_35/','weld_fujiscan_2025_07_09_16_16_40/']
     
     train_flag = True # set to False to use the pre-trained model
-    load_pretrained = True
+    load_pretrained = False
     viz_weightings = False # set to True to visualize the weightings of the model
-    use_all_data_for_testing = True # set to True to use all data for testing, otherwise use the last tote for testing
+    use_all_data_for_testing = False # set to True to use all data for testing, otherwise use the last tote for testing
     
     if len(sys.argv) > 1:
         train_flag = True if sys.argv[1].lower() == 'true' else False  # first argument is train flag, if not provided, default to True
@@ -111,17 +111,18 @@ if __name__ == "__main__":
         sequence_length = 40 # sequence length for training
         sample_sequence_overlap = 0.5 # overlap between sequences, 0.5 means 50% overlap
         learning_rate = 0.001 # learning rate for training
-        # latency = 1
+        latency = 1 # sec
+        latency_steps = int(latency * sample_rate) # number of steps to consider for latency
 
         # model parameters
         # model_input_size = 18 # (cmd_v, cmd_fd)_(t,t-1,t-2), (dh,dw)_(t-1,t-2,t-3), (dh dw error)_(t-1,t-2,t-3)
         # model_input_size = 12 # (cmd_v, cmd_fd)_(t,t-1,t-2), (dh,dw)_(t-1,t-2,t-3), (dh dw error)_(t-1,t-2,t-3)
         # model_input_size = 4 # cmd_v, cmd_fd, dh error, dw error
         # model_input_size = 2 # cmd_v, cmd_fd
-        # model_input_size = 5 # cmd_v, cmd_fd, stickout, dh error, dw error
-        model_input_size = 3 # cmd_v, cmd_fd, stickout
+        model_input_size = 5 # cmd_v, cmd_fd, stickout, dh error, dw error
+        # model_input_size = 3 # cmd_v, cmd_fd, stickout
 
-        model_hidden_size = 3 # hidden size
+        model_hidden_size = 16 # hidden size
         num_layers = 1 # number of layers
         model_output_size = 2 # dh, dw
         open_loop = False
@@ -177,7 +178,8 @@ if __name__ == "__main__":
             'learning_rate': learning_rate, 'model_input_size': model_input_size,
             'history_length': history_length, 'model_hidden_size': model_hidden_size,
             'num_layers': num_layers, 'model_output_size': model_output_size,
-            'open_loop': open_loop, 'use_stickout_length': use_stickout_length
+            'open_loop': open_loop, 'use_stickout_length': use_stickout_length,
+            'latency': latency
         }
         # save the training parameters
         # add timestamp to the model_dir
@@ -222,6 +224,11 @@ if __name__ == "__main__":
             use_stickout_length = training_params['use_stickout_length']
         except KeyError:
             use_stickout_length = False
+        try:
+            latency = training_params['latency']
+        except KeyError:
+            latency = 0
+        latency_steps = int(latency * sample_rate) # number of steps to consider for latency
 
         if model_type != 'RNN':
             print("Skip:",model_type, "model with input size", model_input_size, "and open loop:", open_loop)
@@ -279,7 +286,7 @@ if __name__ == "__main__":
     if model_input_size == 2 and model_type not in ['NARMA', 'DTRNN']:
         model = modelClass(input_size=model_input_size, hidden_size=model_hidden_size, output_size=model_output_size, num_layers=num_layers, device=device).to(device)
     else:
-        model = modelClass(input_size=model_input_size, hidden_size=model_hidden_size, output_size=model_output_size, num_layers=num_layers, history_length=history_length, open_loop=open_loop, device=device).to(device)
+        model = modelClass(input_size=model_input_size, hidden_size=model_hidden_size, output_size=model_output_size, num_layers=num_layers, history_length=history_length, latency_steps=latency_steps, open_loop=open_loop, device=device).to(device)
     print("Model trainable parameters:",count_parameters(model))
 
     ignore_start_end = 5
@@ -479,7 +486,7 @@ if __name__ == "__main__":
         # training loop
         start_time = time.time()
         _, training_loss, testing_loss = train(train_data_input, train_data_labels, test_data_input, test_data_labels, model,\
-                                                history_length, epochs, learning_rate, model_dir=model_dir)
+                                                history_length, latency_steps, epochs, learning_rate, model_dir=model_dir)
         end_time = time.time()
         print(f"Training completed in {end_time - start_time:.2f} seconds.")
 

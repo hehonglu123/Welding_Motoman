@@ -355,12 +355,13 @@ class DeepTransitionRNNCell(nn.Module):
 
 # RNN Model for autoregression
 class RNNAutoRegressionModel(nn.Module):
-    def __init__(self, input_size, hidden_size, output_size, num_layers=1, history_length=0, open_loop=False, device='cpu'):
+    def __init__(self, input_size, hidden_size, output_size, num_layers=1, history_length=0, latency_steps=0, open_loop=False, device='cpu'):
         super(RNNAutoRegressionModel, self).__init__()
         self.input_size = input_size
         self.hidden_size = hidden_size
         self.num_layers = num_layers
         self.history_length = history_length
+        self.latency_steps = latency_steps
         self.open_loop = open_loop
         self.rnn_cell = nn.RNNCell(input_size, hidden_size)
         if num_layers > 1:
@@ -382,7 +383,10 @@ class RNNAutoRegressionModel(nn.Module):
             if not self.open_loop:
                 u_t = torch.flatten(u[:, t-self.history_length+1:t, :], start_dim=1)  # (batch, history_length * input_size)
                 u_t = torch.cat([u[:, t, :], u_t], dim=1)
-                y_t = torch.flatten(x_true[:, t-self.history_length:t, :], start_dim=1)  # (batch, history_length * output_size)
+                if t >= self.latency_steps:
+                    y_t = torch.flatten(x_true[:, t-self.history_length-self.latency_steps:t-self.latency_steps, :], start_dim=1)  # (batch, history_length * output_size)
+                else:
+                    y_t = torch.zeros_like(torch.flatten(x_true[:, t-self.history_length:t, :], start_dim=1), device=self.device)  # (batch, history_length * output_size)
                 # Concatenate error and inputs
                 input_t = torch.cat([y_t, u_t, error], dim=1)  # (batch, history_length * output_size + current_input + history_length * input_size + error)
             else:
@@ -392,7 +396,10 @@ class RNNAutoRegressionModel(nn.Module):
             y_pred = self.fc(h_t)
             predictions.append(y_pred)
 
-            error = x_true[:, t, :] - y_pred
+            if t>= self.latency_steps:
+                error = x_true[:, t-self.latency_steps, :] - predictions[-self.latency_steps-1]  # Use the prediction from latency steps ago
+            else:
+                error = torch.zeros_like(y_pred, device=self.device)
 
         predictions = torch.stack(predictions, dim=1)
         return predictions
