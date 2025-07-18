@@ -491,6 +491,64 @@ class RNNAutoRegressionModel(nn.Module):
         predictions = torch.stack(predictions, dim=1)
         return predictions, h_t
     
+    def forward_multi_steps(self,x_true,u,multi_steps=1):
+        assert multi_steps > 0, "multi_steps must be greater than 0"
+
+        batch_size, x_true_len, _ = x_true.size()
+        _, u_len, _ = u.size()
+
+        with torch.no_grad():
+            fc_hh = nn.Linear(self.hidden_size, self.hidden_size).to(self.device)
+            fc_ih = nn.Linear(2, self.hidden_size).to(self.device)
+            fc_hh.weight.copy_(self.rnn_cell.weight_hh)
+            fc_hh.bias.copy_(self.rnn_cell.bias_hh)
+            fc_ih.weight.copy_(self.rnn_cell.weight_ih[:, :2])  # Use only the first two input features
+            fc_ih.bias.copy_(self.rnn_cell.bias_ih)
+        
+        # Initial error is zero
+        if x_true_len > 0:
+            error = torch.zeros_like(x_true[:, 0, :],device=self.device)
+        predictions = []
+        predictions_one_step = []
+
+        for t in range(self.history_length, u_len-multi_steps):
+            if not self.open_loop:
+                u_t = torch.flatten(u[:, t-self.history_length+1:t, :], start_dim=1)  # (batch, history_length * input_size)
+                u_t = torch.cat([u[:, t, :], u_t], dim=1)
+                if t >= self.latency_steps:
+                    y_t = torch.flatten(x_true[:, t-self.history_length-self.latency_steps:t-self.latency_steps, :], start_dim=1)  # (batch, history_length * output_size)
+                else:
+                    y_t = torch.zeros_like(torch.flatten(x_true[:, t-self.history_length:t, :], start_dim=1), device=self.device)  # (batch, history_length * output_size)
+                # Concatenate error and inputs
+                input_t = torch.cat([y_t, u_t, error], dim=1)  # (batch, history_length * output_size + current_input + history_length * input_size + error)
+            else:
+                input_t = u[:, t, :]  # (batch, input_size)
+
+            h_t = self.rnn_cell(input_t, h_t)
+            y_pred = self.fc(h_t)
+            predictions_one_step.append(y_pred)
+
+            if t>= self.latency_steps:
+                error = x_true[:, t-self.latency_steps, :] - predictions_one_step[-self.latency_steps-1]  # Use the prediction from latency steps ago
+            else:
+                error = torch.zeros_like(y_pred, device=self.device)
+            
+            # Multi-step prediction
+            h_t_next = h_t.clone()
+            for step in range(1,multi_steps+1):
+                y_t_next = torch.zeros_like(torch.flatten(x_true[:, t-self.history_length:t, :], start_dim=1), device=self.device)
+                error_next = torch.zeros_like(y_pred, device=self.device)
+                u_t_next = torch.flatten(u[:, t-self.history_length+1+step:t+step, :], start_dim=1)  # (batch, history_length * input_size)
+                u_t_next = torch.cat([u[:, t+step, :], u_t_next], dim=1)
+                input_t_next = torch.cat([y_t_next, u_t_next, error_next], dim=1)  # (batch, output_size + current_input + input_size + error)
+                h_t_next = self.rnn_cell(input_t_next, h_t_next)
+                y_pred_next = self.fc(h_t_next)
+            predictions.append(y_pred_next)
+
+        predictions = torch.stack(predictions, dim=1)
+        predictions_one_step = torch.stack(predictions_one_step, dim=1)
+        return predictions
+
 # GRU Model
 class GRUModel(nn.Module):
     def __init__(self, input_size, hidden_size, output_size, num_layers=1, device='cpu'):

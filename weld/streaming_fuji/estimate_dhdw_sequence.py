@@ -91,8 +91,8 @@ if __name__ == "__main__":
                        'weld_fujiscan_2025_06_12_16_59_09/','weld_fujiscan_2025_06_12_15_33_03/','weld_fujiscan_2025_06_12_15_03_27/']
     # logdata_dir_all = ['weld_fujiscan_2025_07_09_14_52_42/','weld_fujiscan_2025_07_09_15_21_35/','weld_fujiscan_2025_07_09_16_16_40/']
     
-    train_flag = True # set to False to use the pre-trained model
-    load_pretrained = False
+    train_flag = False # set to False to use the pre-trained model
+    load_pretrained = True
     viz_weightings = False # set to True to visualize the weightings of the model
     use_all_data_for_testing = False # set to True to use all data for testing, otherwise use the last tote for testing
     
@@ -192,7 +192,7 @@ if __name__ == "__main__":
     else:
         # RNN 8 hidden close/open: 20250625_131753/20250625_131507
         # RNN 16 hidden close/open: 20250625_132020/20250625_131520
-        pre_trained_model_dir = model_dir+'model_20250625_131507/'
+        pre_trained_model_dir = model_dir+'model_20250715_151650/'
         if len(sys.argv) < 2:
             model_dir = deepcopy(pre_trained_model_dir)
         else:
