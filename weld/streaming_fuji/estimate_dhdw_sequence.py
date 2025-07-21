@@ -6,7 +6,7 @@ from sklearn.gaussian_process.kernels import RBF, WhiteKernel
 from matplotlib import pyplot as plt
 import torch
 import torch.nn as nn
-import sys, datetime, yaml, pathlib, glob, os, time
+import sys, datetime, yaml, pathlib, glob, os, time, argparse
 sys.path.append('../../mocap/')
 from Models import *
 from model_train_utils import *
@@ -84,18 +84,31 @@ def train(train_data_input:torch.tensor, train_data_labels:torch.tensor, test_da
 
 if __name__ == "__main__":
 
+    parser = argparse.ArgumentParser(description="Compare RNN weights from PyTorch models")
+    parser.add_argument("--train", action='store_true', help="Train the model or not, default is False")
+    parser.add_argument("--load_pretrained", action='store_true', help="Load pre-trained model or not, default is False")
+    parser.add_argument("--viz_weightings", action='store_true', help="Visualize weightings or not, default is False")
+    parser.add_argument("--all_data_testing", action='store_true', help="Use all data for testing or not, default is False")
+    parser.add_argument("--model_type", type=str, default='RNN', help="Model type: RNN, LSTM, GRU, NARMA, DTRNN")
+    parser.add_argument("--model_input_size", type=int, default=0, help="Model input size, default is 4")
+    parser.add_argument("--model_hidden_size", type=int, default=8, help="Model hidden size, default is 8")
+    parser.add_argument("--open_loop", action='store_false', help="Open loop model or not, default is True")
+    parser.add_argument("--load_model_dir", type=str, default='', help="Directory to load the model from")
+    parser.add_argument("--multi_steps", type=int, default=0, help="Number of steps to predict, default is 0")
+    parse_arg = parser.parse_args()
+
     # load data
     geo_data_dir = '../../data/wall_weld_test/'
     logdata_dir_all = ['weld_fujiscan_2025_06_11_16_27_41/','weld_fujiscan_2025_06_11_16_52_36/','weld_fujiscan_2025_06_11_17_16_48/',\
                        'weld_fujiscan_2025_06_11_17_49_27/','weld_fujiscan_2025_06_11_18_14_56/','weld_fujiscan_2025_06_12_17_33_24/',\
                        'weld_fujiscan_2025_06_12_16_59_09/','weld_fujiscan_2025_06_12_15_33_03/','weld_fujiscan_2025_06_12_15_03_27/']
     # logdata_dir_all = ['weld_fujiscan_2025_07_09_14_52_42/','weld_fujiscan_2025_07_09_15_21_35/','weld_fujiscan_2025_07_09_16_16_40/']
-    
-    train_flag = False # set to False to use the pre-trained model
-    load_pretrained = True
-    viz_weightings = False # set to True to visualize the weightings of the model
-    use_all_data_for_testing = False # set to True to use all data for testing, otherwise use the last tote for testing
-    
+
+    train_flag = parse_arg.train # set to False to use the pre-trained model
+    load_pretrained = parse_arg.load_pretrained
+    viz_weightings = parse_arg.viz_weightings # set to True to visualize the weightings of the model
+    use_all_data_for_testing = parse_arg.all_data_testing # set to True to use all data for testing, otherwise use the last tote for testing
+
     if len(sys.argv) > 1:
         train_flag = True if sys.argv[1].lower() == 'true' else False  # first argument is train flag, if not provided, default to True
 
@@ -104,7 +117,22 @@ if __name__ == "__main__":
     if train_flag and not load_pretrained:
 
         # parameters
-        model_type = 'RNN' # 'LSTM', 'RNN', 'GRU', 'NARMA', 'DTRNN'
+        model_type = parse_arg.model_type # 'LSTM', 'RNN', 'GRU', 'NARMA', 'DTRNN'
+        if model_type not in ['LSTM', 'RNN', 'GRU', 'NARMA', 'DTRNN']:
+            print("Invalid model type:", model_type, ". Please choose from 'LSTM', 'RNN', 'GRU', 'NARMA', or 'DTRNN'.")
+            sys.exit(1)
+        model_input_size = parse_arg.model_input_size # default is 4
+        if model_input_size < 2:
+            print("Invalid model input size. Please provide a value greater than or equal to 2.")
+            sys.exit(1)
+        if model_type == 'NARMA':
+            model_input_size = (model_input_size+2)*3
+        model_hidden_size = parse_arg.model_hidden_size # default is 8
+        if model_hidden_size < 1:
+            print("Invalid model hidden size. Please provide a value greater than or equal to 1.")
+            sys.exit(1)
+        open_loop = parse_arg.open_loop # default is True, set to False for closed loop model
+
         sample_rate = 10 # Hz, using the rate of ir camera
         train_test_split = 0.8 # 80% for training, 20% for testing
         epochs = 5000 # number of epochs for training
@@ -113,44 +141,18 @@ if __name__ == "__main__":
         learning_rate = 0.001 # learning rate for training
         latency = 1 # sec
         latency_steps = int(latency * sample_rate) # number of steps to consider for latency
+        num_layers = 1 # number of layers
+        model_output_size = 2 # dh, dw
 
         # model parameters
         # model_input_size = 18 # (cmd_v, cmd_fd)_(t,t-1,t-2), (dh,dw)_(t-1,t-2,t-3), (dh dw error)_(t-1,t-2,t-3)
         # model_input_size = 12 # (cmd_v, cmd_fd)_(t,t-1,t-2), (dh,dw)_(t-1,t-2,t-3), (dh dw error)_(t-1,t-2,t-3)
         # model_input_size = 4 # cmd_v, cmd_fd, dh error, dw error
         # model_input_size = 2 # cmd_v, cmd_fd
-        model_input_size = 5 # cmd_v, cmd_fd, stickout, dh error, dw error
+        # model_input_size = 5 # cmd_v, cmd_fd, stickout, dh error, dw error
         # model_input_size = 3 # cmd_v, cmd_fd, stickout
-
-        model_hidden_size = 16 # hidden size
-        num_layers = 1 # number of layers
-        model_output_size = 2 # dh, dw
-        open_loop = False
-
-        # pass system arguments
-        # the first argument is model type, the second argument is model_input_size
-        for i in range(len(sys.argv)):
-            if i < 2:
-                continue
-            if i == 2:
-                model_type = sys.argv[i]
-                if model_type not in ['LSTM', 'RNN', 'GRU', 'NARMA', 'DTRNN']:
-                    print("Invalid model type:", model_type, ". Please choose from 'LSTM', 'RNN', 'GRU', 'NARMA', or 'DTRNN'.")
-                    sys.exit(1)
-            if i == 3:
-                model_input_size = int(sys.argv[i])
-                if model_input_size < 2:
-                    print("Invalid model input size. Please provide a value greater than or equal to 2.")
-                    sys.exit(1)
-                if model_type == 'NARMA':
-                    model_input_size = (model_input_size+2)*3
-            if i == 4:
-                model_hidden_size = int(sys.argv[i])
-                if model_hidden_size < 1:
-                    print("Invalid model hidden size. Please provide a value greater than or equal to 1.")
-                    sys.exit(1)
-            if i == 5:
-                open_loop = sys.argv[i].lower() == 'true'
+        # model_hidden_size = 16 # hidden size
+        # open_loop = False
 
         # if include stickout length as the input feature
         use_stickout_length = True if model_input_size in [3,5] else False
@@ -192,15 +194,11 @@ if __name__ == "__main__":
     else:
         # RNN 8 hidden close/open: 20250625_131753/20250625_131507
         # RNN 16 hidden close/open: 20250625_132020/20250625_131520
-        pre_trained_model_dir = model_dir+'model_20250715_151650/'
-        if len(sys.argv) < 2:
-            model_dir = deepcopy(pre_trained_model_dir)
-        else:
-            model_dir = model_dir + sys.argv[2] + '/'
-            pre_trained_model_dir = deepcopy(model_dir)
-                    
+        pre_trained_model_dir = model_dir+'model_20250715_151650/' if parse_arg.load_model_dir == '' else model_dir+parse_arg.load_model_dir+'/'
+        model_dir = deepcopy(pre_trained_model_dir) # use the pre-trained model directory
+
         # load the training parameters
-        with open(model_dir+'training_params.yaml', 'r') as f:
+        with open(pre_trained_model_dir+'training_params.yaml', 'r') as f:
             training_params = yaml.safe_load(f)
         geo_data_dir = training_params['geo_data_dir']
         logdata_dir_all = training_params['logdata_dir_all']
@@ -256,12 +254,15 @@ if __name__ == "__main__":
             with open(model_dir+'training_params.yaml', 'w') as f:
                 yaml.dump(training_params, f, default_flow_style=False)
 
+    future_multi_step_prediction = parse_arg.multi_steps
+
     print("Training parameters:")
     print("Train flag:", train_flag)
     print("Model directory:", model_dir)
     if (not train_flag) or load_pretrained:
         print("Using pre-trained model:", pre_trained_model_dir)
     print("Model type:", model_type, "Model input size:", model_input_size, "Model hidden size:", model_hidden_size)
+    print("Doing multi-step prediction in the testing stage:", parse_arg.multi_steps)
 
     # Model types
     if model_type == 'LSTM':
@@ -662,13 +663,37 @@ if __name__ == "__main__":
     # plot dh and w error distribution
     model.eval()
     with torch.no_grad():
-        train_predictions = model(train_data_labels, train_data_input)
-        test_predictions = model(test_data_labels, test_data_input)
-        train_dh_error = (train_predictions[:, :, 0] - train_data_labels[:, history_length:, 0]).cpu().numpy().flatten()
-        train_dw_error = (train_predictions[:, :, 1] - train_data_labels[:, history_length:, 1]).cpu().numpy().flatten()
-        test_dh_error = (test_predictions[:, :, 0] - test_data_labels[:, history_length:, 0]).cpu().numpy().flatten()
-        test_dw_error = (test_predictions[:, :, 1] - test_data_labels[:, history_length:, 1]).cpu().numpy().flatten()
+        if future_multi_step_prediction == 0:
+            train_predictions = model(train_data_labels, train_data_input)
+            test_predictions = model(test_data_labels, test_data_input)
+        else:
+            train_predictions, train_predictions_onestep = model.forward_multi_steps(train_data_labels, train_data_input, multi_steps=future_multi_step_prediction)
+            test_predictions, test_predictions_onestep = model.forward_multi_steps(test_data_labels, test_data_input, multi_steps=future_multi_step_prediction)
+        train_dh_error = (train_predictions[:, :, 0] - train_data_labels[:, history_length+future_multi_step_prediction:, 0]).cpu().numpy().flatten()
+        train_dw_error = (train_predictions[:, :, 1] - train_data_labels[:, history_length+future_multi_step_prediction:, 1]).cpu().numpy().flatten()
+        test_dh_error = (test_predictions[:, :, 0] - test_data_labels[:, history_length+future_multi_step_prediction:, 0]).cpu().numpy().flatten()
+        test_dw_error = (test_predictions[:, :, 1] - test_data_labels[:, history_length+future_multi_step_prediction:, 1]).cpu().numpy().flatten()
+
+    # plot for sanity check
+    # plot_batch=21
+    # time_length = train_data_labels.shape[1]
+    # plt.figure(figsize=(10, 5))
+    # plt.subplot(1, 2, 1)
+    # plt.plot(np.arange(future_multi_step_prediction,time_length), test_predictions[plot_batch, :, 0].cpu().numpy(), label='Predicted dh')
+    # if future_multi_step_prediction > 0:
+    #     plt.plot(test_predictions_onestep[plot_batch, :, 0].cpu().numpy(), label='Predicted dh (one step)')
+    # plt.plot(test_data_labels[plot_batch, :, 0].cpu().numpy(), label='Ground Truth dh')
+    # plt.legend(fontsize=legend_size)
+
+    # plt.subplot(1, 2, 2)
+    # plt.plot(np.arange(future_multi_step_prediction,time_length), test_predictions[plot_batch, :, 1].cpu().numpy(), label='Predicted dw')
+    # if future_multi_step_prediction > 0:
+    #     plt.plot(test_predictions_onestep[plot_batch, :, 1].cpu().numpy(), label='Predicted dw (one step)')
+    # plt.plot(test_data_labels[plot_batch, :, 1].cpu().numpy(), label='Ground Truth dw')
     
+    # plt.legend(fontsize=legend_size)
+    # plt.show()
+
     # save the errors
     np.savetxt(model_dir+'train_dh_error.csv', train_dh_error, delimiter=',')
     np.savetxt(model_dir+'train_dw_error.csv', train_dw_error, delimiter=',')

@@ -496,15 +496,9 @@ class RNNAutoRegressionModel(nn.Module):
 
         batch_size, x_true_len, _ = x_true.size()
         _, u_len, _ = u.size()
-
-        with torch.no_grad():
-            fc_hh = nn.Linear(self.hidden_size, self.hidden_size).to(self.device)
-            fc_ih = nn.Linear(2, self.hidden_size).to(self.device)
-            fc_hh.weight.copy_(self.rnn_cell.weight_hh)
-            fc_hh.bias.copy_(self.rnn_cell.bias_hh)
-            fc_ih.weight.copy_(self.rnn_cell.weight_ih[:, :2])  # Use only the first two input features
-            fc_ih.bias.copy_(self.rnn_cell.bias_ih)
         
+        # Initial hidden states
+        h_t = torch.zeros(batch_size, self.hidden_size, device=self.device)
         # Initial error is zero
         if x_true_len > 0:
             error = torch.zeros_like(x_true[:, 0, :],device=self.device)
@@ -547,7 +541,7 @@ class RNNAutoRegressionModel(nn.Module):
 
         predictions = torch.stack(predictions, dim=1)
         predictions_one_step = torch.stack(predictions_one_step, dim=1)
-        return predictions
+        return predictions, predictions_one_step
 
 # GRU Model
 class GRUModel(nn.Module):

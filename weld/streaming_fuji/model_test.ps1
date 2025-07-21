@@ -8,7 +8,8 @@ if (-not (Test-Path -Path $modelsPath -PathType Container)) {
 }
 
 # Get all folders in the weld_Seq_models directory
-$folders = Get-ChildItem -Path $modelsPath -Directory
+# $folders = Get-ChildItem -Path $modelsPath -Directory
+$folders = @("model_20250715_151005", "model_20250715_151228", "model_20250715_151436", "model_20250715_151650")
 
 # Check if any folders were found
 if ($folders.Count -eq 0) {
@@ -18,11 +19,12 @@ if ($folders.Count -eq 0) {
 
 # Loop through each folder and run the Python script
 foreach ($folder in $folders) {
-    $folderName = $folder.Name
+    # $folderName = $folder.Name
+    $folderName = $folder
     Write-Host "Processing folder: $folderName"
     
     # Run the Python script with the folder name as an argument
-    python estimate_dhdw_sequence.py false $folderName
+    python estimate_dhdw_sequence.py --load_pretrained --load_model_dir $folderName --multi_steps 10
     
     # Check if the Python script executed successfully
     if ($LASTEXITCODE -ne 0) {
