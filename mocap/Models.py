@@ -543,6 +543,12 @@ class RNNAutoRegressionModel(nn.Module):
         predictions_one_step = torch.stack(predictions_one_step, dim=1)
         return predictions, predictions_one_step
 
+    def forward_one_step(self, u, h_t):
+
+        h_t = self.rnn_cell(u, h_t)
+        y_pred = self.fc(h_t)
+        return y_pred, h_t
+
 # GRU Model
 class GRUModel(nn.Module):
     def __init__(self, input_size, hidden_size, output_size, num_layers=1, device='cpu'):
