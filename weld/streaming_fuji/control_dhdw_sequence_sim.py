@@ -119,6 +119,7 @@ def denormalize_input(u_normed):
     return u
 
 def mixed_input_correction(J:torch.tensor, delta_y:torch.tensor, u_cont_prev:torch.tensor, u_disc_prev:torch.tensor,
+                           model, h_t, alpha, y_desired,
                             disc_search_radius=feedrate_delta, lambda_smooth=1e-2, lambda_disc=1e-2):
     """
     J: Jacobian matrix, shape (output_dim, input_dim)
@@ -134,6 +135,12 @@ def mixed_input_correction(J:torch.tensor, delta_y:torch.tensor, u_cont_prev:tor
 
     J_cont = J[:, :cont_dim]  # (output_dim, cont_dim)
     J_disc = J[:, cont_dim:]  # (output_dim, disc_dim)
+
+    # JT = J.T
+    # lhs = JT @ J + torch.diag(torch.tensor([lambda_smooth, lambda_disc],device=device))@torch.eye(J.shape[1], device=device)
+    # rhs = JT @ delta_y
+    # delta_u = torch.linalg.solve(lhs, rhs).T
+    # return delta_u
 
     best_cost = float('inf')
     best_u_disc = None
@@ -151,8 +158,14 @@ def mixed_input_correction(J:torch.tensor, delta_y:torch.tensor, u_cont_prev:tor
 
         delta_u_cont = torch.linalg.solve(JTJ, JTr)
 
+        # cost using the linearized model
         residual = J_cont @ delta_u_cont + J_disc @ torch.tensor([[delta_disc]], dtype=J.dtype, device=J.device) - delta_y
         cost = residual.norm()**2 + lambda_smooth * (delta_u_cont.norm()**2) + lambda_disc * (delta_disc**2)
+        # cost using the original model
+        # u_candidate = torch.stack([u_cont_prev[0] + delta_u_cont.view(-1), u_disc_candidate], dim=1)
+        # y_pred_control_t, _ = model.forward_one_step(torch.cat((u_candidate, torch.zeros((1,2),device=device)), dim=1), h_t.clone().detach())
+        # residual = y_desired - y_pred_control_t
+        # cost = residual.norm()**2 + lambda_smooth * (delta_u_cont.norm()**2) + lambda_disc * (delta_disc**2)
 
         if cost < best_cost:
             best_cost = cost
@@ -198,7 +211,7 @@ def main():
         target_index = np.searchsorted(step_break, t_step, side='right') - 1
 
         # feedforward to the simulation model
-        u_t_sim = u_t.clone().detach()  # ensure u_t_sim is differentiable
+        u_t_sim = u_t.clone().detach()
         y_pred_sim_t, h_t_sim = model_sim.forward_one_step(torch.cat((u_t_sim, torch.zeros_like(y_target[target_index:target_index+1])), dim=1), h_t_sim)
         output_y_seq.append(y_pred_sim_t)
 
@@ -217,12 +230,21 @@ def main():
         delta_y_desired = (y_target[target_index] - y_pred_sim_t).detach().T
 
         # Solve mixed input correction
+        # delta_u = mixed_input_correction(
+        #     J, delta_y_desired, u_t[:, 0], u_t[:, 1],
+        #     model_control, h_t, alpha, y_target[target_index],
+        #     disc_search_radius=feedrate_delta,
+        #     lambda_smooth=lambda_smooth, lambda_disc=lambda_disc
+        # )
+        # u_t = u_t + alpha * delta_u  # Update u_t with the correction
+        # u_t[:,1] = torch.round(u_t[:, 1] / feedrate_delta) * feedrate_delta  # Discretize the feedrate input
+
         u_cont_new, u_disc_new = mixed_input_correction(
             J, delta_y_desired, u_t[:, 0], u_t[:, 1],
+            model_control, h_t, alpha, y_target[target_index],
             disc_search_radius=feedrate_delta,
             lambda_smooth=lambda_smooth, lambda_disc=lambda_disc
         )
-
         u_t_cont_new = u_t[:, 0] + alpha * (u_cont_new - u_t[:, 0])
         u_t = torch.stack([u_t_cont_new, u_disc_new], dim=1)
     
