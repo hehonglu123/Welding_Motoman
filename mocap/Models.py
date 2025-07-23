@@ -330,6 +330,31 @@ class RNNModel(nn.Module):
         out = self.fc(out)  # Get the last time step's output
         return out
 
+class KalmanNet(nn.Module):
+    def __init__(self, state_dim, observation_dim, Qgru_input_dim, Pgru_input_dim, Sgru_input_dim):
+        super().__init__()
+        self.state_dim = state_dim
+        self.observation_dim = observation_dim
+        self.Qfc = nn.Linear(state_dim, Qgru_input_dim)
+        self.Qgru = nn.GRUCell(Qgru_input_dim, state_dim**2)
+        self.Pfc = nn.Linear(state_dim, Pgru_input_dim)
+        self.Pgru = nn.GRUCell(Pgru_input_dim+state_dim**2, state_dim**2)
+        self.fc_P2S = nn.Linear(state_dim**2, Sgru_input_dim)
+        self.Sfc = nn.Linear(observation_dim*2, Sgru_input_dim)
+        self.Sgru = nn.GRUCell(Sgru_input_dim*2, observation_dim**2)
+        self.fc2K = nn.Linear(observation_dim**2+state_dim**2, state_dim*observation_dim)
+        self.fc2P1 = nn.Linear(state_dim*observation_dim+observation_dim**2,state_dim*observation_dim)
+        self.fc2P2 = nn.Linear(state_dim*observation_dim+state_dim**2,state_dim*state_dim)
+
+    def forward(self, obs_diff, inno_diff, evo_diff, upd_diff, Q_prev, P_prev, S_prev):
+        Q_new = self.Qgru(torch.tanh(self.Qfc(upd_diff)), Q_prev)
+        P_new = self.Pgru(torch.cat([torch.tanh(self.Pfc(evo_diff)), Q_new], dim=1), P_prev)
+        all_obs_input = torch.cat([obs_diff, inno_diff], dim=1)  # Concatenate observation and innovation differences
+        S_new = self.Sgru(torch.cat([torch.tanh(self.Sfc(all_obs_input)), torch.tanh(self.fc_P2S(P_new))], dim=1), S_prev)
+        K_new = torch.tanh(self.fc2K(torch.cat([S_new, Q_new], dim=1)))
+        P_new = torch.tanh(self.fc2P1(torch.cat([K_new, S_new], dim=1)))
+        P_new = self.fc2P2(torch.cat([P_new, Q_new], dim=1))
+        return K_new, P_new, S_new, Q_new
 
 class DeepTransitionRNNCell(nn.Module):
     def __init__(self, input_size, hidden_size, depth=2):
