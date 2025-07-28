@@ -211,6 +211,7 @@ def main():
     h_t_seq = [h_t.detach().cpu().numpy()[0]]
     output_y_seq = []
     input_u_seq = []
+    error_y_pred_seq = []
 
     # the very first control model feedforward prediction
     y_pred_control_t, h_t = model_control.forward_one_step(torch.cat((u_t, torch.zeros((1, y_target.size(1)), device=device)), dim=1), h_t)
@@ -230,6 +231,7 @@ def main():
         u_t = u_t.clone().detach().requires_grad_(True)  # ensure u_t is differentiable
         # y_pred_control_t, h_t = model_control.forward_one_step(torch.cat((u_t, torch.zeros_like(y_target[target_index:target_index+1])), dim=1), h_t)
         error_y_pred = y_pred_sim_t - y_pred_control_t
+        error_y_pred_seq.append(error_y_pred.detach().cpu().numpy()[0])
         y_pred_control_t, h_t = model_control.forward_one_step(torch.cat((u_t, error_y_pred), dim=1), h_t)
         h_t_seq.append(h_t.detach().cpu().numpy()[0])
         # Compute Jacobian dy/du
@@ -261,11 +263,16 @@ def main():
         u_t_cont_new = u_t[:, 0] + alpha * (u_cont_new - u_t[:, 0])
         u_t = torch.stack([u_t_cont_new, u_disc_new], dim=1)
     
-    # plot h_t_sim_seq to visualize the hidden state evolution
-    h_t_sim_seq = np.array(h_t_sim_seq)
-    plt.figure(figsize=(12, 6))
-    plt.plot(h_t_sim_seq, '-o')
-    plt.show()
+    # # plot h_t_sim_seq to visualize the hidden state evolution
+    # h_t_sim_seq = np.array(h_t_sim_seq)
+    # plt.figure(figsize=(12, 6))
+    # plt.plot(h_t_sim_seq, '-o')
+    # plt.show()
+    # # plot error_y_pred_seq to visualize the error evolution
+    # error_y_pred_seq = np.array(error_y_pred_seq)
+    # plt.figure(figsize=(12, 6))
+    # plt.plot(error_y_pred_seq, '-o')
+    # plt.show()
 
     # plot the results output_y_seq and y target vs time
     output_y_seq = torch.stack(output_y_seq, dim=0).detach().cpu().numpy()
