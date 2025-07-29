@@ -16,6 +16,14 @@ from scan_utils import *
 from scanProcess import *
 from animation_3d import *
 
+
+# for plotting
+xy_label_size = 14
+xy_tick_size = 12
+legend_size = 12
+title_size = 16
+sup_title_size = 18
+
 # # feat_detector = cv.ORB_create()
 # feat_detector = cv.SIFT_create()
 # # bf_matcher = cv.BFMatcher(cv.NORM_HAMMING, crossCheck=True)
@@ -53,10 +61,10 @@ def main():
 
     # material ER316L (stainless steel)
     # logdata_dir_all = ['weld_fujiscan_2025_06_11_16_27_41/']
-    # logdata_dir_all = ['weld_fujiscan_2025_06_11_16_27_41/','weld_fujiscan_2025_06_11_16_52_36/','weld_fujiscan_2025_06_11_17_16_48/',\
-    #                    'weld_fujiscan_2025_06_11_17_49_27/','weld_fujiscan_2025_06_11_18_14_56/','weld_fujiscan_2025_06_12_17_33_24/',\
-    #                    'weld_fujiscan_2025_06_12_16_59_09/','weld_fujiscan_2025_06_12_15_33_03/','weld_fujiscan_2025_06_12_15_03_27/']
-    logdata_dir_all = ['weld_fujiscan_2025_07_09_14_52_42/','weld_fujiscan_2025_07_09_15_21_35/','weld_fujiscan_2025_07_09_16_16_40/']
+    logdata_dir_all = ['weld_fujiscan_2025_06_11_16_27_41/','weld_fujiscan_2025_06_11_16_52_36/','weld_fujiscan_2025_06_11_17_16_48/',\
+                       'weld_fujiscan_2025_06_11_17_49_27/','weld_fujiscan_2025_06_11_18_14_56/','weld_fujiscan_2025_06_12_17_33_24/',\
+                       'weld_fujiscan_2025_06_12_16_59_09/','weld_fujiscan_2025_06_12_15_33_03/','weld_fujiscan_2025_06_12_15_03_27/']
+    # logdata_dir_all = ['weld_fujiscan_2025_07_09_14_52_42/','weld_fujiscan_2025_07_09_15_21_35/','weld_fujiscan_2025_07_09_16_16_40/']
     # logdata_dir_all = ['weld_fujiscan_2025_06_11_18_14_56/']
     
     ### skip data directories
@@ -67,6 +75,9 @@ def main():
     # since the camera is following the torch
     # if the torch is not detected, use the last few frames' centroid
     thermal_centroid_record = []
+
+    all_feedrate_cmd = []
+    all_torch_v_cmd = []
 
     run_code_again_flag = True # For scanner leading case, need to generate all profile height before actually get dh.
     create_transform = False
@@ -99,8 +110,8 @@ def main():
             Transz0_H_even = np.loadtxt(logdata_dir+'Transz0_H_even.csv',delimiter=',')
             Transicp_H_odd2even = np.loadtxt(logdata_dir+'Trans_icp_odd2even.csv',delimiter=',')
             Transz0_H_odd = Transz0_H_odd @ Transicp_H_odd2even
-        for weld_parts in ['base','layer']:
-        # for weld_parts in ['layer']:
+        # for weld_parts in ['base','layer']:
+        for weld_parts in ['layer']:
             if weld_parts == 'base':
                 total_layers_name = glob.glob(logdata_dir+'baselayer*')
             else:
@@ -145,6 +156,10 @@ def main():
 
                 ############### get welding commands #####################
                 weld_cmd = np.loadtxt(this_layer_dir+'weld_cmd.csv',delimiter=',')
+                all_torch_v_cmd.extend(weld_cmd[:,2])
+                all_feedrate_cmd.extend(weld_cmd[:,3])
+                continue
+                
 
                 ############### get welding js ####################
                 stamps_diff_sorted = np.argsort(np.diff(robot_stamps))[::-1]
@@ -675,6 +690,31 @@ def main():
         #     visualize_pcd(all_pcd_transform)
         #     animation_mesh(all_pcd_transform)
         
+        plt.scatter(all_torch_v_cmd,all_feedrate_cmd,s=2)
+        # all_torch_v_cmd = []
+        # all_feedrate_cmd = []
+
+    # count how many different pairs of feedrate and torch velocity commands are there
+    # how many unique feedrate and torch velocity commands are there
+    all_feedrate_cmd = np.array(all_feedrate_cmd)
+    all_torch_v_cmd = np.array(all_torch_v_cmd)
+    unique_v_cmd = np.unique(all_torch_v_cmd)
+    unique_fr_cmd = np.unique(all_feedrate_cmd)
+    unique_pairs = set(zip(all_feedrate_cmd, all_torch_v_cmd))
+    print(f"Total unique feedrate commands: {len(unique_fr_cmd)}")
+    print(f"Total unique torch velocity commands: {len(unique_v_cmd)}")
+    print(f"Total unique pairs of feedrate and torch velocity commands: {len(unique_pairs)}")
+
+    # plot all collected feedrate and torch velocity commands
+    plt.xlabel('Velocity (mm/s)', fontsize=xy_label_size)
+    plt.ylabel('Feedrate (inch/min)', fontsize=xy_label_size)
+    plt.xticks(fontsize=xy_tick_size)
+    plt.yticks(fontsize=xy_tick_size)
+    plt.title('Collected Feedrate and Torch Velocity Commands', fontsize=title_size)
+    plt.grid()
+    plt.ylim(40, 260)
+    plt.tight_layout()
+    plt.show()
 
     if run_code_again_flag:
         print("********** You need to run the code again **********")
