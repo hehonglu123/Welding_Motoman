@@ -1,4 +1,5 @@
 import numpy as np
+from scipy import stats
 from copy import deepcopy
 from general_robotics_toolbox import *
 import pickle
@@ -8,6 +9,16 @@ from motoman_def import *
 from matplotlib import pyplot as plt
 from calib_analytic_grad import *
 from PH_interp import *
+import pandas as pd
+import seaborn as sns
+import corner
+
+# for plotting
+xy_label_size = 14
+xy_tick_size = 12
+legend_size = 12
+title_size = 16
+sup_title_size = 18
 
 from numpy.random import default_rng
 rng = default_rng()
@@ -87,6 +98,27 @@ test_mocap_T = np.loadtxt(test_data_dir+'mocap_T_align.csv',delimiter=',')
 
 train_robot_q = np.loadtxt(PH_data_dir+'robot_q_align.csv',delimiter=',')
 train_mocap_T = np.loadtxt(PH_data_dir+'mocap_T_align.csv',delimiter=',')
+
+# plot testing and training q distribution of all 6 joints in one plot
+all_robot_q = np.vstack((test_robot_q))
+plt.figure(figsize=(8,4))
+# for j in range(6):
+#     plt.scatter(all_robot_q[:,j],j*np.ones(len(all_robot_q)),label='J'+str(j+1),s=10)
+# plt.legend()
+# plt.show()
+for i in range(6):
+    sns.kdeplot(np.degrees(all_robot_q[:, i]), label='DOF'+str(i+1), fill=True, alpha=0.4)
+plt.legend(fontsize=legend_size)
+plt.title('Dataset Joint Angles Distribution', fontsize=title_size)
+plt.xlabel('Joint Angles (Deg)', fontsize=xy_label_size)
+plt.ylabel('Density', fontsize=xy_label_size)
+plt.xticks(fontsize=xy_tick_size)
+plt.yticks(fontsize=xy_tick_size)
+plt.grid(True)
+plt.tight_layout()
+plt.show()
+
+# exit()
 
 split_index = len(train_robot_q)
 test_robot_q = np.vstack((train_robot_q,test_robot_q))
@@ -632,6 +664,39 @@ plt.xlabel("Training pose index",fontsize=26)
 plt.ylabel("Position Error (mm)",fontsize=26)
 plt.tight_layout()
 plt.show()
+
+
+methods_error = {
+    'Nominal': error_pos_origin_norm,
+    'CPA': error_pos_baseline_norm,
+    'One PH': error_pos_onePH_norm,
+    'Nearest PH': error_pos_near_norm,
+    'Linear Interp PH': error_pos_lin_norm,
+    'Cubic Interp PH': error_pos_cub_norm,
+    'RBF Interp PH': error_pos_rbf_norm,
+    'Fourier Basis PH': error_pos_fbf_norm,
+    'Fourier Basis PH (Hori)': error_pos_fbf_hori_norm,
+    'Fourier Basis PH (Minimal)': error_pos_fbf_min_norm,
+    'Fourier Basis PH (Reduced)': error_pos_fbf_redu_norm
+}
+
+for method_name, errors in methods_error.items():
+    print(f"{method_name} - Mean Error: {np.mean(errors):.4f}, Std Dev: {np.std(errors):.4f}")
+    # Paired t-test
+    t_statistic, p_value = stats.ttest_rel(methods_error['CPA'], errors)
+
+    # 95% confidence interval for the difference
+    differences = methods_error['CPA'] - errors
+    mean_diff = np.mean(differences)
+    conf_interval = stats.t.interval(
+        0.95,
+        len(differences)-1,
+        loc=mean_diff,
+        scale=stats.sem(differences)
+    )
+
+    print(f"t-statistic: {t_statistic:.4f}, p-value: {p_value:.4e}")
+    print(f"95% Confidence Interval: {conf_interval}")
 
 if plot_origin:
     plt.plot(error_ori_origin_norm,'-o',markersize=1,label='Origin PH')
