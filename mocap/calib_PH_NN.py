@@ -113,6 +113,7 @@ def train(inputs_q2q3, targets_delta_PH, training_q, training_T, testing_q, test
 
     if test_only:
         model.eval()
+        print(f'# of parameters: {sum(p.numel() for p in model.parameters() if p.requires_grad)}')
         testing_T_error,testing_ori_error = test_fwd_accuracy(model, testing_q, testing_T,robot,param_nominal)
         print(f'Max testing error: {np.max(testing_T_error):.2f}')
         print(f'Mean testing error: {np.mean(testing_T_error):.2f}')

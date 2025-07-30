@@ -241,6 +241,8 @@ def trained_model_test(inputs_q2q3, data_delta_PH, training_q, training_T, testi
     vae_model.load_state_dict(torch.load(data_dir+'best_testing_model.pt',weights_only=True))
     vae_model.eval()
 
+    print(f'# of parameters: {sum(p.numel() for p in vae_model.parameters() if p.requires_grad)}')
+
     latent_size = vae_meta_data['latent_size']
 
     # get linear interpolation functions
