@@ -60,7 +60,7 @@ def test_fwd_accuracy(model, data_q, data_T,robot,param_nominal):
     return p_error_all,ori_error_all
 
 
-def train(inputs_q2q3, targets_delta_PH, training_q, training_T, testing_q, testing_T,robot,param_nominal,robot_type):
+def train(inputs_q2q3, targets_delta_PH, training_q, training_T, testing_q, testing_T,robot,param_nominal,robot_type, test_data_dir=None):
 
     print(np.degrees(inputs_q2q3).shape)
     print(targets_delta_PH.shape)
@@ -121,6 +121,7 @@ def train(inputs_q2q3, targets_delta_PH, training_q, training_T, testing_q, test
         print(f'Max testing ori error: {np.max(testing_ori_error):.2f}')
         print(f'Mean testing ori error: {np.mean(testing_ori_error):.2f}')
         print(f'Std testing ori error: {np.std(testing_ori_error):.2f}')
+        np.savetxt(test_data_dir+'testing_pos_error_NN.csv', testing_T_error, delimiter=',')
         exit()
 
     # Print the model architecture
@@ -277,7 +278,7 @@ Rz=np.array([0,0,1])
 
 config_dir='../config/'
 
-robot_type = 'R2'
+robot_type = 'R1'
 
 if robot_type == 'R1':
     ph_dataset_date='0801'
@@ -376,7 +377,7 @@ for qkey in PH_q.keys():
 ## NN input: training q, 2x1
 ## NN output: training param_PH, 33x1
 ## train the NN
-train(np.array(train_q),np.array(param_PH_q),train_robot_q,train_mocap_T,test_robot_q,test_mocap_T,robot,param_nominal,robot_type)
+train(np.array(train_q),np.array(param_PH_q),train_robot_q,train_mocap_T,test_robot_q,test_mocap_T,robot,param_nominal,robot_type, test_data_dir=test_data_dir)
 
 
         

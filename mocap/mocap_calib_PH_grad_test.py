@@ -107,7 +107,7 @@ plt.figure(figsize=(8,4))
 # plt.legend()
 # plt.show()
 for i in range(6):
-    sns.kdeplot(np.degrees(all_robot_q[:, i]), label='DOF'+str(i+1), fill=True, alpha=0.4)
+    sns.kdeplot(np.degrees(all_robot_q[:, i]), label='J'+str(i+1), fill=True, alpha=0.4)
 plt.legend(fontsize=legend_size)
 plt.title('Dataset Joint Angles Distribution', fontsize=title_size)
 plt.xlabel('Joint Angles (Deg)', fontsize=xy_label_size)
@@ -119,6 +119,11 @@ plt.tight_layout()
 plt.show()
 
 # exit()
+
+### use only the first 2 training data
+### for faster evaluation
+# train_robot_q = train_robot_q[:2,:]
+# train_mocap_T = train_mocap_T[:2,:]
 
 split_index = len(train_robot_q)
 test_robot_q = np.vstack((train_robot_q,test_robot_q))
@@ -665,11 +670,26 @@ plt.ylabel("Position Error (mm)",fontsize=26)
 plt.tight_layout()
 plt.show()
 
+methods_train_error = {
+    'Nominal': train_error_pos_origin_norm,
+    'CPA': train_error_pos_baseline_norm,
+    'One PH': train_error_pos_onePH_norm,
+    'Zero PH': train_error_pos_PHZero_norm,
+    'Nearest PH': train_error_pos_near_norm,
+    'Linear Interp PH': train_error_pos_lin_norm,
+    'Cubic Interp PH': train_error_pos_cub_norm,
+    'RBF Interp PH': train_error_pos_rbf_norm,
+    'Fourier Basis PH': train_error_pos_fbf_norm,
+    'Fourier Basis PH (Hori)': train_error_pos_fbf_hori_norm,
+    'Fourier Basis PH (Minimal)': train_error_pos_fbf_min_norm,
+    'Fourier Basis PH (Reduced)': train_error_pos_fbf_redu_norm
+}
 
 methods_error = {
     'Nominal': error_pos_origin_norm,
     'CPA': error_pos_baseline_norm,
     'One PH': error_pos_onePH_norm,
+    'Zero PH': error_pos_PHZero_norm,
     'Nearest PH': error_pos_near_norm,
     'Linear Interp PH': error_pos_lin_norm,
     'Cubic Interp PH': error_pos_cub_norm,
@@ -680,23 +700,59 @@ methods_error = {
     'Fourier Basis PH (Reduced)': error_pos_fbf_redu_norm
 }
 
-for method_name, errors in methods_error.items():
-    print(f"{method_name} - Mean Error: {np.mean(errors):.4f}, Std Dev: {np.std(errors):.4f}")
-    # Paired t-test
-    t_statistic, p_value = stats.ttest_rel(methods_error['CPA'], errors)
+import pickle
+with open(test_data_dir+'test_error_pos_'+robot_type+'.pickle','wb') as file:
+    pickle.dump(methods_error,file)
+with open(PH_data_dir+'train_error_pos_'+robot_type+'.pickle','wb') as file:
+    pickle.dump(methods_train_error,file)
 
-    # 95% confidence interval for the difference
-    differences = methods_error['CPA'] - errors
-    mean_diff = np.mean(differences)
-    conf_interval = stats.t.interval(
-        0.95,
-        len(differences)-1,
-        loc=mean_diff,
-        scale=stats.sem(differences)
-    )
+t_test_string = {}
+wilcoxon_string = {}
+for compare_key in ['Nominal', 'CPA', 'One PH']:
+    t_test_string[compare_key] = {}
+    wilcoxon_string[compare_key] = {}
+    for method_name, errors in methods_error.items():
+        if compare_key == method_name:
+            continue
+        # print(f"Comparing {compare_key} with {method_name}")
+        # Paired t-test
+        t_statistic, p_value = stats.ttest_rel(methods_error[compare_key], errors)
+        t_test_string[compare_key][method_name] = str(round(t_statistic,4)) + ' (' + str(round(p_value,4)) + ')'
+        wilcoxon_statistic, p_value_wilcoxon = stats.wilcoxon(methods_error[compare_key], errors)
+        wilcoxon_string[compare_key][method_name] = str(round(wilcoxon_statistic,4)) + ' (' + str(round(p_value_wilcoxon,4)) + ')'
 
-    print(f"t-statistic: {t_statistic:.4f}, p-value: {p_value:.4e}")
-    print(f"95% Confidence Interval: {conf_interval}")
+        # 95% confidence interval for the difference
+        differences = methods_error[compare_key] - errors
+        mean_diff = np.mean(differences)
+        conf_interval = stats.t.interval(
+            0.95,
+            len(differences)-1,
+            loc=mean_diff,
+            scale=stats.sem(differences)
+        )
+
+        # print(f"t-statistic: {t_statistic:.4f}, p-value: {p_value:.4e}")
+        # print(f"95% Confidence Interval: {conf_interval}")
+        # print(f"Wilcoxon statistic: {wilcoxon_statistic:.4f}, p-value: {p_value_wilcoxon:.4e}")
+    print("======================")
+
+# print the t_test_string as a markdown table
+markdown_str = '| Method | ' + ' | '.join(methods_error.keys()) + ' |\n'
+markdown_str += '|--------|' + '|'.join(['-' * len(method) for method in methods_error.keys()]) + '|\n'
+for method_name, stats in t_test_string.items():
+    markdown_str += f"| {method_name} | " + " | ".join(stats.values()) + " |\n"
+
+print(markdown_str)
+
+# print the wilcoxon_string as a markdown table
+markdown_str = '| Method | ' + ' | '.join(methods_error.keys()) + ' |\n'
+markdown_str += '|--------|' + '|'.join(['-' * len(method) for method in methods_error.keys()]) + '|\n'
+for method_name, stats in wilcoxon_string.items():
+    markdown_str += f"| {method_name} | " + " | ".join(stats.values()) + " |\n"
+
+print(markdown_str)
+
+exit()
 
 if plot_origin:
     plt.plot(error_ori_origin_norm,'-o',markersize=1,label='Origin PH')

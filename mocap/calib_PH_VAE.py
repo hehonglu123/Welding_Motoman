@@ -203,7 +203,7 @@ def latent_space_analysis(inputs_q2q3, data_delta_PH, training_q, training_T, te
     fig.suptitle('Autoencoder latent space vs q2,q3',fontsize=20, fontweight='bold')
     plt.show()
 
-def trained_model_test(inputs_q2q3, data_delta_PH, training_q, training_T, testing_q, testing_T,robot,param_nominal,robot_type):
+def trained_model_test(inputs_q2q3, data_delta_PH, training_q, training_T, testing_q, testing_T,robot,param_nominal,robot_type,test_data_dir=None):
 
     # data preprocessing
     N_per_cluster = 7
@@ -266,6 +266,10 @@ def trained_model_test(inputs_q2q3, data_delta_PH, training_q, training_T, testi
     print(f'Max testing ori error: {round(np.max(testing_ori_error),2):.2f}')
     print(f'Mean testing ori error: {round(np.mean(testing_ori_error),2):.2f}')
     print(f'Std testing ori error: {round(np.std(testing_ori_error),2):.2f}')
+
+    if test_data_dir is not None:
+        # save the testing error
+        np.savetxt(test_data_dir+'testing_pos_error_AE.csv', testing_T_error, delimiter=',')
 
 def train_interp(inputs_q2q3, data_delta_PH, training_q, training_T, testing_q, testing_T,robot,param_nominal,robot_type):
 
@@ -612,9 +616,9 @@ Rz=np.array([0,0,1])
 config_dir='../config/'
 \
 
-# robot_type = 'R1'
+robot_type = 'R1'
 ####
-robot_type = 'R2'
+# robot_type = 'R2'
 
 if robot_type == 'R1':
     ph_dataset_date='0801'
@@ -728,4 +732,4 @@ param_PH_q = np.array(param_PH_q)
 # train(np.array(train_q),np.array(param_PH_q),train_robot_q,train_mocap_T,test_robot_q,test_mocap_T,robot,param_nominal,robot_type)
 # train_interp(np.array(train_q),np.array(param_PH_q),train_robot_q,train_mocap_T,test_robot_q,test_mocap_T,robot,param_nominal,robot_type)
 # latent_space_analysis(np.array(train_q),np.array(param_PH_q),train_robot_q,train_mocap_T,test_robot_q,test_mocap_T,robot,param_nominal,robot_type)
-trained_model_test(np.array(train_q),np.array(param_PH_q),train_robot_q,train_mocap_T,test_robot_q,test_mocap_T,robot,param_nominal,robot_type)
+trained_model_test(np.array(train_q),np.array(param_PH_q),train_robot_q,train_mocap_T,test_robot_q,test_mocap_T,robot,param_nominal,robot_type,test_data_dir=test_data_dir)
