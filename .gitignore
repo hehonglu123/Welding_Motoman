@@ -441,3 +441,5 @@ mocap/kinematic_raw_data/test0801_R1/testing_pos_error_AE.csv
 mocap/kinematic_raw_data/test0801_R1/testing_pos_error_NN.csv
 mocap/kinematic_raw_data/test0804_R2/testing_pos_error_NN.csv
 mocap/kinematic_raw_data/test0804_R2/testing_pos_error_AE.csv
+
+robot_calibration/turntable_calibration*

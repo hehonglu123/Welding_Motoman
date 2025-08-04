@@ -158,8 +158,6 @@ def main():
                 weld_cmd = np.loadtxt(this_layer_dir+'weld_cmd.csv',delimiter=',')
                 all_torch_v_cmd.extend(weld_cmd[:,2])
                 all_feedrate_cmd.extend(weld_cmd[:,3])
-                continue
-                
 
                 ############### get welding js ####################
                 stamps_diff_sorted = np.argsort(np.diff(robot_stamps))[::-1]

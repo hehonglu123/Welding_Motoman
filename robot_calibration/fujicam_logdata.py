@@ -1,5 +1,5 @@
 import numpy as np
-import time, pickle
+import time, pickle, os
 from copy import deepcopy
 from StreamingSend import *
 from RobotRaconteur.Client import *
@@ -41,8 +41,10 @@ while True:
 SS.deinitialize_robot()
 
 data_dir = 'turntable_calibration/'
-this_name = 'angle_0_0'
+if not os.path.exists(data_dir):
+    os.makedirs(data_dir)
+this_name = 'angle_1_0'
 
-weld_js_exe = np.loadtxt(f'{data_dir}{this_name}_weld_js_exe.csv',delimiter=',')
-with open(f'{data_dir}{this_name}_scan_exe.pickle', 'rb') as f:
-    scan_exe = pickle.load(f)
+np.savetxt(f'{data_dir}{this_name}_weld_js_exe.csv', np.array(weld_js_exe), delimiter=',')
+with open(f'{data_dir}{this_name}_scan_exe.pickle', 'wb') as f:
+    pickle.dump(scan_exe, f)
