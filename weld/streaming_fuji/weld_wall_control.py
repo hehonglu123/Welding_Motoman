@@ -6,6 +6,9 @@ import datetime
 from motoman_def import *
 from lambda_calc import *
 import open3d as o3d
+import torch
+import torch.nn as nn
+
 from RobotRaconteur.Client import *
 from weldRRSensor import *
 from StreamingSend import *
@@ -17,9 +20,12 @@ sys.path.append('../../scan/scan_tools/')
 from scan_utils import *
 from scanProcess import *
 from threading import Thread
+from controlModelFunction import *
 
 inch2mm = 25.4
 mm2inch = 1/25.4
+
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 def welder_handler(exp):
 	if (exp is not None):
@@ -178,6 +184,10 @@ def main():
     ##### welding target parameters #####
     dh_target = 5
     dw_target = 3
+
+    ##### controller parameters and model #####
+    control_model_dir = 'model_20250715_151650'
+    ctrlModel = controlModel(control_model_dir,device=device)
     
     ##### Log data dir #####
     current_time = datetime.datetime.now()
@@ -317,8 +327,12 @@ def main():
                         scan_denoise_thread = Thread(target=scan_process.scan_denoise_thread, args=([-40, 30],[40, 200])) # arges: (crop_min, crop_max)
                         scan_denoise_thread.start()
                     # initial velocity
-                    v_cmd = vel_profile[0]
-                    feedrate_cmd = feedrate_profile[0]
+                    if weld_parts == 'base':
+                        v_cmd = base_nom_vel
+                        feedrate_cmd = base_feedrate
+                    else:
+                        v_cmd = vel_profile[0]
+                        feedrate_cmd = feedrate_profile[0]
                     if thermal_on:
                         rr_sensors.start_all_sensors()
                     q_cur = deepcopy(SS.q_cur)
@@ -354,18 +368,9 @@ def main():
                         ### update welding param
                         if time.perf_counter()-last_update_time>1./feedrate_update_rate:
                             if weld_parts == 'layer':
-                                if random_velocity:
-                                    # find the last index smaller than lam_cur
-                                    lam_idx=np.where(lam_split-v_cmd*feedrate_update_rate/2<=lam_cur)[0][-1]
-                                    v_cmd = vel_profile[lam_idx]
-                                    feedrate_cmd = feedrate_profile[lam_idx]
-                                else:
-                                    v_cmd = vel_profile[np.min([cmd_update_cnt, len(vel_profile)-1])]
-                                    feedrate_cmd = feedrate_profile[np.min([cmd_update_cnt, len(feedrate_profile)-1])]
-                                    cmd_update_cnt += 1
-                                    if cmd_update_cnt == len(vel_profile):
-                                        print("Welding velocity profile achieved, stop updating.")
                                 # update feedrate to welder
+                                if weld_parts == 'layer':
+                                    pass
                                 if weld_arcon:
                                     fronius_client.async_set_job_number(int(round(feedrate_cmd/10)+job_offset), welder_handler)
                             # log command data

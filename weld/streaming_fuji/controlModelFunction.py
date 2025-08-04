@@ -1,0 +1,178 @@
+import numpy as np
+import pandas as pd
+from scipy import stats
+from sklearn.gaussian_process import GaussianProcessRegressor
+from sklearn.gaussian_process.kernels import RBF, WhiteKernel
+from matplotlib import pyplot as plt
+import torch
+import torch.nn as nn
+import sys, datetime, yaml, pathlib, glob, os, time, argparse
+sys.path.append('../../mocap/')
+from Models import *
+from model_train_utils import *
+from qpsolvers import solve_qp
+
+np.random.seed(42) # for reproducibility
+torch.manual_seed(42) # for reproducibility
+
+
+class controlModel():
+    def __init__(self, model_dir, minmax_v_file='weld_Seq_models/test_cmd_v_feedrate.csv', minmax_feedrate_file='weld_Seq_models/train_cmd_v_feedrate.csv',\
+                  device='cpu'):
+
+        # for neural network input normalization
+        all_inputs = np.loadtxt(minmax_v_file, delimiter=',',skiprows=1)
+        all_inputs = np.vstack((all_inputs, np.loadtxt(minmax_feedrate_file, delimiter=',',skiprows=1)))
+        self.v_max = np.max(all_inputs[:, 0])
+        self.v_min = np.min(all_inputs[:, 0])
+        self.feedrate_max = np.max(all_inputs[:, 1])
+        self.feedrate_min = np.min(all_inputs[:, 1])
+        print(f"v_min: {self.v_min}, v_max: {self.v_max}, feedrate_min: {self.feedrate_min}, feedrate_max: {self.feedrate_max}")
+        self.feedrate_delta = 10 / (self.feedrate_max-self.feedrate_min) # 10 is discretized feedrate value
+
+        self.model_dir = model_dir
+        self.device = device
+        self.model, self.model_params = self.load_model()
+    
+    def load_model(self):
+        model_dir = 'weld_Seq_models/'+self.model_dir+'/'
+        # load the parameters
+        with open(model_dir+'training_params.yaml', 'r') as f:
+            training_params = yaml.safe_load(f)
+        geo_data_dir = training_params['geo_data_dir']
+        logdata_dir_all = training_params['logdata_dir_all']
+        model_type = training_params['model_type']
+        sample_rate = training_params['sample_rate']
+        train_test_split = training_params['train_test_split']
+        epochs = training_params['epochs']
+        sequence_length = training_params['sequence_length']
+        sample_sequence_overlap = training_params['sample_sequence_overlap']
+        learning_rate = training_params['learning_rate']
+        model_input_size = training_params['model_input_size']
+        history_length = training_params['history_length']
+        model_hidden_size = training_params['model_hidden_size']
+        num_layers = training_params['num_layers'] if 'num_layers' in training_params else 1
+        model_output_size = training_params['model_output_size']
+        if 'open_loop' in training_params:
+            open_loop = training_params['open_loop']
+        else:
+            open_loop = True if model_input_size == 2 else False
+        try:
+            use_stickout_length = training_params['use_stickout_length']
+        except KeyError:
+            use_stickout_length = False
+        try:
+            latency = training_params['latency']
+        except KeyError:
+            latency = 0
+        latency_steps = int(latency * sample_rate) # number of steps to consider for latency
+
+        # Model types
+        if model_type == 'LSTM':
+            if model_input_size == 2:
+                modelClass = LSTMModel
+            else:
+                modelClass = LSTMAutoRegressionModel
+        elif model_type == 'RNN' or model_type == 'DTRNN':
+            if model_input_size == 2 and model_type == 'RNN':
+                modelClass = RNNModel
+            else:
+                modelClass = RNNAutoRegressionModel
+        elif model_type == 'GRU':
+            if model_input_size == 2:
+                modelClass = GRUModel
+            else:
+                modelClass = GRUAutoRegressionModel
+        elif model_type == 'NARMA':
+            modelClass = ARMANeuralNetwork
+
+        # model initialization
+        if model_input_size == 2 and model_type not in ['NARMA', 'DTRNN']:
+            model = modelClass(input_size=model_input_size, hidden_size=model_hidden_size, output_size=model_output_size, num_layers=num_layers, device=device).to(device)
+        else:
+            model = modelClass(input_size=model_input_size, hidden_size=model_hidden_size, output_size=model_output_size, num_layers=num_layers, history_length=history_length, latency_steps=latency_steps, open_loop=open_loop, device=device).to(device)
+
+        # load the model state
+        model_state_dict = torch.load(model_dir + 'best_model.pth', map_location=device, weights_only=True)
+        model.load_state_dict(model_state_dict)
+
+        return model, training_params
+
+    def get_model(self):
+        return self.model, self.model_params
+    
+    def normalize_input(self,u):
+        """
+        Normalize the input based on the predefined min and max values.
+        """
+        u_in = deepcopy(u)
+        u_in[:, 0] = (u_in[:, 0] - self.v_min) / (self.v_max - self.v_min)
+        u_in[:, 1] = (u_in[:, 1] - self.feedrate_min) / (self.feedrate_max - self.feedrate_min)
+        return u_in
+
+    def denormalize_input(self,u_normed):
+        """
+        Denormalize the input based on the predefined min and max values.
+        """
+        u = np.zeros_like(u_normed)
+        u[:, 0] = u_normed[:, 0] * (self.v_max - self.v_min) + self.v_min
+        u[:, 1] = u_normed[:, 1] * (self.feedrate_max - self.feedrate_min) + self.feedrate_min
+        return u
+
+    def mixed_input_correction(self,J:torch.tensor, delta_y:torch.tensor, u_cont_prev:torch.tensor, u_disc_prev:torch.tensor,
+                            model, h_t, alpha, y_desired,disc_search_radius=None, lambda_smooth=1e-2, lambda_disc=1e-2):
+        """
+        J: Jacobian matrix, shape (output_dim, input_dim)
+        delta_y: Desired output change, shape (output_dim, 1)
+        u_cont_prev: previous continuous input (torch speed) tensor of shape (cont_dim,)
+        u_disc_prev: previous discrete input (wire feed rate) scalar
+
+        Returns: Updated (u_cont_new, u_disc_new)
+        """
+        if disc_search_radius is None:
+            disc_search_radius = self.feedrate_delta
+
+        input_dim = J.shape[1]
+        cont_dim = u_cont_prev.shape[0]
+        disc_dim = 1
+
+        J_cont = J[:, :cont_dim]  # (output_dim, cont_dim)
+        J_disc = J[:, cont_dim:]  # (output_dim, disc_dim)
+
+        # JT = J.T
+        # lhs = JT @ J + torch.diag(torch.tensor([lambda_smooth, lambda_disc],device=device))@torch.eye(J.shape[1], device=device)
+        # rhs = JT @ delta_y
+        # delta_u = torch.linalg.solve(lhs, rhs).T
+        # return delta_u
+
+        best_cost = float('inf')
+        best_u_disc = None
+        best_u_cont = None
+
+        for delta_disc_index in range(-1,2):
+            delta_disc = delta_disc_index * disc_search_radius
+            u_disc_candidate = u_disc_prev + delta_disc
+
+            # Compute rhs of least squares
+            rhs = delta_y - J_disc @ torch.tensor([[delta_disc]], dtype=J.dtype, device=J.device)
+
+            JTJ = J_cont.T @ J_cont + lambda_smooth * torch.eye(cont_dim, device=J.device)
+            JTr = J_cont.T @ rhs
+
+            delta_u_cont = torch.linalg.solve(JTJ, JTr)
+
+            # cost using the linearized model
+            residual = J_cont @ delta_u_cont + J_disc @ torch.tensor([[delta_disc]], dtype=J.dtype, device=J.device) - delta_y
+            cost = residual.norm()**2 + lambda_smooth * (delta_u_cont.norm()**2) + lambda_disc * (delta_disc**2)
+            # cost using the original model
+            # u_candidate = torch.stack([u_cont_prev[0] + delta_u_cont.view(-1), u_disc_candidate], dim=1)
+            # y_pred_control_t, _ = model.forward_one_step(torch.cat((u_candidate, torch.zeros((1,2),device=device)), dim=1), h_t.clone().detach())
+            # residual = y_desired - y_pred_control_t
+            # cost = residual.norm()**2 + lambda_smooth * (delta_u_cont.norm()**2) + lambda_disc * (delta_disc**2)
+
+            if cost < best_cost:
+                best_cost = cost
+                best_u_disc = u_disc_candidate
+                best_u_cont = u_cont_prev + delta_u_cont.view(-1)
+
+        return best_u_cont, best_u_disc
