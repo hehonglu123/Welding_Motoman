@@ -437,3 +437,7 @@ mocap/param_t1_gt.csv
 mocap/param_t2_gt.csv
 
 FLIR/calibration/IR_calibration/*
+mocap/kinematic_raw_data/test0801_R1/testing_pos_error_AE.csv
+mocap/kinematic_raw_data/test0801_R1/testing_pos_error_NN.csv
+mocap/kinematic_raw_data/test0804_R2/testing_pos_error_NN.csv
+mocap/kinematic_raw_data/test0804_R2/testing_pos_error_AE.csv
