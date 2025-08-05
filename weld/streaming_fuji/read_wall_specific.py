@@ -373,7 +373,11 @@ def main():
                        'weld_fujiscan_2025_06_12_16_59_09/','weld_fujiscan_2025_06_12_15_33_03/','weld_fujiscan_2025_06_12_15_03_27/']
         # test_dir = ['weld_fujiscan_2025_06_11_14_12_44/','weld_fujiscan_2025_06_11_16_27_41/']
         # logdata_dir_all = ['weld_fujiscan_2025_07_09_14_52_42/','weld_fujiscan_2025_07_09_15_21_35/','weld_fujiscan_2025_07_09_16_16_40/']
-        test_dir = ['weld_fujiscan_2025_07_09_14_52_42/']
+        # test_dir = ['weld_fujiscan_2025_07_09_14_52_42/']
+        test_dir = ['weld_fujiscan_2025_06_11_16_27_41/','weld_fujiscan_2025_06_11_16_52_36/','weld_fujiscan_2025_06_11_17_16_48/',\
+                       'weld_fujiscan_2025_06_11_17_49_27/','weld_fujiscan_2025_06_11_18_14_56/','weld_fujiscan_2025_06_12_17_33_24/',\
+                       'weld_fujiscan_2025_06_12_16_59_09/','weld_fujiscan_2025_06_12_15_33_03/','weld_fujiscan_2025_06_12_15_03_27/',\
+                        'weld_fujiscan_2025_07_09_14_52_42/','weld_fujiscan_2025_07_09_15_21_35/','weld_fujiscan_2025_07_09_16_16_40/']
         
         
         color_viz = []
@@ -394,8 +398,9 @@ def main():
                 this_layer = this_layer.split('r')[-1]
                 layer_nums.append(int(this_layer))
             layer_nums = np.sort(layer_nums)
+            show_pcd_list = []
             for layer_n_id, layer_n in enumerate(layer_nums):
-                print(f"Processing layer {layer_n} ({layer_n_id+1}/{len(layer_nums)})")
+                # print(f"Processing layer {layer_n} ({layer_n_id+1}/{len(layer_nums)})")
                 # if layer_n_id % 3 != 0:
                 #     print(f"Skipping layer {layer_n} due to odd index")
                 #     continue
@@ -444,16 +449,30 @@ def main():
                 this_height = np.loadtxt(this_layer_dir+'profile_height.csv',delimiter=',',skiprows=1)
                 height_viz.append(this_height)
                 color_viz.append(color_map(dir_cnt/len(test_dir)))
-            
+
+                if layer_n_id == len(layer_nums)-2:
+                    pcd = o3d.io.read_point_cloud(this_layer_dir+'pcd_denoise.pcd')
+                    show_pcd_list.append(pcd)
+                if layer_n_id == len(layer_nums)-1:
+                    # print the height and width of the middle part of the last layer
+                    profile_welding = profile_welding[profile_welding[:,1] >= -5]
+                    profile_welding = profile_welding[profile_welding[:,1] <= 5]
+                    print(f"Feedrate: {float(np.mean(profile_welding[:,3])):.2f} ipm, Welding Speed: {float(np.mean(profile_welding[:,2])):.2f} mm/s")
+                    print(f"Average height: {float(np.mean(profile_welding[:,4])):.2f} mm, Average width: {float(np.mean(profile_welding[:,7])):.2f} mm")
+                    print("==========================================")
+                    pcd = o3d.io.read_point_cloud(this_layer_dir+'pcd_denoise.pcd')
+                    show_pcd_list.append(pcd)
+                    visualize_pcd(show_pcd_list)
+
             # visualize the height
-            for profile_cnt,height_profile in enumerate(height_viz):
-                plt.plot(height_profile[:,0], height_profile[:,1]+40, '-o', color=color_viz[profile_cnt], label='Height Profile')
-                # plt.plot(profile_welding_viz[profile_cnt][:,0]-profile_welding_viz[profile_cnt][0,0], profile_welding_viz[profile_cnt][:,1], 'o', label='Welding Profile')
-                plt.plot(profile_welding_viz[profile_cnt][:,0], profile_welding_viz[profile_cnt][:,1], 'o', label='Welding Profile')
-            plt.xlabel('X Position (mm)')
-            plt.ylabel('Height (mm)')
-            plt.grid()
-            plt.show()
+            # for profile_cnt,height_profile in enumerate(height_viz):
+            #     plt.plot(height_profile[:,0], height_profile[:,1]+40, '-o', color=color_viz[profile_cnt], label='Height Profile')
+            #     # plt.plot(profile_welding_viz[profile_cnt][:,0]-profile_welding_viz[profile_cnt][0,0], profile_welding_viz[profile_cnt][:,1], 'o', label='Welding Profile')
+            #     plt.plot(profile_welding_viz[profile_cnt][:,0], profile_welding_viz[profile_cnt][:,1], 'o', label='Welding Profile')
+            # plt.xlabel('X Position (mm)')
+            # plt.ylabel('Height (mm)')
+            # plt.grid()
+            # plt.show()
 
         dh_sample = np.array(dh_sample)
         width_sample = np.array(width_sample)
