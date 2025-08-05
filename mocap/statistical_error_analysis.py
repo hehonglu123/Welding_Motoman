@@ -10,11 +10,11 @@ import matplotlib.cm as cm
 import matplotlib.colors as colors
 
 # for plotting
-xy_label_size = 14
-xy_tick_size = 12
-legend_size = 12
-title_size = 16
-sup_title_size = 18
+xy_label_size = 18
+xy_tick_size = 16
+legend_size = 16
+title_size = 20
+# sup_title_size = 18
 
 def load_errors(pickle_file):
     """
@@ -156,7 +156,7 @@ def plot_error_distributions(errors):
 
 def main():
 
-    robot_type = 'R1'
+    robot_type = 'R2'
 
     test_data_dir = 'kinematic_raw_data/test0801_R1/' if robot_type == 'R1' else 'kinematic_raw_data/test0804_R2/'
 
@@ -230,7 +230,7 @@ def main():
     ax.scatter(mocap_T[start_idx:end_idx, 0][::skip_idx], np.ones(total_length)*0.1,c=fbf_errors, cmap=cmap, norm=norm, label='FBF', s=marker_size)
     # Proper colorbar using ScalarMappable
     cbar = plt.colorbar(sm, ax=ax,pad=0.02)
-    cbar.set_label('Error Magnitude', fontsize=xy_label_size)         # Title font size
+    cbar.set_label('Error (mm)', fontsize=xy_label_size)         # Title font size
     cbar.ax.tick_params(labelsize=xy_tick_size)
     # Plot aesthetics
     if robot_type == 'R1':
