@@ -101,8 +101,8 @@ def train(inputs_q2q3, targets_delta_PH, training_q, training_T, testing_q, test
     # model.load_state_dict(torch.load('PH_NN_results/trainDirect_Fourier_lr0.0001_wp1_wo57.3_2409301609/best_training_model.pt',weights_only=True))
     # model.load_state_dict(torch.load('PH_NN_results/trainDirect_200_200_200_NN_lr0.0001_wp1_wo57.3_2409301814/best_testing_model.pt',weights_only=True))
     # model.load_state_dict(torch.load('PH_NN_results/train_R2_400_400_lr0.02_weighted_2409181201/best_testing_model.pt',weights_only=True))
-    # model.load_state_dict(torch.load('PH_NN_results/train_R1_200_200_200_NN_lr0.02_weighted_2503091846/best_testing_model.pt',weights_only=True))
-    model.load_state_dict(torch.load('PH_NN_results/train_R2_200_200_200_NN_lr0.02_weighted_2503082242/best_testing_model.pt',weights_only=True))
+    model.load_state_dict(torch.load('PH_NN_results/train_R1_200_200_200_NN_lr0.02_weighted_2503091846/best_testing_model.pt',weights_only=True))
+    # model.load_state_dict(torch.load('PH_NN_results/train_R2_200_200_200_NN_lr0.02_weighted_2503082242/best_testing_model.pt',weights_only=True))
 
     # statistics before training
     training_T_error,training_ori_error = test_fwd_accuracy(model, training_q, training_T,robot,param_nominal)

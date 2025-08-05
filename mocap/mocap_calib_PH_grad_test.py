@@ -30,7 +30,7 @@ Rz=np.array([0,0,1])
 
 config_dir='../config/'
 
-robot_type = 'R2'
+robot_type = 'R1'
 
 if robot_type == 'R1':
     ph_dataset_date='0801'
@@ -84,6 +84,9 @@ if use_toolmaker:
     # robot.robot.R_tool = np.eye(3)
     # robot.robot.p_tool = np.zeros(3)
     # robot.T_tool_toolmarker = robot.T_toolmarker_flange.inv()
+
+print("zero configuration:",robot.fwd(np.zeros(6)))
+exit()
 
 PH_data_dir='PH_grad_data/test'+ph_dataset_date+'_'+robot_type+'/train_data_'
 # test_data_dir='kinematic_raw_data/test'+test_dataset_date+'_aftercalib/'
