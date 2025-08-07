@@ -7,6 +7,7 @@ from matplotlib import pyplot as plt
 import torch
 import torch.nn as nn
 import sys, datetime, yaml, pathlib, glob, os, time, argparse
+from estimate_dhdw import train_loglog
 sys.path.append('../../mocap/')
 from Models import *
 from model_train_utils import *
@@ -108,9 +109,6 @@ if __name__ == "__main__":
     load_pretrained = parse_arg.load_pretrained
     viz_weightings = parse_arg.viz_weightings # set to True to visualize the weightings of the model
     use_all_data_for_testing = parse_arg.all_data_testing # set to True to use all data for testing, otherwise use the last tote for testing
-
-    if len(sys.argv) > 1:
-        train_flag = True if sys.argv[1].lower() == 'true' else False  # first argument is train flag, if not provided, default to True
 
     model_dir = 'weld_Seq_models/' # directory to save the model
     # model directory
@@ -430,6 +428,29 @@ if __name__ == "__main__":
     test_cmd_v = test_data[:, :, 1].flatten()
     test_cmd_feedrate = test_data[:, :, 2].flatten()
     test_stickout_length = test_data[:, :, 5].flatten()
+
+    # train with log-log model for comparison
+    train_dh = train_data[:, :, 3].flatten()
+    train_dw = train_data[:, :, 4].flatten()
+    test_dh = test_data[:, :, 3].flatten()
+    test_dw = test_data[:, :, 4].flatten()
+    # change all dh dw smaller than 0.01 to 0.01
+    train_dh[train_dh < 0.01] = 0.01
+    train_dw[train_dw < 0.01] = 0.01
+    test_dh[test_dh < 0.01] = 0.01
+    test_dw[test_dw < 0.01] = 0.01
+    train_cmd_feedrate_loglog = train_cmd_feedrate* inch2mm / 60 # ipm to mm/s
+    test_cmd_feedrate_loglog = test_cmd_feedrate* inch2mm / 60 # ipm to mm/s
+    train_dh_error_loglog, train_dw_error_loglog, val_dh_error_loglog, val_dw_error_loglog = \
+        train_loglog(np.vstack((train_cmd_v,train_cmd_feedrate_loglog)).T, np.vstack((train_dh, train_dw)).T, \
+                     np.vstack((test_cmd_v,test_cmd_feedrate_loglog)).T, np.vstack((test_dh, test_dw)).T,quadratic=True)
+    val_dh_error_loglog = np.abs(val_dh_error_loglog)
+    val_dw_error_loglog = np.abs(val_dw_error_loglog)
+    print(f"log log test dh (mean,95%,max):{np.mean(val_dh_error_loglog):.4f}, {stats.expon(scale=np.std(val_dh_error_loglog)).interval(0.95)[1]:.4f}, {np.max(val_dh_error_loglog):.4f}")
+    print(f"log log test dw (mean,95%,max):{np.mean(val_dw_error_loglog):.4f}, {stats.expon(scale=np.std(val_dw_error_loglog)).interval(0.95)[1]:.4f}, {np.max(val_dw_error_loglog):.4f}")
+    print(f"MSE (dh dw)",np.mean(np.vstack((val_dh_error_loglog, val_dw_error_loglog)).T**2))
+    exit()
+    ######
 
     np.savetxt(model_dir+'../train_cmd_v_feedrate.csv', np.vstack((train_cmd_v, train_cmd_feedrate, train_stickout_length)).T, delimiter=',', header='cmd_v,cmd_fd,stickout')
     np.savetxt(model_dir+'../test_cmd_v_feedrate.csv', np.vstack((test_cmd_v, test_cmd_feedrate, test_stickout_length)).T, delimiter=',', header='cmd_v,cmd_fd,stickout')

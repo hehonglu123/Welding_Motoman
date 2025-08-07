@@ -50,9 +50,12 @@ def main():
 
     # initial input: [velocity, feedrate]
     # random guess or from a log-log model
-    u_init = np.array([[5.,170.]], dtype=np.float64)  # initial guess for velocity and feedrate
+    # u_init = np.array([[5.,170.]], dtype=np.float64)  # initial guess for velocity and feedrate
+    u_init = np.array([[7.56,150.]], dtype=np.float64)  # initial guess for velocity and feedrate
     print("Normalizing input:", crtlModel_control.normalize_input(u_init))
     print("Denormalizing input:", crtlModel_control.denormalize_input(crtlModel_control.normalize_input(u_init)))
+
+    
 
     u_t = torch.tensor(crtlModel_control.normalize_input(u_init), dtype=torch.float32, device=device)
     u_t_sim = u_t.clone().detach()  # for simulation model
@@ -65,6 +68,22 @@ def main():
     output_y_seq = []
     input_u_seq = []
     error_y_pred_seq = []
+
+    for t_step in range(sim_steps):
+        target_index = np.searchsorted(step_break, t_step, side='right') - 1
+        # feedforward to the simulation model
+        u_t_sim = u_t.clone().detach()
+        y_pred_sim_t, h_t_sim = crtlModel_sim.model.forward_one_step(torch.cat((u_t_sim, torch.zeros_like(y_target[target_index:target_index+1])), dim=1), h_t_sim)
+        output_y_seq.append(y_pred_sim_t)
+        h_t_sim_seq.append(h_t_sim.detach().cpu().numpy()[0])
+    output_y_seq = torch.stack(output_y_seq, dim=0).detach().cpu().numpy()
+    # plot dh and width vs time
+    time_elapse = np.arange(sim_steps)/model_params_control['sample_rate']
+    plt.figure(figsize=(12, 6))
+    plt.subplot(2, 1, 1)
+    plt.plot(time_elapse, output_y_seq[:, 0, 0], label=f'Simulated $\Delta h$')
+    plt.show()
+    exit()
 
     # the very first control model feedforward prediction
     y_pred_control_t, h_t = crtlModel_control.model.forward_one_step(torch.cat((u_t, torch.zeros((1, y_target.size(1)), device=device)), dim=1), h_t)

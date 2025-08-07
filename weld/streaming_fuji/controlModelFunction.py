@@ -88,12 +88,12 @@ class controlModel():
 
         # model initialization
         if model_input_size == 2 and model_type not in ['NARMA', 'DTRNN']:
-            model = modelClass(input_size=model_input_size, hidden_size=model_hidden_size, output_size=model_output_size, num_layers=num_layers, device=device).to(device)
+            model = modelClass(input_size=model_input_size, hidden_size=model_hidden_size, output_size=model_output_size, num_layers=num_layers, device=self.device).to(self.device)
         else:
-            model = modelClass(input_size=model_input_size, hidden_size=model_hidden_size, output_size=model_output_size, num_layers=num_layers, history_length=history_length, latency_steps=latency_steps, open_loop=open_loop, device=device).to(device)
+            model = modelClass(input_size=model_input_size, hidden_size=model_hidden_size, output_size=model_output_size, num_layers=num_layers, history_length=history_length, latency_steps=latency_steps, open_loop=open_loop, device=self.device).to(self.device)
 
         # load the model state
-        model_state_dict = torch.load(model_dir + 'best_model.pth', map_location=device, weights_only=True)
+        model_state_dict = torch.load(model_dir + 'best_model.pth', map_location=self.device, weights_only=True)
         model.load_state_dict(model_state_dict)
 
         return model, training_params

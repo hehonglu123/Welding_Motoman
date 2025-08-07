@@ -450,7 +450,7 @@ def main():
                 height_viz.append(this_height)
                 color_viz.append(color_map(dir_cnt/len(test_dir)))
 
-                if layer_n_id == len(layer_nums)-2:
+                if layer_n_id >= len(layer_nums)-9:
                     pcd = o3d.io.read_point_cloud(this_layer_dir+'pcd_denoise.pcd')
                     show_pcd_list.append(pcd)
                 if layer_n_id == len(layer_nums)-1:
@@ -460,8 +460,6 @@ def main():
                     print(f"Feedrate: {float(np.mean(profile_welding[:,3])):.2f} ipm, Welding Speed: {float(np.mean(profile_welding[:,2])):.2f} mm/s")
                     print(f"Average height: {float(np.mean(profile_welding[:,4])):.2f} mm, Average width: {float(np.mean(profile_welding[:,7])):.2f} mm")
                     print("==========================================")
-                    pcd = o3d.io.read_point_cloud(this_layer_dir+'pcd_denoise.pcd')
-                    show_pcd_list.append(pcd)
                     visualize_pcd(show_pcd_list)
 
             # visualize the height
