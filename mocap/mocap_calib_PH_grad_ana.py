@@ -124,7 +124,6 @@ lambda_P = 2.5
 # lambda_H = 0.5
 # lambda_P = 0.25
 
-
 start_t = time.time()
 ### start calibration. Iterate all collected configurations/clusters
 PH_q = {}

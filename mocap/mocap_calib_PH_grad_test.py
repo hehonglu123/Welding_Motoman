@@ -14,11 +14,11 @@ import seaborn as sns
 import corner
 
 # for plotting
-xy_label_size = 14
-xy_tick_size = 12
-legend_size = 12
-title_size = 16
-sup_title_size = 18
+xy_label_size = 18
+xy_tick_size = 16
+legend_size = 16
+title_size = 20
+sup_title_size = 20
 
 from numpy.random import default_rng
 rng = default_rng()
@@ -86,7 +86,6 @@ if use_toolmaker:
     # robot.T_tool_toolmarker = robot.T_toolmarker_flange.inv()
 
 print("zero configuration:",robot.fwd(np.zeros(6)))
-exit()
 
 PH_data_dir='PH_grad_data/test'+ph_dataset_date+'_'+robot_type+'/train_data_'
 # test_data_dir='kinematic_raw_data/test'+test_dataset_date+'_aftercalib/'
@@ -102,6 +101,33 @@ test_mocap_T = np.loadtxt(test_data_dir+'mocap_T_align.csv',delimiter=',')
 train_robot_q = np.loadtxt(PH_data_dir+'robot_q_align.csv',delimiter=',')
 train_mocap_T = np.loadtxt(PH_data_dir+'mocap_T_align.csv',delimiter=',')
 
+##### calibrate base xyz only
+all_train_errors = []
+for pose_ind in range(len(train_robot_q)):
+    robot_init_T = robot.fwd(train_robot_q[pose_ind])
+    all_train_errors.append(train_mocap_T[pose_ind][:3]-robot_init_T.p)
+new_base_xyz = np.mean(all_train_errors,axis=0)
+print("New Base XYZ:",new_base_xyz)
+all_train_errors_new_base = []
+for pose_ind in range(len(train_robot_q)):
+    robot_init_T = robot.fwd(train_robot_q[pose_ind])
+    robot_init_T.p += new_base_xyz
+    all_train_errors_new_base.append(train_mocap_T[pose_ind][:3]-robot_init_T.p)
+all_train_errors_norm = np.linalg.norm(all_train_errors,axis=1)
+all_train_errors_new_base_norm = np.linalg.norm(all_train_errors_new_base,axis=1)
+print("Old Mean Std Max Error:",np.mean(all_train_errors_norm),np.std(all_train_errors_norm),np.max(all_train_errors_norm))
+print("New Mean Std Max Error:",np.mean(all_train_errors_new_base_norm),np.std(all_train_errors_new_base_norm),np.max(all_train_errors_new_base_norm))
+all_test_errors_new_base = []
+for pose_ind in range(len(test_robot_q)):
+    robot_init_T = robot.fwd(test_robot_q[pose_ind])
+    robot_init_T.p += new_base_xyz
+    all_test_errors_new_base.append(test_mocap_T[pose_ind][:3]-robot_init_T.p)
+all_test_errors_new_base_norm = np.linalg.norm(all_test_errors_new_base,axis=1)
+print("New Test Mean Std Max Error:",np.mean(all_test_errors_new_base_norm),np.std(all_test_errors_new_base_norm),np.max(all_test_errors_new_base_norm))
+
+
+
+
 # plot testing and training q distribution of all 6 joints in one plot
 all_robot_q = np.vstack((test_robot_q))
 plt.figure(figsize=(8,4))
@@ -110,7 +136,7 @@ plt.figure(figsize=(8,4))
 # plt.legend()
 # plt.show()
 for i in range(6):
-    sns.kdeplot(np.degrees(all_robot_q[:, i]), label='J'+str(i+1), fill=True, alpha=0.4)
+    sns.kdeplot(np.degrees(all_robot_q[:, i]), label=f'$q_{i+1}$', fill=True, alpha=0.4)
 plt.legend(fontsize=legend_size)
 plt.title('Dataset Joint Angles Distribution', fontsize=title_size)
 plt.xlabel('Joint Angles (Deg)', fontsize=xy_label_size)
@@ -121,7 +147,7 @@ plt.grid(True)
 plt.tight_layout()
 plt.show()
 
-# exit()
+exit()
 
 ### use only the first 2 training data
 ### for faster evaluation
