@@ -15,11 +15,32 @@ from WeldSend import *
 
 ############## Robot definition ##############
 config_dir='../config/'
-robot_1=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',d=15,tool_file_path=config_dir+'torch.csv',\
-    pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',\
-    base_marker_config_file=config_dir+'MA2010_marker_config/MA2010_marker_config.yaml',tool_marker_config_file=config_dir+'weldgun_marker_config/weldgun_marker_config.yaml')
-robot_2=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.yml',tool_file_path=config_dir+'flir.csv',\
-                        pulse2deg_file_path=config_dir+'MA1440_A0_pulse2deg_real.csv',base_transformation_file=config_dir+'MA1440_pose.csv')
+# robot_1=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',d=15,tool_file_path=config_dir+'torch.csv',\
+#     pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',\
+#     base_marker_config_file=config_dir+'MA2010_marker_config/MA2010_marker_config.yaml',tool_marker_config_file=config_dir+'weldgun_marker_config/weldgun_marker_config.yaml')
+# robot_2=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.yml',tool_file_path=config_dir+'flir.csv',\
+#                         pulse2deg_file_path=config_dir+'MA1440_A0_pulse2deg_real.csv',base_transformation_file=config_dir+'MA1440_pose.csv')
+
+ph_dataset_date='0801'
+test_dataset_date='0801'
+robot_marker_dir=config_dir+'MA2010_marker_config/'
+tool_marker_dir=config_dir+'weldgun_marker_config/'
+robot_1=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',\
+                    tool_file_path=config_dir+'torch.csv',d=15,\
+                    #  tool_file_path='',d=0,\
+                    pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',\
+                    base_marker_config_file=robot_marker_dir+'MA2010_'+ph_dataset_date+'_marker_config.yaml',\
+                    tool_marker_config_file=tool_marker_dir+'weldgun_'+ph_dataset_date+'_marker_config.yaml')
+ph_dataset_date='0804'
+test_dataset_date='0804'
+robot_marker_dir=config_dir+'MA1440_marker_config/'
+tool_marker_dir=config_dir+'mti_marker_config/'
+robot_2=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.yml',\
+                    tool_file_path=config_dir+'mti.csv',\
+                    pulse2deg_file_path=config_dir+'MA1440_A0_pulse2deg_real.csv',\
+                    base_marker_config_file=robot_marker_dir+'MA1440_'+ph_dataset_date+'_marker_config.yaml',\
+                    tool_marker_config_file=tool_marker_dir+'mti_'+ph_dataset_date+'_marker_config.yaml',\
+                    base_transformation_file=config_dir+'MA1440_pose.csv')
 
 ### Nominal PH
 nom_P_r1=np.array([[0,0,0],[150,0,0],[0,0,760],\
@@ -111,11 +132,43 @@ def get_residual_error(p_array):
     p_mean = np.mean(p_array, axis=0)
     errors = np.linalg.norm(p_array - p_mean, axis=1)
     return np.sqrt(np.mean(errors**2))
+def get_mean_error(p_array):
+    p_array = np.array(p_array)
+    p_mean = np.mean(p_array, axis=0)
+    errors = np.linalg.norm(p_array - p_mean, axis=1)
+    return np.mean(errors)
+def get_std_error(p_array):
+    p_array = np.array(p_array)
+    p_mean = np.mean(p_array, axis=0)
+    errors = np.linalg.norm(p_array - p_mean, axis=1)
+    return np.std(errors)
+def get_max_error(p_array):
+    p_array = np.array(p_array)
+    p_mean = np.mean(p_array, axis=0)
+    errors = np.linalg.norm(p_array - p_mean, axis=1)
+    return np.max(errors)
 
 origin_p_tool = deepcopy(robot_1.p_tool)
 origin_R_tool = deepcopy(robot_1.R_tool)
+origin_P_R1 = deepcopy(robot_1.robot.P)
+origin_H_R1 = deepcopy(robot_1.robot.H)
+origin_P_R2 = deepcopy(robot_2.robot.P)
+origin_H_R2 = deepcopy(robot_2.robot.H)
 
-for use_cdc in [False, True]:
+# for use_cdc in [False, True]:
+for methods in ['nominal','CPA','CDC']:
+    use_cdc = True if methods == 'CDC' else False
+
+    if methods == 'nominal' or methods == 'CDC':
+        robot_1.robot.P = deepcopy(origin_P_R1)
+        robot_1.robot.H = deepcopy(origin_H_R1)
+        robot_2.robot.P = deepcopy(origin_P_R2)
+        robot_2.robot.H = deepcopy(origin_H_R2)
+    else:
+        robot_1.robot.P = deepcopy(robot_1.calib_P)
+        robot_1.robot.H = deepcopy(robot_1.calib_H)
+        robot_2.robot.P = deepcopy(robot_2.calib_P)
+        robot_2.robot.H = deepcopy(robot_2.calib_H)
 
     # calibrate tool
     # get flange
@@ -174,7 +227,7 @@ for use_cdc in [False, True]:
 
     reference_ps = []
     for joint_i, r_joint in enumerate(reference_joints):
-        if joint_i==4:
+        if joint_i==1:
             continue
         if use_cdc:
             t2 = robot_2.fwd_ph(r_joint[6:12], ph_param_fbf_r2, world=True)
@@ -186,5 +239,9 @@ for use_cdc in [False, True]:
         # print("Relative tool position:", t1_t2.p)
         reference_ps.append(t1_t2.p)
 
-    print("Use CDC:", use_cdc)
+    print("Method:", methods)
     print("Residual tool position error:", get_residual_error(reference_ps))
+    print("Mean tool error:", get_mean_error(reference_ps))
+    print("Standard deviation tool error:", get_std_error(reference_ps))
+    print("Max tool error:", get_max_error(reference_ps))
+    print("===================================")

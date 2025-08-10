@@ -10,6 +10,13 @@ from matplotlib import pyplot as plt
 
 from PH_interp import *
 
+# for plotting
+xy_label_size = 22
+xy_tick_size = 22
+legend_size = 22
+title_size = 24
+sup_title_size = 24
+
 ph_dataset_date='0801'
 test_dataset_date='0801'
 PH_data_dir='PH_grad_data/test'+ph_dataset_date+'_R1/train_data_'
@@ -121,16 +128,19 @@ print(np.allclose(U_mat@np.diag(S_mat)@VT,coeff_A))
 print(U_mat[:,:7]@np.diag(S_mat[:7])@VT[:7,:]-coeff_A)
 
 plt.imshow(np.fabs(VT))
-plt.colorbar()
-plt.title("V Transpose (Abs)",fontsize=20)
-plt.xticks(fontsize=15)
-plt.yticks(fontsize=15)
+cbar=plt.colorbar()
+cbar.ax.tick_params(labelsize=xy_tick_size)
+plt.title("V Transpose (Abs)",fontsize=title_size)
+plt.xticks(fontsize=xy_tick_size)
+plt.yticks(fontsize=xy_tick_size)
+plt.tight_layout()
 plt.show()
 
 plt.plot(np.log10(S),'-o')
-plt.xticks(np.arange(0,len(S),2),fontsize=15)
-plt.xlabel('Singular Value Index',fontsize=15)
-plt.ylabel('Singular Value (log 10 scale)',fontsize=15)
-plt.yticks(fontsize=15)
-plt.title("Singular Values of Coefficient Matrix (A)",fontsize=20)
+plt.xticks(np.arange(0,len(S),2),fontsize=xy_tick_size)
+plt.xlabel('Singular Value Index',fontsize=xy_label_size)
+plt.ylabel('Singular Value (log)',fontsize=xy_label_size)
+plt.yticks(fontsize=xy_tick_size)
+plt.title("Singular Values of Coefficient Matrix",fontsize=title_size)
+plt.tight_layout()
 plt.show()

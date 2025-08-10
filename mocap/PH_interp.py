@@ -409,6 +409,18 @@ def compare_nominal_between_datasets():
         h_mean_all.append(h_mean)
         h_std_all.append(h_std)
         
+    # show mean and std
+    for i in range(len(p_mean_all)):
+        print(f"Dataset {i+1}:")
+        # for j in range(len(p_mean_all[i])):
+        #     print(f"  P Mean: {p_mean_all[i][j]:.4f}, P Std: {p_std_all[i][j]:.4f}")
+        print(f"  P Mean: {np.mean(p_mean_all[i]):.4f}, P Std: {np.mean(p_std_all[i]):.4f}")
+    for i in range(len(h_mean_all)):
+        print(f"Dataset {i+1}:")
+        # for j in range(len(h_mean_all[i])):
+        #     print(f"  H Mean: {h_mean_all[i][j]:.4f}, H Std: {h_std_all[i][j]:.4f}")
+        print(f"  H Mean: {np.mean(h_mean_all[i]):.4f}, H Std: {np.mean(h_std_all[i]):.4f}")
+
     # plot P
     print("**P Variation**")
     for p_mean,p_std in zip(p_mean_all,p_std_all):
@@ -460,6 +472,6 @@ if __name__=='__main__':
             print("Delete key:",qkey)
             del PH_q_cubic[qkey]
     ph_param.fit(PH_q_cubic,method='cubic')
-    ph_param.compare_nominal(nom_P,nom_H)
+    # ph_param.compare_nominal(nom_P,nom_H)
 
-    # compare_nominal_between_datasets()
+    compare_nominal_between_datasets()
