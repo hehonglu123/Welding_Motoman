@@ -24,7 +24,8 @@ def main():
     test_current = False
     test_thermal = False
     test_thermal_collected = False
-    test_geometry = True
+    test_geometry = False
+    test_weld_shift = True
 
     ############## Robot definition ##############
     config_dir='../../config/'
@@ -349,6 +350,85 @@ def main():
             plt.ylabel('Pixel Value (Counts)')
             plt.grid()
             plt.pause(0.1)
+
+    
+    ###### test shift detection ####
+    if test_weld_shift:
+        test_dir = ['weld_fujiscan_2025_06_11_16_27_41/','weld_fujiscan_2025_06_11_16_52_36/','weld_fujiscan_2025_06_11_17_16_48/',\
+                       'weld_fujiscan_2025_06_11_17_49_27/','weld_fujiscan_2025_06_11_18_14_56/','weld_fujiscan_2025_06_12_17_33_24/',\
+                       'weld_fujiscan_2025_06_12_16_59_09/','weld_fujiscan_2025_06_12_15_33_03/','weld_fujiscan_2025_06_12_15_03_27/',\
+                        'weld_fujiscan_2025_07_09_14_52_42/','weld_fujiscan_2025_07_09_15_21_35/','weld_fujiscan_2025_07_09_16_16_40/']
+        for dir_cnt,logdata_dir_name in enumerate(test_dir):
+            ## data to visualize
+            profile_welding_viz = []
+            height_viz = []
+
+            ## directory to process
+            print(f"Processing directory: {logdata_dir_name}")
+            logdata_dir = data_dir + logdata_dir_name
+            total_layers_name = glob.glob(logdata_dir+'baselayer*')
+            # get printed layer number
+            layer_nums = []
+            for layer_name in total_layers_name:
+                this_layer = layer_name.split('\\')[-1]
+                this_layer = this_layer.split('r')[-1]
+                layer_nums.append(int(this_layer))
+            layer_nums = np.sort(layer_nums)
+            show_pcd_list = []
+            for layer_n_id, layer_n in enumerate(layer_nums):
+                this_layer_dir = logdata_dir + 'baselayer' + str(layer_n) + '/'
+
+                profile_height = np.loadtxt(this_layer_dir+'profile_height.csv',delimiter=',')
+                height_viz.append(profile_height)
+
+                if layer_n_id == 1:
+                    scan_N = 100
+                    span_N = scan_N
+                    error_points_1 = []
+                    for point_i, point in enumerate(profile_height[0:scan_N+1]):
+                        if point_i == 0:
+                            continue
+                        # absolute error of z axis to the left of the point
+                        error_left = np.abs(profile_height[max(point_i-span_N, 0):point_i,1]-point[1])
+                        # absolute error of x axis to the right of the point
+                        error_right = np.abs(profile_height[point_i+1:point_i+span_N+1,0]-point[0])
+                        
+                        error_points_1.append(np.mean(error_left)+np.mean(error_right))
+                    print("Lowest error at:",np.argmin(error_points_1), "with error:", np.min(error_points_1))
+                    error_points_2 = []
+                    for point_i, point in enumerate(profile_height[::-1][0:scan_N+1]):
+                        if point_i == 0:
+                            continue
+                        # absolute error of z axis to the right of the point
+                        error_left = np.abs(profile_height[::-1][max(point_i-span_N, 0):point_i,1]-point[1])
+                        # absolute error of x axis to the right of the point
+                        error_right = np.abs(profile_height[::-1][point_i+1:point_i+span_N+1,0]-point[0])
+                        error_points_2.append(np.mean(error_left)+np.mean(error_right))
+                    print("Lowest error at:",np.argmin(error_points_2), "with error:", np.min(error_points_2))
+                    plt.plot(error_points_1, '-o', label='Error Points 1')
+                    plt.plot(error_points_2, '-o', label='Error Points 2')
+                    plt.show()
+
+            # visualize the height
+            plt.figure()
+            for i, h in enumerate(height_viz):
+                plt.plot(h[:, 0], h[:, 1], '-o', label=f'Layer {layer_nums[i]}')
+            plt.title('Profile Height Visualization')
+            plt.xlabel('X Position (mm)')
+            plt.ylabel('Height (mm)')
+            plt.legend()
+            plt.grid()
+            plt.show()
+            # show height diff in x direction
+            plt.figure()
+            for i, h in enumerate(height_viz):
+                plt.plot(h[:-1, 0], np.diff(h[:, 1]), '-o', label=f'Layer {layer_nums[i]}')
+            plt.title('Profile Height Difference Visualization')
+            plt.xlabel('X Position (mm)')
+            plt.ylabel('Height Difference (mm)')
+            plt.legend()
+            plt.grid()
+            plt.show()
 
     ###### viz geometry #####
     if test_geometry:
