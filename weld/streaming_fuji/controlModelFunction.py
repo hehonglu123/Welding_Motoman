@@ -33,7 +33,12 @@ class controlModel():
         self.model_dir = model_dir
         self.device = device
         self.model, self.model_params = self.load_model()
+
+        self.initialize_state()
     
+    def initialize_state(self):
+        self.h_t = torch.zeros((1, self.model_params['model_hidden_size']), device=self.device)
+
     def load_model(self):
         model_dir = 'weld_Seq_models/'+self.model_dir+'/'
         # load the parameters
@@ -119,8 +124,58 @@ class controlModel():
         u[:, 1] = u_normed[:, 1] * (self.feedrate_max - self.feedrate_min) + self.feedrate_min
         return u
 
+    def forward_one_step(self,torch_v,torch_feedrate,h_t=None,error_measure=None):
+
+        u_t = torch.tensor(self.normalize_input(np.array([[torch_v, torch_feedrate]],dtype=np.float64)), dtype=torch.float32, device=self.device)
+        if error_measure is None:
+            u_t = torch.cat((u_t, torch.zeros((1, 2), device=self.device)), dim=1)
+        else:
+            u_t = torch.cat((u_t, error_measure), dim=1)
+        u_t = u_t.clone().detach().requires_grad_(True)  # ensure u_t is differentiable
+        if h_t is None:
+            y_pred_t, h_t = self.model.forward_one_step(u_t, self.h_t)
+        else:
+            y_pred_t, h_t = self.model.forward_one_step(u_t, h_t)
+        self.h_t = h_t.clone()
+        return y_pred_t, h_t.clone(), u_t
+
+    def forward_one_step_get_opt_u(self, torch_v, torch_feedrate, dh_target, dw_target, alpha, h_t=None, error_measure=None, lambda_smooth=1e-2, lambda_disc=1e-2):
+
+        y_pred_t, h_t, u_t = self.forward_one_step(torch_v, torch_feedrate, h_t=h_t, error_measure=error_measure)
+
+        # Compute Jacobian dy/du
+        jacobian = []
+        for i in range(y_pred_t.size(1)):
+            grad = torch.autograd.grad(y_pred_t[0, i], u_t, retain_graph=True)[0]
+            jacobian.append(grad[0].detach())
+        J = torch.stack(jacobian, dim=0)  # Shape: (output_dim, input_dim)
+
+        # Compute the desired y
+        y_target = torch.tensor([[dh_target, dw_target]], dtype=torch.float32, device=self.device)
+        delta_y_desired = (y_target - y_pred_t).detach().T
+
+        # Solve mixed input correction
+        # delta_u = mixed_input_correction(
+        #     J, delta_y_desired, u_t[:, 0], u_t[:, 1],
+        #     crtlModel_control.model, h_t, alpha, y_target[target_index],
+        #     disc_search_radius=feedrate_delta,
+        #     lambda_smooth=lambda_smooth, lambda_disc=lambda_disc
+        # )
+        # u_t = u_t + alpha * delta_u  # Update u_t with the correction
+        # u_t[:,1] = torch.round(u_t[:, 1] / feedrate_delta) * feedrate_delta  # Discretize the feedrate input
+
+        u_cont_new, u_disc_new = self.mixed_input_correction(
+            J, delta_y_desired, u_t[:, 0], u_t[:, 1],
+            h_t, alpha, y_target,
+            lambda_smooth=lambda_smooth, lambda_disc=lambda_disc
+        )
+        u_t_cont_new = u_t[:, 0] + alpha * (u_cont_new - u_t[:, 0])
+        u_t = torch.stack([u_t_cont_new, u_disc_new], dim=1)
+        u_t_denorm = self.denormalize_input(u_t.detach().cpu().numpy())[0]
+        return u_t_denorm[0], u_t_denorm[1]
+
     def mixed_input_correction(self,J:torch.tensor, delta_y:torch.tensor, u_cont_prev:torch.tensor, u_disc_prev:torch.tensor,
-                            model, h_t, alpha, y_desired,disc_search_radius=None, lambda_smooth=1e-2, lambda_disc=1e-2):
+                            h_t, alpha, y_desired,disc_search_radius=None, lambda_smooth=1e-2, lambda_disc=1e-2):
         """
         J: Jacobian matrix, shape (output_dim, input_dim)
         delta_y: Desired output change, shape (output_dim, 1)

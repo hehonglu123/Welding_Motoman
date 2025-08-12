@@ -69,31 +69,33 @@ def main():
     input_u_seq = []
     error_y_pred_seq = []
 
-    for t_step in range(sim_steps):
-        target_index = np.searchsorted(step_break, t_step, side='right') - 1
-        # feedforward to the simulation model
-        u_t_sim = u_t.clone().detach()
-        y_pred_sim_t, h_t_sim = crtlModel_sim.model.forward_one_step(torch.cat((u_t_sim, torch.zeros_like(y_target[target_index:target_index+1])), dim=1), h_t_sim)
-        output_y_seq.append(y_pred_sim_t)
-        h_t_sim_seq.append(h_t_sim.detach().cpu().numpy()[0])
-    output_y_seq = torch.stack(output_y_seq, dim=0).detach().cpu().numpy()
-    # plot dh and width vs time
-    time_elapse = np.arange(sim_steps)/model_params_control['sample_rate']
-    plt.figure(figsize=(12, 6))
-    plt.subplot(2, 1, 1)
-    plt.plot(time_elapse, output_y_seq[:, 0, 0], label=f'Simulated $\Delta h$')
-    plt.show()
-    exit()
+    # for t_step in range(sim_steps):
+    #     target_index = np.searchsorted(step_break, t_step, side='right') - 1
+    #     # feedforward to the simulation model
+    #     u_t_sim = u_t.clone().detach()
+    #     y_pred_sim_t, h_t_sim = crtlModel_sim.model.forward_one_step(torch.cat((u_t_sim, torch.zeros_like(y_target[target_index:target_index+1])), dim=1), h_t_sim)
+    #     output_y_seq.append(y_pred_sim_t)
+    #     h_t_sim_seq.append(h_t_sim.detach().cpu().numpy()[0])
+    # output_y_seq = torch.stack(output_y_seq, dim=0).detach().cpu().numpy()
+    # # plot dh and width vs time
+    # time_elapse = np.arange(sim_steps)/model_params_control['sample_rate']
+    # plt.figure(figsize=(12, 6))
+    # plt.subplot(2, 1, 1)
+    # plt.plot(time_elapse, output_y_seq[:, 0, 0], label=f'Simulated $\Delta h$')
+    # plt.show()
+    # exit()
 
     # the very first control model feedforward prediction
-    y_pred_control_t, h_t = crtlModel_control.model.forward_one_step(torch.cat((u_t, torch.zeros((1, y_target.size(1)), device=device)), dim=1), h_t)
-    h_t_seq.append(h_t.detach().cpu().numpy()[0])
+    # y_pred_control_t, h_t = crtlModel_control.model.forward_one_step(torch.cat((u_t, torch.zeros((1, y_target.size(1)), device=device)), dim=1), h_t)
+    # h_t_seq.append(h_t.detach().cpu().numpy()[0])
 
     for t_step in range(sim_steps):
         target_index = np.searchsorted(step_break, t_step, side='right') - 1
 
         # feedforward to the simulation model
         u_t_sim = u_t.clone().detach()
+        if t_step > 0 :
+            last_y_pred_sim_t = y_pred_sim_t.clone()
         y_pred_sim_t, h_t_sim = crtlModel_sim.model.forward_one_step(torch.cat((u_t_sim, torch.zeros_like(y_target[target_index:target_index+1])), dim=1), h_t_sim)
         output_y_seq.append(y_pred_sim_t)
         h_t_sim_seq.append(h_t_sim.detach().cpu().numpy()[0])
@@ -102,9 +104,12 @@ def main():
         input_u_seq.append(u_t.detach().cpu().numpy()[0])
         u_t = u_t.clone().detach().requires_grad_(True)  # ensure u_t is differentiable
         # y_pred_control_t, h_t = crtlModel_control.model.forward_one_step(torch.cat((u_t, torch.zeros_like(y_target[target_index:target_index+1])), dim=1), h_t)
-        error_y_pred = y_pred_sim_t - y_pred_control_t
-        error_y_pred_seq.append(error_y_pred.detach().cpu().numpy()[0])
-        y_pred_control_t, h_t = crtlModel_control.model.forward_one_step(torch.cat((u_t, error_y_pred), dim=1), h_t)
+        if t_step==0:
+            y_pred_control_t, h_t = crtlModel_control.model.forward_one_step(torch.cat((u_t, torch.zeros((1, y_target.size(1)), device=device)), dim=1), h_t)
+        else:
+            error_y_pred = last_y_pred_sim_t - y_pred_control_t
+            error_y_pred_seq.append(error_y_pred.detach().cpu().numpy()[0])
+            y_pred_control_t, h_t = crtlModel_control.model.forward_one_step(torch.cat((u_t, error_y_pred), dim=1), h_t)
         h_t_seq.append(h_t.detach().cpu().numpy()[0])
         # Compute Jacobian dy/du
         jacobian = []
@@ -114,7 +119,8 @@ def main():
         J = torch.stack(jacobian, dim=0)  # Shape: (output_dim, input_dim)
 
         # Compute the desired y
-        delta_y_desired = (y_target[target_index] - y_pred_sim_t).detach().T
+        # delta_y_desired = (y_target[target_index] - y_pred_sim_t).detach().T
+        delta_y_desired = (y_target[target_index] - y_pred_control_t).detach().T
 
         # Solve mixed input correction
         # delta_u = mixed_input_correction(
@@ -128,7 +134,7 @@ def main():
 
         u_cont_new, u_disc_new = crtlModel_control.mixed_input_correction(
             J, delta_y_desired, u_t[:, 0], u_t[:, 1],
-            crtlModel_control.model, h_t, alpha, y_target[target_index],
+            h_t, alpha, y_target[target_index],
             lambda_smooth=lambda_smooth, lambda_disc=lambda_disc
         )
         u_t_cont_new = u_t[:, 0] + alpha * (u_cont_new - u_t[:, 0])

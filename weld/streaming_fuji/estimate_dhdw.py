@@ -48,6 +48,8 @@ def train_loglog(train_input,train_output,val_input,val_output,quadratic=False):
     time_start = time.perf_counter()
     theta_param_dh = np.linalg.pinv(mat_A_train)@mat_B_dh
     theta_param_dw = np.linalg.pinv(mat_A_train)@mat_B_dw
+    print('theta dh:',theta_param_dh.flatten())
+    print('theta dw:',theta_param_dw.flatten())
     print(f'Training time: {time.perf_counter()-time_start:.2f} seconds')
 
     # prediction

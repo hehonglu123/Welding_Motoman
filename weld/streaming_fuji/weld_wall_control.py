@@ -2,6 +2,7 @@ import time, os, copy, sys, yaml, pathlib
 import traceback
 from copy import deepcopy
 import numpy as np
+from scipy.interpolate import CubicSpline
 import datetime
 from motoman_def import *
 from lambda_calc import *
@@ -34,6 +35,63 @@ def welder_handler(exp):
 		print ("An error occured! " + str(exp))
 		return
 
+def get_target_dh(current_x, last_profile_height, target_layer_height, lookahead_distance, forward):
+
+    if forward:
+        lookahead_x = current_x + lookahead_distance
+        valid_index = np.where((last_profile_height[:,0]>=current_x) & (last_profile_height[:,0]<=lookahead_x))
+    else:
+        lookahead_x = current_x - lookahead_distance
+        valid_index = np.where((last_profile_height[:,0]<=current_x) & (last_profile_height[:,0]>=lookahead_x))
+    next_height = np.mean(last_profile_height[valid_index,1])
+    next_dh = target_layer_height - next_height
+    return next_dh
+
+def get_control_loglog(dh,dw):
+    theta_dh = np.array([-0.51165164, 0.31240801, 0.29077162])
+    theta_dw = np.array([-0.44045542, 0.5737361, -0.04727175])
+
+    log_v_om = np.linalg.pinv(np.vstack((theta_dh[:2], theta_dw[:2])))@(np.log([dh,dw])-np.array([theta_dh[2],theta_dw[2]]))
+
+    torch_v = np.exp(log_v_om[0])
+    torch_feedrate = np.exp(log_v_om[1])
+    torch_feedrate = torch_feedrate * mm2inch * 60 # mm/s to inch/min
+    origin_vpd_ratio = torch_v/torch_feedrate
+    torch_feedrate = np.clip(torch_feedrate, 50, 250)
+    torch_feedrate = round(torch_feedrate/10)*10 # round to nearest 10
+    torch_v = torch_feedrate*origin_vpd_ratio
+
+    return torch_v, torch_feedrate
+
+def get_weld_shift_x(profile_height):
+    profile_x = np.arange(np.min(profile_height[:,0]), np.max(profile_height[:,0])+0.1, 0.1)
+    height_approx_func = CubicSpline(profile_height[:,0], profile_height[:,1])
+    profile_height_aug = np.column_stack((profile_x, height_approx_func(profile_x)))
+    
+    scan_N = 200
+    span_N = 5
+    threshold = 0.1
+    diff_points_1 = []
+    height_diff = np.diff(profile_height_aug[:,1])
+    for point_i, point in enumerate(profile_height_aug[0:scan_N+1]):
+        diff_right = np.mean(height_diff[point_i:point_i+span_N])
+
+        diff_points_1.append(diff_right)
+    # find the first diff points > 0.1
+    left_point = np.argwhere(np.array(diff_points_1) > threshold).flatten()[0]+int(span_N/2)
+    diff_points_2 = []
+    for point_i, point in enumerate(profile_height_aug[::-1][0:scan_N+1]):
+        diff_right = np.mean(height_diff[::-1][point_i:point_i+span_N])
+        diff_points_2.append(diff_right)
+    # find the first diff points < -0.1
+    right_point = np.argwhere(np.array(diff_points_2) < -threshold).flatten()[0]+int(span_N/2)
+
+    left_x = np.mean(profile_height_aug[left_point:left_point+2, 0])
+    right_x = np.mean(profile_height_aug[::-1][right_point:right_point+2, 0])
+    shift_x = -1*(left_x+right_x)/2
+    
+    return shift_x
+
 def main():
     
     weld_arcon = True
@@ -42,6 +100,14 @@ def main():
     scan_online_process = True
     thermal_on = True
     input_from_user = False
+
+    SIMULATION = True
+    if SIMULATION:
+        weld_arcon = False
+        welder_log = False
+        fuji_scanon = False
+        scan_online_process = False
+        thermal_on = False
 
     ############## Robot definition ##############
     config_dir='../../config/'
@@ -69,10 +135,12 @@ def main():
     T_weld_scan = r_weld_z.inv()*r_scan_z
     dist_weld_scan = np.linalg.norm(T_weld_scan.p)
     ########################################################RR STREAMING########################################################
-    # RR_robot_sub = RRN.SubscribeService('rr+tcp://192.168.55.12:59945?service=robot')
-    RR_robot_sub = RRN.SubscribeService('rr+tcp://localhost:59945?service=robot')
-    point_distance=0.04		###STREAMING POINT INTERPOLATED DISTANCE
-    SS=StreamingSend(RR_robot_sub,streaming_rate=125.)
+    stream_rate = 125.
+    if not SIMULATION:
+        # RR_robot_sub = RRN.SubscribeService('rr+tcp://192.168.55.12:59945?service=robot')
+        RR_robot_sub = RRN.SubscribeService('rr+tcp://localhost:59945?service=robot')
+        point_distance=0.04		###STREAMING POINT INTERPOLATED DISTANCE
+        SS=StreamingSend(RR_robot_sub,streaming_rate=stream_rate)
     ########################################################RR FRONIUS########################################################
     if weld_arcon:
         fronius_sub=RRN.SubscribeService('rr+tcp://192.168.55.21:60823?service=welder')
@@ -180,14 +248,19 @@ def main():
     safety_z_offset = 50
     # direction 
     torch_ori_fix = True # torch orientation fixed
+    # lookahead distance
+    lookahead_distance = 2 # mm
 
     ##### welding target parameters #####
-    dh_target = 5
+    dh_target = 2
     dw_target = 3
 
     ##### controller parameters and model #####
     control_model_dir = 'model_20250715_151650'
     ctrlModel = controlModel(control_model_dir,device=device)
+    alpha_control = 0.05
+    lambda_smooth = 1e-2  # regularization parameter for smoothness
+    lambda_disc = 1e-1*5  # regularization parameter for discrete input
     
     ##### Log data dir #####
     current_time = datetime.datetime.now()
@@ -211,13 +284,19 @@ def main():
     # read from file or not
     read_from_file_layer = False
     Transz0_H=None
+    last_profile_height = None
     if read_from_file_layer:
         logdata_dir = '../../data/wall_weld_test/weld_fujicontrol_2025_03_03_18_10_13/'
         Transz0_H = [[ 9.99996717e-01, -9.38152707e-06,  2.56242820e-03, -1.69755313e-02],\
                     [-9.38152707e-06,  9.99973192e-01,  7.32226246e-03, -4.85084015e-02],\
                     [-2.56242820e-03, -7.32226246e-03 , 9.99969909e-01, -6.62458387e+00],\
                     [ 0.00000000e+00 , 0.00000000e+00 , 0.00000000e+00,  1.00000000e+00]]
+        last_profile_height = None
     #####
+
+    ### simulation setup #####
+    if SIMULATION:
+        sim_folder = '../../data/wall_weld_test/weld_fujicontrol_2025_03_03_18_10_13/'
 
     ##### Welding ready to start #####
     print("Logged Data Dir:",logdata_dir)
@@ -240,13 +319,21 @@ def main():
             weld_end = layer_end
             # weld_end = 36
             nom_incre = layer_nom_incre
+            if weld_start == 0:
+                shift_weld_profile_x = get_weld_shift_x(last_profile_height)
+
+        
+
         layer_count = 0
         i=weld_start
         print("Welding parts:",weld_parts)
         print("Start layer:",weld_start,"End layer:",weld_end,"Nominal Increment:",nom_incre)
         input("Press Enter to continue...")
         while i < weld_end:
-
+            if weld_parts == 'layer':
+                # compensate the shift of the weld profile
+                last_profile_height[:,0] = last_profile_height[:,0] + shift_weld_profile_x
+                target_layer_height = dh_target + mean_layer_height
             print("=====================================")
             print(f'Welding {weld_parts} layer {i} counting {layer_count} direction {forward}')
             try:
@@ -289,31 +376,21 @@ def main():
 
                     if input_from_user:
                         input("Press Enter to continue...")
-                    else:
-                        # time.sleep(1)
-                        pass
 
                     # move to start point with safety_z_offset
-                    for z in np.arange(safety_z_offset,0,-5): # a linear movement
-                        T_start = robot_weld.fwd(curve_js[0])
-                        T_start.p[2] += z
-                        curve_js_start_offset = robot_weld.inv(T_start.p, T_start.R, last_joints=curve_js[0])[0]
-                        q_start_offset = np.hstack((curve_js_start_offset, curve_js_cam[0], curve_js_positioner[0]))
-                        SS.jog2q(q_start_offset)
-                        if z==safety_z_offset:
-                            time.sleep(0.1)
-                    # move to start point
-                    q_start = np.hstack((curve_js[0], curve_js_cam[0], curve_js_positioner[0]))
-                    SS.jog2q(q_start)
-                    time.sleep(0.1) # wait for the robot to reach the start point, clean the buffer
-
-                    # add a random delay
-                    if layer_count < 99999999999:
-                        wait_time = 0
-                    else:
-                        wait_time = np.random.uniform(0,10)
-                    print("Wait for",wait_time,"s")
-                    time.sleep(wait_time)
+                    if not SIMULATION:
+                        for z in np.arange(safety_z_offset,0,-5): # a linear movement
+                            T_start = robot_weld.fwd(curve_js[0])
+                            T_start.p[2] += z
+                            curve_js_start_offset = robot_weld.inv(T_start.p, T_start.R, last_joints=curve_js[0])[0]
+                            q_start_offset = np.hstack((curve_js_start_offset, curve_js_cam[0], curve_js_positioner[0]))
+                            SS.jog2q(q_start_offset)
+                            if z==safety_z_offset:
+                                time.sleep(0.1)
+                        # move to start point
+                        q_start = np.hstack((curve_js[0], curve_js_cam[0], curve_js_positioner[0]))
+                        SS.jog2q(q_start) 
+                        time.sleep(0.1) # wait for the robot to reach the start point, clean the buffer
 
                     ##### welding motion #####
                     lam_cur=0
@@ -326,28 +403,30 @@ def main():
                         scan_exe_noise_remove = []
                         scan_denoise_thread = Thread(target=scan_process.scan_denoise_thread, args=([-40, 30],[40, 200])) # arges: (crop_min, crop_max)
                         scan_denoise_thread.start()
-                    # initial velocity
+                    
+                    ### initial velocity
                     if weld_parts == 'base':
                         v_cmd = base_nom_vel
                         feedrate_cmd = base_feedrate
                     else:
-                        v_cmd = vel_profile[0]
-                        feedrate_cmd = feedrate_profile[0]
+                        current_x = curve[0][0]
+                        next_dh = get_target_dh(current_x, last_profile_height, target_layer_height, lookahead_distance, forward)
+                        next_dw = dw_target
+                        v_cmd ,feedrate_cmd = get_control_loglog(next_dh,next_dw) # get the velocity and feedrate from the control loglog as the initial
+                    ### turn on sensors
                     if thermal_on:
                         rr_sensors.start_all_sensors()
-                    q_cur = deepcopy(SS.q_cur)
-                    # start welding and data logging
-                    while lam_cur < (lam_relative[-1] - v_cmd/SS.streaming_rate):
+                    
+                    ### start welding and data logging
+                    while lam_cur < (lam_relative[-1] - v_cmd/stream_rate):
                         loop_start=time.perf_counter()
-                        # if test_motion_start and np.linalg.norm(q_cur-SS.q_cur)>1e-7:
-                        #     print("Motion lag (start move):",time.time()-motion_start_time)
-                        #     test_motion_start = False
-                        q_cur = deepcopy(SS.q_cur)
 
-                        ### get the next q commands
-                        lam_cur+=v_cmd/SS.streaming_rate # get the current lambda (path location)
+                        ### get the next lambda idx
+                        lam_cur+=v_cmd/stream_rate # get the current lambda (path location)
                         lam_idx=np.where(lam_relative>=lam_cur)[0][0] #get closest two indices and interpolate the joint angle
+                        ### get the next q commands
                         ratio=(lam_cur-lam_relative[lam_idx-1])/(lam_relative[lam_idx]-lam_relative[lam_idx-1]) # find the ratio for interpolation
+                        this_curve_p = curve[lam_idx-1]*(1-ratio)+curve[lam_idx]*ratio
                         q1=curve_js[lam_idx-1]*(1-ratio)+curve_js[lam_idx]*ratio # robot 1 joint angles
                         q2=curve_js_cam[lam_idx-1]*(1-ratio)+curve_js_cam[lam_idx]*ratio # robot 2 joint angles
                         q_pos=curve_js_positioner[lam_idx-1]*(1-ratio)+curve_js_positioner[lam_idx]*ratio # positioner joint angles
@@ -370,7 +449,10 @@ def main():
                             if weld_parts == 'layer':
                                 # update feedrate to welder
                                 if weld_parts == 'layer':
-                                    pass
+                                    current_x = this_curve_p[0]
+                                    next_dh = get_target_dh(current_x, last_profile_height, target_layer_height, lookahead_distance, forward)
+                                    next_dw = dw_target
+                                    v_cmd, feedrate_cmd = ctrlModel.forward_one_step_get_opt_u(v_cmd, feedrate_cmd, next_dh, next_dw, alpha_control,  lambda_smooth=lambda_smooth, lambda_disc=lambda_disc)
                                 if weld_arcon:
                                     fronius_client.async_set_job_number(int(round(feedrate_cmd/10)+job_offset), welder_handler)
                             # log command data
@@ -385,7 +467,7 @@ def main():
                             valid_indices=np.intersect1d(valid_indices,np.where(np.abs(wire_packet[1].Z_data)>50)[0])
                             line_profile=np.hstack((wire_packet[1].Y_data[valid_indices].reshape(-1,1),wire_packet[1].Z_data[valid_indices].reshape(-1,1)))
                             scan_exe.append(line_profile)
-                        weld_js_exe.append(np.append(time.perf_counter(),deepcopy(SS.q_cur))) # log timestamp and robot joints
+                        weld_js_exe.append(np.append(time.perf_counter(),deepcopy(SS.q_cur))) if not SIMULATION else None # log timestamp and robot joints
 
                         ### scan online denoising
                         if fuji_scanon and scan_online_process:
@@ -396,10 +478,11 @@ def main():
 
                         ### sent position Command to the robot
                         q_cmd_all.append(np.hstack((time.perf_counter(),i,q_cmd)))
-                        if lam_cur>lam_relative[-1]-v_cmd/SS.streaming_rate:
+                        if not SIMULATION:
                             SS.position_cmd(q_cmd,loop_start)
                         else:
-                            SS.position_cmd(q_cmd,loop_start)
+                            time.sleep(1/SS.streaming_rate) # wait for the robot to reach the start point, clean the buffer
+                                
                     ##################################################
 
                     ### welding end
@@ -416,7 +499,7 @@ def main():
                             valid_indices=np.intersect1d(valid_indices,np.where(np.abs(wire_packet[1].Z_data)>30)[0])
                             line_profile=np.hstack((wire_packet[1].Y_data[valid_indices].reshape(-1,1),wire_packet[1].Z_data[valid_indices].reshape(-1,1)))
                             scan_exe.append(line_profile)
-                        weld_js_exe.append(np.append(time.perf_counter(),deepcopy(SS.q_cur))) # log robot joints
+                        weld_js_exe.append(np.append(time.perf_counter(),deepcopy(SS.q_cur))) if not SIMULATION else None # log robot joints
 
                         ### scan online processing
                         if fuji_scanon and scan_online_process:
@@ -425,27 +508,8 @@ def main():
                                 scan_denoise = scan_process.denoise_pipe.pop(0)
                                 # get denoise scan
                                 scan_exe_noise_remove.append(scan_denoise)
-                        time.sleep(1/SS.streaming_rate)
+                        time.sleep(1/stream_rate)
                     ########################################
-
-                    ###### Motion varification
-                    # time.sleep(1/SS.streaming_rate)
-                    # motion_end_time = time.time()
-                    # print_time = time.time()
-                    # print("last q cur:",np.degrees(q_cur))
-                    # print("q cur:",np.degrees(SS.q_cur))
-                    # print("q cmd:",np.degrees(q_cmd))
-                    # while np.linalg.norm(q_cur-SS.q_cur)>1e-7:
-                    #     q_cur = deepcopy(SS.q_cur)
-                    #     time.sleep(1/SS.streaming_rate)
-                    #     if time.time()-print_time>1:
-                    #         print("Motion lag")
-                    #         print("last q cur:",np.degrees(q_cur))
-                    #         print("q cur:",np.degrees(SS.q_cur))
-                    #         print("q cmd:",np.degrees(q_cmd))
-                    #         print_time = time.time()
-                    # print("Motion lag Time:",time.time()-motion_end_time)
-                    ######
 
                     # if torch orientation is fixed, and the traveling/curve direction is opposite
                     if forward and curve_direction == 'backward':
@@ -477,26 +541,27 @@ def main():
                         lam_scan_relative = calc_lam_cs(curve_dummy[:,:3])
                         lam_scan_relative = np.append(lam_scan_relative,calc_lam_cs(curve_scan[:,:3])+lam_scan_relative[-1])
                         # move to start point with safety_z_offset
-                        q_cur = deepcopy(SS.q_cur)
-                        for z in np.arange(0,safety_z_offset+1,5): # a linear movement
-                            T_end = robot_weld.fwd(q_cur[:6])
-                            T_end.p[2] += z
-                            curve_js_end_offset = robot_weld.inv(T_end.p, T_end.R, last_joints=q_cur[:6])[0]
-                            q_end_offset = np.hstack((curve_js_end_offset, q_cur[6:]))
-                            SS.jog2q(q_end_offset)
-                        # move to start point
-                        q_start = np.hstack((curve_js_scan[0], q2, curve_js_pos_scan[0]))
-                        SS.jog2q(q_start)
+                        if not SIMULATION:
+                            q_cur = deepcopy(SS.q_cur)
+                            for z in np.arange(0,safety_z_offset+1,5): # a linear movement
+                                T_end = robot_weld.fwd(q_cur[:6])
+                                T_end.p[2] += z
+                                curve_js_end_offset = robot_weld.inv(T_end.p, T_end.R, last_joints=q_cur[:6])[0]
+                                q_end_offset = np.hstack((curve_js_end_offset, q_cur[6:]))
+                                SS.jog2q(q_end_offset)
+                            # move to start point
+                            q_start = np.hstack((curve_js_scan[0], q2, curve_js_pos_scan[0]))
+                            SS.jog2q(q_start)
                         
                     ####### remain scanning motion ##########################
                     r2_rest_q = q2
                     v_cmd = scan_nom_vel
                     lam_cur=0
-                    while lam_cur<lam_scan_relative[-1] - v_cmd/SS.streaming_rate:
+                    while lam_cur<lam_scan_relative[-1] - v_cmd/stream_rate:
                         loop_start=time.perf_counter()
 
                         ### get the next q commands
-                        lam_cur+=v_cmd/SS.streaming_rate # get the current lambda (path location)
+                        lam_cur+=v_cmd/stream_rate # get the current lambda (path location)
                         lam_idx=np.where(lam_scan_relative>=lam_cur)[0][0] # get closest two indices and interpolate the joint angle
                         ratio=(lam_cur-lam_scan_relative[lam_idx-1])/(lam_scan_relative[lam_idx]-lam_scan_relative[lam_idx-1]) # find the ratio for interpolation
                         q1=curve_js_scan[lam_idx-1]*(1-ratio)+curve_js_scan[lam_idx]*ratio # robot 1 joint angles
@@ -510,7 +575,7 @@ def main():
                             valid_indices=np.intersect1d(valid_indices,np.where(np.abs(wire_packet[1].Z_data)>50)[0])
                             line_profile=np.hstack((wire_packet[1].Y_data[valid_indices].reshape(-1,1),wire_packet[1].Z_data[valid_indices].reshape(-1,1)))
                             scan_exe.append(line_profile)
-                        weld_js_exe.append(np.append(time.perf_counter(),deepcopy(SS.q_cur))) # log robot joints
+                        weld_js_exe.append(np.append(time.perf_counter(),deepcopy(SS.q_cur))) if not SIMULATION else None # log robot joints
 
                         ### scan online denoising
                         if fuji_scanon and scan_online_process:
@@ -521,12 +586,12 @@ def main():
 
                         ### sent position Command to the robot
                         q_cmd_all.append(np.hstack((time.perf_counter(),i,q_cmd)))
-                        if lam_cur>lam_scan_relative[-1]-v_cmd/SS.streaming_rate:
-                            SS.position_cmd(q_cmd)
-                        else:
+                        if not SIMULATION:
                             SS.position_cmd(q_cmd,loop_start)
+                        else:
+                            time.sleep(1/SS.streaming_rate) # wait for the robot to reach the start point, clean the buffer
+                                
                     ########################################
-                    
                     fuji_scan_time = 0.5 # stay for a while for scanning, and robot to move to the final position
                     fuji_scan_start = time.perf_counter()
                     while time.perf_counter()-fuji_scan_start<fuji_scan_time:
@@ -537,7 +602,7 @@ def main():
                             valid_indices=np.intersect1d(valid_indices,np.where(np.abs(wire_packet[1].Z_data)>30)[0])
                             line_profile=np.hstack((wire_packet[1].Y_data[valid_indices].reshape(-1,1),wire_packet[1].Z_data[valid_indices].reshape(-1,1)))
                             scan_exe.append(line_profile)
-                        weld_js_exe.append(np.append(time.perf_counter(),deepcopy(SS.q_cur))) # log robot joints
+                        weld_js_exe.append(np.append(time.perf_counter(),deepcopy(SS.q_cur))) if not SIMULATION else None # log robot joints
 
                         ### scan online processing
                         if fuji_scanon and scan_online_process:
@@ -546,7 +611,7 @@ def main():
                                 scan_denoise = scan_process.denoise_pipe.pop(0)
                                 # get denoise scan
                                 scan_exe_noise_remove.append(scan_denoise)
-                        time.sleep(1/SS.streaming_rate)
+                        time.sleep(1/stream_rate)
 
                     # final scan processing
                     if fuji_scanon and scan_online_process:
@@ -561,58 +626,35 @@ def main():
                         scan_denoise_thread.join()
 
                     # move to end point with safety_z_offset
-                    for z in np.arange(0,safety_z_offset+1,5): # a linear movement
-                        T_end = robot_weld.fwd(curve_js_scan[-1])
-                        T_end.p[2] += z
-                        curve_js_end_offset = robot_weld.inv(T_end.p, T_end.R, last_joints=curve_js_scan[-1])[0]
-                        q_end_offset = np.hstack((curve_js_end_offset, r2_rest_q, q_pos))
-                        SS.jog2q(q_end_offset)
-
-                    ################### for debugging ######################
-                    # weld_js_exe = np.array(weld_js_exe)
-                    # #### plot robot torch executed velocity vs v cmd
-                    # weld_relative_exe = []
-                    # for exe_i in range(len(weld_js_exe)):
-                    #     T_tool = robot_weld.fwd(weld_js_exe[exe_i][1:7])
-                    #     T_positioner = positioner.fwd(weld_js_exe[exe_i][-2:])
-                    #     T_tool_positioner = T_positioner.inv() * T_tool
-                    #     weld_relative_exe.append(T_tool_positioner.p)
-                    # weld_relative_exe = np.array(weld_relative_exe)
-                    # weld_relative_v_exe=np.linalg.norm(np.diff(weld_relative_exe,axis=0),2,1)/np.diff(weld_js_exe[:,0])
-                    # weld_relative_v_exe=np.append(weld_relative_v_exe[0],weld_relative_v_exe)
-                    # weld_relative_v_exe=moving_average(weld_relative_v_exe,padding=True)
-                    # weld_relative_v_exe=moving_average(weld_relative_v_exe,padding=True) # velocity in mm/s
-                    # welding_cmd_all = np.array(welding_cmd_all)
-                    # plt.plot(weld_js_exe[:,0],weld_relative_v_exe,label='weld relative exe velocity')
-                    # plt.plot(welding_cmd_all[:,0],welding_cmd_all[:,2],label='weld cmd velocity')
-                    # plt.xlabel('Time (s)')
-                    # plt.ylabel('Velocity (mm/s)')
-                    # plt.title(f'Welding {weld_parts} layer {i} velocity')
-                    # plt.legend()
-                    # plt.grid()
-                    # plt.show()
+                    if not SIMULATION:
+                        for z in np.arange(0,safety_z_offset+1,5): # a linear movement
+                            T_end = robot_weld.fwd(curve_js_scan[-1])
+                            T_end.p[2] += z
+                            curve_js_end_offset = robot_weld.inv(T_end.p, T_end.R, last_joints=curve_js_scan[-1])[0]
+                            q_end_offset = np.hstack((curve_js_end_offset, r2_rest_q, q_pos))
+                            SS.jog2q(q_end_offset)
 
                     ############## save data ######################
-                    if not os.path.exists(logdata_dir):
-                        os.makedirs(logdata_dir)
-                    # save meta data
-                    with open(logdata_dir+'weld_meta_data.yml', 'w') as f:
-                        yaml.dump(weld_meta_data, f)
                     if weld_parts == 'base':
                         layer_name = 'baselayer'+str(i)
-                        pathlib.Path(logdata_dir+layer_name).mkdir(parents=True, exist_ok=True)
                     else:
                         layer_name = 'layer'+str(i)
+                    if not SIMULATION:
+                        if not os.path.exists(logdata_dir):
+                            os.makedirs(logdata_dir)
+                        # save meta data
+                        with open(logdata_dir+'weld_meta_data.yml', 'w') as f:
+                            yaml.dump(weld_meta_data, f)
                         pathlib.Path(logdata_dir+layer_name).mkdir(parents=True, exist_ok=True)
-                    np.savetxt(logdata_dir+layer_name+f'/weld_js_exe.csv', weld_js_exe, delimiter=',') # save welding/scanning logged joint space data
-                    np.savetxt(logdata_dir+layer_name+f'/js_cmd.csv', q_cmd_all, delimiter=',') # save welding/scanning commanded joint space data
-                    np.savetxt(logdata_dir+layer_name+f'/weld_cmd.csv', welding_cmd_all, delimiter=',') # save welding commands
-                    if fuji_scanon:
-                        with open(logdata_dir+layer_name+f'/scan_exe.pickle', 'wb') as file: # save scanning logged data
-                            pickle.dump(scan_exe, file)
-                    if thermal_on:
-                        rr_sensors.stop_all_sensors() ## end thermal logging at the very end to collect more thermal data
-                        rr_sensors.save_all_sensors(logdata_dir+layer_name+'/') # save thermal data
+                        np.savetxt(logdata_dir+layer_name+f'/weld_js_exe.csv', weld_js_exe, delimiter=',') # save welding/scanning logged joint space data
+                        np.savetxt(logdata_dir+layer_name+f'/js_cmd.csv', q_cmd_all, delimiter=',') # save welding/scanning commanded joint space data
+                        np.savetxt(logdata_dir+layer_name+f'/weld_cmd.csv', welding_cmd_all, delimiter=',') # save welding commands
+                        if fuji_scanon:
+                            with open(logdata_dir+layer_name+f'/scan_exe.pickle', 'wb') as file: # save scanning logged data
+                                pickle.dump(scan_exe, file)
+                        if thermal_on:
+                            rr_sensors.stop_all_sensors() ## end thermal logging at the very end to collect more thermal data
+                            rr_sensors.save_all_sensors(logdata_dir+layer_name+'/') # save thermal data
                     ##########################################
                 else:
                     print("Read from file")
@@ -658,21 +700,42 @@ def main():
                     # visualize_pcd([pcd])
                     profile_height,Transz0_H = scan_process.pcd2height(deepcopy(pcd),z_height_start,bbox_min=crop_h_min,bbox_max=crop_h_max,Transz0_H=Transz0_H)
                     print("Transz0_H:",Transz0_H)
+                    np.savetxt(logdata_dir+layer_name+f'/profile_height.csv', profile_height, delimiter=',')
+                    o3d.io.write_point_cloud(logdata_dir+layer_name+f'/pcd.pcd',pcd)
+                    
                     if read_from_file_layer:
                         visualize_pcd([pcd])
                         plt.scatter(profile_height[:,0],profile_height[:,1])
                         plt.show()
 
-                    mean_layer_height = np.mean(profile_height[:,1])
+                    if weld_parts == 'base':
+                        mean_layer_height = np.mean(profile_height[:,1])
+                    else:
+                        # find the profile_height x>curve_x_start-shift_x and x<curve_x_end-shift_x
+                        valid_indices = np.where((profile_height[:,0] > curve_x_start - shift_weld_profile_x) & (profile_height[:,0] < curve_x_end - shift_weld_profile_x))
+                        mean_layer_height = np.mean(profile_height[valid_indices,1])
                     print("Mean Layer Height:",mean_layer_height)
+                    last_profile_height = deepcopy(profile_height)
                     # with open(logdata_dir+layer_name+f'/profile_height.csv', 'wb') as f:
                     #     pickle.dump(profile_height, f)
-                    np.savetxt(logdata_dir+layer_name+f'/profile_height.csv', profile_height, delimiter=',')
-                    o3d.io.write_point_cloud(logdata_dir+layer_name+f'/pcd.pcd',pcd)
+                    
                     if weld_parts == 'base':
                         i = i+base_nom_incre # baselayer uses base_nom_incre
                     else:
                         i = round((mean_layer_height-2*baselayer_resolution)/layer_resolution) # layer uses mean_layer_height/layer_resolution
+                elif SIMULATION:
+                    profile_height = np.loadtxt(sim_folder+layer_name+f'/profile_height.csv',delimiter=',')
+
+                    if weld_parts == 'base':
+                        mean_layer_height = np.mean(profile_height[:,1])
+                    else:
+                        # find the profile_height x>curve_x_start-shift_x and x<curve_x_end-shift_x
+                        valid_indices = np.where((profile_height[:,0] > curve_x_start - shift_weld_profile_x) & (profile_height[:,0] < curve_x_end - shift_weld_profile_x))
+                        mean_layer_height = np.mean(profile_height[valid_indices,1])
+                    print("Mean Layer Height:",mean_layer_height)
+                    last_profile_height = deepcopy(profile_height)
+
+
                 else:
                     if weld_parts == 'base':
                         i = i+nom_incre
@@ -710,7 +773,7 @@ def main():
     if weld_arcon:
         fronius_client.stop_weld()
         fronius_client.release_welder()
-    SS.deinitialize_robot()
+    SS.deinitialize_robot() if not SIMULATION else None
 
 if __name__ == '__main__':
     main()

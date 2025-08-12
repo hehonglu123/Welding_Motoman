@@ -443,7 +443,7 @@ if __name__ == "__main__":
     test_cmd_feedrate_loglog = test_cmd_feedrate* inch2mm / 60 # ipm to mm/s
     train_dh_error_loglog, train_dw_error_loglog, val_dh_error_loglog, val_dw_error_loglog = \
         train_loglog(np.vstack((train_cmd_v,train_cmd_feedrate_loglog)).T, np.vstack((train_dh, train_dw)).T, \
-                     np.vstack((test_cmd_v,test_cmd_feedrate_loglog)).T, np.vstack((test_dh, test_dw)).T,quadratic=True)
+                     np.vstack((test_cmd_v,test_cmd_feedrate_loglog)).T, np.vstack((test_dh, test_dw)).T,quadratic=False)
     val_dh_error_loglog = np.abs(val_dh_error_loglog)
     val_dw_error_loglog = np.abs(val_dw_error_loglog)
     print(f"log log test dh (mean,95%,max):{np.mean(val_dh_error_loglog):.4f}, {stats.expon(scale=np.std(val_dh_error_loglog)).interval(0.95)[1]:.4f}, {np.max(val_dh_error_loglog):.4f}")
