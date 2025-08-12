@@ -172,7 +172,8 @@ class controlModel():
         u_t_cont_new = u_t[:, 0] + alpha * (u_cont_new - u_t[:, 0])
         u_t = torch.stack([u_t_cont_new, u_disc_new], dim=1)
         u_t_denorm = self.denormalize_input(u_t.detach().cpu().numpy())[0]
-        return u_t_denorm[0], u_t_denorm[1]
+        dh_pred, dw_pred = y_pred_t.detach().cpu().numpy()[0]
+        return u_t_denorm[0], u_t_denorm[1], dh_pred, dw_pred
 
     def mixed_input_correction(self,J:torch.tensor, delta_y:torch.tensor, u_cont_prev:torch.tensor, u_disc_prev:torch.tensor,
                             h_t, alpha, y_desired,disc_search_radius=None, lambda_smooth=1e-2, lambda_disc=1e-2):
