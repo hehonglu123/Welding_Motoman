@@ -3,6 +3,7 @@ import glob
 from copy import deepcopy
 import numpy as np
 from scipy.signal import find_peaks
+from scipy.interpolate import CubicSpline
 from matplotlib import pyplot as plt
 import open3d as o3d
 import cv2 as cv
@@ -358,6 +359,8 @@ def main():
                        'weld_fujiscan_2025_06_11_17_49_27/','weld_fujiscan_2025_06_11_18_14_56/','weld_fujiscan_2025_06_12_17_33_24/',\
                        'weld_fujiscan_2025_06_12_16_59_09/','weld_fujiscan_2025_06_12_15_33_03/','weld_fujiscan_2025_06_12_15_03_27/',\
                         'weld_fujiscan_2025_07_09_14_52_42/','weld_fujiscan_2025_07_09_15_21_35/','weld_fujiscan_2025_07_09_16_16_40/']
+        # test_dir = ['weld_fujiscan_2025_07_09_14_52_42/','weld_fujiscan_2025_07_09_15_21_35/','weld_fujiscan_2025_07_09_16_16_40/']
+        shift_x_all = []
         for dir_cnt,logdata_dir_name in enumerate(test_dir):
             ## data to visualize
             profile_welding_viz = []
@@ -379,56 +382,72 @@ def main():
                 this_layer_dir = logdata_dir + 'baselayer' + str(layer_n) + '/'
 
                 profile_height = np.loadtxt(this_layer_dir+'profile_height.csv',delimiter=',')
+                profile_x = np.arange(np.min(profile_height[:,0]), np.max(profile_height[:,0])+0.1, 0.1)
+                # profile_height_aug = np.interp(profile_x, profile_height[:,0], profile_height[:,1])
+                # profile_height_aug = np.column_stack((profile_x, profile_height_aug))
+                height_approx_func = CubicSpline(profile_height[:,0], profile_height[:,1])
+                profile_height_aug = np.column_stack((profile_x, height_approx_func(profile_x)))
+
                 height_viz.append(profile_height)
 
                 if layer_n_id == 1:
-                    scan_N = 100
-                    span_N = scan_N
-                    error_points_1 = []
-                    for point_i, point in enumerate(profile_height[0:scan_N+1]):
-                        if point_i == 0:
-                            continue
-                        # absolute error of z axis to the left of the point
-                        error_left = np.abs(profile_height[max(point_i-span_N, 0):point_i,1]-point[1])
-                        # absolute error of x axis to the right of the point
-                        error_right = np.abs(profile_height[point_i+1:point_i+span_N+1,0]-point[0])
-                        
-                        error_points_1.append(np.mean(error_left)+np.mean(error_right))
-                    print("Lowest error at:",np.argmin(error_points_1), "with error:", np.min(error_points_1))
-                    error_points_2 = []
-                    for point_i, point in enumerate(profile_height[::-1][0:scan_N+1]):
-                        if point_i == 0:
-                            continue
-                        # absolute error of z axis to the right of the point
-                        error_left = np.abs(profile_height[::-1][max(point_i-span_N, 0):point_i,1]-point[1])
-                        # absolute error of x axis to the right of the point
-                        error_right = np.abs(profile_height[::-1][point_i+1:point_i+span_N+1,0]-point[0])
-                        error_points_2.append(np.mean(error_left)+np.mean(error_right))
-                    print("Lowest error at:",np.argmin(error_points_2), "with error:", np.min(error_points_2))
-                    plt.plot(error_points_1, '-o', label='Error Points 1')
-                    plt.plot(error_points_2, '-o', label='Error Points 2')
-                    plt.show()
+                    scan_N = 200
+                    span_N = 5
+                    threshold = 0.1
+                    diff_points_1 = []
+                    height_diff = np.diff(profile_height_aug[:,1])
+                    for point_i, point in enumerate(profile_height_aug[0:scan_N+1]):
+                        diff_right = np.mean(height_diff[point_i:point_i+span_N])
+
+                        diff_points_1.append(diff_right)
+                    # find the first diff points > 0.1
+                    left_point = np.argwhere(np.array(diff_points_1) > threshold).flatten()[0]+int(span_N/2)
+                    diff_points_2 = []
+                    for point_i, point in enumerate(profile_height_aug[::-1][0:scan_N+1]):
+                        diff_right = np.mean(height_diff[::-1][point_i:point_i+span_N])
+                        diff_points_2.append(diff_right)
+                    # find the first diff points < -0.1
+                    right_point = np.argwhere(np.array(diff_points_2) < -threshold).flatten()[0]+int(span_N/2)
+
+                    left_x = np.mean(profile_height_aug[left_point:left_point+2, 0])
+                    right_x = np.mean(profile_height_aug[::-1][right_point:right_point+2, 0])
+                    shift_x = -1*(left_x+right_x)/2
+                    shift_x_all.append(shift_x)
+
+                    print(f"Left point: {left_x:.2f}, Right point: {right_x:.2f}")
+                    # plt.plot(diff_points_1, '-o', label='Error Points 1')
+                    # plt.plot(diff_points_2, '-o', label='Error Points 2')
+                    # plt.show()
+                    # plt.figure(figsize=(16, 5))
+                    # plt.plot(profile_height[:,0],profile_height[:,1], '-o', label=f'Layer {layer_n}')
+                    # plt.plot(profile_height_aug[:,0],profile_height_aug[:,1], '--', label=f'Layer {layer_n} (Augmented)')
+                    # plt.axvline(x=left_x, color='r', linestyle='--', label='Left Shift Point')
+                    # plt.axvline(x=right_x, color='g', linestyle='--', label='Right Shift Point')
+                    # plt.xlabel('X Position (mm)')
+                    # plt.ylabel('Height (mm)')
+                    # plt.title(f'Profile Height - Layer {layer_n}')
+                    # plt.legend()
+                    # plt.grid()
+                    # plt.show()
 
             # visualize the height
-            plt.figure()
+            plt.figure(figsize=(16, 5))
             for i, h in enumerate(height_viz):
                 plt.plot(h[:, 0], h[:, 1], '-o', label=f'Layer {layer_nums[i]}')
+            # draw a vertical line at left_x and right_x
+            plt.axvline(x=left_x, color='r', linestyle='--', label='Left Shift Point')
+            plt.axvline(x=right_x, color='g', linestyle='--', label='Right Shift Point')
             plt.title('Profile Height Visualization')
             plt.xlabel('X Position (mm)')
             plt.ylabel('Height (mm)')
             plt.legend()
             plt.grid()
             plt.show()
-            # show height diff in x direction
-            plt.figure()
-            for i, h in enumerate(height_viz):
-                plt.plot(h[:-1, 0], np.diff(h[:, 1]), '-o', label=f'Layer {layer_nums[i]}')
-            plt.title('Profile Height Difference Visualization')
-            plt.xlabel('X Position (mm)')
-            plt.ylabel('Height Difference (mm)')
-            plt.legend()
-            plt.grid()
-            plt.show()
+
+        print(f"Mean shift: {np.mean(shift_x_all):.2f}")
+        print(f"Std shift: {np.std(shift_x_all):.4f}")
+        print(f"Min shift: {np.min(shift_x_all):.2f}, Max shift: {np.max(shift_x_all):.2f}")
+        print(f"Max shift diff: {np.max(shift_x_all) - np.mean(shift_x_all):.4f}")
 
     ###### viz geometry #####
     if test_geometry:
