@@ -52,6 +52,22 @@ def get_target_dh(current_x, last_profile_height, target_layer_height, lookahead
     next_dh = target_layer_height - next_height
     return next_dh
 
+def get_target_dw(current_x, dw_target_profile, lookahead_distance, forward):
+
+    if forward:
+        lookahead_x = current_x + lookahead_distance
+        valid_index = np.where((dw_target_profile[:,0]>=current_x) & (dw_target_profile[:,0]<=lookahead_x))
+    else:
+        lookahead_x = current_x - lookahead_distance
+        valid_index = np.where((dw_target_profile[:,0]<=current_x) & (dw_target_profile[:,0]>=lookahead_x))
+    if len(valid_index[0]) == 0:
+        print('current_x:', current_x, 'lookahead_x:', lookahead_x)
+        print("No valid dw target found in the lookahead distance, using the last 20 points")
+        next_dw = np.mean(dw_target_profile[:20,1]) if current_x < 0 else np.mean(dw_target_profile[-20:,1])
+    else:
+        next_dw = np.mean(dw_target_profile[valid_index,1])
+    return next_dw
+
 def get_control_loglog(dh,dw):
     theta_dh = np.array([-0.51165164, 0.31240801, 0.29077162])
     theta_dw = np.array([-0.44045542, 0.5737361, -0.04727175])
@@ -119,7 +135,7 @@ def main():
     scan_online_process = True
     thermal_on = True
     input_from_user = False
-    SIMULATION = False
+    SIMULATION = True
 
     if SIMULATION:
         weld_arcon = False
@@ -246,7 +262,7 @@ def main():
         # baselayer welding parameters
         base_feedrate = 300 
         base_nom_incre = 1
-        base_nom_vel = 5*1
+        base_nom_vel = 5
         # layer welding parameters
         tune_ratio = 1.5
         layer_feedrate = tune_ratio*100
@@ -255,6 +271,8 @@ def main():
         layer_nom_incre = int(layer_nom_height/layer_resolution)
         # wire cross section
         cross_section = 1.14 # mm^2
+    if SIMULATION:
+        base_nom_vel = 50 # for speed up
     
     ##### motion parameters #####
     # streaming rate
@@ -268,17 +286,28 @@ def main():
     # direction 
     torch_ori_fix = True # torch orientation fixed
     # lookahead distance
-    lookahead_distance = 2 # mm
+    lookahead_distance = 1 # mm
     # which layer to start correction
-    # correction_layer_start = 2 # start correction from layer 2, set to a large number if no correction layer
-    correction_layer_start = 99999999999999 # no correction layer, set to a large number
+    correction_layer_start = 2 # start correction from layer 2, set to a large number if no correction layer
+    # correction_layer_start = 99999999999999 # no correction layer, set to a large number
 
 
     ##### welding target parameters #####
-    # dh_target = 2
-    # dw_target = 3.5
-    dh_target, dw_target = get_pred_loglog(layer_nom_vel, layer_feedrate) # get the target dh and dw from the control loglog
-    print(f'Target dh: {dh_target:.2f} mm, dw: {dw_target:.2f} mm')
+    curve = np.loadtxt(data_dir+f'curve_sliced_relative/slice0_0.csv',delimiter=',')
+    curve_x_start = np.min(curve[:,0])
+    curve_x_end = np.max(curve[:,0])
+    curve_x_sample = np.arange(curve_x_start, curve_x_end+0.1, 0.1) # sample points for the curve
+
+    ## static dw
+    dh_target, dw_target_singlePoint = get_pred_loglog(layer_nom_vel, layer_feedrate) # get the target dh and dw from the control loglog
+    dw_target = np.vstack((curve_x_sample, np.ones_like(curve_x_sample)*dw_target_singlePoint)).T # create a constant dw target for the whole layer
+    ## axe like dw (thick to thin)
+    dh_target, _ = get_pred_loglog(layer_nom_vel, layer_feedrate)
+    dw_target_large = 6.5
+    dw_target_small = 3.5
+    dw_target = np.vstack((curve_x_sample, np.linspace(dw_target_large, dw_target_small, len(curve_x_sample)))).T # create a dw target that decreases from large to small
+
+    print(f'Target dh: {dh_target:.2f} mm, dw: {np.mean(dw_target[:,1]):.2f} mm')
 
     ##### controller parameters and model #####
     control_model_dir = 'model_20250715_151650'
@@ -305,7 +334,7 @@ def main():
                     ,'base_layer_num':base_layer_num, 'baselayer_resolution':baselayer_resolution, 'layer_num':layer_num, 'layer_resolution':layer_resolution\
                     ,'base_feedrate':base_feedrate, 'base_nom_incre':base_nom_incre, 'base_nom_vel':base_nom_vel\
                     ,'layer_feedrate':layer_feedrate, 'layer_nom_incre':layer_nom_incre, 'layer_nom_vel':float(round(layer_nom_vel,3))\
-                    ,'cross_section':cross_section, 'dh_target':dh_target, 'dw_target':dw_target, 'lookahead_distance':lookahead_distance,\
+                    ,'cross_section':cross_section, 'dh_target':float(dh_target), 'dw_target':float(np.mean(dw_target[:,1])), 'lookahead_distance':lookahead_distance,\
                     'alpha_control':alpha_control, 'lambda_smooth':lambda_smooth, 'lambda_disc':lambda_disc,\
                     'model_dir':control_model_dir, 'v_Maximum':v_Maximum, 'v_minimum':v_minimum}
 
@@ -453,7 +482,6 @@ def main():
                         scan_denoise_thread.start()
                     
                     ### initial velocity
-                    
                     if weld_parts == 'base':
                         v_cmd = base_nom_vel
                         feedrate_cmd = base_feedrate
@@ -784,7 +812,7 @@ def main():
                     curve_x_start = np.max(curve[:,0])
                     curve_y = np.mean(curve[:,1])
                     z_height_start=curve_planned_z+0.1
-                    crop_extend_x=10
+                    crop_extend_x=20
                     crop_extend_z=20
                     crop_min=(curve_x_end-crop_extend_x,curve_y-30,-30)
                     crop_max=(curve_x_start+crop_extend_x,curve_y+30,z_height_start+crop_extend_z)

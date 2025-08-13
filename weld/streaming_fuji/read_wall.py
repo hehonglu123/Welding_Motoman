@@ -61,11 +61,12 @@ def main():
 
     # material ER316L (stainless steel)
     # logdata_dir_all = ['weld_fujiscan_2025_06_11_16_27_41/']
-    logdata_dir_all = ['weld_fujiscan_2025_06_11_16_27_41/','weld_fujiscan_2025_06_11_16_52_36/','weld_fujiscan_2025_06_11_17_16_48/',\
-                       'weld_fujiscan_2025_06_11_17_49_27/','weld_fujiscan_2025_06_11_18_14_56/','weld_fujiscan_2025_06_12_17_33_24/',\
-                       'weld_fujiscan_2025_06_12_16_59_09/','weld_fujiscan_2025_06_12_15_33_03/','weld_fujiscan_2025_06_12_15_03_27/']
+    # logdata_dir_all = ['weld_fujiscan_2025_06_11_16_27_41/','weld_fujiscan_2025_06_11_16_52_36/','weld_fujiscan_2025_06_11_17_16_48/',\
+    #                    'weld_fujiscan_2025_06_11_17_49_27/','weld_fujiscan_2025_06_11_18_14_56/','weld_fujiscan_2025_06_12_17_33_24/',\
+    #                    'weld_fujiscan_2025_06_12_16_59_09/','weld_fujiscan_2025_06_12_15_33_03/','weld_fujiscan_2025_06_12_15_03_27/']
     # logdata_dir_all = ['weld_fujiscan_2025_07_09_14_52_42/','weld_fujiscan_2025_07_09_15_21_35/','weld_fujiscan_2025_07_09_16_16_40/']
     # logdata_dir_all = ['weld_fujiscan_2025_06_11_18_14_56/']
+    logdata_dir_all= ['weld_fujicontrol_2025_08_13_14_17_58/', 'weld_fujicontrol_2025_08_13_14_57_52/']
     
     ### skip data directories
     skip_data_dir_all = []
@@ -106,12 +107,18 @@ def main():
             Transz0_H_even = None
             Transicp_H_odd2even = None
         else:
-            Transz0_H_odd = np.loadtxt(logdata_dir+'Transz0_H_odd.csv',delimiter=',')
-            Transz0_H_even = np.loadtxt(logdata_dir+'Transz0_H_even.csv',delimiter=',')
-            Transicp_H_odd2even = np.loadtxt(logdata_dir+'Trans_icp_odd2even.csv',delimiter=',')
-            Transz0_H_odd = Transz0_H_odd @ Transicp_H_odd2even
+            try:
+                Transz0_H_odd = np.loadtxt(logdata_dir+'Transz0_H_odd.csv',delimiter=',')
+                Transz0_H_even = np.loadtxt(logdata_dir+'Transz0_H_even.csv',delimiter=',')
+                Transicp_H_odd2even = np.loadtxt(logdata_dir+'Trans_icp_odd2even.csv',delimiter=',')
+                Transz0_H_odd = Transz0_H_odd @ Transicp_H_odd2even
+            except FileNotFoundError:
+                Transz0_H_odd = None
+                Transz0_H_even = None
+                Transicp_H_odd2even = None
+                scanner_lagging= True
         # for weld_parts in ['base','layer']:
-        for weld_parts in ['layer']:
+        for weld_parts in ['base']:
             if weld_parts == 'base':
                 total_layers_name = glob.glob(logdata_dir+'baselayer*')
             else:
@@ -189,18 +196,18 @@ def main():
                 # plt.grid()
                 # plt.show()
 
-                if len(welding_current_exe) > 0:
-                    # Find peaks
-                    peaks, _ = find_peaks(welding_current_exe[:,1], height=75)  # height=0 filters out very low peaks
-                    # find the timestamp of the first peak
-                    first_strike_time = welding_current_exe[peaks[0], 0]
-                    print(f"First peak time: {first_strike_time:.2f} seconds")
-                    # plt.plot(welding_current_exe[:,0]-welding_current_exe[0,0], welding_current_exe[:,1], label='Welding Current')
-                    # plt.plot(welding_current_exe[peaks,0]-welding_current_exe[0,0], welding_current_exe[peaks,1], "x")
-                    # plt.title("Detected Peaks")
-                    # plt.show()
-                else:
-                    print("No welding current data found.")
+                # if len(welding_current_exe) > 0:
+                #     # Find peaks
+                #     peaks, _ = find_peaks(welding_current_exe[:,1], height=75)  # height=0 filters out very low peaks
+                #     # find the timestamp of the first peak
+                #     first_strike_time = welding_current_exe[peaks[0], 0]
+                #     print(f"First peak time: {first_strike_time:.2f} seconds")
+                #     # plt.plot(welding_current_exe[:,0]-welding_current_exe[0,0], welding_current_exe[:,1], label='Welding Current')
+                #     # plt.plot(welding_current_exe[peaks,0]-welding_current_exe[0,0], welding_current_exe[peaks,1], "x")
+                #     # plt.title("Detected Peaks")
+                #     # plt.show()
+                # else:
+                #     print("No welding current data found.")
 
                 ############### get thermal readings ##############
                 print("Getting thermal readings...")
@@ -522,7 +529,7 @@ def main():
                     # z_height_start = 0
                     # print(z_height_start)
                     # print(curve_y)
-                    crop_extend_x=10
+                    crop_extend_x=20
                     crop_extend_z=20
                     crop_min=(curve_x_end-crop_extend_x,curve_y-30,-30)
                     crop_max=(curve_x_start+crop_extend_x,curve_y+30,z_height_start+crop_extend_z)
@@ -688,7 +695,7 @@ def main():
         #     visualize_pcd(all_pcd_transform)
         #     animation_mesh(all_pcd_transform)
         
-        plt.scatter(all_torch_v_cmd,all_feedrate_cmd,s=2)
+        # plt.scatter(all_torch_v_cmd,all_feedrate_cmd,s=2)
         # all_torch_v_cmd = []
         # all_feedrate_cmd = []
 
@@ -704,15 +711,15 @@ def main():
     print(f"Total unique pairs of feedrate and torch velocity commands: {len(unique_pairs)}")
 
     # plot all collected feedrate and torch velocity commands
-    plt.xlabel('Velocity (mm/s)', fontsize=xy_label_size)
-    plt.ylabel('Feedrate (inch/min)', fontsize=xy_label_size)
-    plt.xticks(fontsize=xy_tick_size)
-    plt.yticks(fontsize=xy_tick_size)
-    plt.title('Collected Feedrate and Torch Velocity Commands', fontsize=title_size)
-    plt.grid()
-    plt.ylim(40, 260)
-    plt.tight_layout()
-    plt.show()
+    # plt.xlabel('Velocity (mm/s)', fontsize=xy_label_size)
+    # plt.ylabel('Feedrate (inch/min)', fontsize=xy_label_size)
+    # plt.xticks(fontsize=xy_tick_size)
+    # plt.yticks(fontsize=xy_tick_size)
+    # plt.title('Collected Feedrate and Torch Velocity Commands', fontsize=title_size)
+    # plt.grid()
+    # plt.ylim(40, 260)
+    # plt.tight_layout()
+    # plt.show()
 
     if run_code_again_flag:
         print("********** You need to run the code again **********")

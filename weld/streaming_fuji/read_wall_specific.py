@@ -355,11 +355,12 @@ def main():
     
     ###### test shift detection ####
     if test_weld_shift:
-        test_dir = ['weld_fujiscan_2025_06_11_16_27_41/','weld_fujiscan_2025_06_11_16_52_36/','weld_fujiscan_2025_06_11_17_16_48/',\
-                       'weld_fujiscan_2025_06_11_17_49_27/','weld_fujiscan_2025_06_11_18_14_56/','weld_fujiscan_2025_06_12_17_33_24/',\
-                       'weld_fujiscan_2025_06_12_16_59_09/','weld_fujiscan_2025_06_12_15_33_03/','weld_fujiscan_2025_06_12_15_03_27/',\
-                        'weld_fujiscan_2025_07_09_14_52_42/','weld_fujiscan_2025_07_09_15_21_35/','weld_fujiscan_2025_07_09_16_16_40/']
+        # test_dir = ['weld_fujiscan_2025_06_11_16_27_41/','weld_fujiscan_2025_06_11_16_52_36/','weld_fujiscan_2025_06_11_17_16_48/',\
+        #                'weld_fujiscan_2025_06_11_17_49_27/','weld_fujiscan_2025_06_11_18_14_56/','weld_fujiscan_2025_06_12_17_33_24/',\
+        #                'weld_fujiscan_2025_06_12_16_59_09/','weld_fujiscan_2025_06_12_15_33_03/','weld_fujiscan_2025_06_12_15_03_27/',\
+        #                 'weld_fujiscan_2025_07_09_14_52_42/','weld_fujiscan_2025_07_09_15_21_35/','weld_fujiscan_2025_07_09_16_16_40/']
         # test_dir = ['weld_fujiscan_2025_07_09_14_52_42/','weld_fujiscan_2025_07_09_15_21_35/','weld_fujiscan_2025_07_09_16_16_40/']
+        test_dir = ['weld_fujicontrol_2025_08_13_14_17_58/', 'weld_fujicontrol_2025_08_13_14_57_52/']
         shift_x_all = []
         for dir_cnt,logdata_dir_name in enumerate(test_dir):
             ## data to visualize
@@ -387,48 +388,67 @@ def main():
                 # profile_height_aug = np.column_stack((profile_x, profile_height_aug))
                 height_approx_func = CubicSpline(profile_height[:,0], profile_height[:,1])
                 profile_height_aug = np.column_stack((profile_x, height_approx_func(profile_x)))
+                # plt.plot(profile_height_aug[:,0], profile_height_aug[:,1], '-o', label=f'Layer {layer_n}')
+                # plt.show()
 
                 height_viz.append(profile_height)
 
                 if layer_n_id == 1:
-                    scan_N = 200
-                    span_N = 5
-                    threshold = 0.1
-                    diff_points_1 = []
-                    height_diff = np.diff(profile_height_aug[:,1])
-                    for point_i, point in enumerate(profile_height_aug[0:scan_N+1]):
-                        diff_right = np.mean(height_diff[point_i:point_i+span_N])
+                    # scan_N = 200
+                    # span_N = 5
+                    # threshold = 0.1
+                    # diff_points_1 = []
+                    # height_diff = np.diff(profile_height_aug[:,1])
+                    # for point_i, point in enumerate(profile_height_aug[0:scan_N+1]):
+                    #     diff_right = np.mean(height_diff[point_i:point_i+span_N])
 
-                        diff_points_1.append(diff_right)
-                    # find the first diff points > 0.1
-                    left_point = np.argwhere(np.array(diff_points_1) > threshold).flatten()[0]+int(span_N/2)
-                    diff_points_2 = []
-                    for point_i, point in enumerate(profile_height_aug[::-1][0:scan_N+1]):
-                        diff_right = np.mean(height_diff[::-1][point_i:point_i+span_N])
-                        diff_points_2.append(diff_right)
-                    # find the first diff points < -0.1
-                    right_point = np.argwhere(np.array(diff_points_2) < -threshold).flatten()[0]+int(span_N/2)
+                    #     diff_points_1.append(diff_right)
+                    # # find the first diff points > 0.1
+                    # plt.plot(profile_height_aug[:,0], profile_height_aug[:,1], '-o', label=f'Layer {layer_n}')
+                    # plt.show()
+                    # plt.plot(diff_points_1, '-o', label='Error Points 1')
+                    # plt.show()
+                    # left_point = np.argwhere(np.array(diff_points_1) > threshold).flatten()[0]+int(span_N/2)
+                    # diff_points_2 = []
+                    # for point_i, point in enumerate(profile_height_aug[::-1][0:scan_N+1]):
+                    #     diff_right = np.mean(height_diff[::-1][point_i:point_i+span_N])
+                    #     diff_points_2.append(diff_right)
+                    # # find the first diff points < -0.1
+                    # right_point = np.argwhere(np.array(diff_points_2) < -threshold).flatten()[0]+int(span_N/2)
 
-                    left_x = np.mean(profile_height_aug[left_point:left_point+2, 0])
-                    right_x = np.mean(profile_height_aug[::-1][right_point:right_point+2, 0])
+                    # left_x = np.mean(profile_height_aug[left_point:left_point+2, 0])
+                    # right_x = np.mean(profile_height_aug[::-1][right_point:right_point+2, 0])
+                    # shift_x = -1*(left_x+right_x)/2
+                    # shift_x_all.append(shift_x)
+
+                    # print(f"Left point: {left_x:.2f}, Right point: {right_x:.2f}")
+                    # # plt.plot(diff_points_1, '-o', label='Error Points 1')
+                    # # plt.plot(diff_points_2, '-o', label='Error Points 2')
+                    # # plt.show()
+                    # # plt.figure(figsize=(16, 5))
+                    # # plt.plot(profile_height[:,0],profile_height[:,1], '-o', label=f'Layer {layer_n}')
+                    # # plt.plot(profile_height_aug[:,0],profile_height_aug[:,1], '--', label=f'Layer {layer_n} (Augmented)')
+                    # # plt.axvline(x=left_x, color='r', linestyle='--', label='Left Shift Point')
+                    # # plt.axvline(x=right_x, color='g', linestyle='--', label='Right Shift Point')
+                    # # plt.xlabel('X Position (mm)')
+                    # # plt.ylabel('Height (mm)')
+                    # # plt.title(f'Profile Height - Layer {layer_n}')
+                    # # plt.legend()
+                    # # plt.grid()
+                    # # plt.show()
+
+                    profile_height_closed_arg = np.argsort(np.abs(profile_height_aug[:,1]-3.5))
+                    left_x = None
+                    right_x = None
+                    for profile_idx in profile_height_closed_arg:
+                        if profile_height_aug[profile_idx,0]<0 and left_x is None:
+                            left_x = profile_height_aug[profile_idx,0]
+                        if profile_height_aug[profile_idx,0]>0 and right_x is None:
+                            right_x = profile_height_aug[profile_idx,0]
+                        if left_x is not None and right_x is not None:
+                            break
                     shift_x = -1*(left_x+right_x)/2
                     shift_x_all.append(shift_x)
-
-                    print(f"Left point: {left_x:.2f}, Right point: {right_x:.2f}")
-                    # plt.plot(diff_points_1, '-o', label='Error Points 1')
-                    # plt.plot(diff_points_2, '-o', label='Error Points 2')
-                    # plt.show()
-                    # plt.figure(figsize=(16, 5))
-                    # plt.plot(profile_height[:,0],profile_height[:,1], '-o', label=f'Layer {layer_n}')
-                    # plt.plot(profile_height_aug[:,0],profile_height_aug[:,1], '--', label=f'Layer {layer_n} (Augmented)')
-                    # plt.axvline(x=left_x, color='r', linestyle='--', label='Left Shift Point')
-                    # plt.axvline(x=right_x, color='g', linestyle='--', label='Right Shift Point')
-                    # plt.xlabel('X Position (mm)')
-                    # plt.ylabel('Height (mm)')
-                    # plt.title(f'Profile Height - Layer {layer_n}')
-                    # plt.legend()
-                    # plt.grid()
-                    # plt.show()
 
             # visualize the height
             plt.figure(figsize=(16, 5))
