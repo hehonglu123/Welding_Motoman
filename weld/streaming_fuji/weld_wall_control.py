@@ -39,8 +39,8 @@ def get_target_dh(current_x, last_profile_height, target_layer_height, lookahead
 
     if forward:
         lookahead_x = current_x + lookahead_distance
+        print(f"Looking ahead from {current_x} to {lookahead_x}")
         valid_index = np.where((last_profile_height[:,0]>=current_x) & (last_profile_height[:,0]<=lookahead_x))
-        
     else:
         lookahead_x = current_x - lookahead_distance
         valid_index = np.where((last_profile_height[:,0]<=current_x) & (last_profile_height[:,0]>=lookahead_x))
@@ -251,9 +251,10 @@ def main():
         base_nom_incre = 1
         base_nom_vel = 50
         # layer welding parameters
-        layer_feedrate = 100
+        tune_ratio = 1.5
+        layer_feedrate = tune_ratio*100
+        layer_nom_vel = tune_ratio*10*1/2 # mm/s => 1, 1/np.sqrt(2), 1/2, 1/(2*np.sqrt(2)), 1/4, affecting VPD
         layer_nom_height = 3 # mm
-        layer_nom_vel = 10*1/2 # mm/s => 1, 1/np.sqrt(2), 1/2, 1/(2*np.sqrt(2)), 1/4, affecting VPD
         layer_nom_incre = int(layer_nom_height/layer_resolution)
         # wire cross section
         cross_section = 1.14 # mm^2
@@ -273,15 +274,18 @@ def main():
     ##### welding target parameters #####
     # dh_target = 2
     # dw_target = 3.5
-    dh_target, dw_target = get_control_loglog(layer_nom_height, layer_feedrate) # get the target dh and dw from the control loglog
+    dh_target, dw_target = get_pred_loglog(layer_nom_vel, layer_feedrate) # get the target dh and dw from the control loglog
     print(f'Target dh: {dh_target:.2f} mm, dw: {dw_target:.2f} mm')
 
     ##### controller parameters and model #####
     control_model_dir = 'model_20250715_151650'
     ctrlModel = controlModel(control_model_dir,device=device)
-    alpha_control = 0.05
+    alpha_control = 0.25
     lambda_smooth = 1e-2  # regularization parameter for smoothness
     lambda_disc = 1e-1*5  # regularization parameter for discrete input
+    # max min torch velocity
+    v_Maximum = 20
+    v_minimum = 0.5
     
     ##### Log data dir #####
     current_time = datetime.datetime.now()
@@ -350,8 +354,7 @@ def main():
             nom_incre = layer_nom_incre
             if weld_start == 0:
                 shift_weld_profile_x = get_weld_shift_x(last_profile_height)
-
-        
+                print("Shift Weld Profile X:", shift_weld_profile_x)
 
         layer_count = 0
         i=weld_start
@@ -446,7 +449,7 @@ def main():
                         next_dw = dw_target
                         v_cmd ,feedrate_cmd = get_control_loglog(next_dh,next_dw) # get the velocity and feedrate from the control loglog as the initial
                         dh_pred, dw_pred = get_pred_loglog(v_cmd, feedrate_cmd) # get the predicted dh and dw from the control loglog
-                        print(f'Initial VPD: {v_cmd:.2f} mm/s, Feedrate: {feedrate_cmd:.2f} inch/min, dh_pred: {dh_pred:.2f} mm, dw_pred: {dw_pred:.2f} mm')
+                        print(f'Initial Torch V: {v_cmd:.2f} mm/s, Feedrate: {feedrate_cmd:.2f} inch/min, dh_pred: {dh_pred:.2f} mm, dw_pred: {dw_pred:.2f} mm')
                     ### turn on sensors
                     if thermal_on:
                         rr_sensors.start_all_sensors()
@@ -455,6 +458,7 @@ def main():
                     if SIMULATION:
                         sim_log = []
                     time_count = []
+                    model_inference_time_count = []
                     while lam_cur < (lam_relative[-1] - v_cmd/stream_rate):
                         loop_start=time.perf_counter()
 
@@ -483,6 +487,7 @@ def main():
 
                         ### update welding param
                         if time.perf_counter()-last_update_time>1./feedrate_update_rate:
+                            model_inference_start_time = time.perf_counter()
                             if weld_parts == 'layer':
                                 # update feedrate to welder
                                 if weld_parts == 'layer':
@@ -490,8 +495,10 @@ def main():
                                     next_dh = get_target_dh(current_x, last_profile_height, target_layer_height, lookahead_distance, forward)
                                     next_dw = dw_target
                                     v_cmd, feedrate_cmd, dh_pred, dw_pred = ctrlModel.forward_one_step_get_opt_u(v_cmd, feedrate_cmd, next_dh, next_dw, alpha_control,  lambda_smooth=lambda_smooth, lambda_disc=lambda_disc)
+                                    v_cmd = np.clip(v_cmd, v_minimum, v_Maximum) # clip the velocity
                                 if weld_arcon:
                                     fronius_client.async_set_job_number(int(round(feedrate_cmd/10)+job_offset), welder_handler)
+                            model_inference_time_count.append(time.perf_counter()-model_inference_start_time)
                             # log command data
                             welding_cmd_all.append(np.hstack((time.perf_counter(),i,v_cmd,int(round(feedrate_cmd/10)*10))))
                             last_update_time=time.perf_counter()
@@ -526,21 +533,35 @@ def main():
                                 continue 
                         
                         time_count.append(time.perf_counter()-loop_start) # log time count
-                                
+
                     ##################################################
                     print(f'Mean time per command: {np.mean(time_count):.4f} s, Max time per command: {np.max(time_count):.4f} s')
+                    print(f'Mean model inference time: {np.mean(model_inference_time_count):.4f} s, Max model inference time: {np.max(model_inference_time_count):.4f} s')
 
                     ### simulation visualization
                     if SIMULATION and weld_parts == 'layer':
+                        plt.figure(figsize=(12, 6))
+                        plt.plot(time_count, '-o')
+                        plt.plot(model_inference_time_count, '-o')
+                        plt.title("Time per Command")
+                        plt.xlabel("Command Index")
+                        plt.ylabel("Time (s)")
+                        plt.grid(True)
+                        plt.show()
+
                         sim_log = np.array(sim_log)
                         sim_log[:,0] -= sim_log[0,0] # make the time start from 0
-                        axs, fig = plt.subplots(2, 2, figsize=(16, 12))
-                        for ax_idx, ax in enumerate(axs.flatten()):
-                            ax.plot(sim_log[:, 0], sim_log[:, ax_idx + 2])
+                        fig, axs = plt.subplots(2, 2, figsize=(16, 12))
+                        for ax_idx in range(4):
+                            ax_row_id = ax_idx // 2
+                            ax_col_id = ax_idx % 2
+                            ax = axs[ax_row_id, ax_col_id]
+                            ax.plot(sim_log[:, 1], sim_log[:, ax_idx + 2])
                             if ax_idx > 1:
-                                ax.plot(sim_log[:, 0], sim_log[:, ax_idx + 4])
+                                ax.plot(sim_log[:, 1], sim_log[:, ax_idx + 4])
                             ax.set_title(f"Simulation Log - {ax_idx + 1}")
-                            ax.set_xlabel("Time (s)")
+                            # ax.set_xlabel("Time (s)")
+                            ax.set_xlabel("X (mm)")
                             ax.set_ylabel("Value")
                             ax.grid(True)
                         plt.show()
@@ -773,7 +794,7 @@ def main():
                         mean_layer_height = np.mean(profile_height[:,1])
                     else:
                         # find the profile_height x>curve_x_start-shift_x and x<curve_x_end-shift_x
-                        valid_indices = np.where((profile_height[:,0] > curve_x_start - shift_weld_profile_x) & (profile_height[:,0] < curve_x_end - shift_weld_profile_x))
+                        valid_indices = np.where((profile_height[:,0] > curve_x_end - shift_weld_profile_x) & (profile_height[:,0] < curve_x_start - shift_weld_profile_x))
                         mean_layer_height = np.mean(profile_height[valid_indices,1])
                     print("Mean Layer Height:",mean_layer_height)
                     last_profile_height = deepcopy(profile_height)
@@ -792,7 +813,7 @@ def main():
                         i = i+base_nom_incre
                     else:
                         # find the profile_height x>curve_x_start-shift_x and x<curve_x_end-shift_x
-                        valid_indices = np.where((profile_height[:,0] > curve_x_start - shift_weld_profile_x) & (profile_height[:,0] < curve_x_end - shift_weld_profile_x))
+                        valid_indices = np.where((profile_height[:,0] > np.min(curve[:,0]) - shift_weld_profile_x) & (profile_height[:,0] < np.max(curve[:,0]) - shift_weld_profile_x))
                         mean_layer_height = np.mean(profile_height[valid_indices,1])
                         i = layer_nums[layer_count+1]
                     print("Mean Layer Height:",mean_layer_height)

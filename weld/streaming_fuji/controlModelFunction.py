@@ -127,17 +127,17 @@ class controlModel():
     def forward_one_step(self,torch_v,torch_feedrate,h_t=None,error_measure=None):
 
         u_t = torch.tensor(self.normalize_input(np.array([[torch_v, torch_feedrate]],dtype=np.float64)), dtype=torch.float32, device=self.device)
-        if error_measure is None:
-            u_t = torch.cat((u_t, torch.zeros((1, 2), device=self.device)), dim=1)
-        else:
-            u_t = torch.cat((u_t, error_measure), dim=1)
         u_t = u_t.clone().detach().requires_grad_(True)  # ensure u_t is differentiable
+
         if h_t is None:
-            y_pred_t, h_t = self.model.forward_one_step(u_t, self.h_t)
+            h_t = self.h_t
+        if error_measure is None:
+            y_pred_t, h_t = self.model.forward_one_step(torch.cat((u_t, torch.zeros((1, 2), device=self.device)), dim=1), h_t)
         else:
-            y_pred_t, h_t = self.model.forward_one_step(u_t, h_t)
-        self.h_t = h_t.clone()
-        return y_pred_t, h_t.clone(), u_t
+            y_pred_t, h_t = self.model.forward_one_step(torch.cat((u_t, error_measure), dim=1), h_t)
+        self.h_t = h_t
+
+        return y_pred_t, h_t, u_t
 
     def forward_one_step_get_opt_u(self, torch_v, torch_feedrate, dh_target, dw_target, alpha, h_t=None, error_measure=None, lambda_smooth=1e-2, lambda_disc=1e-2):
 
@@ -208,6 +208,9 @@ class controlModel():
         for delta_disc_index in range(-1,2):
             delta_disc = delta_disc_index * disc_search_radius
             u_disc_candidate = u_disc_prev + delta_disc
+            if u_disc_candidate < 0 or u_disc_candidate > 1:
+                # higher or lower than maximum values
+                continue
 
             # Compute rhs of least squares
             rhs = delta_y - J_disc @ torch.tensor([[delta_disc]], dtype=J.dtype, device=J.device)
