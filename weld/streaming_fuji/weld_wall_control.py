@@ -39,12 +39,12 @@ def get_target_dh(current_x, last_profile_height, target_layer_height, lookahead
 
     if forward:
         lookahead_x = current_x + lookahead_distance
-        print(f"Looking ahead from {current_x} to {lookahead_x}")
         valid_index = np.where((last_profile_height[:,0]>=current_x) & (last_profile_height[:,0]<=lookahead_x))
     else:
         lookahead_x = current_x - lookahead_distance
         valid_index = np.where((last_profile_height[:,0]<=current_x) & (last_profile_height[:,0]>=lookahead_x))
     if len(valid_index[0]) == 0:
+        print('current_x:', current_x, 'lookahead_x:', lookahead_x)
         print("No valid profile height found in the lookahead distance, using the last 20 points")
         next_height = np.mean(last_profile_height[:20,1]) if current_x < 0 else np.mean(last_profile_height[-20:,1])
     else:
@@ -119,8 +119,8 @@ def main():
     scan_online_process = True
     thermal_on = True
     input_from_user = False
+    SIMULATION = False
 
-    SIMULATION = True
     if SIMULATION:
         weld_arcon = False
         welder_log = False
@@ -219,9 +219,6 @@ def main():
     path_dl = meta_data['path_dl']
     dist_weld_scan_index = np.round(dist_weld_scan/path_dl).astype(int)
 
-    #### welding parameters #####
-    feedrate_update_rate=10	#Hz
-
     # material_name = 'ER4043'
     material_name = 'ER316L'
 
@@ -249,7 +246,7 @@ def main():
         # baselayer welding parameters
         base_feedrate = 300 
         base_nom_incre = 1
-        base_nom_vel = 50
+        base_nom_vel = 5*1
         # layer welding parameters
         tune_ratio = 1.5
         layer_feedrate = tune_ratio*100
@@ -260,6 +257,8 @@ def main():
         cross_section = 1.14 # mm^2
     
     ##### motion parameters #####
+    # streaming rate
+    feedrate_update_rate=10	#Hz
     # weld starting point sleep
     weld_start_sleep = 0.2
     # scanning parameters
@@ -270,6 +269,10 @@ def main():
     torch_ori_fix = True # torch orientation fixed
     # lookahead distance
     lookahead_distance = 2 # mm
+    # which layer to start correction
+    # correction_layer_start = 2 # start correction from layer 2, set to a large number if no correction layer
+    correction_layer_start = 99999999999999 # no correction layer, set to a large number
+
 
     ##### welding target parameters #####
     # dh_target = 2
@@ -285,20 +288,26 @@ def main():
     lambda_disc = 1e-1*5  # regularization parameter for discrete input
     # max min torch velocity
     v_Maximum = 20
-    v_minimum = 0.5
+    v_minimum = 0.75
+
+    ##### visualization parameters #####
+    viz_interval = 1 # visualize every N sec
     
     ##### Log data dir #####
     current_time = datetime.datetime.now()
     formatted_time = current_time.strftime('%Y_%m_%d_%H_%M_%S.%f')[:-7]
     logdata_dir='../../data/wall_weld_test/weld_fujicontrol_'+formatted_time+'/'
+    # logdata_dir='../../data/wall_weld_test/weld_fujicontrol_2025_08_13_14_17_58/'
 
     ##### weld meta data #####
     weld_meta_data = {'well_arcon':weld_arcon, 'fuji_scanon':fuji_scanon, 'data_dir':data_dir, 'logdata_dir':logdata_dir\
                       ,'material_name':material_name\
                     ,'base_layer_num':base_layer_num, 'baselayer_resolution':baselayer_resolution, 'layer_num':layer_num, 'layer_resolution':layer_resolution\
                     ,'base_feedrate':base_feedrate, 'base_nom_incre':base_nom_incre, 'base_nom_vel':base_nom_vel\
-                    , 'layer_feedrate':layer_feedrate, 'layer_nom_incre':layer_nom_incre, 'layer_nom_vel':float(round(layer_nom_vel,3))\
-                    ,'cross_section':cross_section, 'dh_target':dh_target, 'dw_target':dw_target}
+                    ,'layer_feedrate':layer_feedrate, 'layer_nom_incre':layer_nom_incre, 'layer_nom_vel':float(round(layer_nom_vel,3))\
+                    ,'cross_section':cross_section, 'dh_target':dh_target, 'dw_target':dw_target, 'lookahead_distance':lookahead_distance,\
+                    'alpha_control':alpha_control, 'lambda_smooth':lambda_smooth, 'lambda_disc':lambda_disc,\
+                    'model_dir':control_model_dir, 'v_Maximum':v_Maximum, 'v_minimum':v_minimum}
 
     ##### Parameters to chose where to start welding #####
     # start-end layers
@@ -312,15 +321,21 @@ def main():
     last_profile_height = None
     if read_from_file_layer:
         logdata_dir = '../../data/wall_weld_test/weld_fujicontrol_2025_03_03_18_10_13/'
-        Transz0_H = [[ 9.99996717e-01, -9.38152707e-06,  2.56242820e-03, -1.69755313e-02],\
-                    [-9.38152707e-06,  9.99973192e-01,  7.32226246e-03, -4.85084015e-02],\
-                    [-2.56242820e-03, -7.32226246e-03 , 9.99969909e-01, -6.62458387e+00],\
-                    [ 0.00000000e+00 , 0.00000000e+00 , 0.00000000e+00,  1.00000000e+00]]
+        Transz0_H = np.array([[ 9.99850748e-01 , 1.22093145e-04 , 1.72761855e-02 ,-1.41469281e-01],
+                    [ 1.22093145e-04 , 9.99900124e-01 ,-1.41325105e-02,  1.15726710e-01],
+                    [-1.72761855e-02,  1.41325105e-02,  9.99750872e-01, -8.18664727e+00],
+                    [ 0.00000000e+00 , 0.00000000e+00 , 0.00000000e+00 , 1.00000000e+00]])
         last_profile_height = None
+    # logdata_dir='../../data/wall_weld_test/weld_fujicontrol_2025_08_13_14_17_58/'
+    # Transz0_H = np.array([[ 9.99850748e-01 , 1.22093145e-04 , 1.72761855e-02 ,-1.41469281e-01],
+    #                 [ 1.22093145e-04 , 9.99900124e-01 ,-1.41325105e-02,  1.15726710e-01],
+    #                 [-1.72761855e-02,  1.41325105e-02,  9.99750872e-01, -8.18664727e+00],
+    #                 [ 0.00000000e+00 , 0.00000000e+00 , 0.00000000e+00 , 1.00000000e+00]])
+    # last_profile_height = np.loadtxt(logdata_dir+'baselayer1/profile_height.csv', delimiter=',') # load the last profile height
     #####
 
     ### simulation setup #####
-    if SIMULATION:
+    if SIMULATION or not weld_arcon:
         sim_folder = '../../data/wall_weld_test/weld_fujiscan_2025_06_12_15_33_03/'
         total_layers_name = glob.glob(sim_folder+'layer*')
         # get printed layer number
@@ -353,7 +368,8 @@ def main():
             # weld_end = 36
             nom_incre = layer_nom_incre
             if weld_start == 0:
-                shift_weld_profile_x = get_weld_shift_x(last_profile_height)
+                # shift_weld_profile_x = get_weld_shift_x(last_profile_height)
+                shift_weld_profile_x = 5.75
                 print("Shift Weld Profile X:", shift_weld_profile_x)
 
         layer_count = 0
@@ -447,7 +463,11 @@ def main():
                         current_x = curve[0][0]
                         next_dh = get_target_dh(current_x, last_profile_height, target_layer_height, lookahead_distance, forward)
                         next_dw = dw_target
-                        v_cmd ,feedrate_cmd = get_control_loglog(next_dh,next_dw) # get the velocity and feedrate from the control loglog as the initial
+                        if layer_count < correction_layer_start:
+                            v_cmd = layer_nom_vel
+                            feedrate_cmd = layer_feedrate
+                        else:
+                            v_cmd ,feedrate_cmd = get_control_loglog(next_dh,next_dw) # get the velocity and feedrate from the control loglog as the initial
                         dh_pred, dw_pred = get_pred_loglog(v_cmd, feedrate_cmd) # get the predicted dh and dw from the control loglog
                         print(f'Initial Torch V: {v_cmd:.2f} mm/s, Feedrate: {feedrate_cmd:.2f} inch/min, dh_pred: {dh_pred:.2f} mm, dw_pred: {dw_pred:.2f} mm')
                     ### turn on sensors
@@ -455,8 +475,8 @@ def main():
                         rr_sensors.start_all_sensors()
                     
                     ### start welding and data logging
-                    if SIMULATION:
-                        sim_log = []
+                    # if SIMULATION:
+                    control_status_log = []
                     time_count = []
                     model_inference_time_count = []
                     while lam_cur < (lam_relative[-1] - v_cmd/stream_rate):
@@ -482,29 +502,31 @@ def main():
                                 time.sleep(weld_start_sleep) # welder needs about 0.2s to start welding
                             welding_cmd_all.append(np.hstack((time.perf_counter(),i,v_cmd,int(round(feedrate_cmd/10)*10))))
                             last_update_time=time.perf_counter()
+                            last_viz_time=time.perf_counter()
                             cmd_update_cnt += 1
                             arc_off=False
 
                         ### update welding param
                         if time.perf_counter()-last_update_time>1./feedrate_update_rate:
                             model_inference_start_time = time.perf_counter()
-                            if weld_parts == 'layer':
+                            if weld_parts == 'layer' and layer_count >= correction_layer_start:
                                 # update feedrate to welder
-                                if weld_parts == 'layer':
-                                    current_x = this_curve_p[0]
-                                    next_dh = get_target_dh(current_x, last_profile_height, target_layer_height, lookahead_distance, forward)
-                                    next_dw = dw_target
-                                    v_cmd, feedrate_cmd, dh_pred, dw_pred = ctrlModel.forward_one_step_get_opt_u(v_cmd, feedrate_cmd, next_dh, next_dw, alpha_control,  lambda_smooth=lambda_smooth, lambda_disc=lambda_disc)
-                                    v_cmd = np.clip(v_cmd, v_minimum, v_Maximum) # clip the velocity
-                                if weld_arcon:
-                                    fronius_client.async_set_job_number(int(round(feedrate_cmd/10)+job_offset), welder_handler)
+                                current_x = this_curve_p[0]
+                                next_dh = get_target_dh(current_x, last_profile_height, target_layer_height, lookahead_distance, forward)
+                                next_dw = dw_target
+                                v_cmd, feedrate_cmd, dh_pred, dw_pred = ctrlModel.forward_one_step_get_opt_u(v_cmd, feedrate_cmd, next_dh, next_dw, alpha_control,  lambda_smooth=lambda_smooth, lambda_disc=lambda_disc)
+                                v_cmd = np.clip(v_cmd, v_minimum, v_Maximum) # clip the velocity
+                            if weld_arcon:
+                                fronius_client.async_set_job_number(int(round(feedrate_cmd/10)+job_offset), welder_handler)
                             model_inference_time_count.append(time.perf_counter()-model_inference_start_time)
                             # log command data
                             welding_cmd_all.append(np.hstack((time.perf_counter(),i,v_cmd,int(round(feedrate_cmd/10)*10))))
                             last_update_time=time.perf_counter()
-                            print("Current X:", this_curve_p[0], "Update Feedrate, Velocity:",int(round(feedrate_cmd/10)*10),round(v_cmd,1))
-                        if SIMULATION and weld_parts == 'layer':
-                            sim_log.append(np.hstack((time.perf_counter(),this_curve_p[0],v_cmd,int(round(feedrate_cmd/10)*10),next_dh, next_dw, dh_pred, dw_pred)))
+                            if (time.perf_counter()-last_viz_time)>viz_interval:
+                                print("Current X:", this_curve_p[0], "Update Feedrate, Velocity:",int(round(feedrate_cmd/10)*10),round(v_cmd,1))
+                                last_viz_time=time.perf_counter()
+                        if weld_parts == 'layer':
+                            control_status_log.append(np.hstack((time.perf_counter(),this_curve_p[0],v_cmd,int(round(feedrate_cmd/10)*10),next_dh, next_dw, dh_pred, dw_pred)))
                         
                         ### log data, line scanner (fujicam), robot welding joints
                         if fuji_scanon:
@@ -538,34 +560,6 @@ def main():
                     print(f'Mean time per command: {np.mean(time_count):.4f} s, Max time per command: {np.max(time_count):.4f} s')
                     print(f'Mean model inference time: {np.mean(model_inference_time_count):.4f} s, Max model inference time: {np.max(model_inference_time_count):.4f} s')
 
-                    ### simulation visualization
-                    if SIMULATION and weld_parts == 'layer':
-                        plt.figure(figsize=(12, 6))
-                        plt.plot(time_count, '-o')
-                        plt.plot(model_inference_time_count, '-o')
-                        plt.title("Time per Command")
-                        plt.xlabel("Command Index")
-                        plt.ylabel("Time (s)")
-                        plt.grid(True)
-                        plt.show()
-
-                        sim_log = np.array(sim_log)
-                        sim_log[:,0] -= sim_log[0,0] # make the time start from 0
-                        fig, axs = plt.subplots(2, 2, figsize=(16, 12))
-                        for ax_idx in range(4):
-                            ax_row_id = ax_idx // 2
-                            ax_col_id = ax_idx % 2
-                            ax = axs[ax_row_id, ax_col_id]
-                            ax.plot(sim_log[:, 1], sim_log[:, ax_idx + 2])
-                            if ax_idx > 1:
-                                ax.plot(sim_log[:, 1], sim_log[:, ax_idx + 4])
-                            ax.set_title(f"Simulation Log - {ax_idx + 1}")
-                            # ax.set_xlabel("Time (s)")
-                            ax.set_xlabel("X (mm)")
-                            ax.set_ylabel("Value")
-                            ax.grid(True)
-                        plt.show()
-
                     ### welding end
                     if weld_arcon:
                         fronius_client.stop_weld()
@@ -591,6 +585,25 @@ def main():
                                 scan_exe_noise_remove.append(scan_denoise)
                         time.sleep(1/stream_rate)
                     ########################################
+
+                    ### simulation visualization
+                    if weld_parts == 'layer' and layer_count >= correction_layer_start:
+
+                        control_status_log = np.array(control_status_log)
+                        fig, axs = plt.subplots(2, 2, figsize=(16, 8))
+                        for ax_idx in range(4):
+                            ax_row_id = ax_idx // 2
+                            ax_col_id = ax_idx % 2
+                            ax = axs[ax_row_id, ax_col_id]
+                            ax.plot(control_status_log[:, 1], control_status_log[:, ax_idx + 2])
+                            if ax_idx > 1:
+                                ax.plot(control_status_log[:, 1], control_status_log[:, ax_idx + 4])
+                            ax.set_title(f"Simulation Log - {ax_idx + 1}")
+                            # ax.set_xlabel("Time (s)")
+                            ax.set_xlabel("X (mm)")
+                            ax.set_ylabel("Value")
+                            ax.grid(True)
+                        plt.show()
 
                     # if torch orientation is fixed, and the traveling/curve direction is opposite
                     if forward and curve_direction == 'backward':
@@ -805,24 +818,26 @@ def main():
                         i = i+base_nom_incre # baselayer uses base_nom_incre
                     else:
                         i = round((mean_layer_height-2*baselayer_resolution)/layer_resolution) # layer uses mean_layer_height/layer_resolution
-                elif SIMULATION:
-                    profile_height = np.loadtxt(sim_folder+layer_name+f'/profile_height.csv',delimiter=',')
-
-                    if weld_parts == 'base':
-                        mean_layer_height = np.mean(profile_height[:,1])
-                        i = i+base_nom_incre
-                    else:
-                        # find the profile_height x>curve_x_start-shift_x and x<curve_x_end-shift_x
-                        valid_indices = np.where((profile_height[:,0] > np.min(curve[:,0]) - shift_weld_profile_x) & (profile_height[:,0] < np.max(curve[:,0]) - shift_weld_profile_x))
-                        mean_layer_height = np.mean(profile_height[valid_indices,1])
-                        i = layer_nums[layer_count+1]
-                    print("Mean Layer Height:",mean_layer_height)
-                    last_profile_height = deepcopy(profile_height)
                 else:
-                    if weld_parts == 'base':
-                        i = i+nom_incre
-                    else:
-                        i = i+nom_incre
+                    try:
+                        # use a logged profile height as demo
+                        profile_height = np.loadtxt(sim_folder+layer_name+f'/profile_height.csv',delimiter=',')
+
+                        if weld_parts == 'base':
+                            mean_layer_height = np.mean(profile_height[:,1])
+                            i = i+base_nom_incre
+                        else:
+                            # find the profile_height x>curve_x_start-shift_x and x<curve_x_end-shift_x
+                            valid_indices = np.where((profile_height[:,0] > np.min(curve[:,0]) - shift_weld_profile_x) & (profile_height[:,0] < np.max(curve[:,0]) - shift_weld_profile_x))
+                            mean_layer_height = np.mean(profile_height[valid_indices,1])
+                            i = layer_nums[layer_count+1]
+                        print("Mean Layer Height:",mean_layer_height)
+                        last_profile_height = deepcopy(profile_height)
+                    except:
+                        if weld_parts == 'base':
+                            i = i+nom_incre
+                        else:
+                            i = i+nom_incre
                 ##########################################
 
                 ### layer parameters update 
