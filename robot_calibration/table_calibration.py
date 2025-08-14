@@ -386,6 +386,13 @@ positioner.base_H = new_base_H
 
 test_joints = np.radians(np.loadtxt('test_angles.csv', delimiter=','))
 
+### test with nominal tool p
+# robot_1.p_tool = deepcopy(origin_p_tool)
+# robot_1.R_tool = deepcopy(origin_R_tool)
+# robot_1.robot.p_tool = deepcopy(origin_p_tool)
+# robot_1.robot.R_tool = deepcopy(origin_R_tool)
+############################
+
 t2 = positioner.fwd(test_joints[-2:], world=True)
 t1 = robot_1.fwd(test_joints[:6])
 print(t1)

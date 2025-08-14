@@ -103,27 +103,53 @@ def get_weld_shift_x(profile_height):
     height_approx_func = CubicSpline(profile_height[:,0], profile_height[:,1])
     profile_height_aug = np.column_stack((profile_x, height_approx_func(profile_x)))
     
-    scan_N = 200
-    span_N = 5
-    threshold = 0.1
-    diff_points_1 = []
-    height_diff = np.diff(profile_height_aug[:,1])
-    for point_i, point in enumerate(profile_height_aug[0:scan_N+1]):
-        diff_right = np.mean(height_diff[point_i:point_i+span_N])
+    # scan_N = 200
+    # span_N = 5
+    # threshold = 0.1
+    # diff_points_1 = []
+    # height_diff = np.diff(profile_height_aug[:,1])
+    # for point_i, point in enumerate(profile_height_aug[0:scan_N+1]):
+    #     diff_right = np.mean(height_diff[point_i:point_i+span_N])
 
-        diff_points_1.append(diff_right)
-    # find the first diff points > 0.1
-    left_point = np.argwhere(np.array(diff_points_1) > threshold).flatten()[0]+int(span_N/2)
-    diff_points_2 = []
-    for point_i, point in enumerate(profile_height_aug[::-1][0:scan_N+1]):
-        diff_right = np.mean(height_diff[::-1][point_i:point_i+span_N])
-        diff_points_2.append(diff_right)
-    # find the first diff points < -0.1
-    right_point = np.argwhere(np.array(diff_points_2) < -threshold).flatten()[0]+int(span_N/2)
+    #     diff_points_1.append(diff_right)
+    # # find the first diff points > 0.1
+    # left_point = np.argwhere(np.array(diff_points_1) > threshold).flatten()[0]+int(span_N/2)
+    # diff_points_2 = []
+    # for point_i, point in enumerate(profile_height_aug[::-1][0:scan_N+1]):
+    #     diff_right = np.mean(height_diff[::-1][point_i:point_i+span_N])
+    #     diff_points_2.append(diff_right)
+    # # find the first diff points < -0.1
+    # right_point = np.argwhere(np.array(diff_points_2) < -threshold).flatten()[0]+int(span_N/2)
 
-    left_x = np.mean(profile_height_aug[left_point:left_point+2, 0])
-    right_x = np.mean(profile_height_aug[::-1][right_point:right_point+2, 0])
+    # left_x = np.mean(profile_height_aug[left_point:left_point+2, 0])
+    # right_x = np.mean(profile_height_aug[::-1][right_point:right_point+2, 0])
+    # shift_x = -1*(left_x+right_x)/2
+
+    reference_height = 3.5
+    profile_height_closed_arg = np.argsort(np.abs(profile_height_aug[:,1]-reference_height))
+    left_x = None
+    right_x = None
+    for profile_idx in profile_height_closed_arg:
+        if profile_height_aug[profile_idx,0]<0 and left_x is None:
+            left_x = profile_height_aug[profile_idx,0]
+        if profile_height_aug[profile_idx,0]>0 and right_x is None:
+            right_x = profile_height_aug[profile_idx,0]
+        if left_x is not None and right_x is not None:
+            break
     shift_x = -1*(left_x+right_x)/2
+
+    # visualize the height
+    plt.figure(figsize=(16, 5))
+    plt.plot(profile_height_aug[:, 0], profile_height_aug[:, 1], '-o', label='Profile Height')
+    # draw a vertical line at left_x and right_x
+    plt.axvline(x=left_x, color='r', linestyle='--', label='Left Shift Point')
+    plt.axvline(x=right_x, color='g', linestyle='--', label='Right Shift Point')
+    plt.title('Profile Height Visualization')
+    plt.xlabel('X Position (mm)')
+    plt.ylabel('Height (mm)')
+    plt.legend()
+    plt.grid()
+    plt.show()
     
     return shift_x
 
@@ -485,17 +511,17 @@ def main():
                     if weld_parts == 'base':
                         v_cmd = base_nom_vel
                         feedrate_cmd = base_feedrate
-                        next_dh = dh_target
-                        next_dw = dw_target
                     else:
                         current_x = curve[0][0]
                         next_dh = get_target_dh(current_x, last_profile_height, target_layer_height, lookahead_distance, forward)
-                        next_dw = dw_target
-                        if layer_count < correction_layer_start:
-                            v_cmd = layer_nom_vel
-                            feedrate_cmd = layer_feedrate
-                        else:
-                            v_cmd ,feedrate_cmd = get_control_loglog(next_dh,next_dw) # get the velocity and feedrate from the control loglog as the initial
+                        # next_dw = dw_target
+                        next_dw = get_target_dw(current_x, dw_target, lookahead_distance, forward)
+                        if layer_count < correction_layer_start: #
+                            next_dh = dh_target
+                        #     v_cmd = layer_nom_vel
+                        #     feedrate_cmd = layer_feedrate
+                        # else:
+                        v_cmd ,feedrate_cmd = get_control_loglog(next_dh,next_dw) # get the velocity and feedrate from the control loglog as the initial
                         dh_pred, dw_pred = get_pred_loglog(v_cmd, feedrate_cmd) # get the predicted dh and dw from the control loglog
                         print(f'Initial Torch V: {v_cmd:.2f} mm/s, Feedrate: {feedrate_cmd:.2f} inch/min, dh_pred: {dh_pred:.2f} mm, dw_pred: {dw_pred:.2f} mm')
                     ### turn on sensors
@@ -541,7 +567,8 @@ def main():
                                 # update feedrate to welder
                                 current_x = this_curve_p[0]
                                 next_dh = get_target_dh(current_x, last_profile_height, target_layer_height, lookahead_distance, forward)
-                                next_dw = dw_target
+                                # next_dw = dw_target
+                                next_dw = get_target_dw(current_x, dw_target, lookahead_distance, forward)
                                 v_cmd, feedrate_cmd, dh_pred, dw_pred = ctrlModel.forward_one_step_get_opt_u(v_cmd, feedrate_cmd, next_dh, next_dw, alpha_control,  lambda_smooth=lambda_smooth, lambda_disc=lambda_disc)
                                 v_cmd = np.clip(v_cmd, v_minimum, v_Maximum) # clip the velocity
                             if weld_arcon:
