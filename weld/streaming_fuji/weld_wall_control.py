@@ -161,7 +161,7 @@ def main():
     scan_online_process = True
     thermal_on = True
     input_from_user = False
-    SIMULATION = True
+    SIMULATION = False
 
     if SIMULATION:
         weld_arcon = False
@@ -324,14 +324,19 @@ def main():
     curve_x_end = np.max(curve[:,0])
     curve_x_sample = np.arange(curve_x_start, curve_x_end+0.1, 0.1) # sample points for the curve
 
+    weld_type = 'axe' # 'static' or 'axe'
     ## static dw
-    dh_target, dw_target_singlePoint = get_pred_loglog(layer_nom_vel, layer_feedrate) # get the target dh and dw from the control loglog
-    dw_target = np.vstack((curve_x_sample, np.ones_like(curve_x_sample)*dw_target_singlePoint)).T # create a constant dw target for the whole layer
-    ## axe like dw (thick to thin)
-    dh_target, _ = get_pred_loglog(layer_nom_vel, layer_feedrate)
-    dw_target_large = 6.5
-    dw_target_small = 3.5
-    dw_target = np.vstack((curve_x_sample, np.linspace(dw_target_large, dw_target_small, len(curve_x_sample)))).T # create a dw target that decreases from large to small
+    if weld_type == 'static':
+        dh_target, dw_target_singlePoint = get_pred_loglog(layer_nom_vel, layer_feedrate) # get the target dh and dw from the control loglog
+        dw_target = np.vstack((curve_x_sample, np.ones_like(curve_x_sample)*dw_target_singlePoint)).T # create a constant dw target for the whole layer
+    elif weld_type == 'axe':
+        ## axe like dw (thick to thin)
+        dh_target, _ = get_pred_loglog(layer_nom_vel, layer_feedrate)
+        dw_target_large = 6.25
+        dw_target_small = 3.25
+        dw_target = np.vstack((curve_x_sample, np.linspace(dw_target_large, dw_target_small, len(curve_x_sample)))).T # create a dw target that decreases from large to small
+    else:
+        assert False, "Invalid weld type, must be 'static' or 'axe'"
 
     print(f'Target dh: {dh_target:.2f} mm, dw: {np.mean(dw_target[:,1]):.2f} mm')
 
@@ -362,7 +367,7 @@ def main():
                     ,'layer_feedrate':layer_feedrate, 'layer_nom_incre':layer_nom_incre, 'layer_nom_vel':float(round(layer_nom_vel,3))\
                     ,'cross_section':cross_section, 'dh_target':float(dh_target), 'dw_target':float(np.mean(dw_target[:,1])), 'lookahead_distance':lookahead_distance,\
                     'alpha_control':alpha_control, 'lambda_smooth':lambda_smooth, 'lambda_disc':lambda_disc,\
-                    'model_dir':control_model_dir, 'v_Maximum':v_Maximum, 'v_minimum':v_minimum}
+                    'model_dir':control_model_dir, 'v_Maximum':v_Maximum, 'v_minimum':v_minimum, 'weld_type':weld_type}
 
     ##### Parameters to chose where to start welding #####
     # start-end layers
@@ -404,6 +409,7 @@ def main():
     ##### Welding ready to start #####
     print("Logged Data Dir:",logdata_dir)
     print("Material Name:",material_name)
+    print("Weld Type:",weld_type)
     input("Ready to start? Press Enter to continue...")
     ################## print layers ##################
     arc_off=True
@@ -423,8 +429,8 @@ def main():
             # weld_end = 36
             nom_incre = layer_nom_incre
             if weld_start == 0:
-                # shift_weld_profile_x = get_weld_shift_x(last_profile_height)
-                shift_weld_profile_x = 5.75
+                shift_weld_profile_x = get_weld_shift_x(last_profile_height)
+                # shift_weld_profile_x = 5.75
                 print("Shift Weld Profile X:", shift_weld_profile_x)
 
         layer_count = 0
@@ -513,14 +519,11 @@ def main():
                         feedrate_cmd = base_feedrate
                     else:
                         current_x = curve[0][0]
-                        next_dh = get_target_dh(current_x, last_profile_height, target_layer_height, lookahead_distance, forward)
-                        # next_dw = dw_target
                         next_dw = get_target_dw(current_x, dw_target, lookahead_distance, forward)
                         if layer_count < correction_layer_start: #
                             next_dh = dh_target
-                        #     v_cmd = layer_nom_vel
-                        #     feedrate_cmd = layer_feedrate
-                        # else:
+                        else:
+                            next_dh = get_target_dh(current_x, last_profile_height, target_layer_height, lookahead_distance, forward)
                         v_cmd ,feedrate_cmd = get_control_loglog(next_dh,next_dw) # get the velocity and feedrate from the control loglog as the initial
                         dh_pred, dw_pred = get_pred_loglog(v_cmd, feedrate_cmd) # get the predicted dh and dw from the control loglog
                         print(f'Initial Torch V: {v_cmd:.2f} mm/s, Feedrate: {feedrate_cmd:.2f} inch/min, dh_pred: {dh_pred:.2f} mm, dw_pred: {dw_pred:.2f} mm')
@@ -563,12 +566,14 @@ def main():
                         ### update welding param
                         if time.perf_counter()-last_update_time>1./feedrate_update_rate:
                             model_inference_start_time = time.perf_counter()
-                            if weld_parts == 'layer' and layer_count >= correction_layer_start:
+                            if weld_parts == 'layer':
                                 # update feedrate to welder
                                 current_x = this_curve_p[0]
-                                next_dh = get_target_dh(current_x, last_profile_height, target_layer_height, lookahead_distance, forward)
-                                # next_dw = dw_target
                                 next_dw = get_target_dw(current_x, dw_target, lookahead_distance, forward)
+                                if layer_count < correction_layer_start:
+                                    next_dh = dh_target
+                                else:
+                                    next_dh = get_target_dh(current_x, last_profile_height, target_layer_height, lookahead_distance, forward)
                                 v_cmd, feedrate_cmd, dh_pred, dw_pred = ctrlModel.forward_one_step_get_opt_u(v_cmd, feedrate_cmd, next_dh, next_dw, alpha_control,  lambda_smooth=lambda_smooth, lambda_disc=lambda_disc)
                                 v_cmd = np.clip(v_cmd, v_minimum, v_Maximum) # clip the velocity
                             if weld_arcon:
@@ -642,8 +647,7 @@ def main():
                     ########################################
 
                     ### simulation visualization
-                    if weld_parts == 'layer' and layer_count >= correction_layer_start:
-
+                    if weld_parts == 'layer' and SIMULATION:
                         control_status_log = np.array(control_status_log)
                         fig, axs = plt.subplots(2, 2, figsize=(16, 8))
                         for ax_idx in range(4):
@@ -839,7 +843,7 @@ def main():
                     curve_x_start = np.max(curve[:,0])
                     curve_y = np.mean(curve[:,1])
                     z_height_start=curve_planned_z+0.1
-                    crop_extend_x=20
+                    crop_extend_x=15
                     crop_extend_z=20
                     crop_min=(curve_x_end-crop_extend_x,curve_y-30,-30)
                     crop_max=(curve_x_start+crop_extend_x,curve_y+30,z_height_start+crop_extend_z)
