@@ -42,7 +42,7 @@ def train(training_q, training_T_data, testing_q, testing_T_data,robot,param_nom
     output_size = 33
 
     # model type
-    modelType = 'Fourier' # 'Fourier' or 'NN' or 'FourierNN'
+    modelType = 'NN' # 'Fourier' or 'NN' or 'FourierNN'
 
     # Create an instance of the neural network
     model = NeuralNetwork(input_size, output_size, hidden_sizes=hidden_sizes)
@@ -66,7 +66,9 @@ def train(training_q, training_T_data, testing_q, testing_T_data,robot,param_nom
     # read model from previous trained
     # print("Load model from previous trained")
     # model.load_state_dict(torch.load('PH_NN_results/train_200_200_200_lr0.02_2409171041/best_testing_model.pt',weights_only=True))
-    
+    # model.load_state_dict(torch.load('PH_NN_results/train_R1_200_200_200_NN_lr0.02_weighted_2508142201/best_testing_model.pt',weights_only=True))
+    model.load_state_dict(torch.load('PH_NN_results/train_R2_200_200_200_NN_lr0.0005_weighted_2508150007/best_testing_model.pt',weights_only=True))
+
     # Print the model architecture
     print(model)
 
@@ -75,7 +77,7 @@ def train(training_q, training_T_data, testing_q, testing_T_data,robot,param_nom
 
     # weights = torch.tensor([1]*33, dtype=torch.float32)
     weights_pos = 1
-    weights_ori = 180/np.pi 
+    weights_ori = 180/np.pi*100 
     # weights_ori = 1
 
     # statistics before training
@@ -87,7 +89,7 @@ def train(training_q, training_T_data, testing_q, testing_T_data,robot,param_nom
     print(f'Testing error: mean={np.mean(test_p_error_norm_all):.4f}, max={np.max(test_p_error_norm_all):.4f}')
     
     # Define the learning rate
-    learning_rate = 0.0001
+    learning_rate = 0.000008
     # Define the number of epochs
     num_epochs = 1005
     # Define the optimizer
@@ -98,7 +100,7 @@ def train(training_q, training_T_data, testing_q, testing_T_data,robot,param_nom
     # get save folder path
     formatted_string = datetime.datetime.now().strftime("%Y%m%d%H%M")
     formatted_string = formatted_string[2:]
-    folder_path = 'PH_NN_results/trainDirect_'
+    folder_path = 'PH_NN_results/trainDirect_'+robot_type+'_'
     if modelType != 'Fourier':
         for h in hidden_sizes:
             folder_path += str(h)+'_'
@@ -153,7 +155,10 @@ def train(training_q, training_T_data, testing_q, testing_T_data,robot,param_nom
         with torch.no_grad():
             test_outputs = model(test_inputs_q2q3)
             test_loss, test_p_error_all, test_ori_error_all = loss_fn(test_outputs, testing_T, testing_q, robot, param_nominal, weights_pos, weights_ori)
+            
             test_p_error_norm_all = np.linalg.norm(test_p_error_all,axis=1)
+            test_ori_error_norm_all = np.linalg.norm(test_ori_error_all,axis=1)
+            test_ori_error_norm_all = np.degrees(test_ori_error_norm_all)
 
         # Print the loss for every N epochs
         print_loss = True
@@ -181,7 +186,14 @@ def train(training_q, training_T_data, testing_q, testing_T_data,robot,param_nom
             torch.save(model.state_dict(), folder_path+'best_training_model.pt')
         # save the model if the testing error is the best
         if best_testing_error > np.max(test_p_error_norm_all):
+            print("save best model")
             best_testing_error = np.max(test_p_error_norm_all)
+            mean_testing_error = np.mean(test_p_error_norm_all)
+            std_testing_error = np.std(test_p_error_norm_all)
+            best_testing_ori_error = np.max(test_ori_error_norm_all)
+            mean_testing_ori_error = np.mean(test_ori_error_norm_all)
+            std_testing_ori_error = np.std(test_ori_error_norm_all)
+            # save the model
             torch.save(model.state_dict(), folder_path+'best_testing_model.pt')
         # save the training and testing position error
         training_mean_error_all.append(np.mean(p_error_norm_all))
@@ -194,6 +206,14 @@ def train(training_q, training_T_data, testing_q, testing_T_data,robot,param_nom
         np.save(folder_path+'training_max_error_all.npy',np.array(training_max_error_all))
         np.save(folder_path+'testing_max_error_all.npy',np.array(testing_max_error_all))
         np.save(folder_path+'data_sample_epoches.npy',np.array(data_sample_epoches))
+        print("Current best:")
+        print(f'mean testing error: {mean_testing_error:.2f}')
+        print(f'std testing error: {std_testing_error:.2f}')
+        print(f'max testing error: {best_testing_error:.2f}')
+        print(f'mean testing ori error: {mean_testing_ori_error:.2f}')
+        print(f'std testing ori error: {std_testing_ori_error:.2f}')
+        print(f'max testing ori error: {best_testing_ori_error:.2f}')
+        print("=========================")
 
         # training time for each epoch
         epoch_end_time = time.time()
@@ -206,13 +226,13 @@ Rx=np.array([1,0,0])
 Ry=np.array([0,1,0])
 Rz=np.array([0,0,1])
 
-ph_dataset_date='0801'
-test_dataset_date='0801'
 config_dir='../config/'
 
-robot_type = 'R1'
+robot_type = 'R2'
 
 if robot_type == 'R1':
+    ph_dataset_date='0801'
+    test_dataset_date='0801'
     robot_marker_dir=config_dir+'MA2010_marker_config/'
     tool_marker_dir=config_dir+'weldgun_marker_config/'
     robot=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',\
@@ -226,6 +246,8 @@ if robot_type == 'R1':
     nom_H=np.array([[0,0,1],[0,1,0],[0,-1,0],\
                    [-1,0,0],[0,-1,0],[-1,0,0]]).T
 elif robot_type == 'R2':
+    ph_dataset_date='0804'
+    test_dataset_date='0804'
     robot_marker_dir=config_dir+'MA1440_marker_config/'
     tool_marker_dir=config_dir+'mti_marker_config/'
     robot=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.yml',\

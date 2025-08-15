@@ -54,6 +54,7 @@ def perform_statistical_tests(errors):
                 continue
             method1 = methods[i]
             method2 = methods[j]
+            # print(method1, method2)
             
             # Ensure arrays are of the same length
             min_len = min(len(errors[method1]), len(errors[method2]))
@@ -63,17 +64,33 @@ def perform_statistical_tests(errors):
             # Paired t-test
             t_stat, p_t = stats.ttest_rel(err1, err2)
             
-            # Wilcoxon signed-rank test
-            w_stat, p_w = stats.wilcoxon(err1, err2)
+            # # Wilcoxon signed-rank test
+            # w_stat, p_w = stats.wilcoxon(err1, err2)
             
             # Check if error difference distribution is normal
-            diff = err1 - err2
+            diff = err2-err1
+            n = diff.size
             _, p_shapiro = stats.shapiro(diff)
             is_normal = p_shapiro > 0.05
             
             # Calculate mean difference
             mean_diff = np.mean(diff)
-            
+
+            # Cohen's d for paired samples (a.k.a. standardized mean difference of diffs)
+            # d = mean(diff) / sd(diff)
+            sd_diff = diff.std(ddof=1)
+            d_paired = np.mean(diff) / sd_diff if sd_diff > 0 else np.inf
+
+            # ---- Wilcoxon signed-rank test ----
+            # By default SciPy's statistic is R+ (sum of positive ranks of diff)
+            w_stat, p_w = stats.wilcoxon(diff, zero_method="wilcox", alternative="two-sided", mode="auto")
+
+            # Rank-biserial correlation (compatible with Wilcoxon)
+            # r_rb = (R+ - R-) / T  where T = n(n+1)/2 and R- = T - R+
+            # SciPy returns R+ as the statistic when alternative="two-sided" (and no ties dropped)
+            T = n * (n + 1) / 2
+            r_rb = (T - 2 * w_stat) / T  # ∈ [-1, 1]; negative => proposed < baseline (good)
+
             # Recommended test
             recommended = "t-test" if is_normal else "Wilcoxon"
             
@@ -90,11 +107,14 @@ def perform_statistical_tests(errors):
             #     'Significant?': (p_t < 0.05 if is_normal else p_w < 0.05)
             # })
             results[methods[i]][methods[j]] = {
+                'Error diff': diff,
                 'Mean Diff': round(mean_diff, 4),
                 't-stat': round(t_stat, 4),
                 'p-value (t-test)': round(p_t, 4),
                 'Wilcoxon-stat': round(w_stat, 4),
                 'p-value (Wilcoxon)': round(p_w, 4),
+                'Cohen d': round(d_paired, 4),
+                "rank_biserial_r": round(r_rb, 4),
                 'Normal Dist?': is_normal,
                 'Recommended Test': recommended,
                 'Significant?': (p_t < 0.05 if is_normal else p_w < 0.05)
@@ -156,7 +176,7 @@ def plot_error_distributions(errors):
 
 def main():
 
-    robot_type = 'R2'
+    robot_type = 'R1'
 
     test_data_dir = 'kinematic_raw_data/test0801_R1/' if robot_type == 'R1' else 'kinematic_raw_data/test0804_R2/'
 
@@ -167,26 +187,86 @@ def main():
     errors = load_errors(pickle_file)
     if errors is None:
         return
-    
+
+    T_error_fbf = np.loadtxt(test_data_dir + "error_T_FBF.csv")
+    T_error_cpa = np.loadtxt(test_data_dir + "error_T_CPA.csv")
+
+    plt.plot(np.linalg.norm(T_error_cpa[1736:,:3],axis=1), '-o', label='CPA')
+    plt.plot(np.linalg.norm(T_error_fbf[1736:,:3],axis=1), '-o', label='FBF')
+    plt.legend()
+    plt.show()
+
     # load NN and AE errors and add to errors dictionary
     nn_error = np.loadtxt(test_data_dir + "testing_pos_error_NN.csv", delimiter=',')
     ae_error = np.loadtxt(test_data_dir + "testing_pos_error_AE.csv", delimiter=',')
-    # errors['NN'] = nn_error
-    # errors['AE'] = ae_error
+    errors['NN'] = nn_error
+    errors['AE'] = ae_error
+    print(errors.keys())
+    errors['NLS-0']=errors['Zero PH']
+    errors['NLS-1']=errors['One PH']
+    errors['FBF']=errors['Fourier Basis PH']
+    # remove old keys
+    del errors['Zero PH']
+    del errors['One PH']
+    del errors['Fourier Basis PH']
+
+    plt.plot(errors['CPA'], '-o', label='CPA')
+    plt.plot(errors['FBF'], '-o', label='FBF')
+    plt.legend()
+    plt.show()
+
+    methods_one_set = ['Nominal', 'CPA', 'NLS-0', 'NLS-1']
+    methods_config_set = ['FBF', 'NN', 'AE']
 
     # Perform statistical tests
     results = perform_statistical_tests(errors)
     
     # Display results as a table
-    # show the results in 2 markdown NxN tables format
-    # one table show the t statistice and p-values with (t-stats, p-values)
-    # The second table show the Wilcoxon statistics and p-values with (Wilcoxon-stat, p-values)
-    # print("Statistical Test Results:")
-    # for method_1 in results.keys():
-    #     for method_2 in results[method_1].keys():
-    #         print(f"| {method_1} vs {method_2} | ({results[method_1][method_2]['t-stat']}, {results[method_1][method_2]['p-value (t-test)']}) |")
-    #         print(f"| {method_1} vs {method_2} | ({results[method_1][method_2]['Wilcoxon-stat']}, {results[method_1][method_2]['p-value (Wilcoxon)']}) |")
+    # show the p-values of t-test in 2 markdown NxN tables format
+    table_str = '| t-test | ' + ' | '.join(methods_one_set) + ' |\n'
+    table_str += '|--------|' + '|'.join(['--------' for _ in methods_one_set]) + '|\n'
+    for method_config in methods_config_set:
+        table_str += f"| {method_config} | " + ' | '.join([f"{results[method_config][method_one]['p-value (t-test)']}" for method_one in methods_one_set]) + ' |\n'
+    print(table_str)
 
+    table_str = '| Wilcoxon | ' + ' | '.join(methods_one_set) + ' |\n'
+    table_str += '|----------|' + '|'.join(['----------' for _ in methods_one_set]) + '|\n'
+    for method_config in methods_config_set:
+        table_str += f"| {method_config} | " + ' | '.join([f"{results[method_config][method_one]['p-value (Wilcoxon)']}" for method_one in methods_one_set]) + ' |\n'
+    print(table_str)
+
+    table_str = '| Cohens f | ' + ' | '.join(methods_one_set) + ' |\n'
+    table_str += '|----------|' + '|'.join(['----------' for _ in methods_one_set]) + '|\n'
+    for method_config in methods_config_set:
+        table_str += f"| {method_config} | " + ' | '.join([f"{results[method_config][method_one]['Cohen d']}" for method_one in methods_one_set]) + ' |\n'
+    print(table_str)
+
+    table_str = '| Rank-Biserial r | ' + ' | '.join(methods_one_set) + ' |\n'
+    table_str += '|----------| ' + '|'.join(['---------' for _ in methods_one_set]) + '|\n'
+    for method_config in methods_config_set:
+        table_str += f"| {method_config} | " + ' | '.join([f"{results[method_config][method_one]['rank_biserial_r']}" for method_one in methods_one_set]) + ' |\n'
+    print(table_str)
+
+    table_str = '| Normal Dist? | ' + ' | '.join(methods_one_set) + ' |\n'
+    table_str += '|---------------|' + '|'.join(['---------------' for _ in methods_one_set]) + '|\n'
+    for method_config in methods_config_set:
+        table_str += f"| {method_config} | " + ' | '.join([f"{results[method_config][method_one]['Normal Dist?']}" for method_one in methods_one_set]) + ' |\n'
+    print(table_str)
+
+    ## QQ plot
+    for method_config in methods_config_set:
+        for method_one in methods_one_set:
+            print(f"Q–Q plot and Histogram for {method_one} vs {method_config}")
+            # Q–Q plot
+            stats.probplot(results[method_config][method_one]['Error diff'], dist="norm", plot=plt)
+            plt.title("Q–Q plot of differences")
+            plt.show()
+            # Histogram
+            plt.hist(results[method_config][method_one]['Error diff'], bins=30, density=True, alpha=0.6, color='g')
+            plt.title("Histogram of differences")
+            plt.show()
+
+    exit()
     # Plot error distributions
     # plot_error_distributions(errors)
 
@@ -203,6 +283,16 @@ def main():
     max_error = np.max(np.abs(all_errors))
     min_error = np.min(np.abs(all_errors))
     diff_error = max_error - min_error
+
+    ## draw mocap T position in 3D plots
+    fig = plt.figure(figsize=(10, 5))
+    ax = fig.add_subplot(111, projection='3d')
+    ax.scatter(mocap_T[:, 0], mocap_T[:, 1], mocap_T[:, 2], c='b', marker='o')
+    ax.set_xlabel('X Position (mm)')
+    ax.set_ylabel('Y Position (mm)')
+    ax.set_zlabel('Z Position (mm)')
+    ax.set_title('Mocap T Position in 3D Space')
+    plt.show()
 
     start_idx = 610
     end_idx = 1000

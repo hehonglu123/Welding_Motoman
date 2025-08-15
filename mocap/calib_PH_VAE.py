@@ -13,6 +13,13 @@ import os, pathlib
 from motoman_def import *
 from Models import *
 
+# numpy generate random seed
+seed_random = np.random.randint(0, 1000000000)
+# seed_random=729287233
+print(seed_random)
+np.random.seed(seed_random)
+torch.manual_seed(seed_random)
+
 def LinearNDInterpNearestExtrap(points, values):
     q2 = points[:, 0]
     q3 = points[:, 1]
@@ -28,8 +35,6 @@ def LinearNDInterpNearestExtrap(points, values):
             # ... and use its value
             zz= np.array([values[inds]])
         return zz
-    
-    print("Init interpolation done")
     return new_f
 
 def test_fourier_accuracy(weights, data_q, data_T,robot,param_nominal):
@@ -223,10 +228,10 @@ def trained_model_test(inputs_q2q3, data_delta_PH, training_q, training_T, testi
     data_delta_PH_qall_tensor = torch.tensor(data_delta_PH_qall, dtype=torch.float32)
 
     # AE_model_dir = "trainLATENT_VAE_R1_latent6_2411121154/"
-    # AE_model_dir = 'trainLATENT_AE_R1_latent6_2411121051/'
+    AE_model_dir = 'trainLATENT_AE_R1_latent6_2411121051/'
     # AE_model_dir = 'trainLATENT_AE_R2_latent6_2411201610/'
     # AE_model_dir = 'trainLATENT_AE_R1_latent6_weighted_2503091944/'
-    AE_model_dir = 'trainLATENT_AE_R2_latent6_weighted_2503092025/'
+    # AE_model_dir = 'trainLATENT_AE_R2_latent6_weighted_2503092025/'
 
     data_dir = 'PH_NN_results/'+AE_model_dir
     # read meta data
@@ -431,7 +436,7 @@ def train(inputs_q2q3, data_delta_PH, training_q, training_T, testing_q, testing
     
 
     # Define the input size, hidden size, and output size
-    latent_size = 6 # 2 6 12
+    latent_size = 12 # 2 6 12
     hidden_sizes = [200,200,200]
     data_size = 33
     mu = 0
@@ -444,6 +449,8 @@ def train(inputs_q2q3, data_delta_PH, training_q, training_T, testing_q, testing
         model = VariationalAutoEncoder(data_size, latent_size, hidden_sizes, mu=mu, sigma=sigma)
     else:
         model = AutoEncoder(data_size, latent_size, hidden_sizes)
+
+    # model.load_state_dict(torch.load('PH_NN_results/trainLATENT_AE_R1_latent6_weighted_2508150021/best_testing_model.pt',weights_only=True))
 
     # Print the model architecture
     print("Encoder:", model.encoder)
@@ -459,6 +466,7 @@ def train(inputs_q2q3, data_delta_PH, training_q, training_T, testing_q, testing
         weights = torch.tensor(np.append(np.ones(21)*weights_P,np.ones(12)*weights_H), dtype=torch.float32)
     # Define the learning rate
     learning_rate = 0.003
+    # learning_rate = 0.00001
     # Define the number of epochs
     num_epochs = 50000
     # Define the optimizer
@@ -485,6 +493,7 @@ def train(inputs_q2q3, data_delta_PH, training_q, training_T, testing_q, testing
     meta_data['Variational'] = Variational
     meta_data['robot_type'] = robot_type
     meta_data['weighted'] = weighted
+    meta_data['seed_random'] = seed_random
     if weighted:
         meta_data['weights_P'] = weights_P
         meta_data['weights_H'] = weights_H
@@ -539,7 +548,7 @@ def train(inputs_q2q3, data_delta_PH, training_q, training_T, testing_q, testing
         elif epoch<1001:
             if (epoch+1) % 10 == 0:
                 print_loss = True
-            if (epoch+1) % 100 == 0:
+            if (epoch+1) % 10 == 0:
                 print_error = True
         else:
             if (epoch+1) % 100 == 0:
@@ -554,29 +563,29 @@ def train(inputs_q2q3, data_delta_PH, training_q, training_T, testing_q, testing
         loss_all.append(loss.item())
         np.save(folder_path+'loss_all.npy',np.array(loss_all)) # save the loss
         if print_loss:
-            print(f'Epoch [{epoch+1}/{num_epochs}], Loss: {loss.item():.4f}')
-        if print_error:
+            print(f'Epoch [{epoch+1}/{num_epochs}], Loss: {loss.item():.6f}')
+        if print_error and loss.item() < 0.008:  # only print error when loss is small enough
             latent_vec = model.encoder(data_delta_PH)
             latent_vec_cpu = latent_vec.detach().numpy()
             interp_funcs = []
             for latent_i in range(latent_size):
                 interp_funcs.append(LinearNDInterpNearestExtrap(inputs_q2q3, latent_vec_cpu[:,latent_i]))
-            training_T_error,training_ori_error = test_fwd_accuracy(model, interp_funcs, inputs_q2q3, training_q, training_T,robot,param_nominal)
+            # training_T_error,training_ori_error = test_fwd_accuracy(model, interp_funcs, inputs_q2q3, training_q, training_T,robot,param_nominal)
             testing_T_error,testing_ori_error = test_fwd_accuracy(model, interp_funcs, inputs_q2q3, testing_q, testing_T,robot,param_nominal)
             # print training and testing error, mean, max
-            print(f'Training error: mean={np.mean(training_T_error):.4f}, max={np.max(training_T_error):.4f}')
+            # print(f'Training error: mean={np.mean(training_T_error):.4f}, max={np.max(training_T_error):.4f}')
             print(f'Testing error: mean={np.mean(testing_T_error):.4f}, max={np.max(testing_T_error):.4f}')
-            training_mean_error_all.append(np.mean(training_T_error))
+            # training_mean_error_all.append(np.mean(training_T_error))
             testing_mean_error_all.append(np.mean(testing_T_error))
-            training_max_error_all.append(np.max(training_T_error))
+            # training_max_error_all.append(np.max(training_T_error))
             testing_max_error_all.append(np.max(testing_T_error))
-            training_std_error_all.append(np.std(training_T_error))
+            # training_std_error_all.append(np.std(training_T_error))
             testing_std_error_all.append(np.std(testing_T_error))
             data_sample_epoches.append(epoch)
             # save the model
-            if best_training_error > np.max(training_T_error):
-                best_training_error = np.max(training_T_error)
-                torch.save(model.state_dict(), folder_path+'best_training_model.pt')
+            # if best_training_error > np.max(training_T_error):
+            #     best_training_error = np.max(training_T_error)
+            #     torch.save(model.state_dict(), folder_path+'best_training_model.pt')
             if best_testing_error > np.max(testing_T_error):
                 best_testing_error = np.max(testing_T_error)
                 mean_testing_error = np.mean(testing_T_error)

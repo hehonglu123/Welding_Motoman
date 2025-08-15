@@ -30,7 +30,7 @@ Rz=np.array([0,0,1])
 
 config_dir='../config/'
 
-robot_type = 'R1'
+robot_type = 'R2'
 
 if robot_type == 'R1':
     ph_dataset_date='0801'
@@ -147,7 +147,7 @@ plt.grid(True)
 plt.tight_layout()
 plt.show()
 
-exit()
+# exit()
 
 ### use only the first 2 training data
 ### for faster evaluation
@@ -369,6 +369,7 @@ error_pos_rbf = []
 error_ori_rbf = []
 error_pos_fbf = []
 error_ori_fbf = []
+error_ori_q_fbf = []
 error_pos_fbf_hori = []
 error_ori_fbf_hori = []
 error_pose_fbf_min = []
@@ -377,12 +378,16 @@ error_pos_fbf_redu = []
 error_ori_fbf_redu = []
 error_pos_baseline = []
 error_ori_baseline = []
+error_ori_q_baseline = []
 error_pos_PHZero = []
 error_ori_PHZero = []
+error_ori_q_PHZero = []
 error_pos_onePH = []
 error_ori_onePH = []
+error_ori_q_onePH = []
 error_pos_origin = []
 error_ori_origin = []
+error_ori_q_origin = []
 q2q3=[]
 q_all=[]
 pos_all=[]
@@ -456,6 +461,7 @@ for N in range(total_test_N):
     k=np.array(k)
     error_pos_fbf.append(T_tool_base.p-robot_T.p)
     error_ori_fbf.append(k*np.degrees(theta))
+    error_ori_q_fbf.append(R2q(robot_T.R.T@T_tool_base.R))
 
     #### get error (fbf HRotation)
     opt_P,opt_H = ph_param_fbf_Hori.predict(test_q[1:3])
@@ -496,6 +502,7 @@ for N in range(total_test_N):
     k=np.array(k)
     error_pos_PHZero.append(T_tool_base.p-robot_T.p)
     error_ori_PHZero.append(k*np.degrees(theta))
+    error_ori_q_PHZero.append(R2q(robot_T.R.T@T_tool_base.R))
 
     #### get error (one PH)
     robot.robot.P=deepcopy(universal_P)
@@ -505,6 +512,7 @@ for N in range(total_test_N):
     k=np.array(k)
     error_pos_onePH.append(T_tool_base.p-robot_T.p)
     error_ori_onePH.append(k*np.degrees(theta))
+    error_ori_q_onePH.append(R2q(robot_T.R.T@T_tool_base.R))
 
     #### get error (baseline)
     robot.robot.P=deepcopy(baseline_P)
@@ -514,7 +522,8 @@ for N in range(total_test_N):
     k=np.array(k)
     error_pos_baseline.append(T_tool_base.p-robot_T.p)
     error_ori_baseline.append(k*np.degrees(theta))
-    
+    error_ori_q_baseline.append(R2q(robot_T.R.T@T_tool_base.R))
+
     #### get error (origin)
     robot.robot.P=deepcopy(origin_P)
     robot.robot.H=deepcopy(origin_H)
@@ -523,6 +532,7 @@ for N in range(total_test_N):
     k=np.array(k)
     error_pos_origin.append(T_tool_base.p-robot_T.p)
     error_ori_origin.append(k*np.degrees(theta))
+    error_ori_q_origin.append(R2q(robot_T.R.T@T_tool_base.R))
 
     # if np.all(test_q-np.zeros(6)<1e-3):
     #     print(robot_T)
@@ -535,6 +545,20 @@ for N in range(total_test_N):
                    +str(round(T_tool_base.p[2])))
 q2q3=np.array(q2q3)
 q_all=np.array(q_all)
+
+error_T_fbf = np.hstack((error_pos_fbf, error_ori_q_fbf))
+error_T_PHZero = np.hstack((error_pos_PHZero, error_ori_q_PHZero))
+error_T_onePH = np.hstack((error_pos_onePH, error_ori_q_onePH))
+error_T_baseline = np.hstack((error_pos_baseline, error_ori_q_baseline))
+error_T_origin = np.hstack((error_pos_origin, error_ori_q_origin))
+
+np.savetxt(test_data_dir+'error_T_fbf.csv', error_T_fbf, delimiter=',')
+np.savetxt(test_data_dir+'error_T_PHZero.csv', error_T_PHZero, delimiter=',')
+np.savetxt(test_data_dir+'error_T_onePH.csv', error_T_onePH, delimiter=',')
+np.savetxt(test_data_dir+'error_T_baseline.csv', error_T_baseline, delimiter=',')
+np.savetxt(test_data_dir+'error_T_origin.csv', error_T_origin, delimiter=',')
+
+exit()
 
 error_pos_near_norm=np.linalg.norm(error_pos_near,ord=2,axis=1).flatten()
 error_pos_lin_norm=np.linalg.norm(error_pos_lin,ord=2,axis=1).flatten()

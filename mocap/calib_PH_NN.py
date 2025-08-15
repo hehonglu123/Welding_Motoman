@@ -12,6 +12,13 @@ from pathlib import Path
 from motoman_def import *
 from Models import *
 
+# numpy generate random seed
+seed_random = np.random.randint(0, 1000000000)
+seed_random=729287233
+print(seed_random)
+np.random.seed(seed_random)
+torch.manual_seed(seed_random)
+
 def test_fourier_accuracy(weights, data_q, data_T,robot,param_nominal):
 
     basis_func=[]
@@ -59,6 +66,21 @@ def test_fwd_accuracy(model, data_q, data_T,robot,param_nominal):
         ori_error_all.append(np.abs(ori_error))
     return p_error_all,ori_error_all
 
+def test_fwd_T(model, data_q, data_T, robot, param_nominal):
+
+    p_error = []
+    ori_error = []
+    for i,q in enumerate(data_q):
+        q2q3 = np.array([q[1],q[2]])
+        q2q3 = torch.tensor(q2q3, dtype=torch.float32)
+        pred_PH = model(q2q3)
+        pred_PH = pred_PH.detach().numpy() + param_nominal
+        robot = get_PH_from_param(pred_PH,robot,unit='radians')
+        T_pred = robot.fwd(q)
+        p_error.append(T_pred.p - data_T[i][:3])
+        ori_error.append(R2q(T_pred.R@q2R(data_T[i][3:]).T))
+    T_error = np.hstack((p_error,ori_error))
+    return T_error
 
 def train(inputs_q2q3, targets_delta_PH, training_q, training_T, testing_q, testing_T,robot,param_nominal,robot_type, test_data_dir=None):
 
@@ -101,27 +123,31 @@ def train(inputs_q2q3, targets_delta_PH, training_q, training_T, testing_q, test
     # model.load_state_dict(torch.load('PH_NN_results/trainDirect_Fourier_lr0.0001_wp1_wo57.3_2409301609/best_training_model.pt',weights_only=True))
     # model.load_state_dict(torch.load('PH_NN_results/trainDirect_200_200_200_NN_lr0.0001_wp1_wo57.3_2409301814/best_testing_model.pt',weights_only=True))
     # model.load_state_dict(torch.load('PH_NN_results/train_R2_400_400_lr0.02_weighted_2409181201/best_testing_model.pt',weights_only=True))
-    model.load_state_dict(torch.load('PH_NN_results/train_R1_200_200_200_NN_lr0.02_weighted_2503091846/best_testing_model.pt',weights_only=True))
+    # model.load_state_dict(torch.load('PH_NN_results/train_R1_200_200_200_NN_lr0.02_weighted_2503091846/best_testing_model.pt',weights_only=True))
+    # model.load_state_dict(torch.load('PH_NN_results/train_R1_200_200_200_NN_lr0.005_weighted_2508142326/best_testing_model.pt',weights_only=True))
     # model.load_state_dict(torch.load('PH_NN_results/train_R2_200_200_200_NN_lr0.02_weighted_2503082242/best_testing_model.pt',weights_only=True))
+    model.load_state_dict(torch.load('PH_NN_results/train_R2_200_200_200_NN_lr0.0005_weighted_2508150001/best_testing_model.pt',weights_only=True))
 
     # statistics before training
     training_T_error,training_ori_error = test_fwd_accuracy(model, training_q, training_T,robot,param_nominal)
-    testing_T_error,testing_ori_error = test_fwd_accuracy(model, testing_q, testing_T,robot,param_nominal)
+    testing_p_error,testing_ori_error = test_fwd_accuracy(model, testing_q, testing_T,robot,param_nominal)
     print('Before training:')
     print(f'Training error: mean={np.mean(training_T_error):.4f}, max={np.max(training_T_error):.4f}')
-    print(f'Testing error: mean={np.mean(testing_T_error):.4f}, max={np.max(testing_T_error):.4f}')
+    print(f'Testing error: mean={np.mean(testing_p_error):.4f}, max={np.max(testing_p_error):.4f}')
 
     if test_only:
         model.eval()
         print(f'# of parameters: {sum(p.numel() for p in model.parameters() if p.requires_grad)}')
-        testing_T_error,testing_ori_error = test_fwd_accuracy(model, testing_q, testing_T,robot,param_nominal)
-        print(f'Max testing error: {np.max(testing_T_error):.2f}')
-        print(f'Mean testing error: {np.mean(testing_T_error):.2f}')
-        print(f'Std testing error: {np.std(testing_T_error):.2f}')
+        testing_p_error,testing_ori_error = test_fwd_accuracy(model, testing_q, testing_T,robot,param_nominal)
+        print(f'Max testing error: {np.max(testing_p_error):.2f}')
+        print(f'Mean testing error: {np.mean(testing_p_error):.2f}')
+        print(f'Std testing error: {np.std(testing_p_error):.2f}')
         print(f'Max testing ori error: {np.max(testing_ori_error):.2f}')
         print(f'Mean testing ori error: {np.mean(testing_ori_error):.2f}')
         print(f'Std testing ori error: {np.std(testing_ori_error):.2f}')
-        np.savetxt(test_data_dir+'testing_pos_error_NN.csv', testing_T_error, delimiter=',')
+        np.savetxt(test_data_dir+'testing_pos_error_NN.csv', testing_p_error, delimiter=',')
+        testing_T_error = test_fwd_T(model, testing_q, testing_T, robot, param_nominal)
+        np.savetxt(test_data_dir+'error_T_NN.csv', testing_T_error, delimiter=',')
         exit()
 
     # Print the model architecture
@@ -136,7 +162,7 @@ def train(inputs_q2q3, targets_delta_PH, training_q, training_T, testing_q, test
         weights_H = 180/np.pi*10
         weights = torch.tensor(np.append(np.ones(21)*weights_P,np.ones(12)*weights_H), dtype=torch.float32)
     # Define the learning rate
-    learning_rate = 0.02
+    learning_rate = 0.0005
     # Define the number of epochs
     num_epochs = 100000
     # Define the optimizer
@@ -226,8 +252,11 @@ def train(inputs_q2q3, targets_delta_PH, training_q, training_T, testing_q, test
         loss_all.append(loss.item())
         np.save(folder_path+'loss_all.npy',np.array(loss_all)) # save the loss
         if print_loss:
-            print(f'Epoch [{epoch+1}/{num_epochs}], Loss: {loss.item():.4f}')
-        if print_error:
+            print(f'Epoch [{epoch+1}/{num_epochs}], Loss: {loss.item():.6f}')
+        if epoch>=35:
+            print("epoch:", epoch+1)
+            print_error = True
+        if print_error and epoch>=35:
             training_T_error,training_ori_error = test_fwd_accuracy(model, training_q, training_T,robot,param_nominal)
             testing_T_error,testing_ori_error = test_fwd_accuracy(model, testing_q, testing_T,robot,param_nominal)
             # print training and testing error, mean, max
@@ -249,6 +278,7 @@ def train(inputs_q2q3, targets_delta_PH, training_q, training_T, testing_q, test
                 best_testing_ori_error = np.max(testing_ori_error)
                 mean_testing_ori_error = np.mean(testing_ori_error)
                 std_testing_ori_error = np.std(testing_ori_error)
+                print("save test model")
                 torch.save(model.state_dict(), folder_path+'best_testing_model.pt')
             np.save(folder_path+'training_mean_error_all.npy',np.array(training_mean_error_all))
             np.save(folder_path+'testing_mean_error_all.npy',np.array(testing_mean_error_all))
@@ -278,7 +308,7 @@ Rz=np.array([0,0,1])
 
 config_dir='../config/'
 
-robot_type = 'R1'
+robot_type = 'R2'
 
 if robot_type == 'R1':
     ph_dataset_date='0801'
@@ -340,7 +370,6 @@ test_data_dir='kinematic_raw_data/test'+test_dataset_date+'_'+robot_type+'/'
 print(PH_data_dir)
 print(test_data_dir)
 
-use_raw=False
 test_robot_q = np.loadtxt(test_data_dir+'robot_q_align.csv',delimiter=',')
 test_mocap_T = np.loadtxt(test_data_dir+'mocap_T_align.csv',delimiter=',')
 
@@ -352,6 +381,7 @@ train_mocap_T = np.loadtxt(PH_data_dir+'mocap_T_align.csv',delimiter=',')
 # test_mocap_T = np.vstack((train_mocap_T,test_mocap_T))
 
 calib_file_name = 'calib_PH_q_ana.pickle'
+# calib_file_name = 'calib_PH_q_ana_best.pickle'
 with open(PH_data_dir+calib_file_name,'rb') as file:
     PH_q=pickle.load(file)
 

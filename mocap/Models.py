@@ -180,7 +180,9 @@ class TransformationLossFunction(Function):
             robot = get_PH_from_param(ph.detach().numpy()+param_nominal,robot,unit='radians')
             T_pred = robot.fwd(q)
             p_error = T_pred.p - T.p
-            omega_d= s_err_func(T_pred.R@T.R.T)
+            # omega_d= s_err_func(T_pred.R@T.R.T)
+            k,theta = R2rot(T_pred.R@T.R.T)
+            omega_d= k*theta
             p_error_all.append(p_error)
             ori_error_all.append(omega_d)
         loss = torch.tensor(np.mean(weight_pos*np.linalg.norm(p_error_all,axis=1)+weight_ori*np.linalg.norm(ori_error_all,axis=1)))

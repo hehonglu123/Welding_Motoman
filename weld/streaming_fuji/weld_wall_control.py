@@ -23,6 +23,13 @@ from scanProcess import *
 from threading import Thread
 from controlModelFunction import *
 
+# for plotting
+xy_label_size = 18
+xy_tick_size = 16
+legend_size = 16
+title_size = 20
+sup_title_size = 20
+
 inch2mm = 25.4
 mm2inch = 1/25.4
 
@@ -161,7 +168,7 @@ def main():
     scan_online_process = True
     thermal_on = True
     input_from_user = False
-    SIMULATION = False
+    SIMULATION = True
 
     if SIMULATION:
         weld_arcon = False
@@ -324,7 +331,7 @@ def main():
     curve_x_end = np.max(curve[:,0])
     curve_x_sample = np.arange(curve_x_start, curve_x_end+0.1, 0.1) # sample points for the curve
 
-    weld_type = 'axe' # 'static' or 'axe'
+    weld_type = 'static' # 'static' or 'axe'
     ## static dw
     if weld_type == 'static':
         dh_target, dw_target_singlePoint = get_pred_loglog(layer_nom_vel, layer_feedrate) # get the target dh and dw from the control loglog
@@ -380,7 +387,7 @@ def main():
     Transz0_H=None
     last_profile_height = None
     if read_from_file_layer:
-        logdata_dir = '../../data/wall_weld_test/weld_fujicontrol_2025_03_03_18_10_13/'
+        logdata_dir = '../../data/wall_weld_test/weld_fujicontrol_2025_08_13_14_17_58/'
         Transz0_H = np.array([[ 9.99850748e-01 , 1.22093145e-04 , 1.72761855e-02 ,-1.41469281e-01],
                     [ 1.22093145e-04 , 9.99900124e-01 ,-1.41325105e-02,  1.15726710e-01],
                     [-1.72761855e-02,  1.41325105e-02,  9.99750872e-01, -8.18664727e+00],
@@ -396,7 +403,7 @@ def main():
 
     ### simulation setup #####
     if SIMULATION or not weld_arcon:
-        sim_folder = '../../data/wall_weld_test/weld_fujiscan_2025_06_12_15_33_03/'
+        sim_folder = '../../data/wall_weld_test/weld_fujicontrol_2025_08_14_11_19_59/'
         total_layers_name = glob.glob(sim_folder+'layer*')
         # get printed layer number
         layer_nums = []
@@ -648,21 +655,72 @@ def main():
 
                     ### simulation visualization
                     if weld_parts == 'layer' and SIMULATION:
+                        # plt.plot(last_profile_height[:,0], last_profile_height[:,1], '-o')
+                        # plt.xlabel("X (mm)", fontsize=xy_label_size)
+                        # plt.ylabel("Height (mm)", fontsize=xy_label_size)
+                        # plt.xticks(fontsize=xy_tick_size)
+                        # plt.yticks(fontsize=xy_tick_size)
+                        # plt.title("Last Profile Height", fontsize=title_size)
+                        # plt.grid(True)
+                        # plt.show()
+                        profile_height = np.loadtxt(sim_folder+'layer'+str(i)+f'/profile_height.csv',delimiter=',')
+                        profile_height_shift = deepcopy(profile_height)
+                        profile_height_shift[:,0] += shift_weld_profile_x
+                        profile_dh = []
+                        for x_id, x_pos in enumerate(profile_height_shift[:,0]):
+                            if x_pos>=np.min(curve[:,0]) and x_pos<=np.max(curve[:,0]):
+                                last_x_index = np.argmin(np.abs(last_profile_height[:, 0] - x_pos))
+                                profile_dh.append([x_pos, profile_height_shift[x_id, 1] - last_profile_height[last_x_index, 1]])
+                        profile_dh = np.array(profile_dh)
+                        try:
+                            profile_width = np.loadtxt(sim_folder+'layer'+str(i)+f'/profile_width.csv',delimiter=',')
+                            profile_width_shift = deepcopy(profile_width)
+                            profile_width_shift[:,0] += shift_weld_profile_x
+                            valid_index = np.where((profile_width_shift[:, 0] >= np.min(curve[:, 0])) & (profile_width_shift[:, 0] <= np.max(curve[:, 0])))
+                            profile_width_shift = profile_width_shift[valid_index]
+                        except FileNotFoundError:
+                            profile_width = None
                         control_status_log = np.array(control_status_log)
-                        fig, axs = plt.subplots(2, 2, figsize=(16, 8))
-                        for ax_idx in range(4):
-                            ax_row_id = ax_idx // 2
-                            ax_col_id = ax_idx % 2
-                            ax = axs[ax_row_id, ax_col_id]
-                            ax.plot(control_status_log[:, 1], control_status_log[:, ax_idx + 2])
-                            if ax_idx > 1:
-                                ax.plot(control_status_log[:, 1], control_status_log[:, ax_idx + 4])
-                            ax.set_title(f"Simulation Log - {ax_idx + 1}")
+                        fig, axs = plt.subplots(3, 1, figsize=(16, 10))
+                        mng = plt.get_current_fig_manager()
+                        mng.window.state('zoomed')
+                        # Adjust subplot spacing/margins
+                        fig.subplots_adjust(left=0.07, right=0.95, top=0.912, bottom=0.064, wspace=0.35, hspace=0.545)
+                        for ax_idx in range(3):
+                            ax = axs[ax_idx]
+                            if ax_idx == 2:
+                                ax_right = ax.twinx()
+                                line1 = ax.plot(control_status_log[:, 1], control_status_log[:, 2], 'g-', label='Torch v (mm)')
+                                line2 = ax_right.plot(control_status_log[:, 1], control_status_log[:, 3], 'r-', label='Wire Feed Rate (ipm)')
+                                lines = line1 + line2
+                                labels = [l.get_label() for l in lines]
+                                ax.set_ylabel("mm", fontsize=xy_label_size)
+                                ax_right.set_ylabel("ipm", fontsize=xy_label_size)
+                                ax_right.tick_params(axis='y', labelsize=xy_tick_size)
+                                ax.legend(lines, labels, loc='upper right', fontsize=legend_size)
+                                ax.set_title(f"Commanded Torch Velocity & Wire Feed Rate (mm & ipm)", fontsize=title_size)
+                            elif ax_idx == 0:
+                                ax.plot(control_status_log[:, 1], control_status_log[:, 4], label=f'Target $\Delta h$')                            
+                                ax.plot(control_status_log[:, 1], control_status_log[:, 6], label=f'Predicted $\Delta h$')
+                                ax.plot(profile_dh[:, 0], profile_dh[:, 1], label=f'Actual $\Delta h$')
+                                ax.legend(fontsize=legend_size)
+                                ax.set_ylabel("mm", fontsize=xy_label_size)
+                                ax.set_title(f"Target vs Predicted vs Actual $\Delta h$ (mm)", fontsize=title_size)
+                            elif ax_idx == 1:
+                                ax.plot(control_status_log[:, 1], control_status_log[:, 5], label=f'Target Width')                            
+                                ax.plot(control_status_log[:, 1], control_status_log[:, 7], label=f'Predicted Width')
+                                ax.plot(profile_width_shift[:, 0], profile_width_shift[:, 1], label=f'Actual Width')
+                                ax.legend(fontsize=legend_size)
+                                ax.set_ylabel("mm", fontsize=xy_label_size)
+                                ax.set_title(f"Target vs Predicted vs Actual Width (mm)", fontsize=title_size)
                             # ax.set_xlabel("Time (s)")
-                            ax.set_xlabel("X (mm)")
-                            ax.set_ylabel("Value")
+                            ax.set_xlabel("X (mm)", fontsize=xy_label_size)
+                            ax.tick_params(axis='both', which='major', labelsize=xy_tick_size)
                             ax.grid(True)
-                        plt.show()
+                        plt.suptitle(f"Layer {layer_count} Control Status", fontsize=title_size)
+                        # plt.show()
+                        fig.savefig(sim_folder+'layer'+str(i)+'/control_status.png', dpi=300, bbox_inches='tight')
+                        plt.close(fig)
 
                     # if torch orientation is fixed, and the traveling/curve direction is opposite
                     if forward and curve_direction == 'backward':
