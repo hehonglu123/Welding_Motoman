@@ -17,6 +17,13 @@ from scan_utils import *
 from scanProcess import *
 from animation_3d import *
 
+# for plotting
+xy_label_size = 18
+xy_tick_size = 16
+legend_size = 16
+title_size = 20
+sup_title_size = 20
+
 torch_model = YOLO(os.path.dirname(inspect.getfile(flir_toolbox))+"/torch.pt")
 tip_wire_model = YOLO(os.path.dirname(inspect.getfile(flir_toolbox))+"/tip_wire.pt")
 
@@ -26,7 +33,8 @@ def main():
     test_thermal = False
     test_thermal_collected = False
     test_geometry = False
-    test_weld_shift = True
+    test_weld_shift = False
+    get_statistics = True
 
     ############## Robot definition ##############
     config_dir='../../config/'
@@ -360,7 +368,7 @@ def main():
         #                'weld_fujiscan_2025_06_12_16_59_09/','weld_fujiscan_2025_06_12_15_33_03/','weld_fujiscan_2025_06_12_15_03_27/',\
         #                 'weld_fujiscan_2025_07_09_14_52_42/','weld_fujiscan_2025_07_09_15_21_35/','weld_fujiscan_2025_07_09_16_16_40/']
         # test_dir = ['weld_fujiscan_2025_07_09_14_52_42/','weld_fujiscan_2025_07_09_15_21_35/','weld_fujiscan_2025_07_09_16_16_40/']
-        test_dir = ['weld_fujicontrol_2025_08_13_14_17_58/', 'weld_fujicontrol_2025_08_13_14_57_52/']
+        test_dir = ['weld_fujicontrol_2025_08_14_11_19_59/', 'weld_fujicontrol_2025_08_13_14_57_52/']
         shift_x_all = []
         for dir_cnt,logdata_dir_name in enumerate(test_dir):
             ## data to visualize
@@ -468,6 +476,114 @@ def main():
         print(f"Std shift: {np.std(shift_x_all):.4f}")
         print(f"Min shift: {np.min(shift_x_all):.2f}, Max shift: {np.max(shift_x_all):.2f}")
         print(f"Max shift diff: {np.max(shift_x_all) - np.mean(shift_x_all):.4f}")
+    
+    ###### get std and other statistics
+    if get_statistics:
+        data_dir = '../../data/wall_weld_test/'
+        test_dir = ['weld_fujicontrol_2025_08_13_14_57_52/','weld_fujicontrol_2025_08_14_11_19_59/']
+        test_labels = ['Baseline','Control']
+        test_dimension = ['Height', 'Width']
+        test_statistics = ['STD']
+
+        start_x={'Baseline':-45,'Control':-45}
+        end_x={'Baseline':45,'Control':45}
+
+        test_results={}
+        for logdata_dir_name,dat_label in zip(test_dir,test_labels):
+            test_results[dat_label] = {}
+            ## directory to process
+            print(f"Processing directory: {logdata_dir_name}")
+            logdata_dir = data_dir + logdata_dir_name
+
+            ## get shift x
+            baselayer1_profile_height = np.loadtxt(logdata_dir+'baselayer1/profile_height.csv',delimiter=',')
+            profile_x = np.arange(np.min(baselayer1_profile_height[:,0]), np.max(baselayer1_profile_height[:,0])+0.1, 0.1)
+            height_approx_func = CubicSpline(baselayer1_profile_height[:,0], baselayer1_profile_height[:,1])
+            profile_height_aug = np.column_stack((profile_x, height_approx_func(profile_x)))
+            profile_height_closed_arg = np.argsort(np.abs(profile_height_aug[:,1]-3.5))
+            left_x = None
+            right_x = None
+            for profile_idx in profile_height_closed_arg:
+                if profile_height_aug[profile_idx,0]<0 and left_x is None:
+                    left_x = profile_height_aug[profile_idx,0]
+                if profile_height_aug[profile_idx,0]>0 and right_x is None:
+                    right_x = profile_height_aug[profile_idx,0]
+                if left_x is not None and right_x is not None:
+                    break
+            shift_x = -1*(left_x+right_x)/2
+            print(f"Shift X: {shift_x:.2f}")
+
+            ### loop through all layers to get height width statistics
+            total_layers_name = glob.glob(logdata_dir+'layer*')
+            # get printed layer number
+            layer_nums = []
+            for layer_name in total_layers_name:
+                this_layer = layer_name.split('\\')[-1]
+                this_layer = this_layer.split('r')[-1]
+                layer_nums.append(int(this_layer))
+            layer_nums = np.sort(layer_nums)
+            
+            # collect statistics
+            height_std = []
+            width_std = []
+            for layer_n_id, layer_n in enumerate(layer_nums):
+                this_layer_dir = logdata_dir + f'layer{layer_n}/'
+                profile_height = np.loadtxt(this_layer_dir+'profile_height.csv',delimiter=',')
+                profile_width = np.loadtxt(this_layer_dir+'profile_width.csv',delimiter=',')
+                # shift profiles
+                profile_height[:,0] += shift_x
+                profile_width[:,0] += shift_x
+                # get std between -55 and 55 mm
+                height_std.append(np.std(profile_height[(profile_height[:,0] >= start_x[dat_label]) & (profile_height[:,0] <= end_x[dat_label] )& (profile_height[:,1]> 6), 1]))
+                width_std.append(np.std(profile_width[(profile_width[:,0] >= start_x[dat_label]) & (profile_width[:,0] <= end_x[dat_label]), 1]))
+
+                if layer_n_id == len(layer_nums)-1:
+                    test_results[dat_label]['Height Viz'] = profile_height
+                    test_results[dat_label]['Width Viz'] = profile_width
+
+            # collect statistics
+            test_results[dat_label]['Height'] = {}
+            test_results[dat_label]['Width'] = {}
+            test_results[dat_label]['Height']['STD'] = height_std
+            test_results[dat_label]['Width']['STD'] = width_std
+
+        for stat in test_statistics:
+            fig, ax = plt.subplots(1, 2, figsize=(12, 6))
+            for dim_i,dim in enumerate(test_dimension):
+                for dat_label in test_labels:
+                    ax[dim_i].plot(test_results[dat_label][dim][stat], '-o', label=f"{dat_label}")
+                ax[dim_i].set_xlabel('Layer Number', fontsize=xy_label_size)
+                ax[dim_i].tick_params(axis='both', which='major', labelsize=xy_tick_size)
+                ax[dim_i].set_title(f"{dim} {stat} (mm)", fontsize=title_size)
+                ax[dim_i].legend(fontsize=legend_size)
+                ax[dim_i].grid()
+        plt.show()
+
+        
+        fig, ax = plt.subplots(2, 1, figsize=(12, 7))
+        for dim_i,dim in enumerate(test_dimension):
+            for dat_label in test_labels:
+                valid_index = np.where((test_results[dat_label][dim+' Viz'][:,0] >= start_x[dat_label]) & (test_results[dat_label][dim+' Viz'][:,0] <= end_x[dat_label]))[0]
+                if dim == 'Height':
+                    ax[dim_i].plot(test_results[dat_label][dim+' Viz'][valid_index,0],test_results[dat_label][dim+' Viz'][valid_index,1]-np.mean(test_results[dat_label][dim+' Viz'][valid_index,1]), '-o', label=f"{dat_label}")
+                else:
+                    ax[dim_i].plot(test_results[dat_label][dim+' Viz'][valid_index,0],test_results[dat_label][dim+' Viz'][valid_index,1], '-o', label=f"{dat_label}")
+            ax[dim_i].set_xlabel('X Position (mm)', fontsize=xy_label_size)
+            ax[dim_i].set_ylabel(f"(mm)", fontsize=xy_label_size)
+            yticks = ax[dim_i].get_yticks()  # original y-tick values
+            # new_labels = []  # rename ticks
+            # for val in yticks:
+            #     if val > 0:
+            #         new_labels.append(f"Mean+{val:.0f}")
+            #     else:
+            #         new_labels.append(f"Mean-{-val:.0f}")
+            # ax[dim_i].set_yticks(yticks)  # ensure same positions
+            # ax[dim_i].set_yticklabels(new_labels)  # apply new labels
+            ax[dim_i].tick_params(axis='both', which='major', labelsize=xy_tick_size)
+            ax[dim_i].set_title(f"Layer "+dim+" at Mean", fontsize=title_size)
+            ax[dim_i].legend(fontsize=legend_size)
+            ax[dim_i].grid()
+        plt.show()
 
     ###### viz geometry #####
     if test_geometry:
