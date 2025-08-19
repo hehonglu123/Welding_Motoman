@@ -233,6 +233,7 @@ def main():
                         flame_centroid_history=[]
                         thermal_reading = []
                         thermal_stamp = []
+                        thermal_centroid = []
 
                         thermal_pixel_trace = np.array([])
                         thermal_workpiece_x_trace = []
@@ -335,6 +336,7 @@ def main():
                             flame_reading=get_pixel_value(ir_image,pixel_coord,ir_pixel_window_size)
                             thermal_reading.append(flame_reading)
                             thermal_stamp.append(stamp)
+                            thermal_centroid.append(centroid)
                             # print(flame_reading, centroid)    
 
                             # add trace pixels and thermal readings
@@ -438,7 +440,7 @@ def main():
                         # plt.show()
 
                         # save thermal readings
-                        thermal_reading = np.vstack((thermal_stamp,thermal_reading)).T
+                        thermal_reading = np.vstack((thermal_stamp,thermal_reading,thermal_centroid)).T
                         np.savetxt(this_layer_dir+'thermal.csv',thermal_reading,delimiter=',')
 
                         # save thermal pixel trace
@@ -673,14 +675,16 @@ def main():
                         thermal_reading_idx = -1 if len(thermal_reading_idx) == 0 else thermal_reading_idx[0]
                         ratio=(this_t-thermal_reading[:,0][thermal_reading_idx-1])/(thermal_reading[:,0][thermal_reading_idx]-thermal_reading[:,0][thermal_reading_idx-1])
                         this_thermal_reading=thermal_reading[:,1][thermal_reading_idx-1]*(1-ratio)+thermal_reading[:,1][thermal_reading_idx]*ratio
+                        this_thermal_reading_x = thermal_reading[:,2][thermal_reading_idx-1][0]*(1-ratio)+thermal_reading[:,2][thermal_reading_idx][0]*ratio
+                        this_thermal_reading_y = thermal_reading[:,2][thermal_reading_idx-1][1]*(1-ratio)+thermal_reading[:,2][thermal_reading_idx][1]*ratio
 
-                        this_welding_profile = np.array([this_t,x,this_cmd_v,this_cmd_fr,this_height,this_dh,torch_height,this_width,this_v,this_thermal_reading])
+                        this_welding_profile = np.array([this_t,x,this_cmd_v,this_cmd_fr,this_height,this_dh,torch_height,this_width,this_v,this_thermal_reading,this_thermal_reading_x,this_thermal_reading_y])
                         this_welding_profile = np.append(this_welding_profile,this_welding_status)
                         profile_welding.append(this_welding_profile)
                     
                     profile_welding = np.array(profile_welding)
                     # save profile welding with header
-                    header = 'time,x,cmd_v,cmd_feedrate,height,dheight,torch_height,width,v,thermal,voltage,current,feedrate,energy'
+                    header = 'time,x,cmd_v,cmd_feedrate,height,dheight,torch_height,width,v,thermal,thermal_x,thermal_y,voltage,current,feedrate,energy'
                     np.savetxt(this_layer_dir+'profile_welding.csv',profile_welding,delimiter=',',header=header)
                     last_profile_height = profile_height
 
