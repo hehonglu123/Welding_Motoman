@@ -26,7 +26,7 @@ sup_title_size = 18
 torch.manual_seed(0)
 np.random.seed(0)
 
-def train_loglog(train_input,train_output,val_input,val_output,quadratic=False):
+def train_loglog(train_input,train_output,val_input,val_output,quadratic=False,return_params=False):
 
     train_input = np.array(train_input)[:,:2]
     val_input = np.array(val_input)[:,:2]
@@ -84,7 +84,10 @@ def train_loglog(train_input,train_output,val_input,val_output,quadratic=False):
     plot_title = 'Predicted $\Delta h$ and $\Delta w$ (Linear Model)' if not quadratic else 'Predicted $\Delta h$ and $\Delta w$ (Quadratic Model)'
     plot_vt_vw_dh_dw(v_torch_range, v_wire_range, dh_pred, dw_pred, plot_title=plot_title)
     
-    return train_dh_error, train_dw_error, val_dh_error, val_dw_error
+    if return_params:
+        return train_dh_error, train_dw_error, val_dh_error, val_dw_error, theta_param_dh, theta_param_dw
+    else:
+        return train_dh_error, train_dw_error, val_dh_error, val_dw_error
     
 def train_NN(train_input,train_output,val_input,val_output,torch_height=True,layer_height=False,train_model=True,model_dir=''):
 

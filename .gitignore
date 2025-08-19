@@ -424,6 +424,7 @@ weld/streaming_fuji/weld_Seq_models/model*
 weld/streaming_fuji/weld_Seq_models/close*
 weld/streaming_fuji/weld_Seq_models/open*
 weld/streaming_fuji/weld_Seq_models/stats*
+weld/streaming_fuji/weld_Seq_models/loglog*
 
 data/blade0.1/blade.stl
 data/wall_weld_test/weld_data/weld_data.csv

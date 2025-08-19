@@ -441,14 +441,32 @@ if __name__ == "__main__":
     test_dw[test_dw < 0.01] = 0.01
     train_cmd_feedrate_loglog = train_cmd_feedrate* inch2mm / 60 # ipm to mm/s
     test_cmd_feedrate_loglog = test_cmd_feedrate* inch2mm / 60 # ipm to mm/s
-    train_dh_error_loglog, train_dw_error_loglog, val_dh_error_loglog, val_dw_error_loglog = \
+    train_dh_error_loglog, train_dw_error_loglog, val_dh_error_loglog, val_dw_error_loglog, theta_param_dh, theta_param_dw = \
         train_loglog(np.vstack((train_cmd_v,train_cmd_feedrate_loglog)).T, np.vstack((train_dh, train_dw)).T, \
-                     np.vstack((test_cmd_v,test_cmd_feedrate_loglog)).T, np.vstack((test_dh, test_dw)).T,quadratic=False)
+                     np.vstack((test_cmd_v,test_cmd_feedrate_loglog)).T, np.vstack((test_dh, test_dw)).T,quadratic=False, return_params=True)
     val_dh_error_loglog = np.abs(val_dh_error_loglog)
     val_dw_error_loglog = np.abs(val_dw_error_loglog)
     print(f"log log test dh (mean,95%,max):{np.mean(val_dh_error_loglog):.4f}, {stats.expon(scale=np.std(val_dh_error_loglog)).interval(0.95)[1]:.4f}, {np.max(val_dh_error_loglog):.4f}")
     print(f"log log test dw (mean,95%,max):{np.mean(val_dw_error_loglog):.4f}, {stats.expon(scale=np.std(val_dw_error_loglog)).interval(0.95)[1]:.4f}, {np.max(val_dw_error_loglog):.4f}")
     print(f"MSE (dh dw)",np.mean(np.vstack((val_dh_error_loglog, val_dw_error_loglog)).T**2))
+
+    save_loglog = True
+    if save_loglog:
+        print("Saving log-log model parameters to weld_Seq_models/loglog_models/")
+        training_params_loglog = {}
+        training_params_loglog['geo_data_dir'] = training_params['geo_data_dir']
+        training_params_loglog['logdata_dir_all'] = training_params['logdata_dir_all']
+        training_params_loglog['model_type'] = 'loglog_lin'
+        training_params_loglog['sample_rate'] = training_params['sample_rate']
+        training_params_loglog['train_test_split'] = training_params['train_test_split']
+        training_params_loglog['sequence_length'] = training_params['sequence_length']
+        training_params_loglog['sample_sequence_overlap'] = training_params['sample_sequence_overlap']
+        os.makedirs('weld_Seq_models/loglog_models/', exist_ok=True)
+        with open('weld_Seq_models/loglog_models/training_params.yaml', 'w') as f:
+            yaml.dump(training_params_loglog, f)
+        np.savetxt('weld_Seq_models/loglog_models/theta_param_dh.csv', theta_param_dh, delimiter=',')
+        np.savetxt('weld_Seq_models/loglog_models/theta_param_dw.csv', theta_param_dw, delimiter=',')
+
     exit()
     ######
 

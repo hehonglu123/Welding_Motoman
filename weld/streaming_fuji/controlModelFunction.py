@@ -15,6 +15,10 @@ from qpsolvers import solve_qp
 np.random.seed(42) # for reproducibility
 torch.manual_seed(42) # for reproducibility
 
+class controlLogLogModel():
+    def __init__(self,model_dir):
+        self.model_dir = model_dir
+
 
 class controlModel():
     def __init__(self, model_dir, minmax_v_file='weld_Seq_models/test_cmd_v_feedrate.csv', minmax_feedrate_file='weld_Seq_models/train_cmd_v_feedrate.csv',\
