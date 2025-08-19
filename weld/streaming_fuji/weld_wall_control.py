@@ -75,36 +75,6 @@ def get_target_dw(current_x, dw_target_profile, lookahead_distance, forward):
         next_dw = np.mean(dw_target_profile[valid_index,1])
     return next_dw
 
-def get_control_loglog(dh,dw):
-    theta_dh = np.array([-0.51165164, 0.31240801, 0.29077162])
-    theta_dw = np.array([-0.44045542, 0.5737361, -0.04727175])
-
-    log_v_om = np.linalg.pinv(np.vstack((theta_dh[:2], theta_dw[:2])))@(np.log([dh,dw])-np.array([theta_dh[2],theta_dw[2]]))
-
-    torch_v = np.exp(log_v_om[0])
-    torch_feedrate = np.exp(log_v_om[1])
-    torch_feedrate = torch_feedrate * mm2inch * 60 # mm/s to inch/min
-    origin_vpd_ratio = torch_v/torch_feedrate
-    torch_feedrate = np.clip(torch_feedrate, 50, 250)
-    torch_feedrate = round(torch_feedrate/10)*10 # round to nearest 10
-    torch_v = torch_feedrate*origin_vpd_ratio
-
-    return torch_v, torch_feedrate
-
-def get_pred_loglog(torch_v, feedrate):
-
-    theta_dh = np.array([-0.51165164, 0.31240801, 0.29077162])
-    theta_dw = np.array([-0.44045542, 0.5737361, -0.04727175])
-
-    torch_feedrate = feedrate * inch2mm / 60 # inch/min to mm/s
-    torch_v_log = np.log(torch_v)
-    torch_feedrate_log = np.log(torch_feedrate)
-
-    dh_pred = np.exp(theta_dh[0]*torch_v_log + theta_dh[1]*torch_feedrate_log + theta_dh[2])
-    dw_pred = np.exp(theta_dw[0]*torch_v_log + theta_dw[1]*torch_feedrate_log + theta_dw[2])
-
-    return dh_pred, dw_pred
-
 def get_weld_shift_x(profile_height):
     profile_x = np.arange(np.min(profile_height[:,0]), np.max(profile_height[:,0])+0.1, 0.1)
     height_approx_func = CubicSpline(profile_height[:,0], profile_height[:,1])
@@ -324,6 +294,23 @@ def main():
     correction_layer_start = 2 # start correction from layer 2, set to a large number if no correction layer
     # correction_layer_start = 99999999999999 # no correction layer, set to a large number
 
+    ##### controller parameters and model #####
+    ### Learning model
+    control_model_dir = 'model_20250715_151650'
+    ctrlModel = controlModel(control_model_dir,device=device)
+    alpha_control = 0.25
+    lambda_smooth = 1e-2  # regularization parameter for smoothness
+    lambda_disc = 1e-1*5  # regularization parameter for discrete input
+    ### log-log model
+    loglog_model_dir = 'loglog_model'
+    loglogModel = controlLogLogModel(loglog_model_dir)
+    # max min torch velocity
+    v_Maximum = 20
+    v_minimum = 0.75
+    # choose between log-log control or learning model one step Jacobian
+    control_method = 'loglog-static' # 'loglog-static', 'loglog-rls' or 'learning-Jacobian'
+    assert control_method in ['loglog-static', 'loglog-rls', 'learning-Jacobian'], "Invalid control method"
+    #######################################
 
     ##### welding target parameters #####
     curve = np.loadtxt(data_dir+f'curve_sliced_relative/slice0_0.csv',delimiter=',')
@@ -334,11 +321,11 @@ def main():
     weld_type = 'static' # 'static' or 'axe'
     ## static dw
     if weld_type == 'static':
-        dh_target, dw_target_singlePoint = get_pred_loglog(layer_nom_vel, layer_feedrate) # get the target dh and dw from the control loglog
+        dh_target, dw_target_singlePoint = loglogModel.get_pred_loglog(layer_nom_vel, layer_feedrate) # get the target dh and dw from the control loglog
         dw_target = np.vstack((curve_x_sample, np.ones_like(curve_x_sample)*dw_target_singlePoint)).T # create a constant dw target for the whole layer
     elif weld_type == 'axe':
         ## axe like dw (thick to thin)
-        dh_target, _ = get_pred_loglog(layer_nom_vel, layer_feedrate)
+        dh_target, _ = loglogModel.get_pred_loglog(layer_nom_vel, layer_feedrate)
         dw_target_large = 6.25
         dw_target_small = 3.25
         dw_target = np.vstack((curve_x_sample, np.linspace(dw_target_large, dw_target_small, len(curve_x_sample)))).T # create a dw target that decreases from large to small
@@ -346,35 +333,17 @@ def main():
         assert False, "Invalid weld type, must be 'static' or 'axe'"
 
     print(f'Target dh: {dh_target:.2f} mm, dw: {np.mean(dw_target[:,1]):.2f} mm')
-
-    ##### controller parameters and model #####
-    control_model_dir = 'model_20250715_151650'
-    ctrlModel = controlModel(control_model_dir,device=device)
-    alpha_control = 0.25
-    lambda_smooth = 1e-2  # regularization parameter for smoothness
-    lambda_disc = 1e-1*5  # regularization parameter for discrete input
-    # max min torch velocity
-    v_Maximum = 20
-    v_minimum = 0.75
+    ########################################
 
     ##### visualization parameters #####
     viz_interval = 1 # visualize every N sec
+    ####################################
     
     ##### Log data dir #####
     current_time = datetime.datetime.now()
     formatted_time = current_time.strftime('%Y_%m_%d_%H_%M_%S.%f')[:-7]
     logdata_dir='../../data/wall_weld_test/weld_fujicontrol_'+formatted_time+'/'
     # logdata_dir='../../data/wall_weld_test/weld_fujicontrol_2025_08_13_14_17_58/'
-
-    ##### weld meta data #####
-    weld_meta_data = {'well_arcon':weld_arcon, 'fuji_scanon':fuji_scanon, 'data_dir':data_dir, 'logdata_dir':logdata_dir\
-                      ,'material_name':material_name\
-                    ,'base_layer_num':base_layer_num, 'baselayer_resolution':baselayer_resolution, 'layer_num':layer_num, 'layer_resolution':layer_resolution\
-                    ,'base_feedrate':base_feedrate, 'base_nom_incre':base_nom_incre, 'base_nom_vel':base_nom_vel\
-                    ,'layer_feedrate':layer_feedrate, 'layer_nom_incre':layer_nom_incre, 'layer_nom_vel':float(round(layer_nom_vel,3))\
-                    ,'cross_section':cross_section, 'dh_target':float(dh_target), 'dw_target':float(np.mean(dw_target[:,1])), 'lookahead_distance':lookahead_distance,\
-                    'alpha_control':alpha_control, 'lambda_smooth':lambda_smooth, 'lambda_disc':lambda_disc,\
-                    'model_dir':control_model_dir, 'v_Maximum':v_Maximum, 'v_minimum':v_minimum, 'weld_type':weld_type}
 
     ##### Parameters to chose where to start welding #####
     # start-end layers
@@ -399,9 +368,21 @@ def main():
     #                 [-1.72761855e-02,  1.41325105e-02,  9.99750872e-01, -8.18664727e+00],
     #                 [ 0.00000000e+00 , 0.00000000e+00 , 0.00000000e+00 , 1.00000000e+00]])
     # last_profile_height = np.loadtxt(logdata_dir+'baselayer1/profile_height.csv', delimiter=',') # load the last profile height
-    #####
+    #################################################3
 
-    ### simulation setup #####
+    ##### weld meta data #####
+    weld_meta_data = {'well_arcon':weld_arcon, 'fuji_scanon':fuji_scanon, 'data_dir':data_dir, 'logdata_dir':logdata_dir\
+                      ,'material_name':material_name\
+                    ,'base_layer_num':base_layer_num, 'baselayer_resolution':baselayer_resolution, 'layer_num':layer_num, 'layer_resolution':layer_resolution\
+                    ,'base_feedrate':base_feedrate, 'base_nom_incre':base_nom_incre, 'base_nom_vel':base_nom_vel\
+                    ,'layer_feedrate':layer_feedrate, 'layer_nom_incre':layer_nom_incre, 'layer_nom_vel':float(round(layer_nom_vel,3))\
+                    ,'cross_section':cross_section, 'dh_target':float(dh_target), 'dw_target':float(np.mean(dw_target[:,1])), 'lookahead_distance':lookahead_distance,\
+                    'alpha_control':alpha_control, 'lambda_smooth':lambda_smooth, 'lambda_disc':lambda_disc,\
+                    'model_dir':control_model_dir, 'v_Maximum':v_Maximum, 'v_minimum':v_minimum, 'weld_type':weld_type,\
+                    'loglog_model_dir':loglog_model_dir, 'control_method':control_method}
+    ##############################
+
+    ####### simulation setup #####
     if SIMULATION or not weld_arcon:
         sim_folder = '../../data/wall_weld_test/weld_fujicontrol_2025_08_14_11_19_59/'
         total_layers_name = glob.glob(sim_folder+'layer*')
@@ -412,6 +393,7 @@ def main():
             this_layer = this_layer.split('r')[-1]
             layer_nums.append(int(this_layer))
         layer_nums = np.sort(layer_nums)
+    ####################################################3
 
     ##### Welding ready to start #####
     print("Logged Data Dir:",logdata_dir)
@@ -531,8 +513,8 @@ def main():
                             next_dh = dh_target
                         else:
                             next_dh = get_target_dh(current_x, last_profile_height, target_layer_height, lookahead_distance, forward)
-                        v_cmd ,feedrate_cmd = get_control_loglog(next_dh,next_dw) # get the velocity and feedrate from the control loglog as the initial
-                        dh_pred, dw_pred = get_pred_loglog(v_cmd, feedrate_cmd) # get the predicted dh and dw from the control loglog
+                        v_cmd ,feedrate_cmd = loglogModel.get_control_loglog(next_dh,next_dw) # get the velocity and feedrate from the control loglog as the initial
+                        dh_pred, dw_pred = loglogModel.get_pred_loglog(v_cmd, feedrate_cmd) # get the predicted dh and dw from the control loglog
                         print(f'Initial Torch V: {v_cmd:.2f} mm/s, Feedrate: {feedrate_cmd:.2f} inch/min, dh_pred: {dh_pred:.2f} mm, dw_pred: {dw_pred:.2f} mm')
                     ### turn on sensors
                     if thermal_on:
@@ -581,7 +563,11 @@ def main():
                                     next_dh = dh_target
                                 else:
                                     next_dh = get_target_dh(current_x, last_profile_height, target_layer_height, lookahead_distance, forward)
-                                v_cmd, feedrate_cmd, dh_pred, dw_pred = ctrlModel.forward_one_step_get_opt_u(v_cmd, feedrate_cmd, next_dh, next_dw, alpha_control,  lambda_smooth=lambda_smooth, lambda_disc=lambda_disc)
+                                if control_method == 'learning-Jacobian':
+                                    v_cmd, feedrate_cmd, dh_pred, dw_pred = ctrlModel.forward_one_step_get_opt_u(v_cmd, feedrate_cmd, next_dh, next_dw, alpha_control,  lambda_smooth=lambda_smooth, lambda_disc=lambda_disc)
+                                elif 'loglog' in control_method:
+                                    v_cmd ,feedrate_cmd = loglogModel.get_control_loglog(next_dh,next_dw)
+                                    dh_pred, dw_pred = loglogModel.get_pred_loglog(v_cmd, feedrate_cmd)
                                 v_cmd = np.clip(v_cmd, v_minimum, v_Maximum) # clip the velocity
                             if weld_arcon:
                                 fronius_client.async_set_job_number(int(round(feedrate_cmd/10)+job_offset), welder_handler)

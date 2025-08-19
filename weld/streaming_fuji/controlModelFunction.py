@@ -15,9 +15,40 @@ from qpsolvers import solve_qp
 np.random.seed(42) # for reproducibility
 torch.manual_seed(42) # for reproducibility
 
+mm2inch = 1/25.4
+inch2mm = 25.4
+
 class controlLogLogModel():
     def __init__(self,model_dir):
-        self.model_dir = model_dir
+        self.model_dir = 'weld_Seq_models/'+model_dir
+
+        self.theta_dh = np.loadtxt(self.model_dir + '/theta_param_dh.csv', delimiter=',')
+        self.theta_dw = np.loadtxt(self.model_dir + '/theta_param_dw.csv', delimiter=',')
+
+    def get_control_loglog(self, dh, dw):
+
+        log_v_om = np.linalg.pinv(np.vstack((self.theta_dh[:2], self.theta_dw[:2])))@(np.log([dh,dw])-np.array([self.theta_dh[2],self.theta_dw[2]]))
+
+        torch_v = np.exp(log_v_om[0])
+        torch_feedrate = np.exp(log_v_om[1])
+        torch_feedrate = torch_feedrate * mm2inch * 60 # mm/s to inch/min
+        origin_vpd_ratio = torch_v/torch_feedrate
+        torch_feedrate = np.clip(torch_feedrate, 50, 250)
+        torch_feedrate = round(torch_feedrate/10)*10 # round to nearest 10
+        torch_v = torch_feedrate*origin_vpd_ratio
+
+        return torch_v, torch_feedrate
+
+    def get_pred_loglog(self, torch_v, feedrate):
+
+        torch_feedrate = feedrate * inch2mm / 60 # inch/min to mm/s
+        torch_v_log = np.log(torch_v)
+        torch_feedrate_log = np.log(torch_feedrate)
+
+        dh_pred = np.exp(self.theta_dh[0]*torch_v_log + self.theta_dh[1]*torch_feedrate_log + self.theta_dh[2])
+        dw_pred = np.exp(self.theta_dw[0]*torch_v_log + self.theta_dw[1]*torch_feedrate_log + self.theta_dw[2])
+
+        return dh_pred, dw_pred
 
 
 class controlModel():
