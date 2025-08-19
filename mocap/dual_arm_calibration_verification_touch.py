@@ -3,6 +3,9 @@ import sys
 from robotics_utils import *
 from motoman_def  import *
 
+import torch
+import torch.nn as nn
+
 from general_robotics_toolbox import *
 from RobotRaconteur.Client import *
 from threading import Thread
@@ -12,6 +15,7 @@ import yaml
 from PH_interp import *
 from dx200_motion_program_exec_client import *
 from WeldSend import *
+from calib_PH_VAE import *
 
 ############## Robot definition ##############
 config_dir='../config/'
@@ -21,6 +25,8 @@ config_dir='../config/'
 # robot_2=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.yml',tool_file_path=config_dir+'flir.csv',\
 #                         pulse2deg_file_path=config_dir+'MA1440_A0_pulse2deg_real.csv',base_transformation_file=config_dir+'MA1440_pose.csv')
 
+
+#### load R1
 ph_dataset_date='0801'
 test_dataset_date='0801'
 robot_marker_dir=config_dir+'MA2010_marker_config/'
@@ -31,6 +37,7 @@ robot_1=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_confi
                     pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',\
                     base_marker_config_file=robot_marker_dir+'MA2010_'+ph_dataset_date+'_marker_config.yaml',\
                     tool_marker_config_file=tool_marker_dir+'weldgun_'+ph_dataset_date+'_marker_config.yaml')
+#### load R2
 ph_dataset_date='0804'
 test_dataset_date='0804'
 robot_marker_dir=config_dir+'MA1440_marker_config/'
@@ -71,10 +78,25 @@ with open(PH_r1_data_dir+calib_file_name,'rb') as file:
     PH_q_r1=pickle.load(file)
 ph_param_fbf_r1=PH_Param(nom_P_r1,nom_H_r1)
 ph_param_fbf_r1.fit(PH_q_r1,method='FBF')
+ph_param_fbf_redu_r1=PH_Param(nom_P_r1,nom_H_r1)
+ph_param_fbf_redu_r1.fit(PH_q_r1,method='FBF',useReduced=True)
+# load AE Model
+PH_data_dir='PH_grad_data/test0801_R1/train_data_'
+train_robot_q = np.loadtxt(PH_data_dir+'robot_q_align.csv',delimiter=',')
+AE_model_dir = 'trainLATENT_AE_R1_latent12_weighted_2508151932/'
+vae_model_1, interp_funcs_1, param_nominal_1 = prepare_model(AE_model_dir, robot_1, PH_q_r1, train_robot_q)
+
 with open(PH_r2_data_dir+calib_file_name,'rb') as file:
     PH_q_r2=pickle.load(file)
 ph_param_fbf_r2=PH_Param(nom_P_r2,nom_H_r2)
 ph_param_fbf_r2.fit(PH_q_r2,method='FBF')
+ph_param_fbf_redu_r2=PH_Param(nom_P_r2,nom_H_r2)
+ph_param_fbf_redu_r2.fit(PH_q_r2,method='FBF',useReduced=True)
+# load AE Model
+PH_data_dir='PH_grad_data/test0804_R2/train_data_'
+train_robot_q = np.loadtxt(PH_data_dir+'robot_q_align.csv',delimiter=',')
+AE_model_dir = 'trainLATENT_AE_R2_latent12_weighted_2508151921/'
+vae_model_2, interp_funcs_2, param_nominal_2 = prepare_model(AE_model_dir, robot_2, PH_q_r2, train_robot_q)
 
 # try:
 #     tool_calib_joints = np.radians(np.loadtxt('calib_data/tool_calib_joints.csv', delimiter=','))
@@ -127,6 +149,19 @@ reference_joints = np.radians(np.loadtxt('calib_data/reference_joints.csv', deli
 # print("R1 Out R2 Inward joints: ", np.degrees(r1_out_r2_inward_joints))
 # print("R1 Inward R2 Out joints: ", np.degrees(r1_inward_r2_out_joints))
 
+def robot_get_AE_PH(robot, q_input, interp_funcs, vae_model, param_nominal):
+
+    latent_vec_pred = np.array([interp_func(q_input) for interp_func in interp_funcs]).T
+    if np.isnan(latent_vec_pred).any():
+        raise ValueError('Interpolation failed')
+    latent_vec_pred = torch.tensor(latent_vec_pred[0], dtype=torch.float32)
+    # then, predict delta PH using the latent vector and the decoder  
+    pred_PH = vae_model.decoder(latent_vec_pred)
+    pred_PH = pred_PH.detach().numpy() + param_nominal
+    # get the robot position error
+    robot = get_PH_from_param(pred_PH,robot,unit='radians')
+    return robot
+
 def get_residual_error(p_array):
     p_array = np.array(p_array)
     p_mean = np.mean(p_array, axis=0)
@@ -156,19 +191,19 @@ origin_P_R2 = deepcopy(robot_2.robot.P)
 origin_H_R2 = deepcopy(robot_2.robot.H)
 
 # for use_cdc in [False, True]:
-for methods in ['nominal','CPA','CDC']:
-    use_cdc = True if methods == 'CDC' else False
+for methods in ['nominal','CPA','FBF-13','FBF-7','AE']:
+# for methods in ['AE']:
 
-    if methods == 'nominal' or methods == 'CDC':
-        robot_1.robot.P = deepcopy(origin_P_R1)
-        robot_1.robot.H = deepcopy(origin_H_R1)
-        robot_2.robot.P = deepcopy(origin_P_R2)
-        robot_2.robot.H = deepcopy(origin_H_R2)
-    else:
+    if methods == 'CPA':
         robot_1.robot.P = deepcopy(robot_1.calib_P)
         robot_1.robot.H = deepcopy(robot_1.calib_H)
         robot_2.robot.P = deepcopy(robot_2.calib_P)
         robot_2.robot.H = deepcopy(robot_2.calib_H)
+    else:
+        robot_1.robot.P = deepcopy(origin_P_R1)
+        robot_1.robot.H = deepcopy(origin_H_R1)
+        robot_2.robot.P = deepcopy(origin_P_R2)
+        robot_2.robot.H = deepcopy(origin_H_R2)
 
     # calibrate tool
     # get flange
@@ -183,14 +218,20 @@ for methods in ['nominal','CPA','CDC']:
     robot_ps = []
     for i in range(num_js):
         q=tool_calib_joints[i][:6]
-        # robot_T=robot.fwd_ph(q,ph_param)
-        if use_cdc:
+        
+        if methods == 'AE':
+            q_input = np.array(q[1:3])
+            robot_1 = robot_get_AE_PH(robot_1, q_input, interp_funcs_1, vae_model_1, param_nominal_1)
+
+        if methods == 'FBF-13':
             robot_T=robot_1.fwd_ph(q,ph_param_fbf_r1)
+        elif methods == 'FBF-7':
+            robot_T=robot_1.fwd_ph(q,ph_param_fbf_redu_r1)
         else:
             robot_T=robot_1.fwd(q)
         robot_Ts.append(H_from_RT(robot_T.R,robot_T.p))
         robot_ps.append(robot_T.p)
-    # print("Residual tool position:", get_residual_error(robot_ps))
+    print("Residual tool position:", get_residual_error(robot_ps))
     # print("==============")
 
     A=[]
@@ -216,22 +257,40 @@ for methods in ['nominal','CPA','CDC']:
     robot_ps = []
     for i in range(num_js):
         q=tool_calib_joints[i][:6]
-        # robot_T=robot.fwd_ph(q,ph_param)
-        if use_cdc:
+        
+        if methods == 'AE':
+            q_input = np.array(q[1:3])
+            robot_1 = robot_get_AE_PH(robot_1, q_input, interp_funcs_1, vae_model_1, param_nominal_1)
+
+        if methods == 'FBF-13':
             robot_T=robot_1.fwd_ph(q,ph_param_fbf_r1)
+        elif methods == 'FBF-7':
+            robot_T=robot_1.fwd_ph(q,ph_param_fbf_redu_r1)
         else:
             robot_T=robot_1.fwd(q)
         robot_ps.append(robot_T.p)
         robot_Ts.append(H_from_RT(robot_T.R,robot_T.p))
-    # print("Residual tool position after calibration:", get_residual_error(robot_ps))
+    print("Residual tool position after calibration:", get_residual_error(robot_ps))
 
     reference_ps = []
     for joint_i, r_joint in enumerate(reference_joints):
-        if joint_i==1:
+        if joint_i==1 and methods in ['FBF-13','FBF-7','nominal','CPA']:
             continue
-        if use_cdc:
+        if joint_i==2 and methods == 'AE':
+            continue
+
+        if methods == 'AE':
+            q_input_1 = np.array(r_joint[0:6][1:3])
+            robot_1 = robot_get_AE_PH(robot_1, q_input_1, interp_funcs_1, vae_model_1, param_nominal_1)
+            q_input_2 = np.array(r_joint[6:12][1:3])
+            robot_2 = robot_get_AE_PH(robot_2, q_input_2, interp_funcs_2, vae_model_2, param_nominal_2)
+
+        if methods == 'FBF-13':
             t2 = robot_2.fwd_ph(r_joint[6:12], ph_param_fbf_r2, world=True)
             t1 = robot_1.fwd_ph(r_joint[0:6], ph_param_fbf_r1, world=True)
+        elif methods == 'FBF-7':
+            t2 = robot_2.fwd_ph(r_joint[6:12], ph_param_fbf_redu_r2, world=True)
+            t1 = robot_1.fwd_ph(r_joint[0:6], ph_param_fbf_redu_r1, world=True)
         else:
             t2 = robot_2.fwd(r_joint[6:12], world=True)
             t1 = robot_1.fwd(r_joint[0:6], world=True)

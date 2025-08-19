@@ -67,7 +67,7 @@ def train(training_q, training_T_data, testing_q, testing_T_data,robot,param_nom
     # print("Load model from previous trained")
     # model.load_state_dict(torch.load('PH_NN_results/train_200_200_200_lr0.02_2409171041/best_testing_model.pt',weights_only=True))
     # model.load_state_dict(torch.load('PH_NN_results/train_R1_200_200_200_NN_lr0.02_weighted_2508142201/best_testing_model.pt',weights_only=True))
-    model.load_state_dict(torch.load('PH_NN_results/train_R2_200_200_200_NN_lr0.0005_weighted_2508150007/best_testing_model.pt',weights_only=True))
+    model.load_state_dict(torch.load('PH_NN_results/train_R2_200_200_200_NN_lr0.005_weighted_2508151912/best_testing_model.pt',weights_only=True))
 
     # Print the model architecture
     print(model)

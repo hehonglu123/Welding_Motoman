@@ -14,7 +14,7 @@ from Models import *
 
 # numpy generate random seed
 seed_random = np.random.randint(0, 1000000000)
-seed_random=729287233
+# seed_random=729287233
 print(seed_random)
 np.random.seed(seed_random)
 torch.manual_seed(seed_random)
@@ -87,7 +87,7 @@ def train(inputs_q2q3, targets_delta_PH, training_q, training_T, testing_q, test
     print(np.degrees(inputs_q2q3).shape)
     print(targets_delta_PH.shape)
 
-    test_only = True
+    test_only = False
 
     # data preprocessing
     inputs_q2q3 = torch.tensor(inputs_q2q3, dtype=torch.float32)
@@ -126,7 +126,7 @@ def train(inputs_q2q3, targets_delta_PH, training_q, training_T, testing_q, test
     # model.load_state_dict(torch.load('PH_NN_results/train_R1_200_200_200_NN_lr0.02_weighted_2503091846/best_testing_model.pt',weights_only=True))
     # model.load_state_dict(torch.load('PH_NN_results/train_R1_200_200_200_NN_lr0.005_weighted_2508142326/best_testing_model.pt',weights_only=True))
     # model.load_state_dict(torch.load('PH_NN_results/train_R2_200_200_200_NN_lr0.02_weighted_2503082242/best_testing_model.pt',weights_only=True))
-    model.load_state_dict(torch.load('PH_NN_results/train_R2_200_200_200_NN_lr0.0005_weighted_2508150001/best_testing_model.pt',weights_only=True))
+    # model.load_state_dict(torch.load('PH_NN_results/train_R2_200_200_200_NN_lr0.0005_weighted_2508150001/best_testing_model.pt',weights_only=True))
 
     # statistics before training
     training_T_error,training_ori_error = test_fwd_accuracy(model, training_q, training_T,robot,param_nominal)
@@ -162,7 +162,7 @@ def train(inputs_q2q3, targets_delta_PH, training_q, training_T, testing_q, test
         weights_H = 180/np.pi*10
         weights = torch.tensor(np.append(np.ones(21)*weights_P,np.ones(12)*weights_H), dtype=torch.float32)
     # Define the learning rate
-    learning_rate = 0.0005
+    learning_rate = 0.005
     # Define the number of epochs
     num_epochs = 100000
     # Define the optimizer
@@ -253,24 +253,21 @@ def train(inputs_q2q3, targets_delta_PH, training_q, training_T, testing_q, test
         np.save(folder_path+'loss_all.npy',np.array(loss_all)) # save the loss
         if print_loss:
             print(f'Epoch [{epoch+1}/{num_epochs}], Loss: {loss.item():.6f}')
-        if epoch>=35:
-            print("epoch:", epoch+1)
-            print_error = True
-        if print_error and epoch>=35:
-            training_T_error,training_ori_error = test_fwd_accuracy(model, training_q, training_T,robot,param_nominal)
+        if print_error and loss.item()<0.01:
+            # training_T_error,training_ori_error = test_fwd_accuracy(model, training_q, training_T,robot,param_nominal)
             testing_T_error,testing_ori_error = test_fwd_accuracy(model, testing_q, testing_T,robot,param_nominal)
             # print training and testing error, mean, max
-            print(f'Training error: mean={np.mean(training_T_error):.4f}, max={np.max(training_T_error):.4f}')
+            # print(f'Training error: mean={np.mean(training_T_error):.4f}, max={np.max(training_T_error):.4f}')
             print(f'Testing error: mean={np.mean(testing_T_error):.4f}, max={np.max(testing_T_error):.4f}')
-            training_mean_error_all.append(np.mean(training_T_error))
+            # training_mean_error_all.append(np.mean(training_T_error))
             testing_mean_error_all.append(np.mean(testing_T_error))
-            training_max_error_all.append(np.max(training_T_error))
+            # training_max_error_all.append(np.max(training_T_error))
             testing_max_error_all.append(np.max(testing_T_error))
             data_sample_epoches.append(epoch)
             # save the model
-            if best_training_error > np.max(training_T_error):
-                best_training_error = np.max(training_T_error)
-                torch.save(model.state_dict(), folder_path+'best_training_model.pt')
+            # if best_training_error > np.max(training_T_error):
+            #     best_training_error = np.max(training_T_error)
+            #     torch.save(model.state_dict(), folder_path+'best_training_model.pt')
             if best_testing_error > np.max(testing_T_error):
                 best_testing_error = np.max(testing_T_error)
                 mean_testing_error = np.mean(testing_T_error)

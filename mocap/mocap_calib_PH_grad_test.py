@@ -30,7 +30,7 @@ Rz=np.array([0,0,1])
 
 config_dir='../config/'
 
-robot_type = 'R2'
+robot_type = 'R1'
 
 if robot_type == 'R1':
     ph_dataset_date='0801'
@@ -100,6 +100,8 @@ test_mocap_T = np.loadtxt(test_data_dir+'mocap_T_align.csv',delimiter=',')
 
 train_robot_q = np.loadtxt(PH_data_dir+'robot_q_align.csv',delimiter=',')
 train_mocap_T = np.loadtxt(PH_data_dir+'mocap_T_align.csv',delimiter=',')
+train_robot_q = train_robot_q[:2]
+train_mocap_T = train_mocap_T[:2]
 
 ##### calibrate base xyz only
 all_train_errors = []
@@ -393,8 +395,8 @@ q_all=[]
 pos_all=[]
 for N in range(total_test_N):
     test_q = test_robot_q[N]
-    # if N%10==0:
-    #     print("N:",N)
+    if N%100==0:
+        print("N:",N)
     #     print("Test q2q3:",np.round(np.degrees(test_q[1:3]),3))
     # print("Using Train q2q3:",np.round(np.degrees(train_q[train_q_index]),3))
 
@@ -552,13 +554,13 @@ error_T_onePH = np.hstack((error_pos_onePH, error_ori_q_onePH))
 error_T_baseline = np.hstack((error_pos_baseline, error_ori_q_baseline))
 error_T_origin = np.hstack((error_pos_origin, error_ori_q_origin))
 
-np.savetxt(test_data_dir+'error_T_fbf.csv', error_T_fbf, delimiter=',')
-np.savetxt(test_data_dir+'error_T_PHZero.csv', error_T_PHZero, delimiter=',')
-np.savetxt(test_data_dir+'error_T_onePH.csv', error_T_onePH, delimiter=',')
-np.savetxt(test_data_dir+'error_T_baseline.csv', error_T_baseline, delimiter=',')
-np.savetxt(test_data_dir+'error_T_origin.csv', error_T_origin, delimiter=',')
+# np.savetxt(test_data_dir+'error_T_fbf.csv', error_T_fbf[split_index:], delimiter=',')
+# np.savetxt(test_data_dir+'error_T_PHZero.csv', error_T_PHZero[split_index:], delimiter=',')
+# np.savetxt(test_data_dir+'error_T_onePH.csv', error_T_onePH[split_index:], delimiter=',')
+# np.savetxt(test_data_dir+'error_T_baseline.csv', error_T_baseline[split_index:], delimiter=',')
+# np.savetxt(test_data_dir+'error_T_origin.csv', error_T_origin[split_index:], delimiter=',')
 
-exit()
+# exit()
 
 error_pos_near_norm=np.linalg.norm(error_pos_near,ord=2,axis=1).flatten()
 error_pos_lin_norm=np.linalg.norm(error_pos_lin,ord=2,axis=1).flatten()
@@ -805,7 +807,7 @@ for method_name, stats in wilcoxon_string.items():
 
 print(markdown_str)
 
-exit()
+# exit()
 
 if plot_origin:
     plt.plot(error_ori_origin_norm,'-o',markersize=1,label='Origin PH')

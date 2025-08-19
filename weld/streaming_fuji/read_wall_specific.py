@@ -485,8 +485,11 @@ def main():
         test_dimension = ['Height', 'Width']
         test_statistics = ['STD']
 
-        start_x={'Baseline':-45,'Control':-45}
-        end_x={'Baseline':45,'Control':45}
+        # start_x={'Baseline':-45,'Control':-45}
+        # end_x={'Baseline':45,'Control':45}
+
+        start_x={'Baseline':-55,'Control':-60}
+        end_x={'Baseline':55,'Control':60}
 
         test_results={}
         for logdata_dir_name,dat_label in zip(test_dir,test_labels):
@@ -580,7 +583,7 @@ def main():
             # ax[dim_i].set_yticks(yticks)  # ensure same positions
             # ax[dim_i].set_yticklabels(new_labels)  # apply new labels
             ax[dim_i].tick_params(axis='both', which='major', labelsize=xy_tick_size)
-            ax[dim_i].set_title(f"Layer "+dim+" at Mean", fontsize=title_size)
+            ax[dim_i].set_title(f"Layer "+dim, fontsize=title_size)
             ax[dim_i].legend(fontsize=legend_size)
             ax[dim_i].grid()
         plt.show()

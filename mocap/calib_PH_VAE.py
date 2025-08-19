@@ -94,7 +94,6 @@ def test_fwd_accuracy(model, interp_funcs, train_q, data_q, data_T,robot,param_n
         latent_vec_pred = np.array([interp_func(q_input) for interp_func in interp_funcs]).T
         if np.isnan(latent_vec_pred).any():
             raise ValueError('Interpolation failed')
-            
         latent_vec_pred = torch.tensor(latent_vec_pred[0], dtype=torch.float32)
         # then, predict delta PH using the latent vector and the decoder  
         pred_PH = model.decoder(latent_vec_pred)
@@ -108,6 +107,102 @@ def test_fwd_accuracy(model, interp_funcs, train_q, data_q, data_T,robot,param_n
         p_error_all.append(p_error)
         ori_error_all.append(np.abs(ori_error))
     return p_error_all,ori_error_all
+
+def test_fwd_T(model, interp_funcs, train_q, data_q, data_T,robot,param_nominal,q_index=np.array([1,2])):
+    
+    p_error_all = []
+    ori_error_all = []
+    for i,q in enumerate(data_q):
+        # first, interpolate q2q3 to get latent vector
+        # q2q3 = np.array([q[1],q[2]])
+        q_input = np.array(q[q_index])
+        latent_vec_pred = np.array([interp_func(q_input) for interp_func in interp_funcs]).T
+        if np.isnan(latent_vec_pred).any():
+            raise ValueError('Interpolation failed')
+            
+        latent_vec_pred = torch.tensor(latent_vec_pred[0], dtype=torch.float32)
+        # then, predict delta PH using the latent vector and the decoder  
+        pred_PH = model.decoder(latent_vec_pred)
+        pred_PH = pred_PH.detach().numpy() + param_nominal
+        # get the robot position error
+        robot = get_PH_from_param(pred_PH,robot,unit='radians')
+        T_pred = robot.fwd(q)
+        p_error_all.append(T_pred.p - data_T[i][:3])
+        ori_error_all.append(R2q(T_pred.R@q2R(data_T[i][3:]).T))
+    T_error_all = np.hstack((p_error_all,ori_error_all))
+    return T_error_all
+
+def prepare_model(AE_model_dir,robot,PH_q,training_q):
+
+    # get param nominal
+    robot.P_nominal=deepcopy(robot.robot.P)
+    robot.H_nominal=deepcopy(robot.robot.H)
+    robot.P_nominal=robot.P_nominal.T
+    robot.H_nominal=robot.H_nominal.T
+    robot = get_H_param_axis(robot) # get the axis to parametrize H
+    param_nominal = np.array(np.reshape(robot.robot.P.T,-1).tolist()+[0]*12)
+    nom_H = deepcopy(robot.robot.H)
+
+    # get theta phi
+    train_q=[]
+    param_PH_q = []
+    for qkey in PH_q.keys():
+        # NN data input: q2 q3
+        train_q.append(np.array(qkey))
+        # NN output: P H
+        this_H = PH_q[qkey]['H']
+        param_H = []
+        for i,h in enumerate(this_H.T):
+            theta_sol = subproblem2(nom_H[:,i], h, robot.param_k2[i], robot.param_k1[i])
+            theta_sol = theta_sol[0] if theta_sol[0][0]<np.pi/2 and theta_sol[0][0]>-np.pi/2 else theta_sol[1]
+            param_H.extend(theta_sol[::-1])
+        param_PH = np.array(np.reshape(PH_q[qkey]['P'].T,-1).tolist()+param_H)
+        param_PH_q.append(param_PH-param_nominal) # relative to nominal, predict the difference
+    inputs_q2q3 = np.array(train_q)
+    data_delta_PH = np.array(param_PH_q)
+
+    # data preprocessing
+    N_per_cluster = 7
+    q_index = np.arange(1,3)
+    data_delta_PH = torch.tensor(data_delta_PH, dtype=torch.float32)
+    inputs_q2q3_tensor = torch.tensor(inputs_q2q3, dtype=torch.float32)
+    # augmented inputs
+    inputs_qall = []
+    data_delta_PH_qall = []
+    for i,q2q3 in enumerate(inputs_q2q3):
+        nearest_q_index = np.argsort(np.linalg.norm(training_q[:,1:3] - q2q3, ord=2, axis=1))
+        inputs_qall.extend(training_q[nearest_q_index[:N_per_cluster]][:,q_index])
+        data_delta_PH_qall.extend(np.tile(data_delta_PH[i],(N_per_cluster,1)))
+    inputs_qall = np.array(inputs_qall)
+    data_delta_PH_qall = np.array(data_delta_PH_qall)
+    inputs_qall_tensor = torch.tensor(inputs_qall, dtype=torch.float32)
+    data_delta_PH_qall_tensor = torch.tensor(data_delta_PH_qall, dtype=torch.float32)
+
+    data_dir = 'PH_NN_results/'+AE_model_dir
+    # read meta data
+    with open(data_dir+'meta_data.yaml') as file:
+        vae_meta_data = yaml.full_load(file)
+    # read vae model
+    # Create an instance of the neural network
+    if vae_meta_data['Variational']:
+        vae_model = VariationalAutoEncoder(vae_meta_data['data_size'], vae_meta_data['latent_size'], vae_meta_data['hidden_sizes'], mu=vae_meta_data['mu'], sigma=vae_meta_data['sigma'])
+    else:
+        vae_model = AutoEncoder(vae_meta_data['data_size'], vae_meta_data['latent_size'], vae_meta_data['hidden_sizes'])
+    vae_model.load_state_dict(torch.load(data_dir+'best_testing_model.pt',weights_only=True))
+    vae_model.eval()
+
+    latent_size = vae_meta_data['latent_size']
+
+    # get linear interpolation functions
+    latent_vec = vae_model.encoder(data_delta_PH_qall_tensor)
+    latent_vec_cpu = latent_vec.detach().numpy()
+    interp_funcs = []
+    print("Get linear interpolation functions")
+    for latent_i in range(latent_size):
+        interp_funcs.append(LinearNDInterpNearestExtrap(inputs_qall, latent_vec_cpu[:,latent_i]))
+    print("Interpolation functions done")
+
+    return vae_model, interp_funcs, param_nominal
 
 def latent_space_analysis(inputs_q2q3, data_delta_PH, training_q, training_T, testing_q, testing_T,robot,param_nominal,robot_type):
 
@@ -228,10 +323,12 @@ def trained_model_test(inputs_q2q3, data_delta_PH, training_q, training_T, testi
     data_delta_PH_qall_tensor = torch.tensor(data_delta_PH_qall, dtype=torch.float32)
 
     # AE_model_dir = "trainLATENT_VAE_R1_latent6_2411121154/"
-    AE_model_dir = 'trainLATENT_AE_R1_latent6_2411121051/'
+    # AE_model_dir = 'trainLATENT_AE_R1_latent6_2411121051/'
     # AE_model_dir = 'trainLATENT_AE_R2_latent6_2411201610/'
     # AE_model_dir = 'trainLATENT_AE_R1_latent6_weighted_2503091944/'
     # AE_model_dir = 'trainLATENT_AE_R2_latent6_weighted_2503092025/'
+    AE_model_dir = 'trainLATENT_AE_R1_latent12_weighted_2508151932/'
+    # AE_model_dir = 'trainLATENT_AE_R2_latent12_weighted_2508151921/'
 
     data_dir = 'PH_NN_results/'+AE_model_dir
     # read meta data
@@ -259,22 +356,25 @@ def trained_model_test(inputs_q2q3, data_delta_PH, training_q, training_T, testi
         interp_funcs.append(LinearNDInterpNearestExtrap(inputs_qall, latent_vec_cpu[:,latent_i]))
     print("Interpolation functions done")
     # get data accuracy
-    training_T_error,training_ori_error = test_fwd_accuracy(vae_model, interp_funcs, inputs_qall, training_q, training_T,robot,param_nominal,q_index)
-    testing_T_error,testing_ori_error = test_fwd_accuracy(vae_model, interp_funcs, inputs_qall, testing_q, testing_T,robot,param_nominal,q_index)
+    # training_T_error,training_ori_error = test_fwd_accuracy(vae_model, interp_funcs, inputs_qall, training_q, training_T,robot,param_nominal,q_index)
+    testing_p_error,testing_ori_error = test_fwd_accuracy(vae_model, interp_funcs, inputs_qall, testing_q, testing_T,robot,param_nominal,q_index)
+    
     # print training and testing error, mean, max
-    print(f'Training error: mean={np.mean(training_T_error):.4f}, max={np.max(training_T_error):.4f}')
-    print(f'Testing error: mean={np.mean(testing_T_error):.4f}, max={np.max(testing_T_error):.4f}')
+    # print(f'Training error: mean={np.mean(training_T_error):.4f}, max={np.max(training_T_error):.4f}')
+    print(f'Testing error: mean={np.mean(testing_p_error):.4f}, max={np.max(testing_p_error):.4f}')
 
-    print(f'Max testing error: {round(np.max(testing_T_error),2):.2f}')
-    print(f'Mean testing error: {round(np.mean(testing_T_error),2):.2f}')
-    print(f'Std testing error: {round(np.std(testing_T_error),2):.2f}')
+    print(f'Max testing error: {round(np.max(testing_p_error),2):.2f}')
+    print(f'Mean testing error: {round(np.mean(testing_p_error),2):.2f}')
+    print(f'Std testing error: {round(np.std(testing_p_error),2):.2f}')
     print(f'Max testing ori error: {round(np.max(testing_ori_error),2):.2f}')
     print(f'Mean testing ori error: {round(np.mean(testing_ori_error),2):.2f}')
     print(f'Std testing ori error: {round(np.std(testing_ori_error),2):.2f}')
 
-    if test_data_dir is not None:
-        # save the testing error
-        np.savetxt(test_data_dir+'testing_pos_error_AE.csv', testing_T_error, delimiter=',')
+    # if test_data_dir is not None:
+    #     # save the testing error
+    #     np.savetxt(test_data_dir+'testing_pos_error_AE.csv', testing_p_error, delimiter=',')
+    #     testing_T_error = test_fwd_T(vae_model, interp_funcs, inputs_qall, testing_q, testing_T,robot,param_nominal,q_index)
+    #     np.savetxt(test_data_dir+'error_T_AE.csv', testing_T_error, delimiter=',')
 
 def train_interp(inputs_q2q3, data_delta_PH, training_q, training_T, testing_q, testing_T,robot,param_nominal,robot_type):
 
@@ -436,7 +536,7 @@ def train(inputs_q2q3, data_delta_PH, training_q, training_T, testing_q, testing
     
 
     # Define the input size, hidden size, and output size
-    latent_size = 12 # 2 6 12
+    latent_size = 6 # 2 6 12
     hidden_sizes = [200,200,200]
     data_size = 33
     mu = 0
@@ -617,128 +717,128 @@ def train(inputs_q2q3, data_delta_PH, training_q, training_T, testing_q, testing
 
     print('Training time:',time.time()-training_start_time)            
 
-Rx=np.array([1,0,0])
-Ry=np.array([0,1,0])
-Rz=np.array([0,0,1])
+def main():
 
 
-config_dir='../config/'
-\
+    config_dir='../config/'
 
-robot_type = 'R1'
-####
-# robot_type = 'R2'
+    robot_type = 'R1'
+    ####
+    # robot_type = 'R2'
 
-if robot_type == 'R1':
-    ph_dataset_date='0801'
-    test_dataset_date='0801'
-    robot_marker_dir=config_dir+'MA2010_marker_config/'
-    tool_marker_dir=config_dir+'weldgun_marker_config/'
-    robot=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',\
-                        tool_file_path=config_dir+'torch.csv',d=15,\
-                        #  tool_file_path='',d=0,\
-                        pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',\
-                        base_marker_config_file=robot_marker_dir+'MA2010_'+ph_dataset_date+'_marker_config.yaml',\
-                        tool_marker_config_file=tool_marker_dir+'weldgun_'+ph_dataset_date+'_marker_config.yaml')
-    nom_P=np.array([[0,0,0],[150,0,0],[0,0,760],\
-                   [1082,0,200],[0,0,0],[0,0,0],[100,0,0]]).T
-    nom_H=np.array([[0,0,1],[0,1,0],[0,-1,0],\
-                   [-1,0,0],[0,-1,0],[-1,0,0]]).T
-elif robot_type == 'R2':
-    ph_dataset_date='0804'
-    test_dataset_date='0804'
-    robot_marker_dir=config_dir+'MA1440_marker_config/'
-    tool_marker_dir=config_dir+'mti_marker_config/'
-    robot=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.yml',\
-                        tool_file_path=config_dir+'mti.csv',\
-                        pulse2deg_file_path=config_dir+'MA1440_A0_pulse2deg_real.csv',\
-                        base_marker_config_file=robot_marker_dir+'MA1440_'+ph_dataset_date+'_marker_config.yaml',\
-                        tool_marker_config_file=tool_marker_dir+'mti_'+ph_dataset_date+'_marker_config.yaml')
-    nom_P=np.array([[0,0,0],[155,0,0],[0,0,614],\
-                   [640,0,200],[0,0,0],[0,0,0],[100,0,0]]).T
-    nom_H=np.array([[0,0,1],[0,1,0],[0,-1,0],\
-                   [-1,0,0],[0,-1,0],[-1,0,0]]).T
+    if robot_type == 'R1':
+        ph_dataset_date='0801'
+        test_dataset_date='0801'
+        robot_marker_dir=config_dir+'MA2010_marker_config/'
+        tool_marker_dir=config_dir+'weldgun_marker_config/'
+        robot=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',\
+                            tool_file_path=config_dir+'torch.csv',d=15,\
+                            #  tool_file_path='',d=0,\
+                            pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',\
+                            base_marker_config_file=robot_marker_dir+'MA2010_'+ph_dataset_date+'_marker_config.yaml',\
+                            tool_marker_config_file=tool_marker_dir+'weldgun_'+ph_dataset_date+'_marker_config.yaml')
+        nom_P=np.array([[0,0,0],[150,0,0],[0,0,760],\
+                    [1082,0,200],[0,0,0],[0,0,0],[100,0,0]]).T
+        nom_H=np.array([[0,0,1],[0,1,0],[0,-1,0],\
+                    [-1,0,0],[0,-1,0],[-1,0,0]]).T
+    elif robot_type == 'R2':
+        ph_dataset_date='0804'
+        test_dataset_date='0804'
+        robot_marker_dir=config_dir+'MA1440_marker_config/'
+        tool_marker_dir=config_dir+'mti_marker_config/'
+        robot=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.yml',\
+                            tool_file_path=config_dir+'mti.csv',\
+                            pulse2deg_file_path=config_dir+'MA1440_A0_pulse2deg_real.csv',\
+                            base_marker_config_file=robot_marker_dir+'MA1440_'+ph_dataset_date+'_marker_config.yaml',\
+                            tool_marker_config_file=tool_marker_dir+'mti_'+ph_dataset_date+'_marker_config.yaml')
+        nom_P=np.array([[0,0,0],[155,0,0],[0,0,614],\
+                    [640,0,200],[0,0,0],[0,0,0],[100,0,0]]).T
+        nom_H=np.array([[0,0,1],[0,1,0],[0,-1,0],\
+                    [-1,0,0],[0,-1,0],[-1,0,0]]).T
 
-# T_base_basemarker = robot.T_base_basemarker
-# T_basemarker_base = T_base_basemarker.inv()
-robot.P_nominal=deepcopy(robot.robot.P)
-robot.H_nominal=deepcopy(robot.robot.H)
-robot.P_nominal=robot.P_nominal.T
-robot.H_nominal=robot.H_nominal.T
-robot = get_H_param_axis(robot) # get the axis to parametrize H
-param_nominal = np.array(np.reshape(robot.robot.P.T,-1).tolist()+[0]*12)
+    # T_base_basemarker = robot.T_base_basemarker
+    # T_basemarker_base = T_base_basemarker.inv()
+    robot.P_nominal=deepcopy(robot.robot.P)
+    robot.H_nominal=deepcopy(robot.robot.H)
+    robot.P_nominal=robot.P_nominal.T
+    robot.H_nominal=robot.H_nominal.T
+    robot = get_H_param_axis(robot) # get the axis to parametrize H
+    param_nominal = np.array(np.reshape(robot.robot.P.T,-1).tolist()+[0]*12)
 
-#### using rigid body
-use_toolmaker=True
-T_base_basemarker = robot.T_base_basemarker
-T_basemarker_base = T_base_basemarker.inv()
+    #### using rigid body
+    use_toolmaker=True
+    T_base_basemarker = robot.T_base_basemarker
+    T_basemarker_base = T_base_basemarker.inv()
 
-if use_toolmaker:
-    robot.robot.R_tool = robot.T_toolmarker_flange.R
-    robot.robot.p_tool = robot.T_toolmarker_flange.p
-    robot.T_tool_toolmarker = Transform(np.eye(3),[0,0,0])
-    
-    # robot.robot.R_tool = np.eye(3)
-    # robot.robot.p_tool = np.zeros(3)
-    # robot.T_tool_toolmarker = robot.T_toolmarker_flange.inv()
+    if use_toolmaker:
+        robot.robot.R_tool = robot.T_toolmarker_flange.R
+        robot.robot.p_tool = robot.T_toolmarker_flange.p
+        robot.T_tool_toolmarker = Transform(np.eye(3),[0,0,0])
+        
+        # robot.robot.R_tool = np.eye(3)
+        # robot.robot.p_tool = np.zeros(3)
+        # robot.T_tool_toolmarker = robot.T_toolmarker_flange.inv()
 
-PH_data_dir='PH_grad_data/test'+ph_dataset_date+'_'+robot_type+'/train_data_'
-# test_data_dir='kinematic_raw_data/test'+test_dataset_date+'_aftercalib/'
-test_data_dir='kinematic_raw_data/test'+test_dataset_date+'_'+robot_type+'/'
+    PH_data_dir='PH_grad_data/test'+ph_dataset_date+'_'+robot_type+'/train_data_'
+    # test_data_dir='kinematic_raw_data/test'+test_dataset_date+'_aftercalib/'
+    test_data_dir='kinematic_raw_data/test'+test_dataset_date+'_'+robot_type+'/'
 
-print(PH_data_dir)
-print(test_data_dir)
+    print(PH_data_dir)
+    print(test_data_dir)
 
-use_raw=False
-test_robot_q = np.loadtxt(test_data_dir+'robot_q_align.csv',delimiter=',')
-test_mocap_T = np.loadtxt(test_data_dir+'mocap_T_align.csv',delimiter=',')
+    use_raw=False
+    test_robot_q = np.loadtxt(test_data_dir+'robot_q_align.csv',delimiter=',')
+    test_mocap_T = np.loadtxt(test_data_dir+'mocap_T_align.csv',delimiter=',')
 
-train_robot_q = np.loadtxt(PH_data_dir+'robot_q_align.csv',delimiter=',')
-train_mocap_T = np.loadtxt(PH_data_dir+'mocap_T_align.csv',delimiter=',')
+    train_robot_q = np.loadtxt(PH_data_dir+'robot_q_align.csv',delimiter=',')
+    train_mocap_T = np.loadtxt(PH_data_dir+'mocap_T_align.csv',delimiter=',')
 
-# split_index = len(train_robot_q)
-# test_robot_q = np.vstack((train_robot_q,test_robot_q))
-# test_mocap_T = np.vstack((train_mocap_T,test_mocap_T))
+    # split_index = len(train_robot_q)
+    # test_robot_q = np.vstack((train_robot_q,test_robot_q))
+    # test_mocap_T = np.vstack((train_mocap_T,test_mocap_T))
 
-calib_file_name = 'calib_PH_q_ana.pickle'
-with open(PH_data_dir+calib_file_name,'rb') as file:
-    PH_q=pickle.load(file)
+    calib_file_name = 'calib_PH_q_ana.pickle'
+    with open(PH_data_dir+calib_file_name,'rb') as file:
+        PH_q=pickle.load(file)
 
-# ph_param_fbf=PH_Param(nom_P,nom_H)
-# ph_param_fbf.fit(PH_q,method='FBF')
+    # ph_param_fbf=PH_Param(nom_P,nom_H)
+    # ph_param_fbf.fit(PH_q,method='FBF')
 
-# get theta phi
-train_q=[]
-param_PH_q = []
-for qkey in PH_q.keys():
-    # NN data input: q2 q3
-    train_q.append(np.array(qkey))
-    # NN output: P H
-    this_H = PH_q[qkey]['H']
-    param_H = []
-    for i,h in enumerate(this_H.T):
-        theta_sol = subproblem2(nom_H[:,i], h, robot.param_k2[i], robot.param_k1[i])
-        theta_sol = theta_sol[0] if theta_sol[0][0]<np.pi/2 and theta_sol[0][0]>-np.pi/2 else theta_sol[1]
-        param_H.extend(theta_sol[::-1])
-    param_PH = np.array(np.reshape(PH_q[qkey]['P'].T,-1).tolist()+param_H)
-    param_PH_q.append(param_PH-param_nominal) # relative to nominal, predict the difference
+    # get theta phi
+    train_q=[]
+    param_PH_q = []
+    for qkey in PH_q.keys():
+        # NN data input: q2 q3
+        train_q.append(np.array(qkey))
+        # NN output: P H
+        this_H = PH_q[qkey]['H']
+        param_H = []
+        for i,h in enumerate(this_H.T):
+            theta_sol = subproblem2(nom_H[:,i], h, robot.param_k2[i], robot.param_k1[i])
+            theta_sol = theta_sol[0] if theta_sol[0][0]<np.pi/2 and theta_sol[0][0]>-np.pi/2 else theta_sol[1]
+            param_H.extend(theta_sol[::-1])
+        param_PH = np.array(np.reshape(PH_q[qkey]['P'].T,-1).tolist()+param_H)
+        param_PH_q.append(param_PH-param_nominal) # relative to nominal, predict the difference
 
-train_q = np.array(train_q)
-param_PH_q = np.array(param_PH_q)
+    train_q = np.array(train_q)
+    param_PH_q = np.array(param_PH_q)
 
-# draw the data q (6 of them) vs index 
-# in a subplot
-# fig, axs = plt.subplots(2, 3)
-# for i in range(6):
-#     axs[i//3,i%3].plot(np.degrees(train_robot_q[:,i]))
-#     axs[i//3,i%3].plot(np.degrees(test_robot_q[:,i]))
-#     axs[i//3,i%3].set_title('q'+str(i+1))
-# plt.show()
+    # draw the data q (6 of them) vs index 
+    # in a subplot
+    # fig, axs = plt.subplots(2, 3)
+    # for i in range(6):
+    #     axs[i//3,i%3].plot(np.degrees(train_robot_q[:,i]))
+    #     axs[i//3,i%3].plot(np.degrees(test_robot_q[:,i]))
+    #     axs[i//3,i%3].set_title('q'+str(i+1))
+    # plt.show()
 
-## NN input: training q, 2x1
-## NN output: training param_PH, 33x1
-## train the NN
-# train(np.array(train_q),np.array(param_PH_q),train_robot_q,train_mocap_T,test_robot_q,test_mocap_T,robot,param_nominal,robot_type)
-# train_interp(np.array(train_q),np.array(param_PH_q),train_robot_q,train_mocap_T,test_robot_q,test_mocap_T,robot,param_nominal,robot_type)
-# latent_space_analysis(np.array(train_q),np.array(param_PH_q),train_robot_q,train_mocap_T,test_robot_q,test_mocap_T,robot,param_nominal,robot_type)
-trained_model_test(np.array(train_q),np.array(param_PH_q),train_robot_q,train_mocap_T,test_robot_q,test_mocap_T,robot,param_nominal,robot_type,test_data_dir=test_data_dir)
+    ## NN input: training q, 2x1
+    ## NN output: training param_PH, 33x1
+    ## train the NN
+    # train(np.array(train_q),np.array(param_PH_q),train_robot_q,train_mocap_T,test_robot_q,test_mocap_T,robot,param_nominal,robot_type)
+    # train_interp(np.array(train_q),np.array(param_PH_q),train_robot_q,train_mocap_T,test_robot_q,test_mocap_T,robot,param_nominal,robot_type)
+    # latent_space_analysis(np.array(train_q),np.array(param_PH_q),train_robot_q,train_mocap_T,test_robot_q,test_mocap_T,robot,param_nominal,robot_type)
+    trained_model_test(np.array(train_q),np.array(param_PH_q),train_robot_q,train_mocap_T,test_robot_q,test_mocap_T,robot,param_nominal,robot_type,test_data_dir=test_data_dir)
+
+if __name__ == "__main__":
+    main()
