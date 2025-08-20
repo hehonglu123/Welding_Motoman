@@ -19,13 +19,22 @@ mm2inch = 1/25.4
 inch2mm = 25.4
 
 class controlLogLogModel():
-    def __init__(self,model_dir):
+    def __init__(self,model_dir,lambda_fac=0.9,cov_dh_init=100,cov_dw_init=100):
         self.model_dir = 'weld_Seq_models/'+model_dir
 
         self.theta_dh = np.loadtxt(self.model_dir + '/theta_param_dh.csv', delimiter=',')
         self.theta_dw = np.loadtxt(self.model_dir + '/theta_param_dw.csv', delimiter=',')
+        self.theta_dh_origin = deepcopy(self.theta_dh)
+        self.theta_dw_origin = deepcopy(self.theta_dw)
+
+        self.lambda_fac = lambda_fac
+        self.P_dh = cov_dh_init
+        self.P_dw = cov_dw_init
 
     def get_control_loglog(self, dh, dw):
+
+        dh = np.max([0.03, dh]) # prevent from log invalid
+        dw = np.max([0.03, dw]) # prevent from log invalid
 
         log_v_om = np.linalg.pinv(np.vstack((self.theta_dh[:2], self.theta_dw[:2])))@(np.log([dh,dw])-np.array([self.theta_dh[2],self.theta_dw[2]]))
 
@@ -41,6 +50,9 @@ class controlLogLogModel():
 
     def get_pred_loglog(self, torch_v, feedrate):
 
+        torch_v = np.max([0.03, torch_v]) # prevent from log invalid
+        feedrate = np.max([10, feedrate]) # prevent from log invalid
+
         torch_feedrate = feedrate * inch2mm / 60 # inch/min to mm/s
         torch_v_log = np.log(torch_v)
         torch_feedrate_log = np.log(torch_feedrate)
@@ -50,6 +62,58 @@ class controlLogLogModel():
 
         return dh_pred, dw_pred
 
+    def rls_update(self, profile_height, last_profile_height, profile_width, control_inputs):
+
+        last_measured_height = np.interp(control_inputs[:,1], last_profile_height[:,0], last_profile_height[:,1])
+        this_measured_height = np.interp(control_inputs[:,1], profile_height[:,0], profile_height[:,1])
+        measured_dh = this_measured_height - last_measured_height
+        measured_width = np.interp(control_inputs[:,1], profile_width[:,0], profile_width[:,1])
+
+        cmd_updated_id = np.where(control_inputs[:,-1]!=0)[0]
+
+        if cmd_updated_id.size>0:
+            print("Get multiple new data points. RLS update.")
+            ##### sample data
+            measured_dh_sample = self._get_sum_profile(measured_dh, cmd_updated_id)
+            measured_width_sample = self._get_sum_profile(measured_width, cmd_updated_id)
+            control_torch_v_sample = self._get_sum_profile(control_inputs[:,2], cmd_updated_id)
+            control_feedrate_sample = self._get_sum_profile(control_inputs[:,3], cmd_updated_id)
+            control_feedrate_sample = control_feedrate_sample*inch2mm/60 # from ipm to mm/sec
+
+            ##### prepare data
+            measured_width_sample = measured_width_sample[measured_dh_sample>0]
+            control_torch_v_sample = control_torch_v_sample[measured_dh_sample>0]
+            control_feedrate_sample = control_feedrate_sample[measured_dh_sample>0]
+            measured_dh_sample = measured_dh_sample[measured_dh_sample>0]
+            measured_dh_sample = measured_dh_sample[measured_width_sample>0]
+            control_torch_v_sample = control_torch_v_sample[measured_width_sample>0]
+            control_feedrate_sample = control_feedrate_sample[measured_width_sample>0]
+            measured_width_sample = measured_width_sample[measured_width_sample>0]
+
+            # control input matrix
+            X_new_input = np.vstack((np.log(control_torch_v_sample), np.log(control_feedrate_sample), np.ones_like(control_torch_v_sample))).T
+            # measure output vectors
+            measured_dh_sample_log = np.log(measured_dh_sample)
+            measured_width_sample_log = np.log(measured_width_sample)
+
+            ##### update the parameters using recursive least squares
+            # update theta dh
+            K_gain_dh = self.P_dh@X_new_input.T@np.linalg.inv(self.lambda_fac*np.eye(X_new_input.shape[0])+X_new_input@self.P_dh@X_new_input.T)
+            self.theta_dh = self.theta_dh + K_gain_dh@(measured_dh_sample_log-X_new_input@self.theta_dh)
+            self.P_dh = (self.P_dh-K_gain_dh@X_new_input@self.P_dh)/self.lambda_fac
+            # update theta dw
+            K_gain_dw = self.P_dw@X_new_input.T@np.linalg.inv(self.lambda_fac*np.eye(X_new_input.shape[0])+X_new_input@self.P_dw@X_new_input.T)
+            self.theta_dw = self.theta_dw + K_gain_dw@(measured_width_sample_log-X_new_input@self.theta_dw)
+            self.P_dw = (self.P_dw-K_gain_dw@X_new_input@self.P_dw)/self.lambda_fac
+
+    def _get_sum_profile(self,profile,sample_id):
+
+        profile_sum = np.concatenate([[0.0]],np.cumsum(profile))
+        starts, ends = sample_id[:-1], sample_id[1:]
+        sums = profile_sum[ends] - profile_sum[starts]
+        counts = ends - starts
+        means = sums / counts
+        return means
 
 class controlModel():
     def __init__(self, model_dir, minmax_v_file='weld_Seq_models/test_cmd_v_feedrate.csv', minmax_feedrate_file='weld_Seq_models/train_cmd_v_feedrate.csv',\

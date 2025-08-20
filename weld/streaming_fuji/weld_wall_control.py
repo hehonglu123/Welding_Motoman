@@ -139,6 +139,8 @@ def main():
     thermal_on = True
     input_from_user = False
     SIMULATION = True
+    # simulation_speed_sim = False
+    simulation_save_control_state_fig = False
 
     if SIMULATION:
         weld_arcon = False
@@ -302,7 +304,7 @@ def main():
     lambda_smooth = 1e-2  # regularization parameter for smoothness
     lambda_disc = 1e-1*5  # regularization parameter for discrete input
     ### log-log model
-    loglog_model_dir = 'loglog_model'
+    loglog_model_dir = 'loglog_models'
     loglogModel = controlLogLogModel(loglog_model_dir)
     # max min torch velocity
     v_Maximum = 20
@@ -474,6 +476,10 @@ def main():
 
                     if input_from_user:
                         input("Press Enter to continue...")
+                    
+                    ### turn on sensors
+                    if thermal_on:
+                        rr_sensors.start_all_sensors()
 
                     # move to start point with safety_z_offset
                     if not SIMULATION:
@@ -516,15 +522,12 @@ def main():
                         v_cmd ,feedrate_cmd = loglogModel.get_control_loglog(next_dh,next_dw) # get the velocity and feedrate from the control loglog as the initial
                         dh_pred, dw_pred = loglogModel.get_pred_loglog(v_cmd, feedrate_cmd) # get the predicted dh and dw from the control loglog
                         print(f'Initial Torch V: {v_cmd:.2f} mm/s, Feedrate: {feedrate_cmd:.2f} inch/min, dh_pred: {dh_pred:.2f} mm, dw_pred: {dw_pred:.2f} mm')
-                    ### turn on sensors
-                    if thermal_on:
-                        rr_sensors.start_all_sensors()
                     
                     ### start welding and data logging
                     # if SIMULATION:
                     control_status_log = []
                     time_count = []
-                    model_inference_time_count = []
+                    model_inference_time_count = [0,0]
                     while lam_cur < (lam_relative[-1] - v_cmd/stream_rate):
                         loop_start=time.perf_counter()
 
@@ -553,6 +556,7 @@ def main():
                             arc_off=False
 
                         ### update welding param
+                        weld_cmd_updated = False
                         if time.perf_counter()-last_update_time>1./feedrate_update_rate:
                             model_inference_start_time = time.perf_counter()
                             if weld_parts == 'layer':
@@ -569,6 +573,7 @@ def main():
                                     v_cmd ,feedrate_cmd = loglogModel.get_control_loglog(next_dh,next_dw)
                                     dh_pred, dw_pred = loglogModel.get_pred_loglog(v_cmd, feedrate_cmd)
                                 v_cmd = np.clip(v_cmd, v_minimum, v_Maximum) # clip the velocity
+                                weld_cmd_updated = True
                             if weld_arcon:
                                 fronius_client.async_set_job_number(int(round(feedrate_cmd/10)+job_offset), welder_handler)
                             model_inference_time_count.append(time.perf_counter()-model_inference_start_time)
@@ -579,7 +584,7 @@ def main():
                                 print("Current X:", this_curve_p[0], "Update Feedrate, Velocity:",int(round(feedrate_cmd/10)*10),round(v_cmd,1))
                                 last_viz_time=time.perf_counter()
                         if weld_parts == 'layer':
-                            control_status_log.append(np.hstack((time.perf_counter(),this_curve_p[0],v_cmd,int(round(feedrate_cmd/10)*10),next_dh, next_dw, dh_pred, dw_pred)))
+                            control_status_log.append(np.hstack((time.perf_counter(),this_curve_p[0],v_cmd,int(round(feedrate_cmd/10)*10),next_dh, next_dw, dh_pred, dw_pred, weld_cmd_updated)))
                         
                         ### log data, line scanner (fujicam), robot welding joints
                         if fuji_scanon:
@@ -602,7 +607,6 @@ def main():
                         if not SIMULATION:
                             SS.position_cmd(q_cmd,loop_start)
                         else:
-                            # wait for the robot to reach the start point, clean the buffer
                             while time.perf_counter()-loop_start < 1/stream_rate*0.975:
                                 time.sleep(0)	#sleep 0 for bg thread to run
                                 continue 
@@ -616,39 +620,33 @@ def main():
                     ### welding end
                     if weld_arcon:
                         fronius_client.stop_weld()
-                    arc_off=True
-                    fuji_scan_time = 0.5 # stay for a while for scanning, and robot to move to the final position
-                    fuji_scan_start = time.perf_counter()
-                    while time.perf_counter()-fuji_scan_start<fuji_scan_time:
-                        ### log data
-                        if fuji_scanon:
-                            wire_packet=fuji_scan_wire.TryGetInValue() # log fuji cam scanner data
-                            valid_indices=np.where(wire_packet[1].I_data>1)[0]
-                            valid_indices=np.intersect1d(valid_indices,np.where(np.abs(wire_packet[1].Z_data)>30)[0])
-                            line_profile=np.hstack((wire_packet[1].Y_data[valid_indices].reshape(-1,1),wire_packet[1].Z_data[valid_indices].reshape(-1,1)))
-                            scan_exe.append(line_profile)
-                        weld_js_exe.append(np.append(time.perf_counter(),deepcopy(SS.q_cur))) if not SIMULATION else None # log robot joints
+                    arc_off=True # turn the arc off
+                    ### log the remaining fujicam data
+                    if not SIMULATION:
+                        fuji_scan_time = 0.5 # stay for a while for scanning, and robot to move to the final position
+                        fuji_scan_start = time.perf_counter()
+                        while time.perf_counter()-fuji_scan_start<fuji_scan_time:
+                            ### log data
+                            if fuji_scanon:
+                                wire_packet=fuji_scan_wire.TryGetInValue() # log fuji cam scanner data
+                                valid_indices=np.where(wire_packet[1].I_data>1)[0]
+                                valid_indices=np.intersect1d(valid_indices,np.where(np.abs(wire_packet[1].Z_data)>30)[0])
+                                line_profile=np.hstack((wire_packet[1].Y_data[valid_indices].reshape(-1,1),wire_packet[1].Z_data[valid_indices].reshape(-1,1)))
+                                scan_exe.append(line_profile)
+                            weld_js_exe.append(np.append(time.perf_counter(),deepcopy(SS.q_cur))) if not SIMULATION else None # log robot joints
 
-                        ### scan online processing
-                        if fuji_scanon and scan_online_process:
-                            scan_process.raw_scan_pipe.append(deepcopy(line_profile))
-                            while len(scan_process.denoise_pipe)!=0:
-                                scan_denoise = scan_process.denoise_pipe.pop(0)
-                                # get denoise scan
-                                scan_exe_noise_remove.append(scan_denoise)
-                        time.sleep(1/stream_rate)
+                            ### scan online processing
+                            if fuji_scanon and scan_online_process:
+                                scan_process.raw_scan_pipe.append(deepcopy(line_profile))
+                                while len(scan_process.denoise_pipe)!=0:
+                                    scan_denoise = scan_process.denoise_pipe.pop(0)
+                                    # get denoise scan
+                                    scan_exe_noise_remove.append(scan_denoise)
+                            time.sleep(1/stream_rate)
                     ########################################
 
                     ### simulation visualization
                     if weld_parts == 'layer' and SIMULATION:
-                        # plt.plot(last_profile_height[:,0], last_profile_height[:,1], '-o')
-                        # plt.xlabel("X (mm)", fontsize=xy_label_size)
-                        # plt.ylabel("Height (mm)", fontsize=xy_label_size)
-                        # plt.xticks(fontsize=xy_tick_size)
-                        # plt.yticks(fontsize=xy_tick_size)
-                        # plt.title("Last Profile Height", fontsize=title_size)
-                        # plt.grid(True)
-                        # plt.show()
                         profile_height = np.loadtxt(sim_folder+'layer'+str(i)+f'/profile_height.csv',delimiter=',')
                         profile_height_shift = deepcopy(profile_height)
                         profile_height_shift[:,0] += shift_weld_profile_x
@@ -705,8 +703,11 @@ def main():
                             ax.grid(True)
                         plt.suptitle(f"Layer {layer_count} Control Status", fontsize=title_size)
                         # plt.show()
-                        fig.savefig(sim_folder+'layer'+str(i)+'/control_status.png', dpi=300, bbox_inches='tight')
-                        plt.close(fig)
+                        if simulation_save_control_state_fig:
+                            fig.savefig(sim_folder+'layer'+str(i)+'/control_status.png', dpi=300, bbox_inches='tight')
+                            plt.close(fig)
+                        else:
+                            plt.show()
 
                     # if torch orientation is fixed, and the traveling/curve direction is opposite
                     if forward and curve_direction == 'backward':
@@ -789,39 +790,39 @@ def main():
                             else:
                                 time.sleep(1/stream_rate) # wait for the robot to reach the start point, clean the buffer
                                 
-                    ########################################
-                    fuji_scan_time = 0.5 # stay for a while for scanning, and robot to move to the final position
-                    fuji_scan_start = time.perf_counter()
-                    while time.perf_counter()-fuji_scan_start<fuji_scan_time:
-                        ### log data
-                        if fuji_scanon:
-                            wire_packet=fuji_scan_wire.TryGetInValue() # log fuji cam scanner data
-                            valid_indices=np.where(wire_packet[1].I_data>1)[0]
-                            valid_indices=np.intersect1d(valid_indices,np.where(np.abs(wire_packet[1].Z_data)>30)[0])
-                            line_profile=np.hstack((wire_packet[1].Y_data[valid_indices].reshape(-1,1),wire_packet[1].Z_data[valid_indices].reshape(-1,1)))
-                            scan_exe.append(line_profile)
-                        weld_js_exe.append(np.append(time.perf_counter(),deepcopy(SS.q_cur))) if not SIMULATION else None # log robot joints
+                        ########################################
+                        fuji_scan_time = 0.5 # stay for a while for scanning, and robot to move to the final position
+                        fuji_scan_start = time.perf_counter()
+                        while time.perf_counter()-fuji_scan_start<fuji_scan_time:
+                            ### log data
+                            if fuji_scanon:
+                                wire_packet=fuji_scan_wire.TryGetInValue() # log fuji cam scanner data
+                                valid_indices=np.where(wire_packet[1].I_data>1)[0]
+                                valid_indices=np.intersect1d(valid_indices,np.where(np.abs(wire_packet[1].Z_data)>30)[0])
+                                line_profile=np.hstack((wire_packet[1].Y_data[valid_indices].reshape(-1,1),wire_packet[1].Z_data[valid_indices].reshape(-1,1)))
+                                scan_exe.append(line_profile)
+                            weld_js_exe.append(np.append(time.perf_counter(),deepcopy(SS.q_cur))) if not SIMULATION else None # log robot joints
 
-                        ### scan online processing
+                            ### scan online processing
+                            if fuji_scanon and scan_online_process:
+                                scan_process.raw_scan_pipe.append(deepcopy(line_profile))
+                                while len(scan_process.denoise_pipe)!=0:
+                                    scan_denoise = scan_process.denoise_pipe.pop(0)
+                                    # get denoise scan
+                                    scan_exe_noise_remove.append(scan_denoise)
+                            time.sleep(1/stream_rate)
+
+                        # final scan processing
                         if fuji_scanon and scan_online_process:
-                            scan_process.raw_scan_pipe.append(deepcopy(line_profile))
+                            while len(scan_process.raw_scan_pipe)!=0:
+                                print("Final scan processing...",len(scan_process.raw_scan_pipe))
+                                time.sleep(0.01)
                             while len(scan_process.denoise_pipe)!=0:
                                 scan_denoise = scan_process.denoise_pipe.pop(0)
-                                # get denoise scan
                                 scan_exe_noise_remove.append(scan_denoise)
-                        time.sleep(1/stream_rate)
-
-                    # final scan processing
-                    if fuji_scanon and scan_online_process:
-                        while len(scan_process.raw_scan_pipe)!=0:
-                            print("Final scan processing...",len(scan_process.raw_scan_pipe))
-                            time.sleep(0.01)
-                        while len(scan_process.denoise_pipe)!=0:
-                            scan_denoise = scan_process.denoise_pipe.pop(0)
-                            scan_exe_noise_remove.append(scan_denoise)
-                        # stop scan process
-                        scan_process.end_denoise_thread_flag = True
-                        scan_denoise_thread.join()
+                            # stop scan process
+                            scan_process.end_denoise_thread_flag = True
+                            scan_denoise_thread.join()
 
                     # move to end point with safety_z_offset
                     if not SIMULATION:
@@ -896,7 +897,8 @@ def main():
                     pcd = scan_process.pcd_noise_remove(pcd,outlier_remove=False,nb_neighbors=40,std_ratio=1.5,\
                                                         min_bound=crop_min,max_bound=crop_max,cluster_based_outlier_remove=True,cluster_neighbor=1,min_points=100)
                     # visualize_pcd([pcd])
-                    profile_height,Transz0_H = scan_process.pcd2height(deepcopy(pcd),z_height_start,bbox_min=crop_h_min,bbox_max=crop_h_max,Transz0_H=Transz0_H)
+                    # profile_height,Transz0_H = scan_process.pcd2height(deepcopy(pcd),z_height_start,bbox_min=crop_h_min,bbox_max=crop_h_max,Transz0_H=Transz0_H)
+                    profile_height,profile_width,Transz0_H = scan_process.pcd2height(deepcopy(pcd),z_height_start,bbox_min=crop_h_min,bbox_max=crop_h_max,Transz0_H=Transz0_H,return_width=True)
                     print("Transz0_H:",Transz0_H)
                     np.savetxt(logdata_dir+layer_name+f'/profile_height.csv', profile_height, delimiter=',')
                     o3d.io.write_point_cloud(logdata_dir+layer_name+f'/pcd.pcd',pcd)
@@ -925,6 +927,12 @@ def main():
                     try:
                         # use a logged profile height as demo
                         profile_height = np.loadtxt(sim_folder+layer_name+f'/profile_height.csv',delimiter=',')
+                        profile_width = np.loadtxt(sim_folder+layer_name+f'/profile_width.csv',delimiter=',')
+
+                        # update loglog-rls recursive least square
+                        if control_method == 'loglog_rls' and weld_parts == 'layer':
+                            print("Use loglog RLS. Running RLS")
+                            loglogModel.rls_update(profile_height, last_profile_height, profile_width, control_status_log)
 
                         if weld_parts == 'base':
                             mean_layer_height = np.mean(profile_height[:,1])
