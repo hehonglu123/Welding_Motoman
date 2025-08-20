@@ -310,7 +310,7 @@ def main():
     v_Maximum = 20
     v_minimum = 0.75
     # choose between log-log control or learning model one step Jacobian
-    control_method = 'loglog-static' # 'loglog-static', 'loglog-rls' or 'learning-Jacobian'
+    control_method = 'loglog-rls' # 'loglog-static', 'loglog-rls' or 'learning-Jacobian'
     assert control_method in ['loglog-static', 'loglog-rls', 'learning-Jacobian'], "Invalid control method"
     #######################################
 
@@ -549,7 +549,7 @@ def main():
                                 fronius_client.job_number = int(round(feedrate_cmd/10)+job_offset) # get fronius job number
                                 fronius_client.start_weld() # command to start welding
                                 time.sleep(weld_start_sleep) # welder needs about 0.2s to start welding
-                            welding_cmd_all.append(np.hstack((time.perf_counter(),i,v_cmd,int(round(feedrate_cmd/10)*10))))
+                            welding_cmd_all.append(np.hstack((time.perf_counter(),i,this_curve_p[0],v_cmd,int(round(feedrate_cmd/10)*10))))
                             last_update_time=time.perf_counter()
                             last_viz_time=time.perf_counter()
                             cmd_update_cnt += 1
@@ -578,7 +578,7 @@ def main():
                                 fronius_client.async_set_job_number(int(round(feedrate_cmd/10)+job_offset), welder_handler)
                             model_inference_time_count.append(time.perf_counter()-model_inference_start_time)
                             # log command data
-                            welding_cmd_all.append(np.hstack((time.perf_counter(),i,v_cmd,int(round(feedrate_cmd/10)*10))))
+                            welding_cmd_all.append(np.hstack((time.perf_counter(),i,this_curve_p[0],v_cmd,int(round(feedrate_cmd/10)*10))))
                             last_update_time=time.perf_counter()
                             if (time.perf_counter()-last_viz_time)>viz_interval:
                                 print("Current X:", this_curve_p[0], "Update Feedrate, Velocity:",int(round(feedrate_cmd/10)*10),round(v_cmd,1))
@@ -930,7 +930,41 @@ def main():
                         profile_width = np.loadtxt(sim_folder+layer_name+f'/profile_width.csv',delimiter=',')
 
                         # update loglog-rls recursive least square
-                        if control_method == 'loglog_rls' and weld_parts == 'layer':
+                        if control_method == 'loglog-rls' and weld_parts == 'layer' and layer_count >= correction_layer_start:
+                            # read weld cmd
+                            weld_cmd = np.loadtxt(sim_folder+layer_name+f'/weld_cmd.csv',delimiter=',')
+                            if weld_cmd.shape[1] < 5:
+                                print("Weld command file does not have current x.")
+                                js_cmd = np.loadtxt(sim_folder+layer_name+f'/js_cmd.csv',delimiter=',')
+                                js_cmd_sample = []
+                                for joint_i in range(14):
+                                    js_cmd_sample.append(np.interp(weld_cmd[:,0], js_cmd[:,0], js_cmd[:,joint_i+2]))
+                                js_cmd_sample = np.array(js_cmd_sample).T
+                                cmd_x = []
+                                for j_cmd in js_cmd_sample:
+                                    t2 = positioner.fwd(j_cmd[-2:],world=True)
+                                    t1 = robot_weld.fwd(j_cmd[:6],world=True)
+                                    t1_t2 = t2.inv()*t1
+                                    cmd_x.append(t1_t2.p[0])
+                                weld_cmd = np.column_stack((weld_cmd[:,:1], cmd_x, weld_cmd[:,2:]))
+                            weld_cmd = np.column_stack((weld_cmd, np.ones((weld_cmd.shape[0], 1)))) # add a dummy column for weld_cmd_updated
+                            weld_cmd_full = []
+                            for weld_cmd_i in range(len(weld_cmd)-1):
+                                t_full = np.arange(weld_cmd[weld_cmd_i, 0], weld_cmd[weld_cmd_i+1, 0], 0.008)
+                                x_full = np.interp(t_full, weld_cmd[weld_cmd_i:weld_cmd_i+2, 0], weld_cmd[weld_cmd_i:weld_cmd_i+2, 1])
+                                torch_v_full = np.ones_like(x_full)*weld_cmd[weld_cmd_i, 2]
+                                wire_feed_full = np.ones_like(x_full)*weld_cmd[weld_cmd_i, 3]
+                                change_id_full = np.zeros_like(x_full)
+                                change_id_full[0]=1 if weld_cmd_i > 0 else 0
+                                weld_cmd_full.extend(np.column_stack((t_full, x_full, torch_v_full, wire_feed_full, change_id_full)))
+                            weld_cmd_full = np.array(weld_cmd_full)
+
+                            control_status_log = deepcopy(weld_cmd_full)
+
+                            # plt.plot(control_status_log[:,1], control_status_log[:,2])
+                            # plt.plot(control_status_log[:,1], control_status_log[:,-1])
+                            # plt.show()
+
                             print("Use loglog RLS. Running RLS")
                             loglogModel.rls_update(profile_height, last_profile_height, profile_width, control_status_log)
 
@@ -944,7 +978,7 @@ def main():
                             i = layer_nums[layer_count+1]
                         print("Mean Layer Height:",mean_layer_height)
                         last_profile_height = deepcopy(profile_height)
-                    except:
+                    except FileNotFoundError:
                         if weld_parts == 'base':
                             i = i+nom_incre
                         else:

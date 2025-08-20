@@ -30,6 +30,8 @@ class controlLogLogModel():
         self.lambda_fac = lambda_fac
         self.P_dh = cov_dh_init
         self.P_dw = cov_dw_init
+        self.theta_dh_history = []
+        self.theta_dw_history = []
 
     def get_control_loglog(self, dh, dw):
 
@@ -97,6 +99,8 @@ class controlLogLogModel():
             measured_width_sample_log = np.log(measured_width_sample)
 
             ##### update the parameters using recursive least squares
+            self.theta_dh_history.append(deepcopy(self.theta_dh))
+            self.theta_dw_history.append(deepcopy(self.theta_dw))
             # update theta dh
             K_gain_dh = self.P_dh@X_new_input.T@np.linalg.inv(self.lambda_fac*np.eye(X_new_input.shape[0])+X_new_input@self.P_dh@X_new_input.T)
             self.theta_dh = self.theta_dh + K_gain_dh@(measured_dh_sample_log-X_new_input@self.theta_dh)
@@ -106,9 +110,13 @@ class controlLogLogModel():
             self.theta_dw = self.theta_dw + K_gain_dw@(measured_width_sample_log-X_new_input@self.theta_dw)
             self.P_dw = (self.P_dw-K_gain_dw@X_new_input@self.P_dw)/self.lambda_fac
 
+            print("Updated parameters:")
+            print("theta_dh:", self.theta_dh)
+            print("theta_dw:", self.theta_dw)
+
     def _get_sum_profile(self,profile,sample_id):
 
-        profile_sum = np.concatenate([[0.0]],np.cumsum(profile))
+        profile_sum = np.concatenate(([0.0],np.cumsum(profile, dtype=np.float64)))
         starts, ends = sample_id[:-1], sample_id[1:]
         sums = profile_sum[ends] - profile_sum[starts]
         counts = ends - starts
