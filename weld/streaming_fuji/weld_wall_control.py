@@ -902,7 +902,15 @@ def main():
                     print("Transz0_H:",Transz0_H)
                     np.savetxt(logdata_dir+layer_name+f'/profile_height.csv', profile_height, delimiter=',')
                     o3d.io.write_point_cloud(logdata_dir+layer_name+f'/pcd.pcd',pcd)
-                    
+
+                    # update loglog-rls recursive least square
+                    if control_method == 'loglog-rls' and weld_parts == 'layer' and layer_count >= correction_layer_start:
+                        profile_height_shift = deepcopy(profile_height)
+                        profile_width_shift = deepcopy(profile_width)
+                        profile_height_shift[:,0] += shift_weld_profile_x
+                        profile_width_shift[:,0] += shift_weld_profile_x
+                        loglogModel.rls_update(profile_height_shift, last_profile_height, profile_width_shift, control_status_log)
+
                     if read_from_file_layer:
                         visualize_pcd([pcd])
                         plt.scatter(profile_height[:,0],profile_height[:,1])

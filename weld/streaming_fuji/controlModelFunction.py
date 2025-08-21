@@ -73,18 +73,8 @@ class controlLogLogModel():
         # interp to get the dh width
         last_measured_height = np.interp(control_inputs[:,1], last_profile_height[:,0], last_profile_height[:,1])
         this_measured_height = np.interp(control_inputs[:,1], profile_height[:,0], profile_height[:,1])
-        plt.plot(control_inputs[:,1], last_measured_height, label='last measured height')
-        plt.plot(control_inputs[:,1], this_measured_height, label='this measured height')
-        plt.legend()
-        plt.show()
         measured_dh = this_measured_height - last_measured_height
-        plt.plot(control_inputs[:,1], measured_dh, label='measured dh')
-        plt.legend()
-        plt.show()
         measured_width = np.interp(control_inputs[:,1], profile_width[:,0], profile_width[:,1])
-        plt.plot(control_inputs[:,1], measured_width, label='measured width')
-        plt.legend()
-        plt.show()
 
         cmd_updated_id = np.where(control_inputs[:,-1]!=0)[0]
 
