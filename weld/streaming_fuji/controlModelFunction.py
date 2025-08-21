@@ -19,7 +19,7 @@ mm2inch = 1/25.4
 inch2mm = 25.4
 
 class controlLogLogModel():
-    def __init__(self,model_dir,lambda_fac=0.9,cov_dh_init=100,cov_dw_init=100):
+    def __init__(self,model_dir,lambda_fac=0.99,cov_dh_init=10,cov_dw_init=10):
         self.model_dir = 'weld_Seq_models/'+model_dir
 
         self.theta_dh = np.loadtxt(self.model_dir + '/theta_param_dh.csv', delimiter=',')
@@ -28,8 +28,8 @@ class controlLogLogModel():
         self.theta_dw_origin = deepcopy(self.theta_dw)
 
         self.lambda_fac = lambda_fac
-        self.P_dh = cov_dh_init
-        self.P_dw = cov_dw_init
+        self.P_dh = np.eye(3)*cov_dh_init
+        self.P_dw = np.eye(3)*cov_dw_init
         self.theta_dh_history = []
         self.theta_dw_history = []
 
@@ -66,10 +66,25 @@ class controlLogLogModel():
 
     def rls_update(self, profile_height, last_profile_height, profile_width, control_inputs):
 
+        # ignore the edge of the walls
+        start_end_location = 47.5
+        control_inputs = control_inputs[control_inputs[:,1]>=-start_end_location]
+        control_inputs = control_inputs[control_inputs[:,1]<=start_end_location]
+        # interp to get the dh width
         last_measured_height = np.interp(control_inputs[:,1], last_profile_height[:,0], last_profile_height[:,1])
         this_measured_height = np.interp(control_inputs[:,1], profile_height[:,0], profile_height[:,1])
+        plt.plot(control_inputs[:,1], last_measured_height, label='last measured height')
+        plt.plot(control_inputs[:,1], this_measured_height, label='this measured height')
+        plt.legend()
+        plt.show()
         measured_dh = this_measured_height - last_measured_height
+        plt.plot(control_inputs[:,1], measured_dh, label='measured dh')
+        plt.legend()
+        plt.show()
         measured_width = np.interp(control_inputs[:,1], profile_width[:,0], profile_width[:,1])
+        plt.plot(control_inputs[:,1], measured_width, label='measured width')
+        plt.legend()
+        plt.show()
 
         cmd_updated_id = np.where(control_inputs[:,-1]!=0)[0]
 
@@ -110,6 +125,9 @@ class controlLogLogModel():
             self.theta_dw = self.theta_dw + K_gain_dw@(measured_width_sample_log-X_new_input@self.theta_dw)
             self.P_dw = (self.P_dw-K_gain_dw@X_new_input@self.P_dw)/self.lambda_fac
 
+            print("Previous parameters:")
+            print("theta_dh:", self.theta_dh_history[-1])
+            print("theta_dw:", self.theta_dw_history[-1])
             print("Updated parameters:")
             print("theta_dh:", self.theta_dh)
             print("theta_dw:", self.theta_dw)

@@ -931,6 +931,10 @@ def main():
 
                         # update loglog-rls recursive least square
                         if control_method == 'loglog-rls' and weld_parts == 'layer' and layer_count >= correction_layer_start:
+                            profile_height_shift = deepcopy(profile_height)
+                            profile_width_shift = deepcopy(profile_width)
+                            profile_height_shift[:,0] += shift_weld_profile_x
+                            profile_width_shift[:,0] += shift_weld_profile_x
                             # read weld cmd
                             weld_cmd = np.loadtxt(sim_folder+layer_name+f'/weld_cmd.csv',delimiter=',')
                             if weld_cmd.shape[1] < 5:
@@ -966,7 +970,7 @@ def main():
                             # plt.show()
 
                             print("Use loglog RLS. Running RLS")
-                            loglogModel.rls_update(profile_height, last_profile_height, profile_width, control_status_log)
+                            loglogModel.rls_update(profile_height_shift, last_profile_height, profile_width_shift, control_status_log)
 
                         if weld_parts == 'base':
                             mean_layer_height = np.mean(profile_height[:,1])
