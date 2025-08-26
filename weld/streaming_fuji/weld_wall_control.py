@@ -79,28 +79,6 @@ def get_weld_shift_x(profile_height):
     profile_x = np.arange(np.min(profile_height[:,0]), np.max(profile_height[:,0])+0.1, 0.1)
     height_approx_func = CubicSpline(profile_height[:,0], profile_height[:,1])
     profile_height_aug = np.column_stack((profile_x, height_approx_func(profile_x)))
-    
-    # scan_N = 200
-    # span_N = 5
-    # threshold = 0.1
-    # diff_points_1 = []
-    # height_diff = np.diff(profile_height_aug[:,1])
-    # for point_i, point in enumerate(profile_height_aug[0:scan_N+1]):
-    #     diff_right = np.mean(height_diff[point_i:point_i+span_N])
-
-    #     diff_points_1.append(diff_right)
-    # # find the first diff points > 0.1
-    # left_point = np.argwhere(np.array(diff_points_1) > threshold).flatten()[0]+int(span_N/2)
-    # diff_points_2 = []
-    # for point_i, point in enumerate(profile_height_aug[::-1][0:scan_N+1]):
-    #     diff_right = np.mean(height_diff[::-1][point_i:point_i+span_N])
-    #     diff_points_2.append(diff_right)
-    # # find the first diff points < -0.1
-    # right_point = np.argwhere(np.array(diff_points_2) < -threshold).flatten()[0]+int(span_N/2)
-
-    # left_x = np.mean(profile_height_aug[left_point:left_point+2, 0])
-    # right_x = np.mean(profile_height_aug[::-1][right_point:right_point+2, 0])
-    # shift_x = -1*(left_x+right_x)/2
 
     reference_height = 3.5
     profile_height_closed_arg = np.argsort(np.abs(profile_height_aug[:,1]-reference_height))
