@@ -85,9 +85,9 @@ def main():
     ################## Read geometry data ##################
     data_dir = '../../data/wall_weld_test/'
 
-    run_thermal = True
+    run_thermal = False
     run_geometry = True
-    run_compile = True
+    run_compile = False
 
     # logdata_dir_all = ['weld_fujiscan_2025_02_26_18_08_18/', 'weld_fujiscan_2025_02_26_16_24_21/', 'weld_fujiscan_2025_02_26_17_39_17/']
     # logdata_dir_all = ['weld_fujiscan_2025_02_26_16_24_21/', 'weld_fujiscan_2025_02_26_18_08_18/', 'weld_fujiscan_2025_02_26_17_39_17/']

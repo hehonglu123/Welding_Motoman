@@ -50,6 +50,15 @@ def get_weld_shift_x(profile_height):
     
     return shift_x
 
+def get_sum_profile(profile,sample_id):
+
+    profile_sum = np.concatenate(([0.0],np.cumsum(profile, dtype=np.float64)))
+    starts, ends = sample_id[:-1], sample_id[1:]
+    sums = profile_sum[ends] - profile_sum[starts]
+    counts = ends - starts
+    means = sums / counts
+    return means
+
 # for plotting
 xy_label_size = 18
 xy_tick_size = 16
@@ -572,6 +581,13 @@ def main():
             ## directory to process
             print(f"Processing directory: {logdata_dir_name}")
             logdata_dir = data_dir + logdata_dir_name
+            ## get weld meta file
+            with open(logdata_dir+'weld_meta_data.yml', 'r') as f:
+                weld_meta = yaml.safe_load(f)
+            if 'correction_start_layer' in weld_meta.keys():
+                correction_start_layer = weld_meta['correction_start_layer'] 
+            else:
+                correction_start_layer = 99999999 if dat_label == 'Baseline' else 2
 
             ## get shift x
             baselayer1_profile_height = np.loadtxt(logdata_dir+'baselayer1/profile_height.csv',delimiter=',')
@@ -608,7 +624,7 @@ def main():
             control_error_width = []
             prediction_error_dh = []
             prediction_error_width = []
-            profile_height = np.loadtxt(logdata_dir + f'baselayer1/profile_height.csv',delimiter=',')
+            last_profile_height = np.loadtxt(logdata_dir + f'baselayer1/profile_height.csv',delimiter=',')
             for layer_n_id, layer_n in enumerate(layer_nums):
                 this_layer_dir = logdata_dir + f'layer{layer_n}/'
                 profile_height = np.loadtxt(this_layer_dir+'profile_height.csv',delimiter=',')
@@ -633,16 +649,29 @@ def main():
                     test_results[dat_label]['Width Viz'] = profile_width
                 
                 # get target dh dw vs control/prediction dh dw vs actual dh dw
-                if dat_label is not 'baseline':
+                if layer_n_id >= correction_start_layer:
                     control_status_log = np.loadtxt(this_layer_dir+'control_status_log.csv',delimiter=',')
                     control_status_log_actual_dh = \
                         np.interp(control_status_log[:,1],profile_dh[:,0],profile_dh[:,1])
                     control_status_log_actual_width = \
                         np.interp(control_status_log[:,1],profile_width[:,0],profile_width[:,1])
-                    target_vs_control_dh_error = control_status_log[:,4] - control_status_log[:,6]
-                    target_vs_control_width_error = control_status_log[:,5] - control_status_log[:,7]
-                    actual_vs_predict_dh_error = control_status_log_actual_dh - control_status_log[:,6]
-                    actual_vs_predict_width_error = control_status_log_actual_width - control_status_log[:,7]
+                    control_status_log = np.column_stack((control_status_log[:,:-1], control_status_log_actual_dh, control_status_log_actual_width, control_status_log[:,-1][:,None]))
+
+                    cmd_updated_id = np.where(control_status_log[:,-1]!=0)[0]
+                    # exlude the last segments if too short
+                    if cmd_updated_id[-1] < len(control_status_log)-8:
+                        control_status_log = control_status_log[:cmd_updated_id[-1],:]
+                        cmd_updated_id = cmd_updated_id[:-1]
+                    control_status_log_smooth = []
+                    for profile in control_status_log[:,:-1].T:
+                        control_status_log_smooth.append(get_sum_profile(profile, cmd_updated_id))
+                    control_status_log_smooth = np.array(control_status_log_smooth).T
+
+                    target_vs_control_dh_error = control_status_log_smooth[:,4] - control_status_log_smooth[:,6]
+                    target_vs_control_width_error = control_status_log_smooth[:,5] - control_status_log_smooth[:,7]
+                    actual_vs_predict_dh_error = control_status_log_smooth[:,8] - control_status_log_smooth[:,6]
+                    actual_vs_predict_width_error = control_status_log_smooth[:,9] - control_status_log_smooth[:,7]
+
                     control_error_dh.append(target_vs_control_dh_error)
                     control_error_width.append(target_vs_control_width_error)
                     prediction_error_dh.append(actual_vs_predict_dh_error)
@@ -655,6 +684,10 @@ def main():
             test_results[dat_label]['Width'] = {}
             test_results[dat_label]['Height']['STD'] = height_std
             test_results[dat_label]['Width']['STD'] = width_std
+            test_results[dat_label]['Height']['Control Error'] = control_error_dh
+            test_results[dat_label]['Width']['Control Error'] = control_error_width
+            test_results[dat_label]['Height']['Prediction Error'] = prediction_error_dh
+            test_results[dat_label]['Width']['Prediction Error'] = prediction_error_width
 
         for stat in test_statistics:
             fig, ax = plt.subplots(1, 2, figsize=(12, 6))
@@ -692,6 +725,30 @@ def main():
             ax[dim_i].legend(fontsize=legend_size)
             ax[dim_i].grid()
         plt.show()
+
+        # get height width error statistics
+        for dat_label in test_labels:
+            if 'Control Error' not in test_results[dat_label]['Width'].keys():
+                continue
+            fig,ax = plt.subplots(2,2,figsize=(12,10))
+            for dim_i,dim in enumerate(test_dimension):
+                for err_i,err_type in enumerate(['Control Error','Prediction Error']):
+                    layer_error_all = []
+                    layer_error_mean = []
+                    layer_error_std = []
+                    for layer_n_id, layer_error in enumerate(test_results[dat_label][dim][err_type]):
+                        layer_error_mean.append(np.mean(np.abs(layer_error)))
+                        layer_error_std.append(np.std(np.abs(layer_error)))
+                        layer_error_all.extend(layer_error)
+                    ax[dim_i,err_i].errorbar(np.arange(len(layer_error_mean))+correction_start_layer, layer_error_mean, yerr=layer_error_std, fmt='-o', label=f"{dat_label} {err_type}")
+                    ax[dim_i,err_i].set_xlabel('Layer Number', fontsize=xy_label_size)
+                    ax[dim_i,err_i].set_ylabel('Error (mm)', fontsize=xy_label_size)
+                    ax[dim_i,err_i].tick_params(axis='both', which='major', labelsize=xy_tick_size)
+                    ax[dim_i,err_i].set_title(f"{dim} {err_type}", fontsize=title_size)
+                    # ax[dim_i,err_i].legend(fontsize=legend_size)
+                    ax[dim_i,err_i].grid()
+                    print(f"{dat_label} {dim} {err_type} Mean Error: {np.mean(np.abs(layer_error_all)):.4f}, Std Error: {np.std(np.abs(layer_error_all)):.4f}")
+            plt.show()
 
     ###### viz geometry #####
     if test_geometry:

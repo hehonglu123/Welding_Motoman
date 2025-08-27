@@ -358,7 +358,7 @@ def main():
                     ,'cross_section':cross_section, 'dh_target':float(dh_target), 'dw_target':float(np.mean(dw_target[:,1])), 'lookahead_distance':lookahead_distance,\
                     'alpha_control':alpha_control, 'lambda_smooth':lambda_smooth, 'lambda_disc':lambda_disc,\
                     'model_dir':control_model_dir, 'v_Maximum':v_Maximum, 'v_minimum':v_minimum, 'weld_type':weld_type,\
-                    'loglog_model_dir':loglog_model_dir, 'control_method':control_method}
+                    'loglog_model_dir':loglog_model_dir, 'control_method':control_method, 'correction_layer_start':correction_layer_start}
     ##############################
 
     ####### simulation setup #####
@@ -883,6 +883,7 @@ def main():
                     # visualize_pcd([pcd])
                     # profile_height,Transz0_H = scan_process.pcd2height(deepcopy(pcd),z_height_start,bbox_min=crop_h_min,bbox_max=crop_h_max,Transz0_H=Transz0_H)
                     profile_height,profile_width,Transz0_H = scan_process.pcd2height(deepcopy(pcd),z_height_start,bbox_min=crop_h_min,bbox_max=crop_h_max,Transz0_H=Transz0_H,return_width=True)
+                    profile_width[:,1] = np.convolve(profile_width[:,1], np.ones(5)/5, mode='same')
                     print("Transz0_H:",Transz0_H)
                     np.savetxt(logdata_dir+layer_name+f'/profile_height.csv', profile_height, delimiter=',')
                     o3d.io.write_point_cloud(logdata_dir+layer_name+f'/pcd.pcd',pcd)
