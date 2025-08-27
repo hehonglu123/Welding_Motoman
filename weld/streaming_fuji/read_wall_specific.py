@@ -17,6 +17,39 @@ from scan_utils import *
 from scanProcess import *
 from animation_3d import *
 
+def get_weld_shift_x(profile_height):
+    profile_x = np.arange(np.min(profile_height[:,0]), np.max(profile_height[:,0])+0.1, 0.1)
+    height_approx_func = CubicSpline(profile_height[:,0], profile_height[:,1])
+    profile_height_aug = np.column_stack((profile_x, height_approx_func(profile_x)))
+
+    reference_height = 3.5
+    profile_height_closed_arg = np.argsort(np.abs(profile_height_aug[:,1]-reference_height))
+    left_x = None
+    right_x = None
+    for profile_idx in profile_height_closed_arg:
+        if profile_height_aug[profile_idx,0]<0 and left_x is None:
+            left_x = profile_height_aug[profile_idx,0]
+        if profile_height_aug[profile_idx,0]>0 and right_x is None:
+            right_x = profile_height_aug[profile_idx,0]
+        if left_x is not None and right_x is not None:
+            break
+    shift_x = -1*(left_x+right_x)/2
+
+    # # visualize the height
+    # plt.figure(figsize=(16, 5))
+    # plt.plot(profile_height_aug[:, 0], profile_height_aug[:, 1], '-o', label='Profile Height')
+    # # draw a vertical line at left_x and right_x
+    # plt.axvline(x=left_x, color='r', linestyle='--', label='Left Shift Point')
+    # plt.axvline(x=right_x, color='g', linestyle='--', label='Right Shift Point')
+    # plt.title('Profile Height Visualization')
+    # plt.xlabel('X Position (mm)')
+    # plt.ylabel('Height (mm)')
+    # plt.legend()
+    # plt.grid()
+    # plt.show()
+    
+    return shift_x
+
 # for plotting
 xy_label_size = 18
 xy_tick_size = 16
@@ -32,9 +65,10 @@ def main():
     test_current = False
     test_thermal = False
     test_thermal_collected = False
+    test_pcd = True
     test_geometry = False
     test_weld_shift = False
-    get_statistics = True
+    get_statistics = False
 
     ############## Robot definition ##############
     config_dir='../../config/'
@@ -50,12 +84,12 @@ def main():
     
     ############## choose data directory ##############
     data_dir = '../../data/wall_weld_test/'
-    logdata_dir_name = 'weld_fujiscan_2025_06_11_16_27_41/'
+    logdata_dir_name = 'weld_fujicontrol_2025_08_13_14_57_52/'
     logdata_dir = data_dir+logdata_dir_name
 
     ##### layer, basic infos ####
-    last_layer_n = 117
-    layer_n = 129
+    last_layer_n = 440
+    layer_n = 456
     layer_name = 'layer'+str(layer_n)
     last_layer_name = 'layer'+str(last_layer_n)
     this_layer_dir = logdata_dir+layer_name+'/'
@@ -477,6 +511,42 @@ def main():
         print(f"Min shift: {np.min(shift_x_all):.2f}, Max shift: {np.max(shift_x_all):.2f}")
         print(f"Max shift diff: {np.max(shift_x_all) - np.mean(shift_x_all):.4f}")
     
+    ###### test pcd and profile height width ####
+    if test_pcd:
+        scan_process = ScanProcess(robot_scan,positioner)
+        pcd = o3d.io.read_point_cloud(this_layer_dir+'pcd.pcd')
+        pcd_denoise = o3d.io.read_point_cloud(this_layer_dir+'pcd_denoise.pcd')
+        pcd_base_denoise = o3d.io.read_point_cloud(logdata_dir+'baselayer0/'+'pcd_denoise.pcd')
+        last_profile_height = np.loadtxt(last_layer_dir+'profile_height.csv',delimiter=',')
+
+        baselayer1_profile_height = np.loadtxt(logdata_dir+'baselayer1/profile_height.csv',delimiter=',')
+        shift_x = get_weld_shift_x(baselayer1_profile_height)
+
+        # cropping the point cloud
+        curve_planned_z = np.mean(curve[:,2])
+        curve_x_end = np.min(curve[:,0])
+        curve_x_start = np.max(curve[:,0])
+        curve_y = np.mean(curve[:,1])
+        z_height_start=curve_planned_z+0.1
+        crop_extend_x=20
+        crop_extend_z=20
+        crop_min=(curve_x_end-crop_extend_x,curve_y-30,-30)
+        crop_max=(curve_x_start+crop_extend_x,curve_y+30,z_height_start+crop_extend_z)
+        crop_h_min=(curve_x_end-crop_extend_x,curve_y-20,-30)
+        crop_h_max=(curve_x_start+crop_extend_x,curve_y+20,z_height_start+crop_extend_z)
+        
+        _, _,Transz0_H = scan_process.pcd2height(deepcopy(pcd_base_denoise),0.1,bbox_min=crop_h_min,bbox_max=crop_h_max,Transz0_H=None,return_width=True)
+        
+        profile_height,Transz0_H = scan_process.pcd2height(deepcopy(pcd_denoise),last_profile_height,bbox_min=crop_h_min,bbox_max=crop_h_max,Transz0_H=Transz0_H,return_width=False)
+        # _, profile_width,_ = scan_process.pcd2height(deepcopy(pcd),z_height_start,bbox_min=crop_h_min,bbox_max=crop_h_max,Transz0_H=Transz0_H,return_width=True)
+        _, profile_width,_ = scan_process.pcd2height(deepcopy(pcd),last_profile_height,bbox_min=crop_h_min,bbox_max=crop_h_max,Transz0_H=Transz0_H,return_width=True)
+
+        fig,ax = plt.subplots(2,1,figsize=(12,6))
+        ax[0].plot(profile_height[:,0]+shift_x,profile_height[:,1],'-o',label=f'height')
+        ax[1].plot(profile_width[:,0]+shift_x,profile_width[:,1],'-o',label=f'width')
+        plt.legend()
+        plt.show()
+
     ###### get std and other statistics
     if get_statistics:
         data_dir = '../../data/wall_weld_test/'
@@ -488,8 +558,11 @@ def main():
         # start_x={'Baseline':-45,'Control':-45}
         # end_x={'Baseline':45,'Control':45}
 
-        start_x={'Baseline':-55,'Control':-60}
-        end_x={'Baseline':55,'Control':60}
+        # start_x={'Baseline':-55,'Control':-60}
+        # end_x={'Baseline':55,'Control':60}
+
+        start_x={'Baseline':-60,'Control':-60}
+        end_x={'Baseline':60,'Control':60}
 
         test_results={}
         for logdata_dir_name,dat_label in zip(test_dir,test_labels):
