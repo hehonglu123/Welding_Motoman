@@ -65,10 +65,10 @@ def main():
     test_current = False
     test_thermal = False
     test_thermal_collected = False
-    test_pcd = True
+    test_pcd = False
     test_geometry = False
     test_weld_shift = False
-    get_statistics = False
+    get_statistics = True
 
     ############## Robot definition ##############
     config_dir='../../config/'
@@ -547,6 +547,8 @@ def main():
         plt.legend()
         plt.show()
 
+        visualize_pcd([pcd])
+
     ###### get std and other statistics
     if get_statistics:
         data_dir = '../../data/wall_weld_test/'
@@ -602,6 +604,11 @@ def main():
             # collect statistics
             height_std = []
             width_std = []
+            control_error_dh = []
+            control_error_width = []
+            prediction_error_dh = []
+            prediction_error_width = []
+            profile_height = np.loadtxt(logdata_dir + f'baselayer1/profile_height.csv',delimiter=',')
             for layer_n_id, layer_n in enumerate(layer_nums):
                 this_layer_dir = logdata_dir + f'layer{layer_n}/'
                 profile_height = np.loadtxt(this_layer_dir+'profile_height.csv',delimiter=',')
@@ -609,13 +616,39 @@ def main():
                 # shift profiles
                 profile_height[:,0] += shift_x
                 profile_width[:,0] += shift_x
+                # get dh
+                profile_dh = []
+                for x_id, x_pos in enumerate(profile_height[:,0]):
+                    last_x_index = np.argmin(np.abs(last_profile_height[:, 0] - x_pos))
+                    profile_dh.append([x_pos, profile_height[x_id, 1] - last_profile_height[last_x_index, 1]])
+                profile_dh = np.array(profile_dh)
+                
                 # get std between -55 and 55 mm
                 height_std.append(np.std(profile_height[(profile_height[:,0] >= start_x[dat_label]) & (profile_height[:,0] <= end_x[dat_label] )& (profile_height[:,1]> 6), 1]))
                 width_std.append(np.std(profile_width[(profile_width[:,0] >= start_x[dat_label]) & (profile_width[:,0] <= end_x[dat_label]), 1]))
 
+
                 if layer_n_id == len(layer_nums)-1:
                     test_results[dat_label]['Height Viz'] = profile_height
                     test_results[dat_label]['Width Viz'] = profile_width
+                
+                # get target dh dw vs control/prediction dh dw vs actual dh dw
+                if dat_label is not 'baseline':
+                    control_status_log = np.loadtxt(this_layer_dir+'control_status_log.csv',delimiter=',')
+                    control_status_log_actual_dh = \
+                        np.interp(control_status_log[:,1],profile_dh[:,0],profile_dh[:,1])
+                    control_status_log_actual_width = \
+                        np.interp(control_status_log[:,1],profile_width[:,0],profile_width[:,1])
+                    target_vs_control_dh_error = control_status_log[:,4] - control_status_log[:,6]
+                    target_vs_control_width_error = control_status_log[:,5] - control_status_log[:,7]
+                    actual_vs_predict_dh_error = control_status_log_actual_dh - control_status_log[:,6]
+                    actual_vs_predict_width_error = control_status_log_actual_width - control_status_log[:,7]
+                    control_error_dh.append(target_vs_control_dh_error)
+                    control_error_width.append(target_vs_control_width_error)
+                    prediction_error_dh.append(actual_vs_predict_dh_error)
+                    prediction_error_width.append(actual_vs_predict_width_error)
+
+                last_profile_height = deepcopy(profile_height)
 
             # collect statistics
             test_results[dat_label]['Height'] = {}
@@ -635,7 +668,6 @@ def main():
                 ax[dim_i].grid()
         plt.show()
 
-        
         fig, ax = plt.subplots(2, 1, figsize=(12, 7))
         for dim_i,dim in enumerate(test_dimension):
             for dat_label in test_labels:

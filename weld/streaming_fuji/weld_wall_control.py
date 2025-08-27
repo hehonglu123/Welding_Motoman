@@ -110,15 +110,14 @@ def get_weld_shift_x(profile_height):
 
 def main():
     
-    weld_arcon = True
-    welder_log = True
-    fuji_scanon = True
-    scan_online_process = True
-    thermal_on = True
+    weld_arcon = False
+    welder_log = False
+    fuji_scanon = False
+    scan_online_process = False
+    thermal_on = False
     input_from_user = False
     SIMULATION = True
-    # simulation_speed_sim = False
-    simulation_save_control_state_fig = False
+    simulation_save_control_state_fig = True
 
     if SIMULATION:
         weld_arcon = False
@@ -288,7 +287,7 @@ def main():
     v_Maximum = 20
     v_minimum = 0.75
     # choose between log-log control or learning model one step Jacobian
-    control_method = 'loglog-rls' # 'loglog-static', 'loglog-rls' or 'learning-Jacobian'
+    control_method = 'learning-Jacobian' # 'loglog-static', 'loglog-rls' or 'learning-Jacobian'
     assert control_method in ['loglog-static', 'loglog-rls', 'learning-Jacobian'], "Invalid control method"
     #######################################
 
@@ -379,6 +378,8 @@ def main():
     print("Logged Data Dir:",logdata_dir)
     print("Material Name:",material_name)
     print("Weld Type:",weld_type)
+    print("Control method:",control_method)
+    print("Control start layer:",correction_layer_start)
     input("Ready to start? Press Enter to continue...")
     ################## print layers ##################
     arc_off=True
@@ -671,7 +672,8 @@ def main():
                             elif ax_idx == 1:
                                 ax.plot(control_status_log[:, 1], control_status_log[:, 5], label=f'Target Width')                            
                                 ax.plot(control_status_log[:, 1], control_status_log[:, 7], label=f'Predicted Width')
-                                ax.plot(profile_width_shift[:, 0], profile_width_shift[:, 1], label=f'Actual Width')
+                                if profile_width_shift is not None:
+                                    ax.plot(profile_width_shift[:, 0], profile_width_shift[:, 1], label=f'Actual Width')
                                 ax.legend(fontsize=legend_size)
                                 ax.set_ylabel("mm", fontsize=xy_label_size)
                                 ax.set_title(f"Target vs Predicted vs Actual Width (mm)", fontsize=title_size)
@@ -686,6 +688,8 @@ def main():
                             plt.close(fig)
                         else:
                             plt.show()
+                        if not os.path.exists(sim_folder+'layer'+str(i)+'/control_status_log.csv'):
+                            np.savetxt(sim_folder+'layer'+str(i)+'/control_status_log.csv', control_status_log, delimiter=',')
 
                     # if torch orientation is fixed, and the traveling/curve direction is opposite
                     if forward and curve_direction == 'backward':
@@ -826,6 +830,8 @@ def main():
                         np.savetxt(logdata_dir+layer_name+f'/weld_js_exe.csv', weld_js_exe, delimiter=',') # save welding/scanning logged joint space data
                         np.savetxt(logdata_dir+layer_name+f'/js_cmd.csv', q_cmd_all, delimiter=',') # save welding/scanning commanded joint space data
                         np.savetxt(logdata_dir+layer_name+f'/weld_cmd.csv', welding_cmd_all, delimiter=',') # save welding commands
+                        if layer_count >= correction_layer_start:
+                            np.savetxt(logdata_dir+layer_name+f'/control_status_log.csv', control_status_log, delimiter=',') # save control status log if controlling
                         if fuji_scanon:
                             with open(logdata_dir+layer_name+f'/scan_exe.pickle', 'wb') as file: # save scanning logged data
                                 pickle.dump(scan_exe, file)
