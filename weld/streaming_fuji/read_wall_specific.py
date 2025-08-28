@@ -11,11 +11,27 @@ from motoman_def import *
 from robotics_utils import *
 from flir_toolbox import *
 from ultralytics import YOLO
+
+from controlModelFunction import *
 sys.path.append('../../scan/scan_process/')
 sys.path.append('../../scan/scan_tools/')
 from scan_utils import *
 from scanProcess import *
 from animation_3d import *
+
+def grid_from_data(log_v, log_omega, n=30, pad=0.05):
+    """
+    Build a meshgrid spanning the data range with a small padding.
+    """
+    xv_min, xv_max = np.min(log_v), np.max(log_v)
+    xo_min, xo_max = np.min(log_omega), np.max(log_omega)
+    # small padding to avoid tight cropping
+    dxv = (xv_max - xv_min) or 1.0
+    dxo = (xo_max - xo_min) or 1.0
+    xv = np.linspace(xv_min - pad*dxv, xv_max + pad*dxv, n)
+    xo = np.linspace(xo_min - pad*dxo, xo_max + pad*dxo, n)
+    Xv, Xo = np.meshgrid(xv, xo)
+    return Xv, Xo
 
 def get_weld_shift_x(profile_height):
     profile_x = np.arange(np.min(profile_height[:,0]), np.max(profile_height[:,0])+0.1, 0.1)
@@ -77,7 +93,8 @@ def main():
     test_pcd = False
     test_geometry = False
     test_weld_shift = False
-    get_statistics = True
+    get_statistics = False
+    test_loglog = True
 
     ############## Robot definition ##############
     config_dir='../../config/'
@@ -591,20 +608,7 @@ def main():
 
             ## get shift x
             baselayer1_profile_height = np.loadtxt(logdata_dir+'baselayer1/profile_height.csv',delimiter=',')
-            profile_x = np.arange(np.min(baselayer1_profile_height[:,0]), np.max(baselayer1_profile_height[:,0])+0.1, 0.1)
-            height_approx_func = CubicSpline(baselayer1_profile_height[:,0], baselayer1_profile_height[:,1])
-            profile_height_aug = np.column_stack((profile_x, height_approx_func(profile_x)))
-            profile_height_closed_arg = np.argsort(np.abs(profile_height_aug[:,1]-3.5))
-            left_x = None
-            right_x = None
-            for profile_idx in profile_height_closed_arg:
-                if profile_height_aug[profile_idx,0]<0 and left_x is None:
-                    left_x = profile_height_aug[profile_idx,0]
-                if profile_height_aug[profile_idx,0]>0 and right_x is None:
-                    right_x = profile_height_aug[profile_idx,0]
-                if left_x is not None and right_x is not None:
-                    break
-            shift_x = -1*(left_x+right_x)/2
+            shift_x = get_weld_shift_x(baselayer1_profile_height)
             print(f"Shift X: {shift_x:.2f}")
 
             ### loop through all layers to get height width statistics
@@ -625,6 +629,7 @@ def main():
             prediction_error_dh = []
             prediction_error_width = []
             last_profile_height = np.loadtxt(logdata_dir + f'baselayer1/profile_height.csv',delimiter=',')
+            last_profile_height[:,0] += shift_x
             for layer_n_id, layer_n in enumerate(layer_nums):
                 this_layer_dir = logdata_dir + f'layer{layer_n}/'
                 profile_height = np.loadtxt(this_layer_dir+'profile_height.csv',delimiter=',')
@@ -750,6 +755,92 @@ def main():
                     print(f"{dat_label} {dim} {err_type} Mean Error: {np.mean(np.abs(layer_error_all)):.4f}, Std Error: {np.std(np.abs(layer_error_all)):.4f}")
             plt.show()
 
+    ###### test log-log control model RLS #####
+    if test_loglog:
+        data_dir = '../../data/wall_weld_test/'
+        test_dir = ['weld_fujicontrol_2025_08_14_11_19_59/']
+        
+        loglog_model_dir = 'loglog_models'
+        loglogModel = controlLogLogModel(loglog_model_dir)
+
+        for logdata_dir_name in test_dir:
+            logdata_dir = data_dir + logdata_dir_name
+            ## get weld meta file
+            with open(logdata_dir+'weld_meta_data.yml', 'r') as f:
+                weld_meta = yaml.safe_load(f)
+            if 'correction_start_layer' in weld_meta.keys():
+                correction_start_layer = weld_meta['correction_start_layer'] 
+            else:
+                correction_start_layer = 2
+            
+            ## get shift x
+            baselayer1_profile_height = np.loadtxt(logdata_dir+'baselayer1/profile_height.csv',delimiter=',')
+            shift_x = get_weld_shift_x(baselayer1_profile_height)
+            print(f"Shift X: {shift_x:.2f}")
+
+            ### loop through all layers to get height width statistics
+            total_layers_name = glob.glob(logdata_dir+'layer*')
+            # get printed layer number
+            layer_nums = []
+            for layer_name in total_layers_name:
+                this_layer = layer_name.split('\\')[-1]
+                this_layer = this_layer.split('r')[-1]
+                layer_nums.append(int(this_layer))
+            layer_nums = np.sort(layer_nums)
+
+            ### visualization
+            # Build a color for each batch
+            cmap = plt.get_cmap('viridis', len(layer_nums)-correction_start_layer)
+            batch_to_color = {layer_nums[i+correction_start_layer]: cmap(i) for i in range(len(layer_nums)-correction_start_layer)}
+            print(batch_to_color)
+            # Figure + axes
+            fig = plt.figure(figsize=(12, 8))
+            ax00 = fig.add_subplot(1, 2, 1, projection='3d')  # planes for log h
+            ax01 = fig.add_subplot(1, 2, 2, projection='3d')  # planes for log w
+
+            last_profile_height = np.loadtxt(logdata_dir + f'baselayer1/profile_height.csv',delimiter=',')
+            last_profile_height[:,0] += shift_x
+            for layer_n_id, layer_n in enumerate(layer_nums):
+                this_layer_dir = logdata_dir + f'layer{layer_n}/'
+                profile_height = np.loadtxt(this_layer_dir+'profile_height.csv',delimiter=',')
+                profile_width = np.loadtxt(this_layer_dir+'profile_width.csv',delimiter=',')
+                # shift profiles
+                profile_height[:,0] += shift_x
+                profile_width[:,0] += shift_x
+                
+                # get target dh dw vs control/prediction dh dw vs actual dh dw
+                if layer_n_id >= correction_start_layer:
+                    control_status_log = np.loadtxt(this_layer_dir+'control_status_log.csv',delimiter=',')
+                    log_v, log_feedrate, log_dh, log_dw = loglogModel.rls_update(profile_height, last_profile_height, profile_width, control_status_log)
+                    layer_dh_theta = deepcopy(loglogModel.theta_dh)
+                    layer_dw_theta = deepcopy(loglogModel.theta_dw)
+
+                    if layer_n_id % 2 == 0:
+                        # log h scatter
+                        ax00.scatter(log_v, log_feedrate, log_dh,
+                                    s=12, alpha=0.8, depthshade=False, label=f'layer {layer_n}', color=batch_to_color[layer_n])
+                        # log w scatter
+                        ax01.scatter(log_v, log_feedrate, log_dw,
+                                    s=12, alpha=0.8, depthshade=False, label=f'layer {layer_n}', color=batch_to_color[layer_n])
+                        # Create grid for planes
+                        Xv, Xo = grid_from_data(log_v, log_feedrate, n=30, pad=0.05)
+                        Za = layer_dh_theta[0]*Xv + layer_dh_theta[1]*Xo + layer_dh_theta[2]  # for log h
+                        Zw = layer_dw_theta[0]*Xv + layer_dw_theta[1]*Xo + layer_dw_theta[2]  # for log w
+                        # Use wireframes or translucent surfaces; wireframes keep clutter down
+                        ax00.plot_wireframe(Xv, Xo, Za, rstride=3, cstride=3, color=batch_to_color[layer_n], alpha=0.9, linewidth=0.6)
+                        ax01.plot_wireframe(Xv, Xo, Zw, rstride=3, cstride=3, color=batch_to_color[layer_n], alpha=0.9, linewidth=0.6)
+
+                last_profile_height = deepcopy(profile_height)
+            for ax, zlabel, title in [
+                (ax00, 'log h', 'Overlaid regression planes for log h'),
+                (ax01, 'log w', 'Overlaid regression planes for log w')]:
+                ax.set_xlabel('log v')
+                ax.set_ylabel('log ω')
+                ax.set_zlabel(zlabel)
+                ax.set_title(title)
+                ax.view_init(elev=22, azim=-55)  # a nice default view
+            plt.show()
+    
     ###### viz geometry #####
     if test_geometry:
         # profile_welding = np.loadtxt(this_layer_dir+'profile_welding.csv',delimiter=',',skiprows=1)

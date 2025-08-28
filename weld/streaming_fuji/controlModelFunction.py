@@ -98,7 +98,9 @@ class controlLogLogModel():
             measured_width_sample = measured_width_sample[measured_width_sample>0]
 
             # control input matrix
-            X_new_input = np.vstack((np.log(control_torch_v_sample), np.log(control_feedrate_sample), np.ones_like(control_torch_v_sample))).T
+            control_torch_v_sample_log = np.log(control_torch_v_sample)
+            control_feedrate_sample_log = np.log(control_feedrate_sample)
+            X_new_input = np.vstack((control_torch_v_sample_log, control_feedrate_sample_log, np.ones_like(control_torch_v_sample_log))).T
             # measure output vectors
             measured_dh_sample_log = np.log(measured_dh_sample)
             measured_width_sample_log = np.log(measured_width_sample)
@@ -121,6 +123,8 @@ class controlLogLogModel():
             print("Updated parameters:")
             print("theta_dh:", self.theta_dh)
             print("theta_dw:", self.theta_dw)
+
+            return control_torch_v_sample_log, control_feedrate_sample_log, measured_dh_sample_log, measured_width_sample_log
 
     def _get_sum_profile(self,profile,sample_id):
 
