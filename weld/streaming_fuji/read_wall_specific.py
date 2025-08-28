@@ -637,17 +637,10 @@ def main():
                 # shift profiles
                 profile_height[:,0] += shift_x
                 profile_width[:,0] += shift_x
-                # get dh
-                profile_dh = []
-                for x_id, x_pos in enumerate(profile_height[:,0]):
-                    last_x_index = np.argmin(np.abs(last_profile_height[:, 0] - x_pos))
-                    profile_dh.append([x_pos, profile_height[x_id, 1] - last_profile_height[last_x_index, 1]])
-                profile_dh = np.array(profile_dh)
                 
                 # get std between -55 and 55 mm
                 height_std.append(np.std(profile_height[(profile_height[:,0] >= start_x[dat_label]) & (profile_height[:,0] <= end_x[dat_label] )& (profile_height[:,1]> 6), 1]))
                 width_std.append(np.std(profile_width[(profile_width[:,0] >= start_x[dat_label]) & (profile_width[:,0] <= end_x[dat_label]), 1]))
-
 
                 if layer_n_id == len(layer_nums)-1:
                     test_results[dat_label]['Height Viz'] = profile_height
@@ -655,12 +648,21 @@ def main():
                 
                 # get target dh dw vs control/prediction dh dw vs actual dh dw
                 if layer_n_id >= correction_start_layer:
+
                     control_status_log = np.loadtxt(this_layer_dir+'control_status_log.csv',delimiter=',')
-                    control_status_log_actual_dh = \
-                        np.interp(control_status_log[:,1],profile_dh[:,0],profile_dh[:,1])
+                    control_status_log_actual_height = \
+                        np.interp(control_status_log[:,1],profile_height[:,0],profile_height[:,1])
+                    control_status_log_actual_height_last_layer = \
+                        np.interp(control_status_log[:,1],last_profile_height[:,0],last_profile_height[:,1])
+                    control_status_log_actual_dh = control_status_log_actual_height - control_status_log_actual_height_last_layer
                     control_status_log_actual_width = \
                         np.interp(control_status_log[:,1],profile_width[:,0],profile_width[:,1])
                     control_status_log = np.column_stack((control_status_log[:,:-1], control_status_log_actual_dh, control_status_log_actual_width, control_status_log[:,-1][:,None]))
+
+                    # remove edges
+                    start_end_location = 47.5
+                    control_status_log = control_status_log[control_status_log[:,1]>=-start_end_location]
+                    control_status_log = control_status_log[control_status_log[:,1]<=start_end_location]
 
                     cmd_updated_id = np.where(control_status_log[:,-1]!=0)[0]
                     # exlude the last segments if too short
@@ -752,7 +754,7 @@ def main():
                     ax[dim_i,err_i].set_title(f"{dim} {err_type}", fontsize=title_size)
                     # ax[dim_i,err_i].legend(fontsize=legend_size)
                     ax[dim_i,err_i].grid()
-                    print(f"{dat_label} {dim} {err_type} Mean Error: {np.mean(np.abs(layer_error_all)):.4f}, Std Error: {np.std(np.abs(layer_error_all)):.4f}")
+                    print(f"{dat_label} {dim} {err_type} Mean Error: {np.mean(np.abs(layer_error_all)):.4f}, 95% Error: {stats.expon(scale=np.std(np.abs(layer_error_all))).interval(0.95)[1]:.4f}")
             plt.show()
 
     ###### test log-log control model RLS #####
@@ -762,6 +764,7 @@ def main():
         
         loglog_model_dir = 'loglog_models'
         loglogModel = controlLogLogModel(loglog_model_dir)
+        loglogModel_static = controlLogLogModel(loglog_model_dir)
 
         for logdata_dir_name in test_dir:
             logdata_dir = data_dir + logdata_dir_name
@@ -800,6 +803,10 @@ def main():
 
             last_profile_height = np.loadtxt(logdata_dir + f'baselayer1/profile_height.csv',delimiter=',')
             last_profile_height[:,0] += shift_x
+            prediction_error_dh = []
+            prediction_error_width = []
+            prediction_error_dh_static = []
+            prediction_error_width_static = []
             for layer_n_id, layer_n in enumerate(layer_nums):
                 this_layer_dir = logdata_dir + f'layer{layer_n}/'
                 profile_height = np.loadtxt(this_layer_dir+'profile_height.csv',delimiter=',')
@@ -811,36 +818,109 @@ def main():
                 # get target dh dw vs control/prediction dh dw vs actual dh dw
                 if layer_n_id >= correction_start_layer:
                     control_status_log = np.loadtxt(this_layer_dir+'control_status_log.csv',delimiter=',')
-                    log_v, log_feedrate, log_dh, log_dw = loglogModel.rls_update(profile_height, last_profile_height, profile_width, control_status_log)
+
+                    # rls update
+                    log_v, log_feedrate, log_dh, log_dw, dh_pred_error, dw_pred_error = loglogModel.rls_update(profile_height, last_profile_height, profile_width, control_status_log)
                     layer_dh_theta = deepcopy(loglogModel.theta_dh)
                     layer_dw_theta = deepcopy(loglogModel.theta_dw)
+                    # get prediction error (before rls)
+                    prediction_error_dh.append(dh_pred_error)
+                    prediction_error_width.append(dw_pred_error)
 
-                    if layer_n_id % 2 == 0:
+                    # static model
+                    _,_,_,_, dh_pred_error_static, dw_pred_error_static = loglogModel_static.rls_update(profile_height, last_profile_height, profile_width, control_status_log)
+                    prediction_error_dh_static.append(dh_pred_error_static)
+                    prediction_error_width_static.append(dw_pred_error_static)
+                    # restore the theta
+                    loglogModel_static.theta_dh = loglogModel_static.theta_dh_history[-1]
+                    loglogModel_static.theta_dw = loglogModel_static.theta_dw_history[-1]
+
+                    if layer_n_id % 1 == 0:
                         # log h scatter
                         ax00.scatter(log_v, log_feedrate, log_dh,
-                                    s=12, alpha=0.8, depthshade=False, label=f'layer {layer_n}', color=batch_to_color[layer_n])
+                                    s=6, alpha=0.8, depthshade=False, label=f'layer {layer_n}', color=batch_to_color[layer_n])
                         # log w scatter
                         ax01.scatter(log_v, log_feedrate, log_dw,
-                                    s=12, alpha=0.8, depthshade=False, label=f'layer {layer_n}', color=batch_to_color[layer_n])
+                                    s=6, alpha=0.8, depthshade=False, label=f'layer {layer_n}', color=batch_to_color[layer_n])
                         # Create grid for planes
-                        Xv, Xo = grid_from_data(log_v, log_feedrate, n=30, pad=0.05)
+                        Xv, Xo = grid_from_data(np.log([0.5,20]), np.log(np.array([50,250])*inch2mm/60), n=30, pad=0.05)
                         Za = layer_dh_theta[0]*Xv + layer_dh_theta[1]*Xo + layer_dh_theta[2]  # for log h
                         Zw = layer_dw_theta[0]*Xv + layer_dw_theta[1]*Xo + layer_dw_theta[2]  # for log w
                         # Use wireframes or translucent surfaces; wireframes keep clutter down
-                        ax00.plot_wireframe(Xv, Xo, Za, rstride=3, cstride=3, color=batch_to_color[layer_n], alpha=0.9, linewidth=0.6)
-                        ax01.plot_wireframe(Xv, Xo, Zw, rstride=3, cstride=3, color=batch_to_color[layer_n], alpha=0.9, linewidth=0.6)
+                        try:
+                            surf_h.remove()
+                            surf_w.remove()
+                        except NameError:
+                            pass
+                        surf_h = ax00.plot_wireframe(Xv, Xo, Za, rstride=3, cstride=3, color='red', alpha=0.9, linewidth=0.6)
+                        surf_w = ax01.plot_wireframe(Xv, Xo, Zw, rstride=3, cstride=3, color='red', alpha=0.9, linewidth=0.6)
+
+                        for ax, zlabel, title in [
+                            (ax00, f'$log \Delta h$', f'Regression plane for $log \Delta h$'),
+                            (ax01, f'$log w$', f'Regression plane for $log w$')]:
+                            ax.set_xlabel(f'$log v$', fontsize=xy_label_size)
+                            ax.set_ylabel(f'$log feedrate$', fontsize=xy_label_size)
+                            ax.set_zlabel(zlabel, fontsize=xy_label_size)
+                            ax.set_title(title, fontsize=title_size)
+                            ax.tick_params(axis='both', which='major', labelsize=xy_tick_size)
+                            ax.view_init(elev=22, azim=-55)  # a nice default view
+
+                        plt.pause(0.5)
 
                 last_profile_height = deepcopy(profile_height)
-            for ax, zlabel, title in [
-                (ax00, 'log h', 'Overlaid regression planes for log h'),
-                (ax01, 'log w', 'Overlaid regression planes for log w')]:
-                ax.set_xlabel('log v')
-                ax.set_ylabel('log ω')
-                ax.set_zlabel(zlabel)
-                ax.set_title(title)
-                ax.view_init(elev=22, azim=-55)  # a nice default view
+            
             plt.show()
-    
+
+            dh_error_mean = []
+            dh_error_std = []
+            dh_error_all = []
+            width_error_mean = []
+            width_error_std = []
+            width_error_all = []
+            dh_error_mean_static = []
+            dh_error_std_static = []
+            dh_error_all_static = []
+            width_error_mean_static = []
+            width_error_std_static = []
+            width_error_all_static = []
+
+            for dh_error, dw_error, dh_error_static, dw_error_static in zip(prediction_error_dh, prediction_error_width, prediction_error_dh_static, prediction_error_width_static):
+                dh_error_mean.append(np.mean(np.abs(dh_error)))
+                dh_error_std.append(np.std(np.abs(dh_error)))
+                dh_error_all.extend(dh_error)
+                dh_error_mean_static.append(np.mean(np.abs(dh_error_static)))
+                dh_error_std_static.append(np.std(np.abs(dh_error_static)))
+                dh_error_all_static.extend(dh_error_static)
+                width_error_mean.append(np.mean(np.abs(dw_error)))
+                width_error_std.append(np.std(np.abs(dw_error)))
+                width_error_all.extend(dw_error)
+                width_error_mean_static.append(np.mean(np.abs(dw_error_static)))
+                width_error_std_static.append(np.std(np.abs(dw_error_static)))
+                width_error_all_static.extend(dw_error_static)
+            print("RLS Model:")
+            print(f"Height Mean Error: {np.mean(np.abs(dh_error_all)):.4f}, 95% Error: {stats.expon(scale=np.std(np.abs(dh_error_all))).interval(0.95)[1]:.4f}")
+            print(f"Width Mean Error: {np.mean(np.abs(width_error_all)):.4f}, 95% Error: {stats.expon(scale=np.std(np.abs(width_error_all))).interval(0.95)[1]:.4f}")
+            print("Static Model:")
+            print(f"Height Mean Error: {np.mean(np.abs(dh_error_all_static)):.4f}, 95% Error: {stats.expon(scale=np.std(np.abs(dh_error_all_static))).interval(0.95)[1]:.4f}")
+            print(f"Width Mean Error: {np.mean(np.abs(width_error_all_static)):.4f}, 95% Error: {stats.expon(scale=np.std(np.abs(width_error_all_static))).interval(0.95)[1]:.4f}")
+
+            fig, ax = plt.subplots(1,2,figsize=(12,6))
+            ax[0].errorbar(layer_nums[correction_start_layer:], dh_error_mean_static, yerr=dh_error_std_static, fmt='-o', label=f'Static model')
+            ax[0].errorbar(layer_nums[correction_start_layer:], dh_error_mean, yerr=dh_error_std, fmt='-o', label=f'RLS model')
+            ax[1].errorbar(layer_nums[correction_start_layer:], width_error_mean_static, yerr=width_error_std_static, fmt='-o', label=f'Static model')
+            ax[1].errorbar(layer_nums[correction_start_layer:], width_error_mean, yerr=width_error_std, fmt='-o', label=f'RLS model')
+            ax[0].set_xlabel('Layer Number', fontsize=xy_label_size)
+            ax[0].set_ylabel('mm', fontsize=xy_label_size)
+            ax[1].set_xlabel('Layer Number', fontsize=xy_label_size)
+            ax[1].set_ylabel('mm', fontsize=xy_label_size)
+            ax[0].tick_params(axis='both', which='major', labelsize=xy_tick_size)
+            ax[1].tick_params(axis='both', which='major', labelsize=xy_tick_size)
+            ax[0].legend(fontsize=legend_size)
+            ax[1].legend(fontsize=legend_size)
+            ax[0].set_title(f'$\Delta h$ Prediction Error', fontsize=title_size)
+            ax[1].set_title(f'Width Prediction Error', fontsize=title_size)
+            plt.show()
+
     ###### viz geometry #####
     if test_geometry:
         # profile_welding = np.loadtxt(this_layer_dir+'profile_welding.csv',delimiter=',',skiprows=1)

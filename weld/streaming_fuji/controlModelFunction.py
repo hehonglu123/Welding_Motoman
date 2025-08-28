@@ -52,8 +52,10 @@ class controlLogLogModel():
 
     def get_pred_loglog(self, torch_v, feedrate):
 
-        torch_v = np.max([0.03, torch_v]) # prevent from log invalid
-        feedrate = np.max([10, feedrate]) # prevent from log invalid
+        # torch_v = np.max([0.03, torch_v]) 
+        torch_v = np.clip(torch_v, 0.03, 1000) # prevent from log invalid
+        # feedrate = np.max([10, feedrate]) 
+        feedrate = np.clip(feedrate, 10, 1000) # prevent from log invalid
 
         torch_feedrate = feedrate * inch2mm / 60 # inch/min to mm/s
         torch_v_log = np.log(torch_v)
@@ -64,7 +66,12 @@ class controlLogLogModel():
 
         return dh_pred, dw_pred
 
-    def rls_update(self, profile_height, last_profile_height, profile_width, control_inputs):
+    def rls_update(self, profile_height_in, last_profile_height_in, profile_width_in, control_inputs_in):
+
+        profile_height = deepcopy(profile_height_in)
+        last_profile_height = deepcopy(last_profile_height_in)
+        profile_width = deepcopy(profile_width_in)
+        control_inputs = deepcopy(control_inputs_in)
 
         # ignore the edge of the walls
         start_end_location = 47.5
@@ -97,6 +104,11 @@ class controlLogLogModel():
             control_feedrate_sample = control_feedrate_sample[measured_width_sample>0]
             measured_width_sample = measured_width_sample[measured_width_sample>0]
 
+            ##### get current dh width prediction error
+            dh_pred, dw_pred = self.get_pred_loglog(control_torch_v_sample, control_feedrate_sample*60*mm2inch)
+            dh_pred_error = dh_pred - measured_dh_sample
+            dw_pred_error = dw_pred - measured_width_sample
+
             # control input matrix
             control_torch_v_sample_log = np.log(control_torch_v_sample)
             control_feedrate_sample_log = np.log(control_feedrate_sample)
@@ -124,7 +136,7 @@ class controlLogLogModel():
             print("theta_dh:", self.theta_dh)
             print("theta_dw:", self.theta_dw)
 
-            return control_torch_v_sample_log, control_feedrate_sample_log, measured_dh_sample_log, measured_width_sample_log
+            return control_torch_v_sample_log, control_feedrate_sample_log, measured_dh_sample_log, measured_width_sample_log, dh_pred_error, dw_pred_error
 
     def _get_sum_profile(self,profile,sample_id):
 
