@@ -3,7 +3,7 @@ import glob
 from copy import deepcopy
 import numpy as np
 from scipy.signal import find_peaks
-from scipy.interpolate import CubicSpline
+from scipy.interpolate import CubicSpline, LinearNDInterpolator
 from matplotlib import pyplot as plt
 import open3d as o3d
 import cv2 as cv
@@ -94,7 +94,8 @@ def main():
     test_geometry = False
     test_weld_shift = False
     get_statistics = False
-    test_loglog = True
+    test_loglog = False
+    test_read_thermal = True
 
     ############## Robot definition ##############
     config_dir='../../config/'
@@ -110,12 +111,12 @@ def main():
     
     ############## choose data directory ##############
     data_dir = '../../data/wall_weld_test/'
-    logdata_dir_name = 'weld_fujicontrol_2025_08_13_14_57_52/'
+    logdata_dir_name = 'weld_fujiscan_2025_06_12_15_33_03/'
     logdata_dir = data_dir+logdata_dir_name
 
     ##### layer, basic infos ####
-    last_layer_n = 440
-    layer_n = 456
+    last_layer_n = 293
+    layer_n = 311
     layer_name = 'layer'+str(layer_n)
     last_layer_name = 'layer'+str(last_layer_n)
     this_layer_dir = logdata_dir+layer_name+'/'
@@ -1083,6 +1084,91 @@ def main():
 
         # plt.plot(profile_welding[:,0]-profile_welding[0,0], profile_welding[:,4], '-o', label='Welding Height')
         # plt.show()
+
+    ###### read thermal example #####
+    if test_read_thermal:
+        with open(this_layer_dir+'thermal_pixel_trace.pickle', 'rb') as f:
+            thermal_pixel_trace = pickle.load(f)
+        # for x in thermal_pixel_trace.keys():
+        #     plt.plot(thermal_pixel_trace[x]['time']-thermal_pixel_trace[x]['time'][0], thermal_pixel_trace[x]['value'])
+        #     plt.title(f'Thermal Trace at X={x:.2f} mm')
+        #     plt.xlabel('Time (s)')
+        #     plt.ylabel('Temperature (°C)')
+        #     plt.grid()
+        #     plt.pause(0.1)
+
+        profile_welding = np.loadtxt(this_layer_dir+'profile_welding.csv',delimiter=',',skiprows=1)
+        profile_welding_x = profile_welding[:,1]
+        profile_welding_t = profile_welding[:,0]
+        profile_welding_t_sample = np.arange(np.min(profile_welding_t), np.max(profile_welding_t), 0.1)
+        profile_welding_x_sample = np.interp(profile_welding_t_sample, profile_welding_t, profile_welding_x)
+
+        # build a 2D linear interpolation in time and x
+        x_time_map = []
+        x_time_value = []
+        for x in thermal_pixel_trace.keys():
+            for t, value in zip(thermal_pixel_trace[x]['time'], thermal_pixel_trace[x]['value']):
+                x_time_map.append([x, t])
+                x_time_value.append(value)
+        x_time_map = np.array(x_time_map)
+        x_time_value = np.array(x_time_value)
+
+        print(f"x_time_map shape: {x_time_map.shape}, x_time_value shape: {x_time_value.shape}")
+        # thermal_map = LinearNDInterpolator(x_time_map, x_time_value, fill_value=8000)
+        # visualize the thermal map
+        
+        # dynamic local linear interpolation
+        thermal_map = None
+        t_sample_window = 0.5 # sec
+        x_sample_window = 12 # mm
+        start_time = time.perf_counter()
+        for data_i, (t,x) in enumerate(zip(profile_welding_t_sample, profile_welding_x_sample)):
+            if data_i % 10 == 0:
+                print(f"Processing data point {data_i}: (t={t}, x={x})")
+
+            x_local = np.arange(x - 10, x + 10.1, 0.1)
+            mesh_X, mesh_Y = np.meshgrid(x_local, t)
+            # if thermal_map is None:
+            this_x_time_map = x_time_map[(x_time_map[:, 0] >= x - x_sample_window) & (x_time_map[:, 0] <= x + x_sample_window)]
+            this_x_time_value = x_time_value[(x_time_map[:, 0] >= x - x_sample_window) & (x_time_map[:, 0] <= x + x_sample_window)]
+            closest_t = x_time_map[np.argmin(np.abs(x_time_map[:, 1] - t)), 1]
+            this_x_time_map = x_time_map[(x_time_map[:, 1] == closest_t)]
+            this_x_time_value = x_time_value[(x_time_map[:, 1] == closest_t)]
+            this_x_sort_id = np.argsort(this_x_time_map[:, 0])
+            this_x = this_x_time_map[this_x_sort_id,0]
+            this_values = this_x_time_value[this_x_sort_id]
+            Z_interp = np.interp(x_local, this_x, this_values, left=8000, right=8000)
+            # if np.where(Z_value == 8000)[0].size > 90:
+            #     this_x_time_map = x_time_map[(x_time_map[:, 0] >= x - x_sample_window) & (x_time_map[:, 0] <= x + x_sample_window)]
+            #     this_x_time_value = x_time_value[(x_time_map[:, 0] >= x - x_sample_window) & (x_time_map[:, 0] <= x + x_sample_window)]
+            #     # this_x_time_map = x_time_map[(x_time_map[:, 1] >= t - t_sample_window) & (x_time_map[:, 1] <= t + t_sample_window)]
+            #     # this_x_time_value = x_time_value[(x_time_map[:, 1] >= t - t_sample_window) & (x_time_map[:, 1] <= t + t_sample_window)]
+            #     t_one_step_large = np.min(x_time_map[x_time_map[:, 1] > t, 1])
+            #     t_one_step_small = np.max(x_time_map[x_time_map[:, 1] < t, 1])
+            #     this_x_time_map = x_time_map[(x_time_map[:, 1] >= t_one_step_small) & (x_time_map[:, 1] <= t_one_step_large)]
+            #     this_x_time_value = x_time_value[(x_time_map[:, 1] >= t_one_step_small) & (x_time_map[:, 1] <= t_one_step_large)]
+            #     thermal_map = LinearNDInterpolator(this_x_time_map, this_x_time_value, fill_value=8000)
+            #     Z = thermal_map(mesh_X, mesh_Y)
+            #     Z_value = Z.flatten()
+
+            plt.clf()
+            plt.plot(x_local, Z_interp, '-o')
+            plt.xlabel('X Position (mm)')
+            plt.ylabel('Temperature (°C)')
+            plt.title(f'Thermal Map at Time={t:.2f} s, X={x:.2f} mm')
+            plt.grid()
+            plt.pause(0.1)
+        print(f"Time taken for dynamic interpolation: {time.perf_counter() - start_time:.2f} s")
+
+        # # Z = thermal_map(X, Y)
+        # plt.pcolormesh(X, Y, Z, shading='auto')
+        # plt.colorbar(label='Brightness')
+        # plt.xlabel('X Position (mm)')
+        # plt.ylabel('Time (s)')
+        # plt.title('Thermal Map')
+        # plt.grid()
+        # plt.show()
+
 
 if __name__ == "__main__":
     

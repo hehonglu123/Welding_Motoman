@@ -487,15 +487,15 @@ def main():
                         # thermal_reading = np.hstack((thermal_reading,thermal_centroid))
                         # np.savetxt(this_layer_dir+'thermal.csv',thermal_reading,delimiter=',')
 
-                        # # save thermal pixel trace
-                        # trace_dict = {}
-                        # for (trace_st, trace_x, trace_t) in zip(thermal_trace_stamp, thermal_workpiece_x_trace, thermal_trace):
-                        #     trace_dict[trace_x[0]] = {
-                        #         'time': trace_st,
-                        #         'value': trace_t
-                        #     }
-                        # with open(this_layer_dir+'thermal_pixel_trace.pickle', 'wb') as f:
-                        #     pickle.dump(trace_dict, f)
+                        # save thermal pixel trace
+                        trace_dict = {}
+                        for (trace_st, trace_x, trace_t) in zip(thermal_trace_stamp, thermal_workpiece_x_trace, thermal_trace):
+                            trace_dict[trace_x[0]] = {
+                                'time': trace_st,
+                                'value': trace_t
+                            }
+                        with open(this_layer_dir+'thermal_pixel_trace.pickle', 'wb') as f:
+                            pickle.dump(trace_dict, f)
 
                 ################ get speed ##############
                 print("Getting speed...")

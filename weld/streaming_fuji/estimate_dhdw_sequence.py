@@ -351,9 +351,6 @@ if __name__ == "__main__":
                     stickout_interp[interp_id] = np.mean(profile_welding[window_id_start:window_id_end, 6])
                     thermal_interp[interp_id] = np.mean(profile_welding[window_id_start:window_id_end, 9])
                 if np.any(cmd_v_interp==0):
-                    # plt.plot(timestamps_interp, cmd_v_interp, 'o', label='cmd_v_interp')
-                    # plt.grid()
-                    # plt.show()
                     # interpolate the zero values using linear interpolation
                     cmd_v_interp = np.interp(timestamps_interp, timestamps_interp[cmd_v_interp!=0], cmd_v_interp[cmd_v_interp!=0])
                     cmd_fd_interp = np.interp(timestamps_interp, timestamps_interp[cmd_fd_interp!=0], cmd_fd_interp[cmd_fd_interp!=0])
