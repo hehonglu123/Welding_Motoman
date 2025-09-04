@@ -627,3 +627,123 @@ class GRUAutoRegressionModel(nn.Module):
         
         predictions = torch.stack(predictions, dim=1)
         return predictions
+    
+class ThermalEncoder(nn.Module):
+    """
+    1D-CNN with strides/dilations -> GAP + GMP -> Linear -> LayerNorm
+    Input per step: (B, 400) float
+    Output per step: (B, E_T) where E_T=64 (default)
+    """
+    def __init__(self, emb_dim: int = 64):
+        super().__init__()
+        # Conv stack expands channels, reduces length
+        self.conv = nn.Sequential(
+            nn.Conv1d(1, 32, kernel_size=5, stride=2, padding=2),  # L: 400 -> 200
+            nn.ReLU(),
+            nn.Conv1d(32, 64, kernel_size=5, stride=2, padding=2, dilation=2),  # 200 -> 100
+            nn.ReLU(),
+            nn.Conv1d(64, 96, kernel_size=5, stride=2, padding=4, dilation=4),  # 100 -> ~50
+            nn.ReLU(),
+        )
+        # Final projection to embedding dim
+        # We will concat GAP (96) and GMP (96) -> 192, then Linear to emb_dim
+        self.proj = nn.Linear(192, emb_dim)
+        self.ln = nn.LayerNorm(emb_dim)
+        self.emb_dim = emb_dim
+    
+    def forward(self, thermal_400: torch.Tensor) -> torch.Tensor:
+        """
+        thermal_400: (B, 400) or (B, 1, 400)
+        returns: (B, emb_dim)
+        """
+        if thermal_400.dim() == 2:
+            x = thermal_400.unsqueeze(1)  # (B,1,400)
+        else:
+            x = thermal_400               # (B,1,400)
+        feat = self.conv(x)               # (B,96,L~50)
+
+        # Global Average Pooling & Global Max Pooling along length
+        gap = feat.mean(dim=-1)           # (B,96)
+        gmp = feat.amax(dim=-1)           # (B,96)
+        pooled = torch.cat([gap, gmp], dim=-1)  # (B,192)
+
+        z = self.proj(pooled)             # (B,emb_dim)
+        return self.ln(z)
+
+class WAAMFeatureEncoder(nn.Module):
+    """
+    Tiny MLP for low-dim scalars -> E_S (default=32) + LayerNorm
+    """
+    def __init__(self, in_dim: int, emb_dim: int = 32):
+        super().__init__()
+        self.mlp = nn.Sequential(
+            nn.Linear(in_dim, 64),
+            nn.ReLU(),
+            nn.Linear(64, emb_dim),
+            nn.ReLU(),
+        )
+        self.ln = nn.LayerNorm(emb_dim)
+        self.in_dim = in_dim
+        self.emb_dim = emb_dim
+
+    def forward(self, s: torch.Tensor) -> torch.Tensor:
+        """
+        s: (B, scalar_dim)
+        returns: (B, emb_dim)
+        """
+        return self.ln(self.mlp(s))
+
+class WAAMModel(nn.Module):
+    """
+    Full model:
+      ThermalEncoder(E_T=64) + ScalarEncoder(E_S=32)
+      -> concat -> LayerNorm -> GRU(128) -> Head -> 2 outputs
+    """
+    def __init__(self, scalar_dim: int,
+                 thermal_emb: int = 64, scalar_emb: int = 32,
+                 rnn_hidden: int = 128, rnn_layers: int = 1):
+        super().__init__()
+        self.thermal_enc = ThermalEncoder(emb_dim=thermal_emb)
+        self.scalar_enc = WAAMFeatureEncoder(in_dim=scalar_dim, emb_dim=scalar_emb)
+        self.fuse_ln = nn.LayerNorm(thermal_emb + scalar_emb)
+
+        self.rnn = nn.GRU(input_size=thermal_emb + scalar_emb,
+                          hidden_size=rnn_hidden,
+                          num_layers=rnn_layers,
+                          batch_first=True)
+
+        self.head = nn.Sequential(
+            nn.Linear(rnn_hidden, 2)     # height, width
+        )
+        # self.head = nn.Sequential(
+        #     nn.Linear(rnn_hidden, 128),
+        #     nn.ReLU(),
+        #     nn.Linear(128, 2)     # height, width
+        # )
+    
+    def forward(self,
+                scalars_seq: torch.Tensor,     # (B, T, scalar_dim)
+                thermals_seq: torch.Tensor,    # (B, T, 400)
+                lengths: torch.Tensor          # (B,) true lengths
+                ) -> torch.Tensor:
+        """
+        Returns predictions for all padded steps: (B, T, 2)
+        You should mask loss using 'lengths' outside.
+        """
+        B, T, _ = scalars_seq.shape
+
+        # Encode per time step in batch mode:
+        # Flatten batch*time for encoders, then reshape back.
+        S = scalars_seq.reshape(B*T, -1)          # (B*T, scalar_dim)
+        Th = thermals_seq.reshape(B*T, -1)        # (B*T, 400)
+
+        e_t = self.thermal_enc(Th)                # (B*T, E_T)
+        s_t = self.scalar_enc(S)                  # (B*T, E_S)
+        fused = torch.cat([e_t, s_t], dim=-1)     # (B*T, E_T+E_S)
+
+        fused = self.fuse_ln(fused).reshape(B, T, -1)  # (B, T, E)
+
+        # RNN over time
+        rnn_out, _ = self.rnn(fused)              # (B, T, H)
+        out = self.head(rnn_out)                  # (B, T, 2)
+        return out
