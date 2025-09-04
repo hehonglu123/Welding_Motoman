@@ -95,7 +95,8 @@ def main():
     test_weld_shift = False
     get_statistics = False
     test_loglog = False
-    test_read_thermal = True
+    test_read_thermal = False
+    reverse_thermal_pixel_trace = True
 
     ############## Robot definition ##############
     config_dir='../../config/'
@@ -1169,6 +1170,61 @@ def main():
         # plt.grid()
         # plt.show()
 
+    ###### reverse thermal pixel trace #####
+    if reverse_thermal_pixel_trace:
+        logdata_dir_all = ['weld_fujiscan_2025_06_11_16_27_41/','weld_fujiscan_2025_06_11_16_52_36/','weld_fujiscan_2025_06_11_17_16_48/',\
+                       'weld_fujiscan_2025_06_11_17_49_27/','weld_fujiscan_2025_06_11_18_14_56/','weld_fujiscan_2025_06_12_17_33_24/',\
+                       'weld_fujiscan_2025_06_12_16_59_09/','weld_fujiscan_2025_06_12_15_33_03/','weld_fujiscan_2025_06_12_15_03_27/',\
+                       'weld_fujiscan_2025_07_09_14_52_42/','weld_fujiscan_2025_07_09_15_21_35/','weld_fujiscan_2025_07_09_16_16_40/']
+        for logdata_dir_name in logdata_dir_all:
+            print('Processing:',logdata_dir_name)
+            logdata_dir = data_dir+logdata_dir_name
+            for weld_parts in ['base','layer']:
+                if weld_parts == 'base':
+                    total_layers_name = glob.glob(logdata_dir+'baselayer*')
+                else:
+                    total_layers_name = glob.glob(logdata_dir+'layer*')
+                # get printed layer number
+                layer_nums = []
+                for layer_name in total_layers_name:
+                    this_layer = layer_name.split('\\')[-1]
+                    this_layer = this_layer.split('r')[-1]
+                    layer_nums.append(int(this_layer))
+                layer_nums = np.sort(layer_nums)
+
+                for layer_n_id, layer_n in enumerate(layer_nums):
+                    # read logged data
+                    if weld_parts == 'base':
+                        layer_name = 'baselayer'+str(layer_n)
+                    else:
+                        layer_name = 'layer'+str(layer_n)
+                    print('Processing layer:',layer_name)
+                    this_layer_dir = logdata_dir+layer_name+'/'
+                    with open(this_layer_dir+'thermal_pixel_trace.pickle', 'rb') as f:
+                        thermal_pixel_trace = pickle.load(f)
+                    thermal_x = []
+                    thermal_t = []
+                    thermal_value = []
+                    thermal_stamp_all = []
+                    for lox_x in thermal_pixel_trace.keys():
+                        thermal_t.extend(thermal_pixel_trace[lox_x]['time'])
+                        thermal_value.extend(thermal_pixel_trace[lox_x]['value'])
+                        thermal_x.extend([lox_x]*len(thermal_pixel_trace[lox_x]['time']))
+                        thermal_stamp_all.extend(np.setdiff1d(thermal_pixel_trace[lox_x]['time'], thermal_stamp_all))
+                    thermal_x = np.array(thermal_x)
+                    thermal_t = np.array(thermal_t)
+                    thermal_value = np.array(thermal_value)
+                    thermal_stamp_all = np.sort(np.array(thermal_stamp_all))
+                    thermal_pixel_trace_stamp_key = {}
+                    for i, stamp in enumerate(thermal_stamp_all):
+                        thermal_pixel_trace_stamp_key[stamp] = {}
+                        this_thermal_x = thermal_x[thermal_t == stamp]
+                        this_thermal_value = thermal_value[thermal_t == stamp]
+                        x_sort_id = np.argsort(this_thermal_x)
+                        thermal_pixel_trace_stamp_key[stamp]['x'] = this_thermal_x[x_sort_id]
+                        thermal_pixel_trace_stamp_key[stamp]['value'] = this_thermal_value[x_sort_id]
+                    with open(this_layer_dir+'thermal_pixel_trace_stamp_key.pickle', 'wb') as f:
+                        pickle.dump(thermal_pixel_trace_stamp_key, f)
 
 if __name__ == "__main__":
     

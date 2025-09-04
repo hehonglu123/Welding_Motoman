@@ -85,9 +85,9 @@ def main():
     ################## Read geometry data ##################
     data_dir = '../../data/wall_weld_test/'
 
-    run_thermal = False
+    run_thermal = True
     run_geometry = True
-    run_compile = False
+    run_compile = True
 
     # logdata_dir_all = ['weld_fujiscan_2025_02_26_18_08_18/', 'weld_fujiscan_2025_02_26_16_24_21/', 'weld_fujiscan_2025_02_26_17_39_17/']
     # logdata_dir_all = ['weld_fujiscan_2025_02_26_16_24_21/', 'weld_fujiscan_2025_02_26_18_08_18/', 'weld_fujiscan_2025_02_26_17_39_17/']
@@ -99,13 +99,14 @@ def main():
 
     # material ER316L (stainless steel)
     # logdata_dir_all = ['weld_fujiscan_2025_06_11_16_27_41/']
-    # logdata_dir_all = ['weld_fujiscan_2025_06_11_16_27_41/','weld_fujiscan_2025_06_11_16_52_36/','weld_fujiscan_2025_06_11_17_16_48/',\
-    #                    'weld_fujiscan_2025_06_11_17_49_27/','weld_fujiscan_2025_06_11_18_14_56/','weld_fujiscan_2025_06_12_17_33_24/',\
-    #                    'weld_fujiscan_2025_06_12_16_59_09/','weld_fujiscan_2025_06_12_15_33_03/','weld_fujiscan_2025_06_12_15_03_27/']
+    logdata_dir_all = ['weld_fujiscan_2025_06_11_16_27_41/','weld_fujiscan_2025_06_11_16_52_36/','weld_fujiscan_2025_06_11_17_16_48/',\
+                       'weld_fujiscan_2025_06_11_17_49_27/','weld_fujiscan_2025_06_11_18_14_56/','weld_fujiscan_2025_06_12_17_33_24/',\
+                       'weld_fujiscan_2025_06_12_16_59_09/','weld_fujiscan_2025_06_12_15_33_03/','weld_fujiscan_2025_06_12_15_03_27/',\
+                       'weld_fujiscan_2025_07_09_14_52_42/','weld_fujiscan_2025_07_09_15_21_35/','weld_fujiscan_2025_07_09_16_16_40/']
     # logdata_dir_all = ['weld_fujiscan_2025_07_09_14_52_42/','weld_fujiscan_2025_07_09_15_21_35/','weld_fujiscan_2025_07_09_16_16_40/']
     # logdata_dir_all = ['weld_fujiscan_2025_06_11_18_14_56/']
     # logdata_dir_all= ['weld_fujicontrol_2025_08_13_14_17_58/', 'weld_fujicontrol_2025_08_13_14_57_52/']
-    logdata_dir_all= ['weld_fujicontrol_2025_08_13_14_17_58/', 'weld_fujicontrol_2025_08_13_14_57_52/','weld_fujicontrol_2025_08_14_11_19_59/']
+    # logdata_dir_all= ['weld_fujicontrol_2025_08_13_14_17_58/', 'weld_fujicontrol_2025_08_13_14_57_52/','weld_fujicontrol_2025_08_14_11_19_59/']
     
     
     ### skip data directories
@@ -652,8 +653,6 @@ def main():
                         o3d.io.write_point_cloud(this_layer_dir+'pcd.pcd',pcd)
                         o3d.io.write_point_cloud(this_layer_dir+'pcd_denoise.pcd',pcd_denoise)
                         #############################################
-
-                
 
                 ################ combine everything in one array ##############
                 if run_compile:

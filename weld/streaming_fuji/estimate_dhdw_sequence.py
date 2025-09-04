@@ -288,9 +288,12 @@ if __name__ == "__main__":
         model = modelClass(input_size=model_input_size, hidden_size=model_hidden_size, output_size=model_output_size, num_layers=num_layers, history_length=history_length, latency_steps=latency_steps, open_loop=open_loop, device=device).to(device)
     print("Model trainable parameters:",count_parameters(model))
 
-    ignore_start_end = 5
+    ignore_start_end = 0
     start_x = -55 + ignore_start_end
     end_x = 55 - ignore_start_end
+    thermal_window = 40 # 40 mm
+    thermal_dx_sample = 0.2 # sample every 0.2 mm
+    thermal_void_value = 7000 # if no values than background
 
     ### data processing
     data_dirs = []
@@ -307,7 +310,7 @@ if __name__ == "__main__":
         for layer_n_id, layer_n in enumerate(layer_nums):
             layer_name = 'layer'+str(layer_n)
             this_layer_dir = geo_data_dir + logdata_dir + layer_name + '/'
-            if os.path.exists(this_layer_dir+'profile_welding_'+str(sample_rate)+'_dhdw.csv'):
+            if os.path.exists(this_layer_dir+'profile_welding_'+str(sample_rate)+'_dhdw.csv') and os.path.exists(this_layer_dir+'profile_welding_'+str(sample_rate)+'_thermal_neighborhood'):
                 data_dirs.append(this_layer_dir)
                 this_layer = np.loadtxt(this_layer_dir+'profile_welding_'+str(sample_rate)+'_dhdw.csv', delimiter=',', skiprows=1)
                 train_data_batch_len.append(len(this_layer))
@@ -317,6 +320,8 @@ if __name__ == "__main__":
                 print("Interpolate data from profile welding.csv")
                 # load data
                 profile_welding = np.loadtxt(this_layer_dir+'profile_welding.csv', delimiter=',', skiprows=1)
+                with open(this_layer_dir+'thermal_pixel_trace_stamp_key.pickle', 'rb') as f:
+                    thermal_pixel_trace = pickle.load(f)
                 # chop x < start_x or x > end_x
                 x_location = np.array(profile_welding[:, 1])
                 if x_location[-1]>x_location[0]:
@@ -329,13 +334,18 @@ if __name__ == "__main__":
                 # interpolate the data to the sample rate
                 timestamp_welding = profile_welding[:,0]
                 timestamps_interp = np.arange(timestamp_welding[0]+1/sample_rate, timestamp_welding[-1], 1/sample_rate)
+                x_loc_interp = np.interp(timestamps_interp, timestamp_welding, profile_welding[:,1])
                 cmd_v_interp = np.zeros_like(timestamps_interp)
                 cmd_fd_interp = np.zeros_like(timestamps_interp)
                 dh_interp = np.zeros_like(timestamps_interp)
                 dw_interp = np.zeros_like(timestamps_interp)
                 stickout_interp = np.zeros_like(timestamps_interp)
                 thermal_interp = np.zeros_like(timestamps_interp)
-                for interp_id, interp_time in enumerate(timestamps_interp):
+                thermal_x_interp = np.zeros_like(timestamps_interp)
+                thermal_y_interp = np.zeros_like(timestamps_interp)
+                thermal_neighborhood_interp = []
+                thermal_stamps = np.array(list(thermal_pixel_trace.keys()))
+                for interp_id, (interp_time, interp_x) in enumerate(zip(timestamps_interp, x_loc_interp)):
                     window_id_start = np.where(timestamp_welding >= interp_time-1/sample_rate)[0][0]
                     window_id_end = np.where(timestamp_welding <= interp_time)[0][-1]+1
                     if window_id_end<=window_id_start:
@@ -350,6 +360,16 @@ if __name__ == "__main__":
                     dw_interp[interp_id] = np.mean(profile_welding[window_id_start:window_id_end, 7])
                     stickout_interp[interp_id] = np.mean(profile_welding[window_id_start:window_id_end, 6])
                     thermal_interp[interp_id] = np.mean(profile_welding[window_id_start:window_id_end, 9])
+                    thermal_x_interp[interp_id] = np.mean(profile_welding[window_id_start:window_id_end, 10])
+                    thermal_y_interp[interp_id] = np.mean(profile_welding[window_id_start:window_id_end, 11])
+
+                    # find closest smaller thermal t
+                    thermal_t_closest = np.max(thermal_stamps[thermal_stamps <= interp_time])
+                    this_thermal_neighbor_x = np.arange(interp_x-thermal_window, interp_x+thermal_window, thermal_dx_sample)
+                    np.append(this_thermal_neighbor_x, interp_x+thermal_window) if this_thermal_neighbor_x[-1] < interp_x+thermal_window else None
+                    this_thermal_neighbor_value = np.interp(this_thermal_neighbor_x, thermal_pixel_trace[thermal_t_closest]['x'], thermal_pixel_trace[thermal_t_closest]['value'], left=thermal_void_value, right=thermal_void_value)
+                    thermal_neighborhood_interp.append(this_thermal_neighbor_value)
+
                 if np.any(cmd_v_interp==0):
                     # interpolate the zero values using linear interpolation
                     cmd_v_interp = np.interp(timestamps_interp, timestamps_interp[cmd_v_interp!=0], cmd_v_interp[cmd_v_interp!=0])
@@ -358,13 +378,18 @@ if __name__ == "__main__":
                     dw_interp = np.interp(timestamps_interp, timestamps_interp[dw_interp!=0], dw_interp[dw_interp!=0])
                     stickout_interp = np.interp(timestamps_interp, timestamps_interp[stickout_interp!=0], stickout_interp[stickout_interp!=0])
                     thermal_interp = np.interp(timestamps_interp, timestamps_interp[thermal_interp!=0], thermal_interp[thermal_interp!=0])
+                    thermal_x_interp = np.interp(timestamps_interp, timestamps_interp[thermal_x_interp!=0], thermal_x_interp[thermal_x_interp!=0])
+                    thermal_y_interp = np.interp(timestamps_interp, timestamps_interp[thermal_y_interp!=0], thermal_y_interp[thermal_y_interp!=0])
 
                 # save the interpolated data
-                interp_data = np.column_stack((timestamps_interp, cmd_v_interp, cmd_fd_interp, dh_interp, dw_interp, stickout_interp, thermal_interp))
-                np.savetxt(this_layer_dir+'profile_welding_'+str(sample_rate)+'_dhdw.csv', interp_data, delimiter=',', header='timestamp,cmd_v,cmd_fd,dh,dw,stickout,thermal')
+                interp_data = np.column_stack((timestamps_interp, x_loc_interp, cmd_v_interp, cmd_fd_interp, dh_interp, dw_interp, stickout_interp, thermal_interp, thermal_x_interp, thermal_y_interp))
+                np.savetxt(this_layer_dir+'profile_welding_'+str(sample_rate)+'_dhdw.csv', interp_data, delimiter=',', header='timestamp,x_loc,cmd_v,cmd_fd,dh,dw,stickout,thermal,thermal_x,thermal_y')
+                thermal_neighborhood_interp = np.array(thermal_neighborhood_interp)
+                np.save(this_layer_dir+'profile_welding_'+str(sample_rate)+'_thermal_neighborhood.npy', thermal_neighborhood_interp)
                 data_dirs.append(this_layer_dir)
                 train_data_batch_len.append(len(interp_data))
-                    
+
+    exit()
     # total amount of data
     print("Total amount of data: ", len(data_dirs))
     print("Total amount of data batch: ", np.sum(train_data_batch_len))
