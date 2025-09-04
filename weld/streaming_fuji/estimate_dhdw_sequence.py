@@ -4,8 +4,12 @@ from scipy import stats
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import RBF, WhiteKernel
 from matplotlib import pyplot as plt
+from typing import List, Dict, Any, Tuple
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
+from torch.utils.data import Dataset, DataLoader
+from torch.amp import autocast, GradScaler
 import sys, datetime, yaml, pathlib, glob, os, time, argparse
 from estimate_dhdw import train_loglog
 sys.path.append('../../mocap/')
@@ -23,8 +27,102 @@ sup_title_size = 18
 np.random.seed(42) # for reproducibility
 torch.manual_seed(42) # for reproducibility
 
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+device_name = 'cuda' if torch.cuda.is_available() else 'cpu'
+device = torch.device(device_name)
 print("Using device:", device)
+
+class LayerSequenceDataset(Dataset):
+    """
+    Expects preprocessed per-layer dictionaries:
+      {
+        "scalars": FloatTensor (T, scalar_dim),
+        "thermal": FloatTensor (T, 400),
+        "target":  FloatTensor (T, 2)  # height, width
+        # optional: "group_id" or metadata for grouped splitting
+      }
+    All channels should be standardized with training stats beforehand.
+    """
+    def __init__(self, layers_dir: List[str], sample_rate: int = 10, data_index: list = [1,2,3,6,8,9], label_index: list = [4,5]):
+        super().__init__()
+        self.layers_dir = layers_dir
+        self.sample_rate = sample_rate
+        self.data_index = data_index
+        self.label_index = label_index
+        self.load_layer()
+    
+    def load_layer(self):
+
+        self.layers = []
+        for layer_dir in self.layers_dir:
+            this_layer_data = {}
+            profile_welding = np.loadtxt(layer_dir+'profile_welding_'+str(self.sample_rate)+'_dhdw.csv', delimiter=',', skiprows=1)
+            thermal_neighborhood = np.load(layer_dir+'profile_welding_'+str(self.sample_rate)+'_thermal_neighborhood.npy')
+            this_layer_data["scalars"] = torch.tensor(profile_welding[:, self.data_index], dtype=torch.float32) # x_location, cmd_v, cmd_fd, stickout, thermal_x, thermal_y
+            this_layer_data["thermal"] = torch.tensor(thermal_neighborhood, dtype=torch.float32)
+            this_layer_data["target"] = torch.tensor(profile_welding[:, self.label_index], dtype=torch.float32) # dh, dw
+            assert this_layer_data["scalars"].shape[0] == this_layer_data["thermal"].shape[0] == this_layer_data["target"].shape[0], "Mismatch in sequence lengths"
+            self.layers.append(this_layer_data)
+
+    def __len__(self):
+        return len(self.layers)
+
+    def __getitem__(self, idx):
+        item = self.layers[idx]
+        return {
+            "scalars": item["scalars"].float(),
+            "thermal": item["thermal"].float(),
+            "target":  item["target"].float(),
+            "meta":    item.get("meta", None)
+        }
+
+def pad_sequences_and_make_mask(batch: List[Dict[str, Any]]
+                                ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+    """
+    Collate function:
+      - Pads to max T in batch
+      - Returns tensors and length vector for masking
+    """
+    # Extract
+    scalars_list = [b["scalars"] for b in batch]  # list of (T, S)
+    thermal_list = [b["thermal"] for b in batch]  # list of (T, thermal_dim)
+    target_list  = [b["target"]  for b in batch]  # list of (T, 2)
+
+    lengths = torch.tensor([x.shape[0] for x in scalars_list], dtype=torch.long)
+
+    B = len(batch)
+    T_max = int(max(lengths))
+
+    S_dim = scalars_list[0].shape[1]
+    thermal_dim = thermal_list[0].shape[1]
+    # Create padded tensors
+    scalars_pad = torch.zeros(B, T_max, S_dim)
+    thermal_pad = torch.zeros(B, T_max, thermal_dim)
+    target_pad  = torch.zeros(B, T_max, 2)
+
+    for i, (s, th, y) in enumerate(zip(scalars_list, thermal_list, target_list)):
+        T = s.shape[0]
+        scalars_pad[i, :T, :] = s
+        thermal_pad[i, :T, :] = th
+        target_pad[i,  :T, :] = y
+
+    return scalars_pad, thermal_pad, target_pad, lengths
+
+def masked_mse_loss(pred: torch.Tensor, target: torch.Tensor, lengths: torch.Tensor) -> torch.Tensor:
+    """
+    pred, target: (B, T, 2)
+    lengths: (B,)
+    Computes MSE only over valid timesteps.
+    """
+    B, T, D = pred.shape
+    # build mask
+    device = pred.device
+    time_idx = torch.arange(T, device=device).unsqueeze(0).expand(B, T)  # (B,T)
+    mask = (time_idx < lengths.unsqueeze(1)).float()                     # (B,T)
+    mask = mask.unsqueeze(-1)                                            # (B,T,1)
+
+    mse = (pred - target) ** 2                                           # (B,T,2)
+    mse = (mse * mask).sum() / (mask.sum() * D + 1e-8)
+    return mse
 
 # Define hook to freeze half of W_ih
 def freeze_half_weight(param: torch.Tensor, freeze_cols=[0,1]):
@@ -34,52 +132,85 @@ def freeze_half_weight(param: torch.Tensor, freeze_cols=[0,1]):
         return grad * (1 - mask)
     param.register_hook(hook)
 
-def train(train_data_input:torch.tensor, train_data_labels:torch.tensor, test_data_input:torch.tensor, test_data_labels:torch.tensor, model:nn.Module, \
-          history_length, latency_steps, epochs, learning_rate, model_dir='weld_LSTM_models/'):
-    
+def train(train_dataloader: DataLoader, test_dataloader: DataLoader, model: nn.Module, epochs: int, learning_rate: float, model_dir='weld_LSTM_models/'):
+
     # loss function
-    loss_fn = nn.MSELoss()
+    loss_fn = masked_mse_loss
     # optimizer
     # optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
     optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=learning_rate)
-
-    # print all trainable parameters
-    print("Trainable parameters:")
-    for name, param in model.named_parameters():
-        if param.requires_grad:
-            print(f"{name}: {param.data.shape}")
+    
+    scaler = GradScaler(device=device_name)
+    acc_steps = 32          # tune this
+    max_norm = 1.0         # grad clip
 
     # Training
     training_losses = []
     testing_losses = []
     for epoch in range(epochs):
-        # get the testing loss
-        model.eval()
-        with torch.no_grad():
-            test_predictions = model(test_data_labels, test_data_input)
-            test_loss = loss_fn(test_predictions, test_data_labels[:, history_length:, :]) # skip the history length for loss calculation
-            testing_losses.append(test_loss.item())
-        
-        # save best testing loss model
-        if epoch == 0 or test_loss.item() <= min(testing_losses):
-            best_model = model.state_dict()
-            torch.save(best_model, model_dir+'best_model.pth')
-
-        # train the model
+        ####### training 
         model.train()
-        optimizer.zero_grad()
+        total_loss = 0.0
+        n_steps = 0
+        optimizer.zero_grad(set_to_none=True)
+        for step, (scalars, thermal, target, lengths) in enumerate(train_dataloader):
+            scalars = scalars.to(device)
+            thermal = thermal.to(device)
+            target  = target.to(device)
+            lengths = lengths.to(device)
 
-        predictions = model(train_data_labels, train_data_input)
-        loss = loss_fn(predictions, train_data_labels[:, history_length:, :])  # skip the history length for loss calculation
-        training_losses.append(loss.item())
+            with autocast(device_type=device_name, dtype=torch.float16):
+                pred = model(scalars, thermal, lengths)
+                loss = masked_mse_loss(pred, target, lengths) / acc_steps
+
+            scaler.scale(loss).backward()
+
+            if (step + 1) % acc_steps == 0:
+                scaler.unscale_(optimizer)
+                torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm)
+                scaler.step(optimizer)
+                scaler.update()
+                optimizer.zero_grad(set_to_none=True)
+
+            total_loss += loss.item() * acc_steps
+            n_steps += 1
+        # flush leftover grads
+        rem = n_steps % acc_steps
+        if rem != 0:
+            scaler.unscale_(optimizer)
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm)
+            scaler.step(optimizer)
+            scaler.update()
+            optimizer.zero_grad(set_to_none=True)
+        
+        this_training_loss = total_loss / max(1, n_steps)
+        training_losses.append(this_training_loss)
+        ######
+
+        ###### testing
+        model.eval()
+        total_loss = 0.0
+        n_batches = 0
+        for scalars, thermal, target, lengths in test_dataloader:
+            scalars = scalars.to(device)
+            thermal = thermal.to(device)
+            target  = target.to(device)
+            lengths = lengths.to(device)
+            pred = model(scalars, thermal, lengths)
+            loss = loss_fn(pred, target, lengths)
+            total_loss += loss.item()
+            n_batches += 1
+        this_test_loss = total_loss / n_batches
+        testing_losses.append(this_test_loss)
+
+        # save the best model
+        if epoch == 0 or this_test_loss < min(testing_losses[:-1]):
+            torch.save(model.state_dict(), model_dir + 'best_model.pth')
+            print(f"Epoch {epoch}: Saved new best model with loss {this_test_loss:.4f}")
 
         # print training progress
         if epoch % (epochs//10) == 0:
-            print(f"Epoch {epoch}/{epochs}, Training Loss: {loss.item():.4f}, Testing Loss: {test_loss.item():.4f}")
-
-        # backpropagation
-        loss.backward()
-        optimizer.step()
+            print(f"Epoch {epoch}/{epochs}, Training Loss: {this_training_loss:.4f}, Testing Loss: {this_test_loss:.4f}")
 
     return model, training_losses, testing_losses
 
@@ -88,14 +219,17 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Compare RNN weights from PyTorch models")
     parser.add_argument("--train", action='store_true', help="Train the model or not, default is False")
     parser.add_argument("--load_pretrained", action='store_true', help="Load pre-trained model or not, default is False")
-    parser.add_argument("--viz_weightings", action='store_true', help="Visualize weightings or not, default is False")
-    parser.add_argument("--all_data_testing", action='store_true', help="Use all data for testing or not, default is False")
-    parser.add_argument("--model_type", type=str, default='RNN', help="Model type: RNN, LSTM, GRU, NARMA, DTRNN")
-    parser.add_argument("--model_input_size", type=int, default=0, help="Model input size, default is 4")
-    parser.add_argument("--model_hidden_size", type=int, default=8, help="Model hidden size, default is 8")
-    parser.add_argument("--open_loop", action='store_false', help="Open loop model or not, default is True")
     parser.add_argument("--load_model_dir", type=str, default='', help="Directory to load the model from")
-    parser.add_argument("--multi_steps", type=int, default=0, help="Number of steps to predict, default is 0")
+    parser.add_argument("--all_data_testing", action='store_true', help="Use all data for testing or not, default is False")
+    parser.add_argument("--model_type", type=str, default='WAAM_GRU', help="Model type: WAAM_GRU")
+    parser.add_argument("--rnn_layers", type=int, default=1, help="Number of RNN layers, default is 1")
+    parser.add_argument("--thermal_emb", type=int, default=64, help="Embedding size for thermal data, default is 64")
+    parser.add_argument("--scalar_emb", type=int, default=32, help="Embedding size for scalar data, default is 32")
+    parser.add_argument("--rnn_hidden_size", type=int, default=128, help="Model hidden size, default is 128")
+    parser.add_argument("--innovation", action='store_true', help="Innovation model or not, default is False")
+    parser.add_argument("--sample_rate", type=int, default=10, help="Sample rate for the data, default is 10")
+    parser.add_argument("--epochs", type=int, default=5000, help="Number of epochs for training, default is 5000")
+    parser.add_argument("--learning_rate", type=float, default=0.001, help="Learning rate for the optimizer, default is 0.001")
     parse_arg = parser.parse_args()
 
     # load data
@@ -107,79 +241,54 @@ if __name__ == "__main__":
 
     train_flag = parse_arg.train # set to False to use the pre-trained model
     load_pretrained = parse_arg.load_pretrained
-    viz_weightings = parse_arg.viz_weightings # set to True to visualize the weightings of the model
     use_all_data_for_testing = parse_arg.all_data_testing # set to True to use all data for testing, otherwise use the last tote for testing
 
     model_dir = 'weld_Seq_models/' # directory to save the model
     # model directory
     if train_flag and not load_pretrained:
 
-        # parameters
-        model_type = parse_arg.model_type # 'LSTM', 'RNN', 'GRU', 'NARMA', 'DTRNN'
-        if model_type not in ['LSTM', 'RNN', 'GRU', 'NARMA', 'DTRNN']:
-            print("Invalid model type:", model_type, ". Please choose from 'LSTM', 'RNN', 'GRU', 'NARMA', or 'DTRNN'.")
+        #### parameters
+        # model type
+        model_type = parse_arg.model_type # 'WAAM_GRU'
+        if model_type not in ['WAAM_GRU']:
+            print("Invalid model type:", model_type, ". Please choose from 'WAAM_GRU'.")
             sys.exit(1)
-        model_input_size = parse_arg.model_input_size # default is 4
-        if model_input_size < 2:
-            print("Invalid model input size. Please provide a value greater than or equal to 2.")
+        # input features
+        feat_x_location = True # use x location as input feature
+        feat_cmd_v = True # use command velocity as input feature
+        feat_cmd_fd = True # use command feed as input feature
+        feat_stickout = True # use stickout length as input feature
+        feat_thermal_x = True # use thermal data as input feature
+        feat_thermal_y = True # use thermal data as input feature
+        feat_neighbor_thermal = True # use neighborhood thermal data as input feature
+        # model structure
+        innovation = parse_arg.innovation # default is True, set to False for closed loop model
+        rnn_hidden_size = parse_arg.rnn_hidden_size # default is 128
+        if rnn_hidden_size < 1:
+            print("Invalid RNN hidden size. Please provide a value greater than or equal to 1.")
             sys.exit(1)
-        if model_type == 'NARMA':
-            model_input_size = (model_input_size+2)*3
-        model_hidden_size = parse_arg.model_hidden_size # default is 8
-        if model_hidden_size < 1:
-            print("Invalid model hidden size. Please provide a value greater than or equal to 1.")
-            sys.exit(1)
-        open_loop = parse_arg.open_loop # default is True, set to False for closed loop model
-
-        sample_rate = 10 # Hz, using the rate of ir camera
-        train_test_split = 0.8 # 80% for training, 20% for testing
-        epochs = 5000 # number of epochs for training
-        sequence_length = 40 # sequence length for training
-        sample_sequence_overlap = 0.5 # overlap between sequences, 0.5 means 50% overlap
-        learning_rate = 0.001 # learning rate for training
-        latency = 1 # sec
-        latency_steps = int(latency * sample_rate) # number of steps to consider for latency
-        num_layers = 1 # number of layers
+        rnn_layers = parse_arg.rnn_layers # number of RNN layers
+        thermal_emb = parse_arg.thermal_emb # embedding size for thermal data
+        scalar_emb = parse_arg.scalar_emb # embedding size for scalar data
         model_output_size = 2 # dh, dw
-
-        # model parameters
-        # model_input_size = 18 # (cmd_v, cmd_fd)_(t,t-1,t-2), (dh,dw)_(t-1,t-2,t-3), (dh dw error)_(t-1,t-2,t-3)
-        # model_input_size = 12 # (cmd_v, cmd_fd)_(t,t-1,t-2), (dh,dw)_(t-1,t-2,t-3), (dh dw error)_(t-1,t-2,t-3)
-        # model_input_size = 4 # cmd_v, cmd_fd, dh error, dw error
-        # model_input_size = 2 # cmd_v, cmd_fd
-        # model_input_size = 5 # cmd_v, cmd_fd, stickout, dh error, dw error
-        # model_input_size = 3 # cmd_v, cmd_fd, stickout
-        # model_hidden_size = 16 # hidden size
-        # open_loop = False
-
-        # if include stickout length as the input feature
-        use_stickout_length = True if model_input_size in [3,5] else False
-
-        # how many previous time steps to consider, only used for AutoRegression
-        if model_type!= 'NARMA':
-            history_length = max(0,int(model_input_size/4-0.5))
-            open_loop = True if model_input_size in [2,3] else False # if model_input_size is 2, then it is an open loop model (RNN, LSTM, GRU)
-        else:
-            if open_loop:
-                history_length = max(0,int(model_input_size/4)) 
-            else:
-                history_length = max(0,int(model_input_size/6))
-
-        if model_type == 'NARMA':
-            model_hidden_size = [model_hidden_size,model_hidden_size] # NARMA model hidden size is a list of two elements, [first hidden, second hidden]
-        if model_type == 'DTRNN':
-            num_layers = 2
+        # data processing parameters
+        sample_rate = parse_arg.sample_rate # Hz, using the rate of fronious control
+        train_test_split = 0.8 # 80% for training, 20% for testing
+        # learning parameters
+        epochs = parse_arg.epochs # number of epochs for training
+        learning_rate = parse_arg.learning_rate # learning rate for training
 
         training_params = {
             'geo_data_dir': geo_data_dir, 'logdata_dir_all': logdata_dir_all,
             'model_type': model_type,
-            'sample_rate': sample_rate, 'train_test_split': train_test_split, 'epochs': epochs,
-            'sequence_length': sequence_length, 'sample_sequence_overlap': sample_sequence_overlap,
-            'learning_rate': learning_rate, 'model_input_size': model_input_size,
-            'history_length': history_length, 'model_hidden_size': model_hidden_size,
-            'num_layers': num_layers, 'model_output_size': model_output_size,
-            'open_loop': open_loop, 'use_stickout_length': use_stickout_length,
-            'latency': latency
+            'feat_x_location': feat_x_location, 'feat_cmd_v': feat_cmd_v, 'feat_cmd_fd': feat_cmd_fd,
+            'feat_stickout': feat_stickout, 'feat_thermal_x': feat_thermal_x, 'feat_thermal_y': feat_thermal_y,
+            'feat_neighbor_thermal': feat_neighbor_thermal,
+            'innovation': innovation, 'rnn_hidden_size': rnn_hidden_size,
+            'rnn_layers': rnn_layers, 'thermal_emb': thermal_emb, 'scalar_emb': scalar_emb,
+            'model_output_size': model_output_size,
+            'sample_rate': sample_rate, 'train_test_split': train_test_split, 
+            'epochs': epochs,'learning_rate': learning_rate
         }
         # save the training parameters
         # add timestamp to the model_dir
@@ -190,8 +299,6 @@ if __name__ == "__main__":
         with open(model_dir+'training_params.yaml', 'w') as f:
             yaml.dump(training_params, f, default_flow_style=False)
     else:
-        # RNN 8 hidden close/open: 20250625_131753/20250625_131507
-        # RNN 16 hidden close/open: 20250625_132020/20250625_131520
         pre_trained_model_dir = model_dir+'model_20250715_151650/' if parse_arg.load_model_dir == '' else model_dir+parse_arg.load_model_dir+'/'
         model_dir = deepcopy(pre_trained_model_dir) # use the pre-trained model directory
 
@@ -201,48 +308,25 @@ if __name__ == "__main__":
         geo_data_dir = training_params['geo_data_dir']
         logdata_dir_all = training_params['logdata_dir_all']
         model_type = training_params['model_type']
+        feat_x_location = training_params['feat_x_location']
+        feat_cmd_v = training_params['feat_cmd_v']
+        feat_cmd_fd = training_params['feat_cmd_fd']
+        feat_stickout = training_params['feat_stickout']
+        feat_thermal_x = training_params['feat_thermal_x']
+        feat_thermal_y = training_params['feat_thermal_y']
+        feat_neighbor_thermal = training_params['feat_neighbor_thermal']
+        innovation = training_params['innovation']
+        rnn_hidden_size = training_params['rnn_hidden_size']
+        rnn_layers = training_params['rnn_layers']
+        thermal_emb = training_params['thermal_emb']
+        scalar_emb = training_params['scalar_emb']
+        model_output_size = training_params['model_output_size']
         sample_rate = training_params['sample_rate']
         train_test_split = training_params['train_test_split']
         epochs = training_params['epochs']
-        sequence_length = training_params['sequence_length']
-        sample_sequence_overlap = training_params['sample_sequence_overlap']
         learning_rate = training_params['learning_rate']
-        model_input_size = training_params['model_input_size']
-        history_length = training_params['history_length']
-        model_hidden_size = training_params['model_hidden_size']
-        num_layers = training_params['num_layers'] if 'num_layers' in training_params else 1
-        model_output_size = training_params['model_output_size']
-        if 'open_loop' in training_params:
-            open_loop = training_params['open_loop']
-        else:
-            open_loop = True if model_input_size == 2 else False
-        try:
-            use_stickout_length = training_params['use_stickout_length']
-        except KeyError:
-            use_stickout_length = False
-        try:
-            latency = training_params['latency']
-        except KeyError:
-            latency = 0
-        latency_steps = int(latency * sample_rate) # number of steps to consider for latency
 
-        if model_type != 'RNN':
-            print("Skip:",model_type, "model with input size", model_input_size, "and open loop:", open_loop)
-            exit() # only trained the closed loop from open loop RNN
-        
         if train_flag:
-            # using the pre-trained model directory to train a new model
-            model_input_size = 5 if use_stickout_length else 4
-            if model_input_size > 3:
-                open_loop = False
-            # epochs = 100 # for testing purpose, reduce the epochs to 100
-            epochs = 5000 # only 5000 epochs for training with pre-trained model
-
-            training_params['model_input_size'] = model_input_size
-            training_params['open_loop'] = open_loop
-            training_params['epochs'] = epochs
-            training_params['pre_trained_model_dir'] = pre_trained_model_dir
-
             # save the training parameters
             # add timestamp to the model_dir
             now = datetime.datetime.now()
@@ -252,8 +336,6 @@ if __name__ == "__main__":
             with open(model_dir+'training_params.yaml', 'w') as f:
                 yaml.dump(training_params, f, default_flow_style=False)
 
-    future_multi_step_prediction = parse_arg.multi_steps
-
     save_loglog = False # set to True to save the log-log model parameters
 
     print("Training parameters:")
@@ -261,41 +343,24 @@ if __name__ == "__main__":
     print("Model directory:", model_dir)
     if (not train_flag) or load_pretrained:
         print("Using pre-trained model:", pre_trained_model_dir)
-    print("Model type:", model_type, "Model input size:", model_input_size, "Model hidden size:", model_hidden_size)
-    print("Doing multi-step prediction in the testing stage:", parse_arg.multi_steps)
-
-    # Model types
-    if model_type == 'LSTM':
-        if model_input_size == 2:
-            modelClass = LSTMModel
-        else:
-            modelClass = LSTMAutoRegressionModel
-    elif model_type == 'RNN' or model_type == 'DTRNN':
-        if model_input_size == 2 and model_type == 'RNN':
-            modelClass = RNNModel
-        else:
-            modelClass = RNNAutoRegressionModel
-    elif model_type == 'GRU':
-        if model_input_size == 2:
-            modelClass = GRUModel
-        else:
-            modelClass = GRUAutoRegressionModel
-    elif model_type == 'NARMA':
-        modelClass = ARMANeuralNetwork
-
-    # model initialization
-    if model_input_size == 2 and model_type not in ['NARMA', 'DTRNN']:
-        model = modelClass(input_size=model_input_size, hidden_size=model_hidden_size, output_size=model_output_size, num_layers=num_layers, device=device).to(device)
-    else:
-        model = modelClass(input_size=model_input_size, hidden_size=model_hidden_size, output_size=model_output_size, num_layers=num_layers, history_length=history_length, latency_steps=latency_steps, open_loop=open_loop, device=device).to(device)
-    print("Model trainable parameters:",count_parameters(model))
-
-    ignore_start_end = 0
-    start_x = -55 + ignore_start_end
-    end_x = 55 - ignore_start_end
-    thermal_window = 40 # 40 mm
-    thermal_dx_sample = 0.2 # sample every 0.2 mm
-    thermal_void_value = 7000 # if no values than background
+    print("Model type:", model_type)
+    print("Features")
+    print("  x_location:", feat_x_location)
+    print("  cmd_v:", feat_cmd_v)
+    print("  cmd_fd:", feat_cmd_fd)
+    print("  stickout:", feat_stickout)
+    print("  thermal_x:", feat_thermal_x)
+    print("  thermal_y:", feat_thermal_y)
+    print("  neighbor_thermal:", feat_neighbor_thermal)
+    print("Model structure:")
+    print("  RNN hidden size:", rnn_hidden_size)
+    print("  RNN layers:", rnn_layers)
+    print("  Thermal embedding:", thermal_emb)
+    print("  Scalar embedding:", scalar_emb)
+    print("  Model output size:", model_output_size)
+    print("Training parameters:")
+    print("  Epochs:", epochs)
+    print("  Learning rate:", learning_rate)
 
     ### data processing
     data_dirs = []
@@ -312,94 +377,11 @@ if __name__ == "__main__":
         for layer_n_id, layer_n in enumerate(layer_nums):
             layer_name = 'layer'+str(layer_n)
             this_layer_dir = geo_data_dir + logdata_dir + layer_name + '/'
-            if os.path.exists(this_layer_dir+'profile_welding_'+str(sample_rate)+'_dhdw.csv') and os.path.exists(this_layer_dir+'profile_welding_'+str(sample_rate)+'_thermal_neighborhood.npy'):
-                data_dirs.append(this_layer_dir)
-                this_layer = np.loadtxt(this_layer_dir+'profile_welding_'+str(sample_rate)+'_dhdw.csv', delimiter=',', skiprows=1)
-                train_data_batch_len.append(len(this_layer))
-            else:
-                print("Processing layer "+str(layer_n)+" in "+logdata_dir)
-                print('No data for layer '+str(layer_n)+' in '+logdata_dir)
-                print("Interpolate data from profile welding.csv")
-                # load data
-                profile_welding = np.loadtxt(this_layer_dir+'profile_welding.csv', delimiter=',', skiprows=1)
-                with open(this_layer_dir+'thermal_pixel_trace_stamp_key.pickle', 'rb') as f:
-                    thermal_pixel_trace = pickle.load(f)
-                # chop x < start_x or x > end_x
-                x_location = np.array(profile_welding[:, 1])
-                if x_location[-1]>x_location[0]:
-                    start_index = np.where(x_location > start_x)[0][0] 
-                    end_index = np.where(x_location < end_x)[0][-1]
-                else:
-                    start_index = np.where(x_location < end_x)[0][0] 
-                    end_index = np.where(x_location > start_x)[0][-1]
-                profile_welding = profile_welding[start_index:end_index+1, :]
-                # interpolate the data to the sample rate
-                timestamp_welding = profile_welding[:,0]
-                timestamps_interp = np.arange(timestamp_welding[0]+1/sample_rate, timestamp_welding[-1], 1/sample_rate)
-                x_loc_interp = np.interp(timestamps_interp, timestamp_welding, profile_welding[:,1])
-                cmd_v_interp = np.zeros_like(timestamps_interp)
-                cmd_fd_interp = np.zeros_like(timestamps_interp)
-                dh_interp = np.zeros_like(timestamps_interp)
-                dw_interp = np.zeros_like(timestamps_interp)
-                stickout_interp = np.zeros_like(timestamps_interp)
-                thermal_interp = np.zeros_like(timestamps_interp)
-                thermal_x_interp = np.zeros_like(timestamps_interp)
-                thermal_y_interp = np.zeros_like(timestamps_interp)
-                thermal_neighborhood_interp = []
-                thermal_stamps = np.array(list(thermal_pixel_trace.keys()))
-                for interp_id, (interp_time, interp_x) in enumerate(zip(timestamps_interp, x_loc_interp)):
-                    window_id_start = np.where(timestamp_welding >= interp_time-1/sample_rate)[0][0]
-                    window_id_end = np.where(timestamp_welding <= interp_time)[0][-1]+1
-                    if window_id_end<=window_id_start:
-                        print('Error: window_id_end <= window_id_start, check the data')
-                        continue
-                    if window_id_end>len(timestamp_welding) or window_id_start>=len(timestamp_welding):
-                        print('Error: window_id_end > len(timestamps) or window_id_start >= len(timestamps), check the data')
-                        continue
-                    cmd_v_interp[interp_id] = np.mean(profile_welding[window_id_start:window_id_end, 2])
-                    cmd_fd_interp[interp_id] = np.mean(profile_welding[window_id_start:window_id_end, 3])
-                    dh_interp[interp_id] = np.mean(profile_welding[window_id_start:window_id_end, 5])
-                    dw_interp[interp_id] = np.mean(profile_welding[window_id_start:window_id_end, 7])
-                    stickout_interp[interp_id] = np.mean(profile_welding[window_id_start:window_id_end, 6])
-                    thermal_interp[interp_id] = np.mean(profile_welding[window_id_start:window_id_end, 9])
-                    thermal_x_interp[interp_id] = np.mean(profile_welding[window_id_start:window_id_end, 10])
-                    thermal_y_interp[interp_id] = np.mean(profile_welding[window_id_start:window_id_end, 11])
-
-                    # find closest smaller thermal t
-                    thermal_t_closest = np.max(thermal_stamps[thermal_stamps <= interp_time])
-                    this_thermal_neighbor_x = np.arange(interp_x-thermal_window, interp_x+thermal_window, thermal_dx_sample)
-                    np.append(this_thermal_neighbor_x, interp_x+thermal_window) if this_thermal_neighbor_x[-1] < interp_x+thermal_window else None
-                    this_thermal_neighbor_value = np.interp(this_thermal_neighbor_x, thermal_pixel_trace[thermal_t_closest]['x'], thermal_pixel_trace[thermal_t_closest]['value'], left=thermal_void_value, right=thermal_void_value)
-                    # find how many value in this_thermal_neighbor_value are thermal_void_value
-                    if np.sum(this_thermal_neighbor_value==thermal_void_value)/len(this_thermal_neighbor_value) > 0.51:
-                        # plt.plot(this_thermal_neighbor_x, this_thermal_neighbor_value, '-o')
-                        # plt.title(f'More than 50% void values in thermal neighborhood, Time:{interp_time:.2f}, X:{interp_x:.2f}')
-                        # plt.show()
-                        # exit()
-                        print('Warning: More than 51% void values in thermal neighborhood')
-                    thermal_neighborhood_interp.append(this_thermal_neighbor_value)
-
-                if np.any(cmd_v_interp==0):
-                    # interpolate the zero values using linear interpolation
-                    cmd_v_interp = np.interp(timestamps_interp, timestamps_interp[cmd_v_interp!=0], cmd_v_interp[cmd_v_interp!=0])
-                    cmd_fd_interp = np.interp(timestamps_interp, timestamps_interp[cmd_fd_interp!=0], cmd_fd_interp[cmd_fd_interp!=0])
-                    dh_interp = np.interp(timestamps_interp, timestamps_interp[dh_interp!=0], dh_interp[dh_interp!=0])
-                    dw_interp = np.interp(timestamps_interp, timestamps_interp[dw_interp!=0], dw_interp[dw_interp!=0])
-                    stickout_interp = np.interp(timestamps_interp, timestamps_interp[stickout_interp!=0], stickout_interp[stickout_interp!=0])
-                    thermal_interp = np.interp(timestamps_interp, timestamps_interp[thermal_interp!=0], thermal_interp[thermal_interp!=0])
-                    thermal_x_interp = np.interp(timestamps_interp, timestamps_interp[thermal_x_interp!=0], thermal_x_interp[thermal_x_interp!=0])
-                    thermal_y_interp = np.interp(timestamps_interp, timestamps_interp[thermal_y_interp!=0], thermal_y_interp[thermal_y_interp!=0])
-
-                # save the interpolated data
-                interp_data = np.column_stack((timestamps_interp, x_loc_interp, cmd_v_interp, cmd_fd_interp, dh_interp, dw_interp, stickout_interp, thermal_interp, thermal_x_interp, thermal_y_interp))
-                np.savetxt(this_layer_dir+'profile_welding_'+str(sample_rate)+'_dhdw.csv', interp_data, delimiter=',', header='timestamp,x_loc,cmd_v,cmd_fd,dh,dw,stickout,thermal,thermal_x,thermal_y')
-                thermal_neighborhood_interp = np.array(thermal_neighborhood_interp)
-                np.save(this_layer_dir+'profile_welding_'+str(sample_rate)+'_thermal_neighborhood.npy', thermal_neighborhood_interp)
-                data_dirs.append(this_layer_dir)
-                train_data_batch_len.append(len(interp_data))
+            data_dirs.append(this_layer_dir)
+            this_layer = np.loadtxt(this_layer_dir+'profile_welding_'+str(sample_rate)+'_dhdw.csv', delimiter=',', skiprows=1)
+            train_data_batch_len.append(len(this_layer))
     
     print(f'Min length of the data: {np.min(train_data_batch_len)}, max length of the data: {np.max(train_data_batch_len)}')
-    exit()
     # total amount of data
     print("Total amount of data: ", len(data_dirs))
     print("Total amount of data batch: ", np.sum(train_data_batch_len))
@@ -424,153 +406,39 @@ if __name__ == "__main__":
     print("max ratio:", np.max(train_data_split_len)/np.sum(train_data_split_len))
 
     ###### load data ######
-    def load_data_from_tote(data_dir_tote):
-        data_all = []
-        for dir_tote in data_dir_tote:
-            for dir_name in dir_tote:
-                this_layer = np.loadtxt(dir_name+'profile_welding_'+str(sample_rate)+'_dhdw.csv', delimiter=',', skiprows=1)
-                for in_layer_id in range(0,len(this_layer)-sequence_length, int(sequence_length*(1-sample_sequence_overlap))):
-                    if in_layer_id+sequence_length >= len(this_layer):
-                        continue
-                    data_all.append(this_layer[in_layer_id:in_layer_id+sequence_length, :])
-                if np.all(data_all[-1]!=this_layer[-sequence_length:, :]):
-                    data_all.append(this_layer[-sequence_length:, :])
-        return np.array(data_all)
-
     train_data_dir_tote = train_data_split_dir[:-1]
     if not use_all_data_for_testing:
         test_data_dir_tote = train_data_split_dir[-1:]
     else:
         test_data_dir_tote = deepcopy(train_data_split_dir)
-    train_data = load_data_from_tote(train_data_dir_tote)
-    test_data = load_data_from_tote(test_data_dir_tote)
-    print("Train data shape: ", train_data.shape, "Total samples:", train_data.shape[0]* train_data.shape[1])
-    print("Test data shape: ", test_data.shape, "Total samples:", test_data.shape[0]* test_data.shape[1])
+    train_data_dir_tote = [item for sublist in train_data_dir_tote for item in sublist]
+    test_data_dir_tote = [item for sublist in test_data_dir_tote for item in sublist]
 
-    # normalization 
-    max_feedrate = np.max(np.append(train_data[:, :, 2], test_data[:, :, 2]))
-    min_feedrate = np.min(np.append(train_data[:, :, 2], test_data[:, :, 2]))
-    max_v = np.max(np.append(train_data[:, :, 1], test_data[:, :, 1]))
-    min_v = np.min(np.append(train_data[:, :, 1], test_data[:, :, 1]))
+    print("Load to datasets...")
+    data_index = []
+    data_index.append(1) if feat_x_location else None
+    data_index.append(2) if feat_cmd_v else None
+    data_index.append(3) if feat_cmd_fd else None
+    data_index.append(6) if feat_stickout else None
+    data_index.append(8) if feat_thermal_x else None
+    data_index.append(9) if feat_thermal_y else None
+    train_ds = LayerSequenceDataset(train_data_dir_tote, sample_rate=sample_rate, data_index=data_index, label_index=[4,5])
+    test_ds = LayerSequenceDataset(test_data_dir_tote, sample_rate=sample_rate, data_index=data_index, label_index=[4,5])
 
-    # save input cmd_v cmd_feedrate
-    train_cmd_v = train_data[:, :, 1].flatten()
-    train_cmd_feedrate = train_data[:, :, 2].flatten()
-    train_stickout_length = train_data[:, :, 5].flatten()
-    test_cmd_v = test_data[:, :, 1].flatten()
-    test_cmd_feedrate = test_data[:, :, 2].flatten()
-    test_stickout_length = test_data[:, :, 5].flatten()
+    train_dataloader = DataLoader(train_ds, batch_size=4, shuffle=True, collate_fn=pad_sequences_and_make_mask)
+    test_dataloader = DataLoader(test_ds, batch_size=len(test_ds), shuffle=False, collate_fn=pad_sequences_and_make_mask)
 
-    # train with log-log model for comparison
-    train_dh = train_data[:, :, 3].flatten()
-    train_dw = train_data[:, :, 4].flatten()
-    test_dh = test_data[:, :, 3].flatten()
-    test_dw = test_data[:, :, 4].flatten()
-    # change all dh dw smaller than 0.01 to 0.01
-    train_dh[train_dh < 0.01] = 0.01
-    train_dw[train_dw < 0.01] = 0.01
-    test_dh[test_dh < 0.01] = 0.01
-    test_dw[test_dw < 0.01] = 0.01
-    train_cmd_feedrate_loglog = train_cmd_feedrate* inch2mm / 60 # ipm to mm/s
-    test_cmd_feedrate_loglog = test_cmd_feedrate* inch2mm / 60 # ipm to mm/s
-    train_dh_error_loglog, train_dw_error_loglog, val_dh_error_loglog, val_dw_error_loglog, theta_param_dh, theta_param_dw = \
-        train_loglog(np.vstack((train_cmd_v,train_cmd_feedrate_loglog)).T, np.vstack((train_dh, train_dw)).T, \
-                     np.vstack((test_cmd_v,test_cmd_feedrate_loglog)).T, np.vstack((test_dh, test_dw)).T,quadratic=False, return_params=True)
-    val_dh_error_loglog = np.abs(val_dh_error_loglog)
-    val_dw_error_loglog = np.abs(val_dw_error_loglog)
-    print(f"log log test dh (mean,95%,max):{np.mean(val_dh_error_loglog):.4f}, {stats.expon(scale=np.std(val_dh_error_loglog)).interval(0.95)[1]:.4f}, {np.max(val_dh_error_loglog):.4f}")
-    print(f"log log test dw (mean,95%,max):{np.mean(val_dw_error_loglog):.4f}, {stats.expon(scale=np.std(val_dw_error_loglog)).interval(0.95)[1]:.4f}, {np.max(val_dw_error_loglog):.4f}")
-    print(f"MSE (dh dw)",np.mean(np.vstack((val_dh_error_loglog, val_dw_error_loglog)).T**2))
+    model = WAAMModel(scalar_dim=len(data_index), thermal_emb=thermal_emb, scalar_emb=scalar_emb, rnn_hidden=rnn_hidden_size, rnn_layers=rnn_layers).to(device)
+    print("Model trainable parameters:",count_parameters(model))
 
-    if save_loglog:
-        print("Saving log-log model parameters to weld_Seq_models/loglog_models/")
-        training_params_loglog = {}
-        training_params_loglog['geo_data_dir'] = training_params['geo_data_dir']
-        training_params_loglog['logdata_dir_all'] = training_params['logdata_dir_all']
-        training_params_loglog['model_type'] = 'loglog_lin'
-        training_params_loglog['sample_rate'] = training_params['sample_rate']
-        training_params_loglog['train_test_split'] = training_params['train_test_split']
-        training_params_loglog['sequence_length'] = training_params['sequence_length']
-        training_params_loglog['sample_sequence_overlap'] = training_params['sample_sequence_overlap']
-        os.makedirs('weld_Seq_models/loglog_models/', exist_ok=True)
-        with open('weld_Seq_models/loglog_models/training_params.yaml', 'w') as f:
-            yaml.dump(training_params_loglog, f)
-        np.savetxt('weld_Seq_models/loglog_models/theta_param_dh.csv', theta_param_dh, delimiter=',')
-        np.savetxt('weld_Seq_models/loglog_models/theta_param_dw.csv', theta_param_dw, delimiter=',')
-
-    exit()
-    ######
-
-    np.savetxt(model_dir+'../train_cmd_v_feedrate.csv', np.vstack((train_cmd_v, train_cmd_feedrate, train_stickout_length)).T, delimiter=',', header='cmd_v,cmd_fd,stickout')
-    np.savetxt(model_dir+'../test_cmd_v_feedrate.csv', np.vstack((test_cmd_v, test_cmd_feedrate, test_stickout_length)).T, delimiter=',', header='cmd_v,cmd_fd,stickout')
-
-    train_data[:, :, 1] = (train_data[:, :, 1] - min_v) / (max_v - min_v)
-    train_data[:, :, 2] = (train_data[:, :, 2] - min_feedrate) / (max_feedrate - min_feedrate)
-    test_data[:, :, 1] = (test_data[:, :, 1] - min_v) / (max_v - min_v)
-    test_data[:, :, 2] = (test_data[:, :, 2] - min_feedrate) / (max_feedrate - min_feedrate)
-
-    # prepare data for training
-    if use_stickout_length:
-        train_data_input = torch.tensor(train_data[:, :, [1,2,5]], dtype=torch.float32).to(device)  # cmd_v, cmd_fd, stickout
-        test_data_input = torch.tensor(test_data[:, :, [1,2,5]], dtype=torch.float32).to(device)  # cmd_v, cmd_fd, stickout
-    else:
-        train_data_input = torch.tensor(train_data[:, :, 1:3], dtype=torch.float32).to(device)  # cmd_v, cmd_fd
-        test_data_input = torch.tensor(test_data[:, :, 1:3], dtype=torch.float32).to(device)  # cmd_v, cmd_fd
-    train_data_labels = torch.tensor(train_data[:, :, 3:5], dtype=torch.float32).to(device)  # dh, dw
-    test_data_labels = torch.tensor(test_data[:, :, 3:5], dtype=torch.float32).to(device)  # dh, dw
-
-    # padd history length at the beginning of the input data
-    if history_length > 0:
-        # repeat the first input for history length times and pad
-        print("Padding history length: ", history_length)
-        train_data_input = torch.cat((train_data_input[:,0:1,:].repeat(1,history_length,1), train_data_input), dim=1).to(device)
-        test_data_input = torch.cat((test_data_input[:,0:1,:].repeat(1,history_length,1), test_data_input), dim=1).to(device)
-        # padd zeros to the labels
-        train_data_labels = torch.cat((torch.zeros((train_data_labels.shape[0], history_length, train_data_labels.shape[2]), dtype=torch.float32).to(device), train_data_labels), dim=1)
-        test_data_labels = torch.cat((torch.zeros((test_data_labels.shape[0], history_length, test_data_labels.shape[2]), dtype=torch.float32).to(device), test_data_labels), dim=1)
-
-    print("Train data input shape: ", train_data_input.shape)
-    print("Train data labels shape: ", train_data_labels.shape)
-    
     if train_flag:
         if load_pretrained:
-            print("Loading pre-trained model from: ", pre_trained_model_dir+'best_model.pth')
-            parameter_dict = torch.load(pre_trained_model_dir+'best_model.pth', weights_only=True)
-            try:
-                model.load_state_dict(parameter_dict)
-            except RuntimeError as e:
-                print("Train closed loop from open loop pre-trained model.")
-                with torch.no_grad():
-                    model.rnn_cell.weight_hh.data.copy_(parameter_dict['rnn.weight_hh_l0'])
-                    model.rnn_cell.bias_hh.data.copy_(parameter_dict['rnn.bias_hh_l0'])
-                    model.rnn_cell.weight_ih[:, :2].data.copy_(parameter_dict['rnn.weight_ih_l0'])
-                    model.rnn_cell.bias_ih.data.copy_(parameter_dict['rnn.bias_ih_l0'])
-                    model.fc.weight.data.copy_(parameter_dict['fc.weight'])
-                    model.rnn_cell.weight_hh.requires_grad = False
-                    model.rnn_cell.bias_hh.requires_grad = False
-                    freeze_half_weight(model.rnn_cell.weight_ih, freeze_cols=[0,1]) # freeze the first two columns of weight_ih
-                    model.rnn_cell.bias_ih.requires_grad = False
-                    model.fc.weight.requires_grad = False
-                    model.fc.bias.requires_grad = False
-                    pre_train_weight_hh = model.rnn_cell.weight_hh.detach().cpu().numpy()
-                    pre_train_weight_ih = model.rnn_cell.weight_ih.detach().cpu().numpy()
+            pass
         # training loop
         start_time = time.time()
-        _, training_loss, testing_loss = train(train_data_input, train_data_labels, test_data_input, test_data_labels, model,\
-                                                history_length, latency_steps, epochs, learning_rate, model_dir=model_dir)
+        _, training_loss, testing_loss = train(train_dataloader, test_dataloader, model, epochs, learning_rate, model_dir=model_dir)
         end_time = time.time()
         print(f"Training completed in {end_time - start_time:.2f} seconds.")
-
-        # plot pre-trained and after training model parameters differences
-        # if load_pretrained:
-        #     plt.matshow(pre_train_weight_hh-model.rnn_cell.weight_hh.detach().cpu().numpy(), cmap='viridis', aspect='equal')
-        #     plt.title("Weight HH Difference")
-        #     plt.colorbar()
-        #     plt.show()
-        #     plt.matshow(pre_train_weight_ih-model.rnn_cell.weight_ih.detach().cpu().numpy(), cmap='viridis', aspect='equal')
-        #     plt.title("Weight IH Difference")
-        #     plt.colorbar()
-        #     plt.show()
 
         model.load_state_dict(torch.load(model_dir+'best_model.pth',weights_only=True)) # load the best model for evaluation
         # save loss
@@ -727,179 +595,5 @@ if __name__ == "__main__":
     plt.legend(fontsize=legend_size)
     plt.title('Training and Testing Loss', fontsize=title_size)
     plt.tight_layout()
-    plt.savefig(model_dir+'training_testing_loss.png')
-    # plt.show()
-
-    # plot dh and w error distribution
-    model.eval()
-    with torch.no_grad():
-        if future_multi_step_prediction == 0:
-            train_predictions = model(train_data_labels, train_data_input)
-            test_predictions = model(test_data_labels, test_data_input)
-        else:
-            train_predictions, train_predictions_onestep = model.forward_multi_steps(train_data_labels, train_data_input, multi_steps=future_multi_step_prediction)
-            test_predictions, test_predictions_onestep = model.forward_multi_steps(test_data_labels, test_data_input, multi_steps=future_multi_step_prediction)
-        train_dh_error = (train_predictions[:, :, 0] - train_data_labels[:, history_length+future_multi_step_prediction:, 0]).cpu().numpy().flatten()
-        train_dw_error = (train_predictions[:, :, 1] - train_data_labels[:, history_length+future_multi_step_prediction:, 1]).cpu().numpy().flatten()
-        test_dh_error = (test_predictions[:, :, 0] - test_data_labels[:, history_length+future_multi_step_prediction:, 0]).cpu().numpy().flatten()
-        test_dw_error = (test_predictions[:, :, 1] - test_data_labels[:, history_length+future_multi_step_prediction:, 1]).cpu().numpy().flatten()
-
-    # plot for sanity check
-    # plot_batch=21
-    # time_length = train_data_labels.shape[1]
-    # plt.figure(figsize=(10, 5))
-    # plt.subplot(1, 2, 1)
-    # plt.plot(np.arange(future_multi_step_prediction,time_length), test_predictions[plot_batch, :, 0].cpu().numpy(), label='Predicted dh')
-    # if future_multi_step_prediction > 0:
-    #     plt.plot(test_predictions_onestep[plot_batch, :, 0].cpu().numpy(), label='Predicted dh (one step)')
-    # plt.plot(test_data_labels[plot_batch, :, 0].cpu().numpy(), label='Ground Truth dh')
-    # plt.legend(fontsize=legend_size)
-
-    # plt.subplot(1, 2, 2)
-    # plt.plot(np.arange(future_multi_step_prediction,time_length), test_predictions[plot_batch, :, 1].cpu().numpy(), label='Predicted dw')
-    # if future_multi_step_prediction > 0:
-    #     plt.plot(test_predictions_onestep[plot_batch, :, 1].cpu().numpy(), label='Predicted dw (one step)')
-    # plt.plot(test_data_labels[plot_batch, :, 1].cpu().numpy(), label='Ground Truth dw')
-    
-    # plt.legend(fontsize=legend_size)
-    # plt.show()
-
-    # save the errors
-    np.savetxt(model_dir+'train_dh_error.csv', train_dh_error, delimiter=',')
-    np.savetxt(model_dir+'train_dw_error.csv', train_dw_error, delimiter=',')
-    np.savetxt(model_dir+'test_dh_error.csv', test_dh_error, delimiter=',')
-    np.savetxt(model_dir+'test_dw_error.csv', test_dw_error, delimiter=',')
-    # plot the error distribution
-    plot_error_distribution(np.abs(train_dh_error), np.abs(train_dw_error), np.abs(test_dh_error), np.abs(test_dw_error), save_dir=model_dir)
-    # print test error statistics
-    print(f"Test dh Error: Mean = {np.mean(np.abs(test_dh_error)):.4f}, width Error = {np.mean(np.abs(test_dw_error)):.4f}")
-
-    # if no plotting
-    exit()
-
-    # plot test data prediction dh dw vs ground truth dh dw of four sequences, using a 2x2 grid
-    layer_dir_chosen = np.random.choice(test_data_dir_tote[0], size=8, replace=False)
-    layer_dir_chosen = layer_dir_chosen[[0,3,6,7]]  # choose 4 layers for visualization
-    chosen_VPD_feedrate = []
-    dh_prediction_gt = []
-    dw_prediction_gt = []
-    timestamps_layer = []
-    for i, dir_name in enumerate(layer_dir_chosen):
-        this_layer = np.loadtxt(dir_name+'profile_welding_'+str(sample_rate)+'_dhdw.csv', delimiter=',', skiprows=1)
-        with open(dir_name+'../weld_meta_data.yml', 'r') as f:
-            meta_data = yaml.safe_load(f)
-            this_vpd = meta_data['VPD']
-        this_feedrate = this_layer[0, 2]
-        chosen_VPD_feedrate.append((this_vpd, this_feedrate))
-        gt_labels = this_layer[:, 3:5]  # dh, dw
-        control_inputs = this_layer[:, 1:3]  # cmd_v, cmd_fd
-        control_inputs[:, 0] = (control_inputs[:, 0] - min_v) / (max_v - min_v)  # normalize cmd_v
-        control_inputs[:, 1] = (control_inputs[:, 1] - min_feedrate) / (max_feedrate - min_feedrate)  # normalize cmd_fd
-        # to tensor with shape (1, sequence_length, 2)
-        gt_labels = torch.tensor(gt_labels, dtype=torch.float32).unsqueeze(0).to(device)
-        control_inputs = torch.tensor(control_inputs, dtype=torch.float32).unsqueeze(0).to(device)
-        model.eval()
-        with torch.no_grad():
-            # predictions = model(gt_labels, control_inputs)
-            predictions_all=[]
-            dh_prediction_all = []
-            dw_prediction_all = []
-            latency_t = 20 # latency in time steps, 20 time steps = 2 seconds
-            for step_t in range(0,len(gt_labels[0])):
-                print("Processing layer "+str(i+1)+" step "+str(step_t+1)+" of "+str(len(gt_labels[0])-latency_t))
-                predictions,_ = model.forward_half_obs(gt_labels[:,:step_t,:], control_inputs[:,:min(step_t+latency_t,len(control_inputs[0])),:])
-            # predictions = model(gt_labels, control_inputs)
-                predictions = predictions.cpu().numpy().astype(np.float64).squeeze(0)
-                predictions_all.append(predictions)
-                dh_prediction_all.append(predictions[:, 0])
-                dw_prediction_all.append(predictions[:, 1])
-            gt_labels = gt_labels.cpu().numpy().astype(np.float64).squeeze(0)
-        # dh_prediction_gt.append(np.vstack((predictions[:, 0], gt_labels[:, 0])))
-        # dw_prediction_gt.append(np.vstack((predictions[:, 1], gt_labels[:, 1])))
-        dh_prediction_gt.append((dh_prediction_all, gt_labels[:, 0]))
-        dw_prediction_gt.append((dw_prediction_all, gt_labels[:, 1]))
-        timestamps_layer.append(this_layer[:, 0])
-
-    # fig, axs = plt.subplots(2, 2, figsize=(20, 14))
-    # for i, dh in enumerate(dh_prediction_gt):
-    #     timestep_predict = timestamps_layer[i]-timestamps_layer[i][0]
-    #     axs[i//2, i%2].clear()  # clear the axes for each time step
-    #     axs[i//2, i%2].plot(timestep_predict, dh[0], label=f'Predicted $\Delta h$', color='tab:blue')
-    #     axs[i//2, i%2].plot(timestamps_layer[i]-timestamps_layer[i][0], dh[1], label=f'Ground Truth $\Delta h$', color='tab:orange')
-    #     axs[i//2, i%2].set_title(f'Sequence {i+1} - VPD: {round(chosen_VPD_feedrate[i][0])}, Feedrate: {round(chosen_VPD_feedrate[i][1])}', fontsize=title_size)
-    #     axs[i//2, i%2].set_xlabel('Time Step', fontsize=xy_label_size)
-    #     axs[i//2, i%2].set_ylabel(f'$\Delta h$', fontsize=xy_label_size)
-    #     axs[i//2, i%2].tick_params(axis='x', labelsize=xy_tick_size)
-    #     axs[i//2, i%2].tick_params(axis='y', labelsize=xy_tick_size)
-    #     axs[i//2, i%2].legend(fontsize=legend_size)
-    #     axs[i//2, i%2].grid()
-    # plt.suptitle(f'Test Data $\Delta h$ Prediction vs Ground Truth, ' + open_loop_string, fontsize=sup_title_size)
-    # plt.show()
-
-    # fig, axs = plt.subplots(2, 2, figsize=(12, 8))
-    # for i, dw in enumerate(dw_prediction_gt):
-    #     timestep_predict = timestamps_layer[i]-timestamps_layer[i][0]
-    #     axs[i//2, i%2].clear()  # clear the axes for each time step
-    #     axs[i//2, i%2].plot(timestep_predict, dw[0], label='Predicted $width$', color='tab:blue')
-    #     axs[i//2, i%2].plot(timestep_predict, dw[1], label='Ground Truth $width$', color='tab:orange')
-    #     axs[i//2, i%2].set_title(f'Sequence {i+1} - VPD: {round(chosen_VPD_feedrate[i][0])}, Feedrate: {round(chosen_VPD_feedrate[i][1])}', fontsize=title_size)
-    #     axs[i//2, i%2].set_xlabel('Time Step', fontsize=xy_label_size)
-    #     axs[i//2, i%2].set_ylabel('$width$', fontsize=xy_label_size)
-    #     axs[i//2, i%2].tick_params(axis='x', labelsize=xy_tick_size)
-    #     axs[i//2, i%2].tick_params(axis='y', labelsize=xy_tick_size)
-    #     axs[i//2, i%2].legend(fontsize=legend_size)
-    #     axs[i//2, i%2].grid()
-    # plt.suptitle(f'Test Data $width$ Prediction vs Ground Truth, ' + open_loop_string, fontsize=sup_title_size)
-    # plt.show()
-
-    # find the layer with longest sequence
-    max_length = max([len(t) for t in timestamps_layer])
-
-    fig, axs = plt.subplots(2, 2, figsize=(20, 14))
-    for t_id in range(max_length):
-        for i, dh in enumerate(dh_prediction_gt):
-            timestep_predict = timestamps_layer[i]-timestamps_layer[i][0]
-            timestep_predict = timestep_predict[:len(dh[0][min(t_id,len(dh[0])-1)])]  # adjust the length to match the prediction
-            axs[i//2, i%2].clear()  # clear the axes for each time step
-            axs[i//2, i%2].plot(timestep_predict, dh[0][min(t_id,len(dh[0])-1)], label=f'Predicted $\Delta h$', color='tab:blue')
-            axs[i//2, i%2].plot(timestamps_layer[i]-timestamps_layer[i][0], dh[1], label=f'Ground Truth $\Delta h$', color='tab:orange')
-            axs[i//2, i%2].scatter(timestep_predict[-1],dh[0][min(t_id,len(dh[0])-1)][-1], color='red',s=50)
-            axs[i//2, i%2].set_title(f'Sequence {i+1} - VPD: {round(chosen_VPD_feedrate[i][0])}, Feedrate: {round(chosen_VPD_feedrate[i][1])}', fontsize=title_size)
-            axs[i//2, i%2].set_xlabel('Time Step', fontsize=xy_label_size)
-            axs[i//2, i%2].set_ylabel(f'$\Delta h$', fontsize=xy_label_size)
-            axs[i//2, i%2].tick_params(axis='x', labelsize=xy_tick_size)
-            axs[i//2, i%2].tick_params(axis='y', labelsize=xy_tick_size)
-            axs[i//2, i%2].legend(fontsize=legend_size)
-            axs[i//2, i%2].grid()
-        plt.suptitle(f'Test Data $\Delta h$ Prediction vs Ground Truth, ' + open_loop_string, fontsize=sup_title_size)
-        if t_id < max_length-1:
-            plt.pause(0.1)  # pause to visualize the animation
-        else:
-            plt.show()
-        if t_id==0:
-            input("Press Enter to continue...")
-            time.sleep(3)
-
-    fig, axs = plt.subplots(2, 2, figsize=(12, 8))
-    for t_id in range(max_length):
-        for i, dw in enumerate(dw_prediction_gt):
-            timestep_predict = timestamps_layer[i]-timestamps_layer[i][0]
-            timestep_predict = timestep_predict[:len(dw[0][min(t_id,len(dw[0])-1)])]  # adjust the length to match the prediction
-            axs[i//2, i%2].clear()  # clear the axes for each time step
-            axs[i//2, i%2].plot(timestep_predict, dw[0][min(t_id,len(dw[0])-1)], label='Predicted $width$', color='tab:blue')
-            axs[i//2, i%2].plot(timestep_predict, dw[1], label='Ground Truth $width$', color='tab:orange')
-            axs[i//2, i%2].set_title(f'Sequence {i+1} - VPD: {round(chosen_VPD_feedrate[i][0])}, Feedrate: {round(chosen_VPD_feedrate[i][1])}', fontsize=title_size)
-            axs[i//2, i%2].set_xlabel('Time Step', fontsize=xy_label_size)
-            axs[i//2, i%2].set_ylabel('$width$', fontsize=xy_label_size)
-            axs[i//2, i%2].tick_params(axis='x', labelsize=xy_tick_size)
-            axs[i//2, i%2].tick_params(axis='y', labelsize=xy_tick_size)
-            axs[i//2, i%2].legend(fontsize=legend_size)
-            axs[i//2, i%2].grid()
-        plt.suptitle(f'Test Data $width$ Prediction vs Ground Truth, ' + open_loop_string, fontsize=sup_title_size)
-        if t_id < max_length-1:
-            plt.pause(0.1)  # pause to visualize the animation
-        else:
-            plt.show()
-        if t_id==0:
-            input("Press Enter to continue...")
-            time.sleep(3)
+    # plt.savefig(model_dir+'training_testing_loss.png')
+    plt.show()

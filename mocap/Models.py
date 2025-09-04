@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from torch.autograd import Function
+from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 from calib_analytic_grad import *
 from robotics_utils import *
 
@@ -631,14 +632,14 @@ class GRUAutoRegressionModel(nn.Module):
 class ThermalEncoder(nn.Module):
     """
     1D-CNN with strides/dilations -> GAP + GMP -> Linear -> LayerNorm
-    Input per step: (B, 400) float
+    Input per step: (B, neighbor_length) float
     Output per step: (B, E_T) where E_T=64 (default)
     """
     def __init__(self, emb_dim: int = 64):
         super().__init__()
         # Conv stack expands channels, reduces length
         self.conv = nn.Sequential(
-            nn.Conv1d(1, 32, kernel_size=5, stride=2, padding=2),  # L: 400 -> 200
+            nn.Conv1d(1, 32, kernel_size=5, stride=2, padding=2),  # L: neighbor_length -> 200
             nn.ReLU(),
             nn.Conv1d(32, 64, kernel_size=5, stride=2, padding=2, dilation=2),  # 200 -> 100
             nn.ReLU(),
@@ -651,15 +652,15 @@ class ThermalEncoder(nn.Module):
         self.ln = nn.LayerNorm(emb_dim)
         self.emb_dim = emb_dim
     
-    def forward(self, thermal_400: torch.Tensor) -> torch.Tensor:
+    def forward(self, thermal_raw: torch.Tensor) -> torch.Tensor:
         """
-        thermal_400: (B, 400) or (B, 1, 400)
+        thermal_raw: (B, neighbor_length) or (B, 1, neighbor_length)
         returns: (B, emb_dim)
         """
-        if thermal_400.dim() == 2:
-            x = thermal_400.unsqueeze(1)  # (B,1,400)
+        if thermal_raw.dim() == 2:
+            x = thermal_raw.unsqueeze(1)  # (B,1,neighbor_length)
         else:
-            x = thermal_400               # (B,1,400)
+            x = thermal_raw               # (B,1,neighbor_length)
         feat = self.conv(x)               # (B,96,L~50)
 
         # Global Average Pooling & Global Max Pooling along length
@@ -699,31 +700,35 @@ class WAAMModel(nn.Module):
       ThermalEncoder(E_T=64) + ScalarEncoder(E_S=32)
       -> concat -> LayerNorm -> GRU(128) -> Head -> 2 outputs
     """
-    def __init__(self, scalar_dim: int,
+    def __init__(self, scalar_dim: int, use_thermal: bool = True,
                  thermal_emb: int = 64, scalar_emb: int = 32,
-                 rnn_hidden: int = 128, rnn_layers: int = 1):
+                 rnn_hidden: int = 128, rnn_layers: int = 1,
+                 output_layers: int = 1):
         super().__init__()
-        self.thermal_enc = ThermalEncoder(emb_dim=thermal_emb)
+        if use_thermal:
+            self.thermal_enc = ThermalEncoder(emb_dim=thermal_emb)
         self.scalar_enc = WAAMFeatureEncoder(in_dim=scalar_dim, emb_dim=scalar_emb)
-        self.fuse_ln = nn.LayerNorm(thermal_emb + scalar_emb)
+        if use_thermal:
+            self.fuse_ln = nn.LayerNorm(thermal_emb + scalar_emb)
+        else:
+            self.fuse_ln = nn.LayerNorm(scalar_emb)
 
         self.rnn = nn.GRU(input_size=thermal_emb + scalar_emb,
                           hidden_size=rnn_hidden,
                           num_layers=rnn_layers,
                           batch_first=True)
 
-        self.head = nn.Sequential(
-            nn.Linear(rnn_hidden, 2)     # height, width
-        )
-        # self.head = nn.Sequential(
-        #     nn.Linear(rnn_hidden, 128),
-        #     nn.ReLU(),
-        #     nn.Linear(128, 2)     # height, width
-        # )
+        self.head = nn.Sequential()
+        for _ in range(output_layers - 1):
+            self.head.append(nn.Linear(rnn_hidden, rnn_hidden))
+            self.head.append(nn.ReLU())
+        self.head.append(nn.Linear(rnn_hidden, 2))     # height, width
+
+        self.use_thermal = use_thermal
     
     def forward(self,
                 scalars_seq: torch.Tensor,     # (B, T, scalar_dim)
-                thermals_seq: torch.Tensor,    # (B, T, 400)
+                thermals_seq: torch.Tensor,    # (B, T, neighbor_length)
                 lengths: torch.Tensor          # (B,) true lengths
                 ) -> torch.Tensor:
         """
@@ -735,15 +740,36 @@ class WAAMModel(nn.Module):
         # Encode per time step in batch mode:
         # Flatten batch*time for encoders, then reshape back.
         S = scalars_seq.reshape(B*T, -1)          # (B*T, scalar_dim)
-        Th = thermals_seq.reshape(B*T, -1)        # (B*T, 400)
+        Th = thermals_seq.reshape(B*T, -1)        # (B*T, neighbor_length)
 
-        e_t = self.thermal_enc(Th)                # (B*T, E_T)
+        if self.use_thermal:
+            e_t = self.thermal_enc(Th)                # (B*T, E_T)
         s_t = self.scalar_enc(S)                  # (B*T, E_S)
-        fused = torch.cat([e_t, s_t], dim=-1)     # (B*T, E_T+E_S)
+        if self.use_thermal:
+            fused = torch.cat([e_t, s_t], dim=-1)     # (B*T, E_T+E_S)
+        else:
+            fused = s_t                               # (B*T, E_S)
 
         fused = self.fuse_ln(fused).reshape(B, T, -1)  # (B, T, E)
 
         # RNN over time
-        rnn_out, _ = self.rnn(fused)              # (B, T, H)
+        # rnn_out, _ = self.rnn(fused)              # (B, T, H)
+        # Pack -> RNN -> Unpack (sort by length desc required)
+        lengths_sorted, sort_idx = lengths.sort(descending=True)
+        fused_sorted = fused.index_select(0, sort_idx)
+
+        packed = pack_padded_sequence(fused_sorted, lengths_sorted.cpu(),
+                                      batch_first=True, enforce_sorted=True)
+        packed_out, _ = self.rnn(packed)
+        rnn_out, _ = pad_packed_sequence(packed_out, batch_first=True)
+
+        # restore original order and pad to max len
+        inv_idx = sort_idx.argsort()
+        rnn_out = rnn_out.index_select(0, inv_idx)
+        
         out = self.head(rnn_out)                  # (B, T, 2)
+        # If some sequences are shorter than the batch max, pad head output to T (no extra compute in RNN)
+        if out.size(1) < T:
+            pad = out.new_zeros(B, T - out.size(1), out.size(2))
+            out = torch.cat([out, pad], dim=1)
         return out
