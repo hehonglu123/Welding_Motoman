@@ -422,7 +422,6 @@ def main():
             plt.grid()
             plt.pause(0.1)
 
-    
     ###### test shift detection ####
     if test_weld_shift:
         # test_dir = ['weld_fujiscan_2025_06_11_16_27_41/','weld_fujiscan_2025_06_11_16_52_36/','weld_fujiscan_2025_06_11_17_16_48/',\

@@ -254,6 +254,8 @@ if __name__ == "__main__":
 
     future_multi_step_prediction = parse_arg.multi_steps
 
+    save_loglog = False # set to True to save the log-log model parameters
+
     print("Training parameters:")
     print("Train flag:", train_flag)
     print("Model directory:", model_dir)
@@ -368,6 +370,13 @@ if __name__ == "__main__":
                     this_thermal_neighbor_x = np.arange(interp_x-thermal_window, interp_x+thermal_window, thermal_dx_sample)
                     np.append(this_thermal_neighbor_x, interp_x+thermal_window) if this_thermal_neighbor_x[-1] < interp_x+thermal_window else None
                     this_thermal_neighbor_value = np.interp(this_thermal_neighbor_x, thermal_pixel_trace[thermal_t_closest]['x'], thermal_pixel_trace[thermal_t_closest]['value'], left=thermal_void_value, right=thermal_void_value)
+                    # find how many value in this_thermal_neighbor_value are thermal_void_value
+                    if np.sum(this_thermal_neighbor_value==thermal_void_value)/len(this_thermal_neighbor_value) > 0.51:
+                        # plt.plot(this_thermal_neighbor_x, this_thermal_neighbor_value, '-o')
+                        # plt.title(f'More than 50% void values in thermal neighborhood, Time:{interp_time:.2f}, X:{interp_x:.2f}')
+                        # plt.show()
+                        # exit()
+                        print('Warning: More than 51% void values in thermal neighborhood')
                     thermal_neighborhood_interp.append(this_thermal_neighbor_value)
 
                 if np.any(cmd_v_interp==0):
@@ -388,7 +397,6 @@ if __name__ == "__main__":
                 np.save(this_layer_dir+'profile_welding_'+str(sample_rate)+'_thermal_neighborhood.npy', thermal_neighborhood_interp)
                 data_dirs.append(this_layer_dir)
                 train_data_batch_len.append(len(interp_data))
-
     exit()
     # total amount of data
     print("Total amount of data: ", len(data_dirs))
@@ -472,7 +480,6 @@ if __name__ == "__main__":
     print(f"log log test dw (mean,95%,max):{np.mean(val_dw_error_loglog):.4f}, {stats.expon(scale=np.std(val_dw_error_loglog)).interval(0.95)[1]:.4f}, {np.max(val_dw_error_loglog):.4f}")
     print(f"MSE (dh dw)",np.mean(np.vstack((val_dh_error_loglog, val_dw_error_loglog)).T**2))
 
-    save_loglog = True
     if save_loglog:
         print("Saving log-log model parameters to weld_Seq_models/loglog_models/")
         training_params_loglog = {}
