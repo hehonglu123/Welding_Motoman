@@ -671,17 +671,71 @@ class ThermalEncoder(nn.Module):
         z = self.proj(pooled)             # (B,emb_dim)
         return self.ln(z)
 
+class ThermalThinEncoder(nn.Module):
+    def __init__(self, emb_dim: int = 32):
+        super().__init__()
+        self.conv = nn.Sequential(
+            nn.Conv1d(1, 16, kernel_size=5, stride=2, padding=2),             # 1→16
+            nn.ReLU(),
+            nn.Conv1d(16, 32, kernel_size=5, stride=2, padding=2, dilation=2),# 16→32
+            nn.ReLU(),
+            nn.Conv1d(32, 48, kernel_size=5, stride=2, padding=4, dilation=4),# 32→48
+            nn.ReLU(),
+        )
+        # GAP only (48) -> Linear -> emb_dim (32)
+        self.proj = nn.Linear(48, emb_dim)
+        self.ln = nn.LayerNorm(emb_dim)
+
+    def forward(self, thermal_raw: torch.Tensor) -> torch.Tensor:
+        x = thermal_raw.unsqueeze(1) if thermal_raw.dim() == 2 else thermal_raw
+        feat = self.conv(x)             # (B,48,L~50)
+        gap = feat.mean(dim=-1)         # (B,48)
+        z = self.proj(gap)              # (B,emb_dim=32)
+        return self.ln(z)
+
+class ThermalNNEncoder(nn.Module):
+    def __init__(self, emb_dim: int = 32):
+        super().__init__()
+        # self.mlp = nn.Sequential(
+        #     nn.Linear(400, 200),
+        #     nn.ReLU(),
+        #     nn.Linear(200, 64),
+        #     nn.ReLU(),
+        #     nn.Linear(64, emb_dim),
+        #     nn.ReLU(),
+        # )
+        self.mlp = nn.Sequential(
+            nn.AvgPool1d(kernel_size=4, stride=4),  # downsample 400 -> 100
+            nn.Linear(100, emb_dim),
+            nn.ReLU(),
+        )
+        self.ln = nn.LayerNorm(emb_dim)
+        self.emb_dim = emb_dim
+    def forward(self, thermal_raw: torch.Tensor) -> torch.Tensor:
+        """
+        thermal_raw: (B, neighbor_length) float
+        returns: (B, emb_dim)
+        """
+        if thermal_raw.dim() != 2:
+            raise ValueError("ThermalNNEncoder expects input of shape (B, neighbor_length)")
+        z = self.mlp(thermal_raw)       # (B, emb_dim)
+        return self.ln(z)
+
 class WAAMFeatureEncoder(nn.Module):
     """
     Tiny MLP for low-dim scalars -> E_S (default=32) + LayerNorm
     """
     def __init__(self, in_dim: int, emb_dim: int = 32):
         super().__init__()
+        # self.mlp = nn.Sequential(
+        #     nn.Linear(in_dim, 32),
+        #     nn.ReLU(),
+        #     nn.Linear(32, emb_dim),
+        #     nn.ReLU(),
+        # )
         self.mlp = nn.Sequential(
-            nn.Linear(in_dim, 64),
-            nn.ReLU(),
-            nn.Linear(64, emb_dim),
-            nn.ReLU(),
+            nn.Linear(in_dim, emb_dim),
+            nn.ReLU()
         )
         self.ln = nn.LayerNorm(emb_dim)
         self.in_dim = in_dim
@@ -694,7 +748,7 @@ class WAAMFeatureEncoder(nn.Module):
         """
         return self.ln(self.mlp(s))
 
-class WAAMModel(nn.Module):
+class WAAMGRUModel(nn.Module):
     """
     Full model:
       ThermalEncoder(E_T=64) + ScalarEncoder(E_S=32)
@@ -712,11 +766,17 @@ class WAAMModel(nn.Module):
             self.fuse_ln = nn.LayerNorm(thermal_emb + scalar_emb)
         else:
             self.fuse_ln = nn.LayerNorm(scalar_emb)
-
-        self.rnn = nn.GRU(input_size=thermal_emb + scalar_emb,
-                          hidden_size=rnn_hidden,
-                          num_layers=rnn_layers,
-                          batch_first=True)
+        
+        if use_thermal:
+            self.rnn = nn.GRU(input_size=thermal_emb + scalar_emb,
+                            hidden_size=rnn_hidden,
+                            num_layers=rnn_layers,
+                            batch_first=True)
+        else:
+            self.rnn = nn.GRU(input_size=scalar_emb,
+                            hidden_size=rnn_hidden,
+                            num_layers=rnn_layers,
+                            batch_first=True)
 
         self.head = nn.Sequential()
         for _ in range(output_layers - 1):
@@ -766,10 +826,60 @@ class WAAMModel(nn.Module):
         # restore original order and pad to max len
         inv_idx = sort_idx.argsort()
         rnn_out = rnn_out.index_select(0, inv_idx)
-        
+
         out = self.head(rnn_out)                  # (B, T, 2)
         # If some sequences are shorter than the batch max, pad head output to T (no extra compute in RNN)
         if out.size(1) < T:
             pad = out.new_zeros(B, T - out.size(1), out.size(2))
             out = torch.cat([out, pad], dim=1)
+        return out
+
+class WAAMNNModel(nn.Module):
+    """
+    Full model:
+      ThermalEncoder(E_T=64) + ScalarEncoder(E_S=32)
+      -> concat -> LayerNorm -> MLP -> 2 outputs
+    """
+    def __init__(self, scalar_dim: int, use_thermal: bool = True,
+                 thermal_emb: int = 64, scalar_emb: int = 32,
+                 nn_hidden: int = 128, nn_layers: int = 1):
+        super().__init__()
+        if use_thermal:
+            # self.thermal_enc = ThermalEncoder(emb_dim=thermal_emb)
+            # self.thermal_enc = ThermalThinEncoder(emb_dim=thermal_emb)
+            self.thermal_enc = ThermalNNEncoder(emb_dim=thermal_emb)
+        self.scalar_enc = WAAMFeatureEncoder(in_dim=scalar_dim, emb_dim=scalar_emb)
+        if use_thermal:
+            self.fuse_ln = nn.LayerNorm(thermal_emb + scalar_emb)
+        else:
+            self.fuse_ln = nn.LayerNorm(scalar_emb)
+
+        self.head = nn.Sequential(nn.Linear(thermal_emb + scalar_emb if use_thermal else scalar_emb, nn_hidden),
+                                  nn.ReLU())
+        for _ in range(nn_layers):
+            self.head.append(nn.Linear(nn_hidden, nn_hidden))
+            self.head.append(nn.ReLU())
+        self.head.append(nn.Linear(nn_hidden, 2))     # height, width
+
+        self.use_thermal = use_thermal
+    
+    def forward(self,
+                scalars_seq: torch.Tensor,     # (B, T, scalar_dim)
+                thermals_seq: torch.Tensor,    # (B, T, neighbor_length)
+                ) -> torch.Tensor:
+        """
+        Returns predictions : (B, 2)
+        """
+
+        if self.use_thermal:
+            e_t = self.thermal_enc(thermals_seq)                # (B, E_T)
+        s_t = self.scalar_enc(scalars_seq)                  # (B, E_S)
+        if self.use_thermal:
+            fused = torch.cat([e_t, s_t], dim=-1)     # (B, E_T+E_S)
+        else:
+            fused = s_t                               # (B, E_S)
+
+        fused = self.fuse_ln(fused)  # (B, E)
+
+        out = self.head(fused) 
         return out
