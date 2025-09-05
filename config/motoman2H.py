@@ -32,13 +32,14 @@ print("positioner",H)
 
 # np.savetxt('D500B_pose.csv',H,delimiter=',')
 
-x=-48.601
-y=1.263
-z=475.041
-rx=-0.4809
-ry=-25.2125
-rz=-2.6997
+x=-19.021
+y=-86.236
+z=583.360
+rx=-161.7589
+ry=-31.9510
+rz=-56.5200
 
 R=Rz(np.radians(-rz))@Ry(np.radians(-ry))@Rx(np.radians(-rx))
 H=H_from_RT(R,[x,y,z])
 print("tool",H)
+# np.savetxt('fujicam.csv',H,delimiter=',')
