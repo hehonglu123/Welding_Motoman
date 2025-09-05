@@ -132,13 +132,13 @@ def get_weld_shift_x(profile_height):
 
 def main():
     
-    weld_arcon = True
-    welder_log = True
-    fuji_scanon = True
-    scan_online_process = True
-    thermal_on = True
+    weld_arcon = False
+    welder_log = False
+    fuji_scanon = False
+    scan_online_process = False
+    thermal_on = False
     input_from_user = False
-    SIMULATION = True
+    SIMULATION = False
     # simulation_speed_sim = False
     simulation_save_control_state_fig = False
 
@@ -227,7 +227,7 @@ def main():
         # if weld_arcon:
         #     fronius_client.release_welder()
         # exit()
-    
+
     ################## Read geometry data ##################
     data_dir = '../../data/wall_weld_test/'
     with open(data_dir+'sliced_meta.yml', 'r') as f:
