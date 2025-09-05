@@ -22,7 +22,7 @@ foreach ($model in $modelsInputs) {
             "--model_type", $model,
             "--thermal_emb", 32,
             "--scalar_emb", 16,
-            "--epochs", 5000
+            "--epochs", 3
         )
         if ($model -like "*NN*") {
             $args += @("--nn_hidden_size", 64, "--nn_layers", 0)

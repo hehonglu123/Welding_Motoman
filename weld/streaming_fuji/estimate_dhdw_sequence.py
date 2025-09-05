@@ -218,6 +218,22 @@ def train_static(train_dataloader: DataLoader, test_dataloader: DataLoader, mode
     # Training
     training_losses = []
     testing_losses = []
+    training_dh_errors_mean = []
+    training_dh_errors_std = []
+    training_dh_errors_95 = []
+    training_dh_errors_max = []
+    training_dw_errors_mean = []
+    training_dw_errors_std = []
+    training_dw_errors_95 = []
+    training_dw_errors_max = []
+    testing_dh_errors_mean = []
+    testing_dh_errors_std = []
+    testing_dh_errors_95 = []
+    testing_dh_errors_max = []
+    testing_dw_errors_mean = []
+    testing_dw_errors_std = []
+    testing_dw_errors_95 = []
+    testing_dw_errors_max = []
     for epoch in range(epochs):
         ####### training 
         model.train()
@@ -259,38 +275,58 @@ def train_static(train_dataloader: DataLoader, test_dataloader: DataLoader, mode
         this_test_loss = total_loss / n_batches
         testing_losses.append(this_test_loss)
 
+        # Compute error statistics
+        error_dhdw_test_abs = np.abs(error_dhdw_test)
+        testing_dh_errors_mean.append(np.mean(error_dhdw_test_abs[:, 0]))
+        testing_dh_errors_std.append(np.std(error_dhdw_test_abs[:, 0]))
+        testing_dh_errors_95.append(stats.expon(scale=np.std(error_dhdw_test_abs[:, 0])).interval(0.95)[1])
+        testing_dh_errors_max.append(np.max(error_dhdw_test_abs[:, 0]))
+        testing_dw_errors_mean.append(np.mean(error_dhdw_test_abs[:, 1]))
+        testing_dw_errors_std.append(np.std(error_dhdw_test_abs[:, 1]))
+        testing_dw_errors_95.append(stats.expon(scale=np.std(error_dhdw_test_abs[:, 1])).interval(0.95)[1])
+        testing_dw_errors_max.append(np.max(error_dhdw_test_abs[:, 1]))
+        error_dhdw_train_abs = np.abs(error_dhdw_train)
+        training_dh_errors_mean.append(np.mean(error_dhdw_train_abs[:, 0]))
+        training_dh_errors_std.append(np.std(error_dhdw_train_abs[:, 0]))
+        training_dh_errors_95.append(stats.expon(scale=np.std(error_dhdw_train_abs[:, 0])).interval(0.95)[1])
+        training_dh_errors_max.append(np.max(error_dhdw_train_abs[:, 0]))
+        training_dw_errors_mean.append(np.mean(error_dhdw_train_abs[:, 1]))
+        training_dw_errors_std.append(np.std(error_dhdw_train_abs[:, 1]))
+        training_dw_errors_95.append(stats.expon(scale=np.std(error_dhdw_train_abs[:, 1])).interval(0.95)[1])
+        training_dw_errors_max.append(np.max(error_dhdw_train_abs[:, 1]))
+
         # save the best testing model
         if epoch == 0 or this_test_loss < min(testing_losses[:-1]):
             torch.save(model.state_dict(), model_dir + 'best_model.pth')
             print(f"Epoch {epoch}: Saved new best testing model with loss {this_test_loss:.4f}")
-            error_dhdw_train_abs = np.abs(np.array(error_dhdw_train))
-            error_dhdw_test_abs = np.abs(np.array(error_dhdw_test))
-            print("  Training dh error: mean {:.4f}, 95% {:.4f}".format(np.mean(error_dhdw_train_abs[:,0]), stats.expon(scale=np.std(np.abs(error_dhdw_train_abs[:,0]))).interval(0.95)[1]))
-            print("  Training dw error: mean {:.4f}, 95% {:.4f}".format(np.mean(error_dhdw_train_abs[:,1]), stats.expon(scale=np.std(np.abs(error_dhdw_train_abs[:,1]))).interval(0.95)[1]))
-            print("  Testing dh error: mean {:.4f}, 95% {:.4f}".format(np.mean(error_dhdw_test_abs[:,0]), stats.expon(scale=np.std(np.abs(error_dhdw_test_abs[:,0]))).interval(0.95)[1]))
-            print("  Testing dw error: mean {:.4f}, 95% {:.4f}".format(np.mean(error_dhdw_test_abs[:,1]), stats.expon(scale=np.std(np.abs(error_dhdw_test_abs[:,1]))).interval(0.95)[1]))
+            print("  Training dh error: mean {:.4f}, 95% {:.4f}".format(np.mean(error_dhdw_train_abs[:,0]), stats.expon(scale=np.std(error_dhdw_train_abs[:,0])).interval(0.95)[1]))
+            print("  Training dw error: mean {:.4f}, 95% {:.4f}".format(np.mean(error_dhdw_train_abs[:,1]), stats.expon(scale=np.std(error_dhdw_train_abs[:,1])).interval(0.95)[1]))
+            print("  Testing dh error: mean {:.4f}, 95% {:.4f}".format(np.mean(error_dhdw_test_abs[:,0]), stats.expon(scale=np.std(error_dhdw_test_abs[:,0])).interval(0.95)[1]))
+            print("  Testing dw error: mean {:.4f}, 95% {:.4f}".format(np.mean(error_dhdw_test_abs[:,1]), stats.expon(scale=np.std(error_dhdw_test_abs[:,1])).interval(0.95)[1]))
             print("======")
+            np.savetxt(model_dir+'training_error_dhdw_train_best_testing.csv', np.array(error_dhdw_train), delimiter=',')
+            np.savetxt(model_dir+'testing_error_dhdw_test_best_testing.csv', np.array(error_dhdw_test), delimiter=',')
         # save the best training model
         if epoch == 0 or this_training_loss < min(training_losses[:-1]):
             torch.save(model.state_dict(), model_dir + 'best_training_model.pth')
+            np.savetxt(model_dir+'training_error_dhdw_train_best_training.csv', np.array(error_dhdw_train), delimiter=',')
+            np.savetxt(model_dir+'training_error_dhdw_test_best_training.csv', np.array(error_dhdw_test), delimiter=',')
 
         # print training progress
         if epoch % max(1, epochs//print_status_for_N_times) == 0:
             print(f"Epoch {epoch}/{epochs}, Training Loss: {this_training_loss:.4f}, Testing Loss: {this_test_loss:.4f}")
-            error_dhdw_train_abs = np.abs(np.array(error_dhdw_train))
-            error_dhdw_test_abs = np.abs(np.array(error_dhdw_test))
-            print("  Training dh error: mean {:.4f}, 95% {:.4f}".format(np.mean(error_dhdw_train_abs[:,0]), stats.expon(scale=np.std(np.abs(error_dhdw_train_abs[:,0]))).interval(0.95)[1]))
-            print("  Training dw error: mean {:.4f}, 95% {:.4f}".format(np.mean(error_dhdw_train_abs[:,1]), stats.expon(scale=np.std(np.abs(error_dhdw_train_abs[:,1]))).interval(0.95)[1]))
-            print("  Testing dh error: mean {:.4f}, 95% {:.4f}".format(np.mean(error_dhdw_test_abs[:,0]), stats.expon(scale=np.std(np.abs(error_dhdw_test_abs[:,0]))).interval(0.95)[1]))
-            print("  Testing dw error: mean {:.4f}, 95% {:.4f}".format(np.mean(error_dhdw_test_abs[:,1]), stats.expon(scale=np.std(np.abs(error_dhdw_test_abs[:,1]))).interval(0.95)[1]))
+            print("  Training dh error: mean {:.4f}, 95% {:.4f}".format(np.mean(error_dhdw_train_abs[:,0]), stats.expon(scale=np.std(error_dhdw_train_abs[:,0])).interval(0.95)[1]))
+            print("  Training dw error: mean {:.4f}, 95% {:.4f}".format(np.mean(error_dhdw_train_abs[:,1]), stats.expon(scale=np.std(error_dhdw_train_abs[:,1])).interval(0.95)[1]))
+            print("  Testing dh error: mean {:.4f}, 95% {:.4f}".format(np.mean(error_dhdw_test_abs[:,0]), stats.expon(scale=np.std(error_dhdw_test_abs[:,0])).interval(0.95)[1]))
+            print("  Testing dw error: mean {:.4f}, 95% {:.4f}".format(np.mean(error_dhdw_test_abs[:,1]), stats.expon(scale=np.std(error_dhdw_test_abs[:,1])).interval(0.95)[1]))
             print("=============================")
 
         # save training and testing loss every epoch
         np.savetxt(model_dir+'training_loss.csv', np.array(training_losses), delimiter=',')
         np.savetxt(model_dir+'testing_loss.csv', np.array(testing_losses), delimiter=',')
-        np.savetxt(model_dir+'error_dhdw_train.csv', np.array(error_dhdw_train), delimiter=',')
-        np.savetxt(model_dir+'error_dhdw_test.csv', np.array(error_dhdw_test), delimiter=',')
-
+        np.savetxt(model_dir+'training_dh_errors.csv', np.column_stack((training_dh_errors_mean, training_dh_errors_std, training_dh_errors_95, training_dh_errors_max)), delimiter=',', header='mean,std,95,max', comments='')
+        np.savetxt(model_dir+'training_dw_errors.csv', np.column_stack((training_dw_errors_mean, training_dw_errors_std, training_dw_errors_95, training_dw_errors_max)), delimiter=',', header='mean,std,95,max', comments='')
+        np.savetxt(model_dir+'testing_dh_errors.csv', np.column_stack((testing_dh_errors_mean, testing_dh_errors_std, testing_dh_errors_95, testing_dh_errors_max)), delimiter=',', header='mean,std,95,max', comments='')
     return model, training_losses, testing_losses
 
 def train_RNN(train_dataloader: DataLoader, test_dataloader: DataLoader, model: nn.Module, epochs: int, learning_rate: float, model_dir='weld_Seq_models/'):
@@ -311,6 +347,23 @@ def train_RNN(train_dataloader: DataLoader, test_dataloader: DataLoader, model: 
     # Training
     training_losses = []
     testing_losses = []
+    training_dh_errors_mean = []
+    training_dh_errors_std = []
+    training_dh_errors_95 = []
+    training_dh_errors_max = []
+    training_dw_errors_mean = []
+    training_dw_errors_std = []
+    training_dw_errors_95 = []
+    training_dw_errors_max = []
+    testing_dh_errors_mean = []
+    testing_dh_errors_std = []
+    testing_dh_errors_95 = []
+    testing_dh_errors_max = []
+    testing_dw_errors_mean = []
+    testing_dw_errors_std = []
+    testing_dw_errors_95 = []
+    testing_dw_errors_max = []
+
     for epoch in range(epochs):
         ####### training 
         model.train()
@@ -372,36 +425,60 @@ def train_RNN(train_dataloader: DataLoader, test_dataloader: DataLoader, model: 
         this_test_loss = total_loss / n_batches
         testing_losses.append(this_test_loss)
 
+        # Compute error statistics
+        error_dhdw_test_abs = np.abs(error_dhdw_test)
+        testing_dh_errors_mean.append(np.mean(error_dhdw_test_abs[:,0]))
+        testing_dh_errors_std.append(np.std(error_dhdw_test_abs[:,0]))
+        testing_dh_errors_95.append(stats.expon(scale=np.std(np.abs(error_dhdw_test_abs[:,0]))).interval(0.95)[1])
+        testing_dh_errors_max.append(np.max(error_dhdw_test_abs[:,0]))
+        testing_dw_errors_mean.append(np.mean(error_dhdw_test_abs[:,1]))
+        testing_dw_errors_std.append(np.std(error_dhdw_test_abs[:,1]))
+        testing_dw_errors_95.append(stats.expon(scale=np.std(np.abs(error_dhdw_test_abs[:,1]))).interval(0.95)[1])
+        testing_dw_errors_max.append(np.max(error_dhdw_test_abs[:,1]))
+        error_dhdw_train_abs = np.abs(error_dhdw_train)
+        training_dh_errors_mean.append(np.mean(error_dhdw_train_abs[:,0]))
+        training_dh_errors_std.append(np.std(error_dhdw_train_abs[:,0]))
+        training_dh_errors_95.append(stats.expon(scale=np.std(np.abs(error_dhdw_train_abs[:,0]))).interval(0.95)[1])
+        training_dh_errors_max.append(np.max(error_dhdw_train_abs[:,0]))
+        training_dw_errors_mean.append(np.mean(error_dhdw_train_abs[:,1]))
+        training_dw_errors_std.append(np.std(error_dhdw_train_abs[:,1]))
+        training_dw_errors_95.append(stats.expon(scale=np.std(np.abs(error_dhdw_train_abs[:,1]))).interval(0.95)[1])
+        training_dw_errors_max.append(np.max(error_dhdw_train_abs[:,1]))
+
         # save the best testing model
         if epoch == 0 or this_test_loss < min(testing_losses[:-1]):
             torch.save(model.state_dict(), model_dir + 'best_model.pth')
             print(f"Epoch {epoch}: Saved new best testing model with loss {this_test_loss:.4f}")
-            error_dhdw_train_abs = np.abs(np.array(error_dhdw_train))
-            error_dhdw_test_abs = np.abs(np.array(error_dhdw_test))
             print("  Training dh error: mean {:.4f}, 95% {:.4f}".format(np.mean(error_dhdw_train_abs[:,0]), stats.expon(scale=np.std(np.abs(error_dhdw_train_abs[:,0]))).interval(0.95)[1]))
             print("  Training dw error: mean {:.4f}, 95% {:.4f}".format(np.mean(error_dhdw_train_abs[:,1]), stats.expon(scale=np.std(np.abs(error_dhdw_train_abs[:,1]))).interval(0.95)[1]))
             print("  Testing dh error: mean {:.4f}, 95% {:.4f}".format(np.mean(error_dhdw_test_abs[:,0]), stats.expon(scale=np.std(np.abs(error_dhdw_test_abs[:,0]))).interval(0.95)[1]))
             print("  Testing dw error: mean {:.4f}, 95% {:.4f}".format(np.mean(error_dhdw_test_abs[:,1]), stats.expon(scale=np.std(np.abs(error_dhdw_test_abs[:,1]))).interval(0.95)[1]))
+            print("======")
+            np.savetxt(model_dir+'training_error_dhdw_train_best_testing.csv', np.array(error_dhdw_train), delimiter=',')
+            np.savetxt(model_dir+'testing_error_dhdw_test_best_testing.csv', np.array(error_dhdw_test), delimiter=',')
 
         # save the best training model
         if epoch == 0 or this_training_loss < min(training_losses[:-1]):
             torch.save(model.state_dict(), model_dir + 'best_training_model.pth')
+            np.savetxt(model_dir+'training_error_dhdw_train_best_training.csv', np.array(error_dhdw_train), delimiter=',')
+            np.savetxt(model_dir+'training_error_dhdw_test_best_training.csv', np.array(error_dhdw_test), delimiter=',')
 
         # print training progress
         if epoch % max(1, epochs//print_status_for_N_times) == 0:
             print(f"Epoch {epoch}/{epochs}, Training Loss: {this_training_loss:.4f}, Testing Loss: {this_test_loss:.4f}")
-            error_dhdw_train_abs = np.abs(np.array(error_dhdw_train))
-            error_dhdw_test_abs = np.abs(np.array(error_dhdw_test))
             print("  Training dh error: mean {:.4f}, 95% {:.4f}".format(np.mean(error_dhdw_train_abs[:,0]), stats.expon(scale=np.std(np.abs(error_dhdw_train_abs[:,0]))).interval(0.95)[1]))
             print("  Training dw error: mean {:.4f}, 95% {:.4f}".format(np.mean(error_dhdw_train_abs[:,1]), stats.expon(scale=np.std(np.abs(error_dhdw_train_abs[:,1]))).interval(0.95)[1]))
             print("  Testing dh error: mean {:.4f}, 95% {:.4f}".format(np.mean(error_dhdw_test_abs[:,0]), stats.expon(scale=np.std(np.abs(error_dhdw_test_abs[:,0]))).interval(0.95)[1]))
             print("  Testing dw error: mean {:.4f}, 95% {:.4f}".format(np.mean(error_dhdw_test_abs[:,1]), stats.expon(scale=np.std(np.abs(error_dhdw_test_abs[:,1]))).interval(0.95)[1]))
+            print("=============================")
 
         # save training and testing loss every epoch
         np.savetxt(model_dir+'training_loss.csv', np.array(training_losses), delimiter=',')
         np.savetxt(model_dir+'testing_loss.csv', np.array(testing_losses), delimiter=',')
-        np.savetxt(model_dir+'error_dhdw_train.csv', np.array(error_dhdw_train), delimiter=',')
-        np.savetxt(model_dir+'error_dhdw_test.csv', np.array(error_dhdw_test), delimiter=',')
+        np.savetxt(model_dir+'training_dh_errors.csv', np.column_stack((training_dh_errors_mean, training_dh_errors_std, training_dh_errors_95, training_dh_errors_max)), delimiter=',', header='mean,std,95,max', comments='')
+        np.savetxt(model_dir+'training_dw_errors.csv', np.column_stack((training_dw_errors_mean, training_dw_errors_std, training_dw_errors_95, training_dw_errors_max)), delimiter=',', header='mean,std,95,max', comments='')
+        np.savetxt(model_dir+'testing_dh_errors.csv', np.column_stack((testing_dh_errors_mean, testing_dh_errors_std, testing_dh_errors_95, testing_dh_errors_max)), delimiter=',', header='mean,std,95,max', comments='')
+        np.savetxt(model_dir+'testing_dw_errors.csv', np.column_stack((testing_dw_errors_mean, testing_dw_errors_std, testing_dw_errors_95, testing_dw_errors_max)), delimiter=',', header='mean,std,95,max', comments='')
 
     return model, training_losses, testing_losses
 
