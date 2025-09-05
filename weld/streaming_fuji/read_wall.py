@@ -3,6 +3,7 @@ import glob
 from copy import deepcopy
 import numpy as np
 from scipy.signal import find_peaks
+from scipy.interpolate import CubicSpline
 from matplotlib import pyplot as plt
 import open3d as o3d
 import cv2 as cv
@@ -15,6 +16,39 @@ sys.path.append('../../scan/scan_tools/')
 from scan_utils import *
 from scanProcess import *
 from animation_3d import *
+
+def get_weld_shift_x(profile_height):
+    profile_x = np.arange(np.min(profile_height[:,0]), np.max(profile_height[:,0])+0.1, 0.1)
+    height_approx_func = CubicSpline(profile_height[:,0], profile_height[:,1])
+    profile_height_aug = np.column_stack((profile_x, height_approx_func(profile_x)))
+
+    reference_height = 3.5
+    profile_height_closed_arg = np.argsort(np.abs(profile_height_aug[:,1]-reference_height))
+    left_x = None
+    right_x = None
+    for profile_idx in profile_height_closed_arg:
+        if profile_height_aug[profile_idx,0]<0 and left_x is None:
+            left_x = profile_height_aug[profile_idx,0]
+        if profile_height_aug[profile_idx,0]>0 and right_x is None:
+            right_x = profile_height_aug[profile_idx,0]
+        if left_x is not None and right_x is not None:
+            break
+    shift_x = -1*(left_x+right_x)/2
+
+    # # visualize the height
+    # plt.figure(figsize=(16, 5))
+    # plt.plot(profile_height_aug[:, 0], profile_height_aug[:, 1], '-o', label='Profile Height')
+    # # draw a vertical line at left_x and right_x
+    # plt.axvline(x=left_x, color='r', linestyle='--', label='Left Shift Point')
+    # plt.axvline(x=right_x, color='g', linestyle='--', label='Right Shift Point')
+    # plt.title('Profile Height Visualization')
+    # plt.xlabel('X Position (mm)')
+    # plt.ylabel('Height (mm)')
+    # plt.legend()
+    # plt.grid()
+    # plt.show()
+    
+    return shift_x
 
 
 # for plotting
@@ -51,9 +85,9 @@ def main():
     ################## Read geometry data ##################
     data_dir = '../../data/wall_weld_test/'
 
-    run_thermal = False
+    run_thermal = True
     run_geometry = True
-    run_compile = False
+    run_compile = True
 
     # logdata_dir_all = ['weld_fujiscan_2025_02_26_18_08_18/', 'weld_fujiscan_2025_02_26_16_24_21/', 'weld_fujiscan_2025_02_26_17_39_17/']
     # logdata_dir_all = ['weld_fujiscan_2025_02_26_16_24_21/', 'weld_fujiscan_2025_02_26_18_08_18/', 'weld_fujiscan_2025_02_26_17_39_17/']
@@ -65,13 +99,15 @@ def main():
 
     # material ER316L (stainless steel)
     # logdata_dir_all = ['weld_fujiscan_2025_06_11_16_27_41/']
-    # logdata_dir_all = ['weld_fujiscan_2025_06_11_16_27_41/','weld_fujiscan_2025_06_11_16_52_36/','weld_fujiscan_2025_06_11_17_16_48/',\
-    #                    'weld_fujiscan_2025_06_11_17_49_27/','weld_fujiscan_2025_06_11_18_14_56/','weld_fujiscan_2025_06_12_17_33_24/',\
-    #                    'weld_fujiscan_2025_06_12_16_59_09/','weld_fujiscan_2025_06_12_15_33_03/','weld_fujiscan_2025_06_12_15_03_27/']
+    logdata_dir_all = ['weld_fujiscan_2025_06_11_16_27_41/','weld_fujiscan_2025_06_11_16_52_36/','weld_fujiscan_2025_06_11_17_16_48/',\
+                       'weld_fujiscan_2025_06_11_17_49_27/','weld_fujiscan_2025_06_11_18_14_56/','weld_fujiscan_2025_06_12_17_33_24/',\
+                       'weld_fujiscan_2025_06_12_16_59_09/','weld_fujiscan_2025_06_12_15_33_03/','weld_fujiscan_2025_06_12_15_03_27/',\
+                       'weld_fujiscan_2025_07_09_14_52_42/','weld_fujiscan_2025_07_09_15_21_35/','weld_fujiscan_2025_07_09_16_16_40/']
     # logdata_dir_all = ['weld_fujiscan_2025_07_09_14_52_42/','weld_fujiscan_2025_07_09_15_21_35/','weld_fujiscan_2025_07_09_16_16_40/']
     # logdata_dir_all = ['weld_fujiscan_2025_06_11_18_14_56/']
     # logdata_dir_all= ['weld_fujicontrol_2025_08_13_14_17_58/', 'weld_fujicontrol_2025_08_13_14_57_52/']
-    logdata_dir_all= ['weld_fujicontrol_2025_08_14_11_19_59/']
+    # logdata_dir_all= ['weld_fujicontrol_2025_08_13_14_17_58/', 'weld_fujicontrol_2025_08_13_14_57_52/','weld_fujicontrol_2025_08_14_11_19_59/']
+    
     
     ### skip data directories
     skip_data_dir_all = []
@@ -122,6 +158,12 @@ def main():
                 Transz0_H_even = None
                 Transicp_H_odd2even = None
                 scanner_lagging= True
+        
+        # get this data set shift x
+        baselayer1_profile_height = np.loadtxt(logdata_dir+'baselayer1/profile_height.csv',delimiter=',')
+        this_logdata_dir_shift_x = get_weld_shift_x(baselayer1_profile_height)
+        print("Shift X for", logdata_dir_name, ":", this_logdata_dir_shift_x)
+
         for weld_parts in ['base','layer']:
         # for weld_parts in ['base']:
             if weld_parts == 'base':
@@ -294,18 +336,8 @@ def main():
 
                             # centroid, bbox, torch_centroid, torch_bbox=weld_detection_aluminum(ir_image,torch_model,percentage_threshold=0.8)
                             centroid, bbox, torch_centroid, torch_bbox=weld_detection_steel(ir_image,torch_model,tip_wire_model)
-
-                            # plt.imshow(ir_image, cmap='inferno', aspect='equal')
-                            # plt.show()
-                            # plt.plot(welding_current_exe[:,0]-welding_current_exe[0,0], welding_current_exe[:,1], label='Welding Current')
-                            # # draw a vertical line at the current time
-                            # plt.axvline(x=stamp-welding_current_exe[0,0], color='r', linestyle='--', label='Current Time')
-                            # plt.title('Welding Current vs Time')
-                            # plt.xlabel('Time (s)')
-                            # plt.ylabel('Welding Current (A)')
-                            # plt.xlim(-0.1,0.5)
-                            # plt.grid()
-                            # plt.show()
+                            # ir_image_log = np.log10(ir_image)
+                            # centroid, bbox, torch_centroid, torch_bbox=weld_detection_steel(ir_image_log,torch_model,tip_wire_model)
 
                             # find max pixel value in ir_image
                             # centroid = np.unravel_index(np.argmax(ir_image, axis=None), ir_image.shape)
@@ -320,12 +352,24 @@ def main():
                                     # use the last N recorded centroid
                                     centroid = np.mean(thermal_centroid_record[-5:], axis=0)
 
-                            thermal_centroid_record.append(centroid) # record centroid for debugging
-
+                            # # visualize flame centroid, bbox
                             # plt.clf()
-                            # plt.imshow(ir_image, cmap='inferno', aspect='equal')
+                            # plt.imshow(np.log10(ir_image), cmap='inferno', aspect='equal')
                             # plt.scatter(centroid[0], centroid[1], c='r', s=5, label='Flame centroid')
-                            # plt.show()
+                            # if bbox is not None:
+                            #     plt.gca().add_patch(plt.Rectangle((bbox[0], bbox[1]), bbox[2], bbox[3], edgecolor='b', facecolor='none', lw=2, label='Flame bbox'))
+                            # if torch_centroid is not None:
+                            #     plt.scatter(torch_centroid[0], torch_centroid[1], c='g', s=5, label='Torch centroid')
+                            #     plt.gca().add_patch(plt.Rectangle((torch_bbox[0], torch_bbox[1]), torch_bbox[2], torch_bbox[3], edgecolor='y', facecolor='none', lw=2, label='Torch bbox'))
+                            # plt.colorbar()
+                            # plt.title(f'Flame Detection at {stamp}')
+                            # plt.xlabel('Pixel X')
+                            # plt.ylabel('Pixel Y')
+                            # plt.legend()
+                            # # plt.show()
+                            # plt.pause(0.01)
+
+                            thermal_centroid_record.append(centroid) # record centroid for debugging
 
                             #find average pixel value 
                             centroid = np.round(centroid).astype(int)
@@ -440,8 +484,9 @@ def main():
                         # plt.show()
 
                         # save thermal readings
-                        thermal_reading = np.vstack((thermal_stamp,thermal_reading,thermal_centroid)).T
-                        np.savetxt(this_layer_dir+'thermal.csv',thermal_reading,delimiter=',')
+                        # thermal_reading = np.vstack((thermal_stamp,thermal_reading)).T
+                        # thermal_reading = np.hstack((thermal_reading,thermal_centroid))
+                        # np.savetxt(this_layer_dir+'thermal.csv',thermal_reading,delimiter=',')
 
                         # save thermal pixel trace
                         trace_dict = {}
@@ -480,7 +525,7 @@ def main():
                     print("Getting height and width...")
                     try:
                         profile_height = np.loadtxt(this_layer_dir+'profile_height.csv',delimiter=',')
-                        profile_width = np.loadtxt(this_layer_dir+'profile_width.csv',delimiter=',')
+                        profile_width = np.loadtxt(this_layer_dir+'profile_width',delimiter=',')
                         all_profile_height.append(profile_height)
                         # pcd = o3d.io.read_point_cloud(this_layer_dir+'pcd.pcd')
                         pcd_denoise = o3d.io.read_point_cloud(this_layer_dir+'pcd_denoise.pcd')
@@ -555,7 +600,7 @@ def main():
                             _, profile_width,_ = scan_process.pcd2height(deepcopy(pcd),z_height_start,bbox_min=crop_h_min,bbox_max=crop_h_max,Transz0_H=Transz0_H,return_width=True)
                         else:
                             profile_height, _,Transz0_H = scan_process.pcd2height(deepcopy(pcd_denoise),last_profile_height,bbox_min=crop_h_min,bbox_max=crop_h_max,Transz0_H=Transz0_H,return_width=True)
-                            _, profile_width,_ = scan_process.pcd2height(deepcopy(pcd),z_height_start,bbox_min=crop_h_min,bbox_max=crop_h_max,Transz0_H=Transz0_H,return_width=True)
+                            _, profile_width,_ = scan_process.pcd2height(deepcopy(pcd),last_profile_height,bbox_min=crop_h_min,bbox_max=crop_h_max,Transz0_H=Transz0_H,return_width=True)
                         
                         # for visualization
                         pcd_denoise_trans = deepcopy(pcd_denoise)
@@ -609,12 +654,11 @@ def main():
                         o3d.io.write_point_cloud(this_layer_dir+'pcd_denoise.pcd',pcd_denoise)
                         #############################################
 
-                
-
                 ################ combine everything in one array ##############
                 if run_compile:
                     # compensating the observed shifting
-                    shift_x = 9.35
+                    shift_x = this_logdata_dir_shift_x
+                    
                     profile_height[:,0] = profile_height[:,0] + shift_x
                     profile_width[:,0] = profile_width[:,0] + shift_x
                     if not scanner_lagging:
@@ -675,8 +719,8 @@ def main():
                         thermal_reading_idx = -1 if len(thermal_reading_idx) == 0 else thermal_reading_idx[0]
                         ratio=(this_t-thermal_reading[:,0][thermal_reading_idx-1])/(thermal_reading[:,0][thermal_reading_idx]-thermal_reading[:,0][thermal_reading_idx-1])
                         this_thermal_reading=thermal_reading[:,1][thermal_reading_idx-1]*(1-ratio)+thermal_reading[:,1][thermal_reading_idx]*ratio
-                        this_thermal_reading_x = thermal_reading[:,2][thermal_reading_idx-1][0]*(1-ratio)+thermal_reading[:,2][thermal_reading_idx][0]*ratio
-                        this_thermal_reading_y = thermal_reading[:,2][thermal_reading_idx-1][1]*(1-ratio)+thermal_reading[:,2][thermal_reading_idx][1]*ratio
+                        this_thermal_reading_x = thermal_reading[:,2][thermal_reading_idx-1]*(1-ratio)+thermal_reading[:,2][thermal_reading_idx]*ratio
+                        this_thermal_reading_y = thermal_reading[:,3][thermal_reading_idx-1]*(1-ratio)+thermal_reading[:,3][thermal_reading_idx]*ratio
 
                         this_welding_profile = np.array([this_t,x,this_cmd_v,this_cmd_fr,this_height,this_dh,torch_height,this_width,this_v,this_thermal_reading,this_thermal_reading_x,this_thermal_reading_y])
                         this_welding_profile = np.append(this_welding_profile,this_welding_status)

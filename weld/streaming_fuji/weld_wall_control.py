@@ -79,28 +79,6 @@ def get_weld_shift_x(profile_height):
     profile_x = np.arange(np.min(profile_height[:,0]), np.max(profile_height[:,0])+0.1, 0.1)
     height_approx_func = CubicSpline(profile_height[:,0], profile_height[:,1])
     profile_height_aug = np.column_stack((profile_x, height_approx_func(profile_x)))
-    
-    # scan_N = 200
-    # span_N = 5
-    # threshold = 0.1
-    # diff_points_1 = []
-    # height_diff = np.diff(profile_height_aug[:,1])
-    # for point_i, point in enumerate(profile_height_aug[0:scan_N+1]):
-    #     diff_right = np.mean(height_diff[point_i:point_i+span_N])
-
-    #     diff_points_1.append(diff_right)
-    # # find the first diff points > 0.1
-    # left_point = np.argwhere(np.array(diff_points_1) > threshold).flatten()[0]+int(span_N/2)
-    # diff_points_2 = []
-    # for point_i, point in enumerate(profile_height_aug[::-1][0:scan_N+1]):
-    #     diff_right = np.mean(height_diff[::-1][point_i:point_i+span_N])
-    #     diff_points_2.append(diff_right)
-    # # find the first diff points < -0.1
-    # right_point = np.argwhere(np.array(diff_points_2) < -threshold).flatten()[0]+int(span_N/2)
-
-    # left_x = np.mean(profile_height_aug[left_point:left_point+2, 0])
-    # right_x = np.mean(profile_height_aug[::-1][right_point:right_point+2, 0])
-    # shift_x = -1*(left_x+right_x)/2
 
     reference_height = 3.5
     profile_height_closed_arg = np.argsort(np.abs(profile_height_aug[:,1]-reference_height))
@@ -310,7 +288,7 @@ def main():
     v_Maximum = 20
     v_minimum = 0.75
     # choose between log-log control or learning model one step Jacobian
-    control_method = 'loglog-rls' # 'loglog-static', 'loglog-rls' or 'learning-Jacobian'
+    control_method = 'learning-Jacobian' # 'loglog-static', 'loglog-rls' or 'learning-Jacobian'
     assert control_method in ['loglog-static', 'loglog-rls', 'learning-Jacobian'], "Invalid control method"
     #######################################
 
@@ -381,7 +359,7 @@ def main():
                     ,'cross_section':cross_section, 'dh_target':float(dh_target), 'dw_target':float(np.mean(dw_target[:,1])), 'lookahead_distance':lookahead_distance,\
                     'alpha_control':alpha_control, 'lambda_smooth':lambda_smooth, 'lambda_disc':lambda_disc,\
                     'model_dir':control_model_dir, 'v_Maximum':v_Maximum, 'v_minimum':v_minimum, 'weld_type':weld_type,\
-                    'loglog_model_dir':loglog_model_dir, 'control_method':control_method}
+                    'loglog_model_dir':loglog_model_dir, 'control_method':control_method, 'correction_layer_start':correction_layer_start}
     ##############################
 
     ####### simulation setup #####
@@ -401,6 +379,8 @@ def main():
     print("Logged Data Dir:",logdata_dir)
     print("Material Name:",material_name)
     print("Weld Type:",weld_type)
+    print("Control method:",control_method)
+    print("Control start layer:",correction_layer_start)
     input("Ready to start? Press Enter to continue...")
     ################## print layers ##################
     arc_off=True
@@ -693,7 +673,8 @@ def main():
                             elif ax_idx == 1:
                                 ax.plot(control_status_log[:, 1], control_status_log[:, 5], label=f'Target Width')                            
                                 ax.plot(control_status_log[:, 1], control_status_log[:, 7], label=f'Predicted Width')
-                                ax.plot(profile_width_shift[:, 0], profile_width_shift[:, 1], label=f'Actual Width')
+                                if profile_width_shift is not None:
+                                    ax.plot(profile_width_shift[:, 0], profile_width_shift[:, 1], label=f'Actual Width')
                                 ax.legend(fontsize=legend_size)
                                 ax.set_ylabel("mm", fontsize=xy_label_size)
                                 ax.set_title(f"Target vs Predicted vs Actual Width (mm)", fontsize=title_size)
@@ -708,6 +689,8 @@ def main():
                             plt.close(fig)
                         else:
                             plt.show()
+                        if not os.path.exists(sim_folder+'layer'+str(i)+'/control_status_log.csv'):
+                            np.savetxt(sim_folder+'layer'+str(i)+'/control_status_log.csv', control_status_log, delimiter=',')
 
                     # if torch orientation is fixed, and the traveling/curve direction is opposite
                     if forward and curve_direction == 'backward':
@@ -848,6 +831,8 @@ def main():
                         np.savetxt(logdata_dir+layer_name+f'/weld_js_exe.csv', weld_js_exe, delimiter=',') # save welding/scanning logged joint space data
                         np.savetxt(logdata_dir+layer_name+f'/js_cmd.csv', q_cmd_all, delimiter=',') # save welding/scanning commanded joint space data
                         np.savetxt(logdata_dir+layer_name+f'/weld_cmd.csv', welding_cmd_all, delimiter=',') # save welding commands
+                        if layer_count >= correction_layer_start:
+                            np.savetxt(logdata_dir+layer_name+f'/control_status_log.csv', control_status_log, delimiter=',') # save control status log if controlling
                         if fuji_scanon:
                             with open(logdata_dir+layer_name+f'/scan_exe.pickle', 'wb') as file: # save scanning logged data
                                 pickle.dump(scan_exe, file)
@@ -899,6 +884,7 @@ def main():
                     # visualize_pcd([pcd])
                     # profile_height,Transz0_H = scan_process.pcd2height(deepcopy(pcd),z_height_start,bbox_min=crop_h_min,bbox_max=crop_h_max,Transz0_H=Transz0_H)
                     profile_height,profile_width,Transz0_H = scan_process.pcd2height(deepcopy(pcd),z_height_start,bbox_min=crop_h_min,bbox_max=crop_h_max,Transz0_H=Transz0_H,return_width=True)
+                    profile_width[:,1] = np.convolve(profile_width[:,1], np.ones(5)/5, mode='same')
                     print("Transz0_H:",Transz0_H)
                     np.savetxt(logdata_dir+layer_name+f'/profile_height.csv', profile_height, delimiter=',')
                     o3d.io.write_point_cloud(logdata_dir+layer_name+f'/pcd.pcd',pcd)
