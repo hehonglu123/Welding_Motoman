@@ -212,6 +212,10 @@ def train(train_dataloader: DataLoader, test_dataloader: DataLoader, model: nn.M
         if epoch % (epochs//10) == 0:
             print(f"Epoch {epoch}/{epochs}, Training Loss: {this_training_loss:.4f}, Testing Loss: {this_test_loss:.4f}")
 
+        # save training and testing loss every epoch
+        np.savetxt(model_dir+'training_loss.csv', np.array(training_losses), delimiter=',')
+        np.savetxt(model_dir+'testing_loss.csv', np.array(testing_losses), delimiter=',')
+
     return model, training_losses, testing_losses
 
 if __name__ == "__main__":
