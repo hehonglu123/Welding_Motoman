@@ -1,29 +1,45 @@
 # Arrays of candidate inputs
-# $firstInputs = @("RNN", "GRU", "LSTM", "NARMA","DTRNN")
-# $secondInputs = @("2", "4", "14")
-# $thirdInputs = @("3", "8", "16", "64")
-$firstInputs = @("RNN")
-$secondInputs = @("3","5")
-$thirdInputs = @("3", "8", "16", "64")
+$modelsInputs = @(
+"WAAM_GRU",    
+"WAAM_NN"
+)
+
+# Feature flags (each entry is one set of extra args)
+$features = @(
+    "--no_feat_neighbor_thermal --no_feat_stickout --no_feat_thermal_x --no_feat_thermal_y --no_feat_x_location",
+    "--no_feat_neighbor_thermal --no_feat_x_location",
+    ""
+)
 
 # Path to the Python script
 $pythonScript = ".\estimate_dhdw_sequence.py"
 
 # Loop through all combinations
-foreach ($first in $firstInputs) {
-    foreach ($second in $secondInputs) {
-        foreach ($third in $thirdInputs) {
-            # If the first input is "NARMA", we need to handle the fourth input differently
-            if ($first -eq "NARMA") {
-                if ($second -eq "2") {
-                    $fourth = "True"  # NARMA with input size 2 use open loop
-                } else {
-                    $fourth = "False"
-                }
-            }
-            python $pythonScript "True" $first $second $third $fourth # train_flag, model_type, model_input_size, model_hidden_size, open_loop
-            Write-Host "==========================================="
+foreach ($model in $modelsInputs) {
+    foreach ($feature in $features) {
+        $args = @(
+            "--train",
+            "--model_type", $model,
+            "--thermal_emb", 32,
+            "--scalar_emb", 16,
+            "--epochs", 5000
+        )
+        if ($model -like "*NN*") {
+            $args += @("--nn_hidden_size", 64, "--nn_layers", 0)
+        } else {
+            $args += @("--nn_hidden_size", 64, "--nn_layers", 1)
         }
+        
+
+        # Add features only if non-empty
+        if ($feature -ne "") {
+            $args += $feature.Split(" ")
+        }
+        Write-Host "Running with model: $model and features: $feature"
+        Write-Host "Command: python $pythonScript $($args -join ' ')"
+
+        python $pythonScript @args
+        Write-Host "==========================================="
     }
 }
 

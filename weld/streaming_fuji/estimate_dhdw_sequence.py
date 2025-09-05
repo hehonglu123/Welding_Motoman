@@ -182,6 +182,20 @@ def masked_mse_loss(pred: torch.Tensor, target: torch.Tensor, lengths: torch.Ten
     mse = (mse * mask).sum() / (mask.sum() * D + 1e-8)
     return mse
 
+def masked_error(pred: torch.Tensor, target: torch.Tensor, lengths: torch.Tensor) -> list:
+    """
+    pred, target: (B, T, 2)
+    lengths: (B,)
+    Computes error only over valid timesteps.
+    """
+    B, T, D = pred.shape
+    error = []
+    for b in range(B):
+        L = lengths[b]
+        error.extend((pred[b, :L, :].detach().cpu().numpy() - target[b, :L, :].detach().cpu().numpy()).tolist())
+    
+    return error
+
 # Define hook to freeze half of W_ih
 def freeze_half_weight(param: torch.Tensor, freeze_cols=[0,1]):
     mask = torch.zeros_like(param)
@@ -222,8 +236,7 @@ def train_static(train_dataloader: DataLoader, test_dataloader: DataLoader, mode
             optimizer.step()
             total_loss += loss.item()
             n_batches += 1
-            if epoch % (epochs//print_status_for_N_times) == 0:
-                error_dhdw_train.extend((pred.detach().cpu().numpy() - target.detach().cpu().numpy()).tolist())
+            error_dhdw_train.extend((pred.detach().cpu().numpy() - target.detach().cpu().numpy()).tolist())
         this_training_loss = total_loss / max(1, n_batches)
         assert not np.isnan(this_training_loss), "Training loss is NaN!"
         training_losses.append(this_training_loss)
@@ -242,8 +255,7 @@ def train_static(train_dataloader: DataLoader, test_dataloader: DataLoader, mode
             loss = loss_fn(pred, target)
             total_loss += loss.item()
             n_batches += 1
-            if epoch % (epochs//print_status_for_N_times) == 0:
-                error_dhdw_test.extend((pred.detach().cpu().numpy() - target.detach().cpu().numpy()).tolist())
+            error_dhdw_test.extend((pred.detach().cpu().numpy() - target.detach().cpu().numpy()).tolist())
         this_test_loss = total_loss / n_batches
         testing_losses.append(this_test_loss)
 
@@ -251,12 +263,19 @@ def train_static(train_dataloader: DataLoader, test_dataloader: DataLoader, mode
         if epoch == 0 or this_test_loss < min(testing_losses[:-1]):
             torch.save(model.state_dict(), model_dir + 'best_model.pth')
             print(f"Epoch {epoch}: Saved new best testing model with loss {this_test_loss:.4f}")
+            error_dhdw_train_abs = np.abs(np.array(error_dhdw_train))
+            error_dhdw_test_abs = np.abs(np.array(error_dhdw_test))
+            print("  Training dh error: mean {:.4f}, 95% {:.4f}".format(np.mean(error_dhdw_train_abs[:,0]), stats.expon(scale=np.std(np.abs(error_dhdw_train_abs[:,0]))).interval(0.95)[1]))
+            print("  Training dw error: mean {:.4f}, 95% {:.4f}".format(np.mean(error_dhdw_train_abs[:,1]), stats.expon(scale=np.std(np.abs(error_dhdw_train_abs[:,1]))).interval(0.95)[1]))
+            print("  Testing dh error: mean {:.4f}, 95% {:.4f}".format(np.mean(error_dhdw_test_abs[:,0]), stats.expon(scale=np.std(np.abs(error_dhdw_test_abs[:,0]))).interval(0.95)[1]))
+            print("  Testing dw error: mean {:.4f}, 95% {:.4f}".format(np.mean(error_dhdw_test_abs[:,1]), stats.expon(scale=np.std(np.abs(error_dhdw_test_abs[:,1]))).interval(0.95)[1]))
+            print("======")
         # save the best training model
         if epoch == 0 or this_training_loss < min(training_losses[:-1]):
             torch.save(model.state_dict(), model_dir + 'best_training_model.pth')
 
         # print training progress
-        if epoch % (epochs//print_status_for_N_times) == 0:
+        if epoch % max(1, epochs//print_status_for_N_times) == 0:
             print(f"Epoch {epoch}/{epochs}, Training Loss: {this_training_loss:.4f}, Testing Loss: {this_test_loss:.4f}")
             error_dhdw_train_abs = np.abs(np.array(error_dhdw_train))
             error_dhdw_test_abs = np.abs(np.array(error_dhdw_test))
@@ -264,10 +283,13 @@ def train_static(train_dataloader: DataLoader, test_dataloader: DataLoader, mode
             print("  Training dw error: mean {:.4f}, 95% {:.4f}".format(np.mean(error_dhdw_train_abs[:,1]), stats.expon(scale=np.std(np.abs(error_dhdw_train_abs[:,1]))).interval(0.95)[1]))
             print("  Testing dh error: mean {:.4f}, 95% {:.4f}".format(np.mean(error_dhdw_test_abs[:,0]), stats.expon(scale=np.std(np.abs(error_dhdw_test_abs[:,0]))).interval(0.95)[1]))
             print("  Testing dw error: mean {:.4f}, 95% {:.4f}".format(np.mean(error_dhdw_test_abs[:,1]), stats.expon(scale=np.std(np.abs(error_dhdw_test_abs[:,1]))).interval(0.95)[1]))
+            print("=============================")
 
         # save training and testing loss every epoch
         np.savetxt(model_dir+'training_loss.csv', np.array(training_losses), delimiter=',')
         np.savetxt(model_dir+'testing_loss.csv', np.array(testing_losses), delimiter=',')
+        np.savetxt(model_dir+'error_dhdw_train.csv', np.array(error_dhdw_train), delimiter=',')
+        np.savetxt(model_dir+'error_dhdw_test.csv', np.array(error_dhdw_test), delimiter=',')
 
     return model, training_losses, testing_losses
 
@@ -279,6 +301,8 @@ def train_RNN(train_dataloader: DataLoader, test_dataloader: DataLoader, model: 
     # optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
     optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=learning_rate)
     # optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=1e-3)
+
+    print_status_for_N_times = 50
     
     scaler = GradScaler(device=device_name)
     acc_steps = 32          # tune this
@@ -292,6 +316,7 @@ def train_RNN(train_dataloader: DataLoader, test_dataloader: DataLoader, model: 
         model.train()
         total_loss = 0.0
         n_steps = 0
+        error_dhdw_train = []
         optimizer.zero_grad(set_to_none=True)
         for step, (scalars, thermal, target, lengths) in enumerate(train_dataloader):
             scalars = scalars.to(device)
@@ -302,6 +327,7 @@ def train_RNN(train_dataloader: DataLoader, test_dataloader: DataLoader, model: 
             with autocast(device_type=device_name, dtype=torch.float16):
                 pred = model(scalars, thermal, lengths)
                 loss = masked_mse_loss(pred, target, lengths) / acc_steps
+                error_dhdw_train.extend(masked_error(pred, target, lengths))
 
             scaler.scale(loss).backward()
 
@@ -332,6 +358,7 @@ def train_RNN(train_dataloader: DataLoader, test_dataloader: DataLoader, model: 
         model.eval()
         total_loss = 0.0
         n_batches = 0
+        error_dhdw_test = []
         for scalars, thermal, target, lengths in test_dataloader:
             scalars = scalars.to(device)
             thermal = thermal.to(device)
@@ -341,6 +368,7 @@ def train_RNN(train_dataloader: DataLoader, test_dataloader: DataLoader, model: 
             loss = loss_fn(pred, target, lengths)
             total_loss += loss.item()
             n_batches += 1
+            error_dhdw_test.extend(masked_error(pred, target, lengths))
         this_test_loss = total_loss / n_batches
         testing_losses.append(this_test_loss)
 
@@ -348,17 +376,32 @@ def train_RNN(train_dataloader: DataLoader, test_dataloader: DataLoader, model: 
         if epoch == 0 or this_test_loss < min(testing_losses[:-1]):
             torch.save(model.state_dict(), model_dir + 'best_model.pth')
             print(f"Epoch {epoch}: Saved new best testing model with loss {this_test_loss:.4f}")
+            error_dhdw_train_abs = np.abs(np.array(error_dhdw_train))
+            error_dhdw_test_abs = np.abs(np.array(error_dhdw_test))
+            print("  Training dh error: mean {:.4f}, 95% {:.4f}".format(np.mean(error_dhdw_train_abs[:,0]), stats.expon(scale=np.std(np.abs(error_dhdw_train_abs[:,0]))).interval(0.95)[1]))
+            print("  Training dw error: mean {:.4f}, 95% {:.4f}".format(np.mean(error_dhdw_train_abs[:,1]), stats.expon(scale=np.std(np.abs(error_dhdw_train_abs[:,1]))).interval(0.95)[1]))
+            print("  Testing dh error: mean {:.4f}, 95% {:.4f}".format(np.mean(error_dhdw_test_abs[:,0]), stats.expon(scale=np.std(np.abs(error_dhdw_test_abs[:,0]))).interval(0.95)[1]))
+            print("  Testing dw error: mean {:.4f}, 95% {:.4f}".format(np.mean(error_dhdw_test_abs[:,1]), stats.expon(scale=np.std(np.abs(error_dhdw_test_abs[:,1]))).interval(0.95)[1]))
+
         # save the best training model
         if epoch == 0 or this_training_loss < min(training_losses[:-1]):
             torch.save(model.state_dict(), model_dir + 'best_training_model.pth')
 
         # print training progress
-        if epoch % (epochs//50) == 0:
+        if epoch % max(1, epochs//print_status_for_N_times) == 0:
             print(f"Epoch {epoch}/{epochs}, Training Loss: {this_training_loss:.4f}, Testing Loss: {this_test_loss:.4f}")
+            error_dhdw_train_abs = np.abs(np.array(error_dhdw_train))
+            error_dhdw_test_abs = np.abs(np.array(error_dhdw_test))
+            print("  Training dh error: mean {:.4f}, 95% {:.4f}".format(np.mean(error_dhdw_train_abs[:,0]), stats.expon(scale=np.std(np.abs(error_dhdw_train_abs[:,0]))).interval(0.95)[1]))
+            print("  Training dw error: mean {:.4f}, 95% {:.4f}".format(np.mean(error_dhdw_train_abs[:,1]), stats.expon(scale=np.std(np.abs(error_dhdw_train_abs[:,1]))).interval(0.95)[1]))
+            print("  Testing dh error: mean {:.4f}, 95% {:.4f}".format(np.mean(error_dhdw_test_abs[:,0]), stats.expon(scale=np.std(np.abs(error_dhdw_test_abs[:,0]))).interval(0.95)[1]))
+            print("  Testing dw error: mean {:.4f}, 95% {:.4f}".format(np.mean(error_dhdw_test_abs[:,1]), stats.expon(scale=np.std(np.abs(error_dhdw_test_abs[:,1]))).interval(0.95)[1]))
 
         # save training and testing loss every epoch
         np.savetxt(model_dir+'training_loss.csv', np.array(training_losses), delimiter=',')
         np.savetxt(model_dir+'testing_loss.csv', np.array(testing_losses), delimiter=',')
+        np.savetxt(model_dir+'error_dhdw_train.csv', np.array(error_dhdw_train), delimiter=',')
+        np.savetxt(model_dir+'error_dhdw_test.csv', np.array(error_dhdw_test), delimiter=',')
 
     return model, training_losses, testing_losses
 
@@ -519,8 +562,8 @@ if __name__ == "__main__":
     print("  neighbor_thermal:", feat_neighbor_thermal)
     print("Model structure:")
     if 'GRU' in model_type:
-        print("  RNN hidden size:", nn_hidden_size)
-        print("  RNN layers:", nn_layers)
+        print("  RNN hidden size:", rnn_hidden_size)
+        print("  RNN layers:", rnn_layers)
     else:
         print("  NN hidden size:", nn_hidden_size)
         print("  NN layers:", nn_layers)
@@ -604,7 +647,7 @@ if __name__ == "__main__":
         test_dataloader = DataLoader(test_ds, batch_size=len(test_ds), shuffle=False, collate_fn=collate_timesteps)
 
     if 'GRU' in model_type:
-        model = WAAMGRUModel(scalar_dim=len(data_index), use_thermal=feat_neighbor_thermal, thermal_emb=thermal_emb, scalar_emb=scalar_emb, rnn_hidden=nn_hidden_size, rnn_layers=nn_layers).to(device)
+        model = WAAMGRUModel(scalar_dim=len(data_index), use_thermal=feat_neighbor_thermal, thermal_emb=thermal_emb, scalar_emb=scalar_emb, rnn_hidden=rnn_hidden_size, rnn_layers=rnn_layers).to(device)
     else:
         model = WAAMNNModel(scalar_dim=len(data_index), use_thermal=feat_neighbor_thermal, thermal_emb=thermal_emb, scalar_emb=scalar_emb, nn_hidden=nn_hidden_size, nn_layers=nn_layers).to(device)
     print("Model trainable parameters:",count_parameters(model))
@@ -776,5 +819,5 @@ if __name__ == "__main__":
     plt.legend(fontsize=legend_size)
     plt.title('Training and Testing Loss', fontsize=title_size)
     plt.tight_layout()
-    # plt.savefig(model_dir+'training_testing_loss.png')
-    plt.show()
+    plt.savefig(model_dir+'training_testing_loss.png')
+    # plt.show()

@@ -705,7 +705,7 @@ class ThermalNNEncoder(nn.Module):
         #     nn.ReLU(),
         # )
         self.mlp = nn.Sequential(
-            nn.AvgPool1d(kernel_size=4, stride=4),  # downsample 400 -> 100
+            nn.AdaptiveAvgPool1d(100),  # downsample 400 -> 100
             nn.Linear(100, emb_dim),
             nn.ReLU(),
         )
