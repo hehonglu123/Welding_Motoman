@@ -116,8 +116,9 @@ def main():
     scan_online_process = False
     thermal_on = False
     input_from_user = False
-    SIMULATION = True
-    simulation_save_control_state_fig = True
+    SIMULATION = False
+    # simulation_speed_sim = False
+    simulation_save_control_state_fig = False
 
     if SIMULATION:
         weld_arcon = False
@@ -204,7 +205,7 @@ def main():
         # if weld_arcon:
         #     fronius_client.release_welder()
         # exit()
-    
+
     ################## Read geometry data ##################
     data_dir = '../../data/wall_weld_test/'
     with open(data_dir+'sliced_meta.yml', 'r') as f:
