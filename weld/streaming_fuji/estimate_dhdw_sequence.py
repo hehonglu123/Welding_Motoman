@@ -24,6 +24,8 @@ sup_title_size = 18
 
 np.random.seed(42) # for reproducibility
 torch.manual_seed(42) # for reproducibility
+# np.random.seed(40) # for reproducibility
+# torch.manual_seed(40) # for reproducibility
 
 device_name = 'cuda' if torch.cuda.is_available() else 'cpu'
 device = torch.device(device_name)
@@ -327,6 +329,7 @@ def train_static(train_dataloader: DataLoader, test_dataloader: DataLoader, mode
         np.savetxt(model_dir+'training_dh_errors.csv', np.column_stack((training_dh_errors_mean, training_dh_errors_std, training_dh_errors_95, training_dh_errors_max)), delimiter=',', header='mean,std,95,max', comments='')
         np.savetxt(model_dir+'training_dw_errors.csv', np.column_stack((training_dw_errors_mean, training_dw_errors_std, training_dw_errors_95, training_dw_errors_max)), delimiter=',', header='mean,std,95,max', comments='')
         np.savetxt(model_dir+'testing_dh_errors.csv', np.column_stack((testing_dh_errors_mean, testing_dh_errors_std, testing_dh_errors_95, testing_dh_errors_max)), delimiter=',', header='mean,std,95,max', comments='')
+        np.savetxt(model_dir+'testing_dw_errors.csv', np.column_stack((testing_dw_errors_mean, testing_dw_errors_std, testing_dw_errors_95, testing_dw_errors_max)), delimiter=',', header='mean,std,95,max', comments='')
     return model, training_losses, testing_losses
 
 def train_RNN(train_dataloader: DataLoader, test_dataloader: DataLoader, model: nn.Module, epochs: int, learning_rate: float, model_dir='weld_Seq_models/'):
