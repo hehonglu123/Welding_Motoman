@@ -88,7 +88,7 @@ tip_wire_model = YOLO(os.path.dirname(inspect.getfile(flir_toolbox))+"/tip_wire.
 def main():
 
     test_current = False
-    test_thermal = False
+    test_thermal = True
     test_thermal_collected = False
     test_pcd = False
     test_geometry = False
@@ -96,7 +96,7 @@ def main():
     get_statistics = False
     test_loglog = False
     test_read_thermal = False
-    reverse_thermal_pixel_trace = True
+    reverse_thermal_pixel_trace = False
 
     ############## Robot definition ##############
     config_dir='../../config/'
@@ -142,6 +142,8 @@ def main():
 
     ###### viz thermal #####
     if test_thermal:
+        last_profile_height = np.loadtxt(last_layer_dir+'profile_height.csv',delimiter=',')
+        last_mean_height = np.mean(last_profile_height[:,1])
         with open(this_layer_dir+'ir_recording.pickle', 'rb') as f:
             ir_exe = pickle.load(f)
         ir_stamp = np.loadtxt(this_layer_dir+'ir_stamps.csv',delimiter=',')
@@ -295,24 +297,38 @@ def main():
             thermal_dist_torch_pixel_x = thermal_dist_torch_pixel_x[(thermal_dist_torch_table_x >= -55)&(thermal_dist_torch_table_x <= 55)]
             thermal_dist_torch_pixel = np.vstack((thermal_dist_torch_pixel_x, np.full_like(thermal_dist_torch_pixel_x, pixel_coord[1]))).T
 
-            plt.clf()
-            # plt.imshow(np.clip(ir_image,7000,10000), cmap='hot', aspect='equal')
-            plt.imshow(np.log10(ir_image), cmap='hot', aspect='equal')
-            # plt.imshow(ir_image, cmap='hot', aspect='equal')
-            plt.scatter(pixel_coord[0], pixel_coord[1], c='r', s=7, label='Flame centroid')
-            # plot tracing pixel
-            # cmap_trace = plt.get_cmap('tab10')
-            # for trace_id, trace in enumerate(thermal_pixel_trace):
-            #     if trace_id % 4 == 0:
-            #         # if pixel within the image
-            #         if 0 <= trace[0] < img_width-1 and 0 <= trace[1] < img_height-1:
-            #             plt.scatter(trace[0], trace[1], c=cmap_trace(trace_id % 10), s=10)
-            # plt.scatter(thermal_pixel_trace[::4,0], thermal_pixel_trace[::4,1], c='b', s=5, label='Traced pixels')
-            plt.scatter(thermal_dist_torch_pixel[:,0], thermal_dist_torch_pixel[:,1], c='b', s=5, label='Thermal distribution at torch x')
-            # plt.colorbar(format='%.2f')
-            plt.pause(0.000001)
+            # plt.clf()
+            # # plt.imshow(np.clip(ir_image,7000,10000), cmap='hot', aspect='equal')
+            # plt.imshow(np.log10(ir_image), cmap='hot', aspect='equal')
+            # # plt.imshow(ir_image, cmap='hot', aspect='equal')
+            # plt.scatter(pixel_coord[0], pixel_coord[1], c='r', s=7, label='Flame centroid')
+            # # plot tracing pixel
+            # # cmap_trace = plt.get_cmap('tab10')
+            # # for trace_id, trace in enumerate(thermal_pixel_trace):
+            # #     if trace_id % 4 == 0:
+            # #         # if pixel within the image
+            # #         if 0 <= trace[0] < img_width-1 and 0 <= trace[1] < img_height-1:
+            # #             plt.scatter(trace[0], trace[1], c=cmap_trace(trace_id % 10), s=10)
+            # # plt.scatter(thermal_pixel_trace[::4,0], thermal_pixel_trace[::4,1], c='b', s=5, label='Traced pixels')
+            # plt.scatter(thermal_dist_torch_pixel[:,0], thermal_dist_torch_pixel[:,1], c='b', s=5, label='Thermal distribution at torch x')
+            # # plt.colorbar(format='%.2f')
+            # plt.pause(0.000001)
 
-            input('')
+            # find the region x+- 40 mm and z- till 0 mm
+            window_x_pixel = int(40*cam_pixel_moving_ratio)
+            window_z_pixel = int(last_mean_height*cam_pixel_moving_ratio)
+            flame_centroid_estimate = np.mean(thermal_centroid_record[-10:], axis=0).astype(int)
+            ir_image_roi = ir_image[max(0,flame_centroid_estimate[1]):min(img_height,flame_centroid_estimate[1]+window_z_pixel), \
+                                    max(0,flame_centroid_estimate[0]-window_x_pixel):min(img_width,flame_centroid_estimate[0]+window_x_pixel)]
+            # show it in x z coordinate
+            plt.clf()
+            plt.imshow(np.log10(ir_image_roi), cmap='hot', aspect='equal', extent=[-40, 40, -min(img_height,flame_centroid_estimate[1]+ir_pixel_window_size//2)+flame_centroid_estimate[1], min(window_z_pixel, flame_centroid_estimate[1])])
+            plt.xlabel('X (mm)')
+            plt.ylabel('Z (mm)')
+            plt.xticks(plt.xticks()[0], (plt.xticks()[0]/cam_pixel_moving_ratio).astype(int))
+            plt.yticks(plt.yticks()[0], (plt.yticks()[0]/cam_pixel_moving_ratio).astype(int))
+            plt.colorbar(label='Log10 Pixel Value (Counts)', format='%.2f')
+            plt.pause(0.000001)
 
         thermal_trace_stamp_full = []
         thermal_workpiece_x_trace_full = []
