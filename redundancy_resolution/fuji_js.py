@@ -47,6 +47,7 @@ def main():
     # the plane perpendicular to the weldgun axis and passing through the weldgun TCP
     T_weldgun = robot_weld.fwd(np.zeros(6))
     T_scanner = robot_scan.fwd(np.zeros(6))
+    print("T_weld_scan:\n", T_weldgun.inv()*T_scanner)
     fujicam_standoff_d = np.dot((T_weldgun.p-T_scanner.p),T_weldgun.R[:3,2])/np.dot(T_scanner.R[:3,2],T_weldgun.R[:3,2])
     robot_scan_motion=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',d=fujicam_standoff_d,tool_file_path=config_dir+'fujicam.csv',\
         pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv')
@@ -58,6 +59,7 @@ def main():
     r_weld_z = robot_weld.fwd(np.zeros(6))
     r_scan_z = robot_scan_motion.fwd(np.zeros(6))
     T_weld_scan = r_weld_z.inv()*r_scan_z
+    print("T_weld_scan_motion:\n", T_weld_scan)
     weld_scan_vec = T_weld_scan.p/np.linalg.norm(T_weld_scan.p)
     rotate_y_direction = subproblem1(weld_scan_vec, np.array([0,1,0]), np.array([0,0,1]))
     dist_weld_scan = np.linalg.norm(T_weld_scan.p)
@@ -82,6 +84,8 @@ def main():
     path_dl = meta_data['path_dl']
     dist_weld_scan_index = np.round(dist_weld_scan/path_dl).astype(int)
     print(f'dist_weld_scan_index: {dist_weld_scan_index}, dist_weld_scan: {dist_weld_scan}')
+
+    exit()
 
     layers_name = ['baselayer','layer']
     # layers_name = ['layer']
