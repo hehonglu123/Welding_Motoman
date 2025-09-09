@@ -38,13 +38,15 @@ for model_dir in model_dirs:
     else:
         continue
 
-    training_dh_errors = np.loadtxt(os.path.join(model_dir, "training_dh_errors.csv"),delimiter=',',skiprows=1)
-    training_dw_errors = np.loadtxt(os.path.join(model_dir, "training_dw_errors.csv"),delimiter=',',skiprows=1)
-    testing_dh_errors = np.loadtxt(os.path.join(model_dir, "testing_dh_errors.csv"),delimiter=',',skiprows=1)
-    # testing_dw_errors = np.loadtxt(os.path.join(model_dir, "testing_dw_errors.csv"),delimiter=',',skiprows=1)
-    testing_dw_errors = deepcopy(training_dw_errors) # placeholder, since we don't have testing width errors saved
-    training_loss = np.loadtxt(os.path.join(model_dir, "training_loss.csv"),delimiter=',')
-    testing_loss = np.loadtxt(os.path.join(model_dir, "testing_loss.csv"),delimiter=',')
+    try:
+        training_dh_errors = np.loadtxt(os.path.join(model_dir, "training_dh_errors.csv"),delimiter=',',skiprows=1)
+        training_dw_errors = np.loadtxt(os.path.join(model_dir, "training_dw_errors.csv"),delimiter=',',skiprows=1)
+        testing_dh_errors = np.loadtxt(os.path.join(model_dir, "testing_dh_errors.csv"),delimiter=',',skiprows=1)
+        testing_dw_errors = np.loadtxt(os.path.join(model_dir, "testing_dw_errors.csv"),delimiter=',',skiprows=1)
+        training_loss = np.loadtxt(os.path.join(model_dir, "training_loss.csv"),delimiter=',')
+        testing_loss = np.loadtxt(os.path.join(model_dir, "testing_loss.csv"),delimiter=',')
+    except FileNotFoundError:
+        continue
 
     # skip if training loss is less than 5000 epochs
     if len(training_loss)<5000:
@@ -83,7 +85,7 @@ dh_test_err_table_str = "|      | Control Only | Control + spatial | Control + s
 width_train_err_table_str = "|      | Control Only | Control + spatial | Control + spatial + thermal |\n"
 width_test_err_table_str = "|      | Control Only | Control + spatial | Control + spatial + thermal |\n"
 for model_type, feat_sets in results.items():
-    loss_table_str += f"| {model_type} "
+    loss_table_str += f"| {model_type} |"
     dh_train_err_table_str += f"| {model_type} |"
     dh_test_err_table_str += f"| {model_type} |"
     width_train_err_table_str += f"| {model_type} |"
@@ -102,17 +104,17 @@ for model_type, feat_sets in results.items():
                 p95_test = metrics['testing'][dim]['95%'] if '95%' in metrics['testing'][dim] else 0
                 max_test = metrics['testing'][dim]['Max'] if 'Max' in metrics['testing'][dim] else 0
                 if dim == 'dh':
-                    dh_train_err_table_str += f" ({mean_train:.4f}, {p95_train:.4f}, {max_train:.4f}) |" if mean_train!=0 else " (N/A, N/A, N/A) |"
-                    dh_test_err_table_str += f" ({mean_test:.4f}, {p95_test:.4f}, {max_test:.4f}) |" if mean_test!=0 else " (N/A, N/A, N/A) |"
+                    dh_train_err_table_str += f" ({mean_train:.4f}/ {p95_train:.4f}/ {max_train:.4f}) |" if mean_train!=0 else " (N/A/ N/A/ N/A) |"
+                    dh_test_err_table_str += f" ({mean_test:.4f}/ {p95_test:.4f}/ {max_test:.4f}) |" if mean_test!=0 else " (N/A/ N/A/ N/A) |"
                 else:
-                    width_train_err_table_str += f" ({mean_train:.4f}, {p95_train:.4f}, {max_train:.4f}) |" if mean_train!=0 else " (N/A, N/A, N/A) |"
-                    width_test_err_table_str += f" ({mean_test:.4f}, {p95_test:.4f}, {max_test:.4f}) |" if mean_test!=0 else " (N/A, N/A, N/A) |"
+                    width_train_err_table_str += f" ({mean_train:.4f}/ {p95_train:.4f}/ {max_train:.4f}) |" if mean_train!=0 else " (N/A/ N/A/ N/A) |"
+                    width_test_err_table_str += f" ({mean_test:.4f}/ {p95_test:.4f}/ {max_test:.4f}) |" if mean_test!=0 else " (N/A/ N/A/ N/A) |"
         except KeyError:
             loss_table_str += " N/A |"
-            dh_train_err_table_str += " (N/A, N/A, N/A) |"
-            dh_test_err_table_str += " (N/A, N/A, N/A) |"
-            width_train_err_table_str += " (N/A, N/A, N/A) |"
-            width_test_err_table_str += " (N/A, N/A, N/A) |"
+            dh_train_err_table_str += " (N/A/ N/A/ N/A) |"
+            dh_test_err_table_str += " (N/A/ N/A/ N/A) |"
+            width_train_err_table_str += " (N/A/ N/A/ N/A) |"
+            width_test_err_table_str += " (N/A/ N/A/ N/A) |"
 
     loss_table_str += "\n"
     dh_train_err_table_str += "\n"
@@ -129,3 +131,15 @@ print("Width Training Error (mean, 95%, Max):")
 print(width_train_err_table_str)
 print("Width Testing Error (mean, 95%, Max):")
 print(width_test_err_table_str)
+
+# save each table to a csv file can be opened in excel
+with open("thermal_loss_table.csv", 'w') as f:
+    f.write(loss_table_str.replace('|', ',').replace(' ', ''))
+with open("thermal_dh_train_err_table.csv", 'w') as f:
+    f.write(dh_train_err_table_str.replace('|', ',').replace(' ', ''))
+with open("thermal_dh_test_err_table.csv", 'w') as f:
+    f.write(dh_test_err_table_str.replace('|', ',').replace(' ', ''))
+with open("thermal_width_train_err_table.csv", 'w') as f:
+    f.write(width_train_err_table_str.replace('|', ',').replace(' ', ''))
+with open("thermal_width_test_err_table.csv", 'w') as f:
+    f.write(width_test_err_table_str.replace('|', ',').replace(' ', ''))

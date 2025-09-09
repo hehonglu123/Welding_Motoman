@@ -70,7 +70,7 @@ def main():
     R1_w_scan = 0.001
     R2_w_scan = 0.05
     thermal_distance=400
-    scanning_extend_distance = 5 # mm
+    scanning_extend_distance = 20 # mm
 
     ## always plan for lagging
     ## then plan for both forward and backward
@@ -81,6 +81,7 @@ def main():
         meta_data = yaml.safe_load(f)
     path_dl = meta_data['path_dl']
     dist_weld_scan_index = np.round(dist_weld_scan/path_dl).astype(int)
+    print(f'dist_weld_scan_index: {dist_weld_scan_index}, dist_weld_scan: {dist_weld_scan}')
 
     layers_name = ['baselayer','layer']
     # layers_name = ['layer']

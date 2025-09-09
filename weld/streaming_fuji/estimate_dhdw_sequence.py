@@ -8,6 +8,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
 from torch.amp import autocast, GradScaler
+from torchview import draw_graph
 import sys, datetime, yaml, pathlib, glob, os, time, argparse
 from estimate_dhdw import train_loglog
 sys.path.append('../../mocap/')
@@ -720,17 +721,52 @@ if __name__ == "__main__":
         test_ds = LayerSequenceDataset(test_data_dir_tote, sample_rate=sample_rate, data_index=data_index, label_index=[4,5])
         train_dataloader = DataLoader(train_ds, batch_size=4, shuffle=True, collate_fn=pad_sequences_and_make_mask)
         test_dataloader = DataLoader(test_ds, batch_size=len(test_ds), shuffle=False, collate_fn=pad_sequences_and_make_mask)
+        batch_size = 4
     else:
         train_ds = TimeStepDataset(train_data_dir_tote, sample_rate=sample_rate, data_index=data_index, label_index=[4,5])
         test_ds = TimeStepDataset(test_data_dir_tote, sample_rate=sample_rate, data_index=data_index, label_index=[4,5])
         train_dataloader = DataLoader(train_ds, batch_size=len(train_ds), shuffle=True, collate_fn=collate_timesteps)
         test_dataloader = DataLoader(test_ds, batch_size=len(test_ds), shuffle=False, collate_fn=collate_timesteps)
+        batch_size = len(train_ds)
+    example_batch = next(iter(train_dataloader))
+    data_input_size = example_batch[0].shape
 
     if 'GRU' in model_type:
         model = WAAMGRUModel(scalar_dim=len(data_index), use_thermal=feat_neighbor_thermal, thermal_emb=thermal_emb, scalar_emb=scalar_emb, rnn_hidden=rnn_hidden_size, rnn_layers=rnn_layers).to(device)
     else:
         model = WAAMNNModel(scalar_dim=len(data_index), use_thermal=feat_neighbor_thermal, thermal_emb=thermal_emb, scalar_emb=scalar_emb, nn_hidden=nn_hidden_size, nn_layers=nn_layers).to(device)
     print("Model trainable parameters:",count_parameters(model))
+
+    if 'GRU' in model_type:
+        scalars_seq, thermals_seq, lengths, *_ = example_batch
+
+        # choose a small but valid batch size for viz
+        n = min(2, scalars_seq.size(0))
+
+        # ensure CPU + correct dtypes/shapes
+        scalars_seq = scalars_seq[:n].cpu()
+        thermals_seq = thermals_seq[:n].cpu()
+        lengths     = lengths[:n].reshape(-1).to(torch.long).cpu()  # 1-D Long
+
+        model.eval().cpu()
+        with torch.inference_mode():
+            model_graph = draw_graph(
+                model,
+                input_data=(scalars_seq, thermals_seq, lengths),
+                device='cpu'
+            )
+    else:
+        scalars, thermals, *_ = example_batch
+        n = min(8, scalars.size(0))
+        scalars = scalars[:n].cpu()
+        thermals = thermals[:n].cpu()
+        model.eval().cpu()
+        with torch.inference_mode():
+            model_graph = draw_graph(model, input_data=(scalars, thermals), device='cpu')
+
+    model_graph.visual_graph
+
+    exit()
 
     if train_flag:
         if load_pretrained:

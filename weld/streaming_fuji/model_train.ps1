@@ -1,7 +1,10 @@
 # Arrays of candidate inputs
+# $modelsInputs = @(
+# "WAAM_NN",    
+# "WAAM_GRU"
+# )
 $modelsInputs = @(
-"WAAM_NN",    
-"WAAM_GRU"
+"WAAM_NN"
 )
 # $modelsInputs = @(
 # "WAAM_GRU"
