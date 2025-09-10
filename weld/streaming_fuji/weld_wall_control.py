@@ -116,7 +116,7 @@ def main():
     scan_online_process = False
     thermal_on = False
     input_from_user = False
-    SIMULATION = False
+    SIMULATION = True
     # simulation_speed_sim = False
     simulation_save_control_state_fig = False
 
@@ -135,6 +135,14 @@ def main():
     robot_scan=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path=config_dir+'fujicam.csv',\
         pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv')
     fuji_tool_H = deepcopy(H_from_RT(robot_scan.R_tool, robot_scan.p_tool))
+    torch_tool_H_origin = deepcopy(H_from_RT(robot_weld.R_tool, robot_weld.p_tool))
+    # torch_tool_H_calib = np.array([[ 9.99997852e-01 , 1.56713800e-03 , 6.95508436e-04 , 2.79923245e+02],\
+    #                                [-1.56713800e-03 , 9.99998763e-01 ,-2.91540649e-04 , 1.45784766e+02],\
+    #                                [-6.95508436e-04 , 2.91540649e-04 , 9.99999707e-01 , 1.18566260e+03],\
+    #                                [ 0.00000000e+00 , 0.00000000e+00 , 0.00000000e+00 , 1.00000000e+00]]) # a place holder, to be replaced by actual calibration
+    torch_tool_H_calib = deepcopy(torch_tool_H_origin)
+    torch_tool_H_calib[3,2] -= 5
+
     # get fujicam standoff distance
     # Move the fujicam frame along the z-axis with the distance of the standoff distance
     # will locate the frame onto 
@@ -256,8 +264,6 @@ def main():
         layer_nom_incre = int(layer_nom_height/layer_resolution)
         # wire cross section
         cross_section = 1.14 # mm^2
-    if SIMULATION:
-        base_nom_vel = 50 # for speed up
     
     ##### motion parameters #####
     # streaming rate
@@ -276,6 +282,10 @@ def main():
     correction_layer_start = 2 # start correction from layer 2, set to a large number if no correction layer
     # correction_layer_start = 99999999999999 # no correction layer, set to a large number
 
+    if SIMULATION:
+        base_nom_vel = 50 # for speed up
+        scan_nom_vel = 20 # for speed up
+
     ##### controller parameters and model #####
     ### Learning model
     control_model_dir = 'model_20250715_151650'
@@ -290,7 +300,7 @@ def main():
     v_Maximum = 20
     v_minimum = 0.75
     # choose between log-log control or learning model one step Jacobian
-    control_method = 'learning-Jacobian' # 'loglog-static', 'loglog-rls' or 'learning-Jacobian'
+    control_method = 'loglog-static' # 'loglog-static', 'loglog-rls' or 'learning-Jacobian'
     assert control_method in ['loglog-static', 'loglog-rls', 'learning-Jacobian'], "Invalid control method"
     #######################################
 
@@ -506,10 +516,11 @@ def main():
                         print(f'Initial Torch V: {v_cmd:.2f} mm/s, Feedrate: {feedrate_cmd:.2f} inch/min, dh_pred: {dh_pred:.2f} mm, dw_pred: {dw_pred:.2f} mm')
                     
                     ### start welding and data logging
-                    # if SIMULATION:
+                    q_command_all = []
                     control_status_log = []
                     time_count = []
                     model_inference_time_count = [0,0]
+                    ik_time_count = []
                     while lam_cur < (lam_relative[-1] - v_cmd/stream_rate):
                         loop_start=time.perf_counter()
 
@@ -522,7 +533,18 @@ def main():
                         q1=curve_js[lam_idx-1]*(1-ratio)+curve_js[lam_idx]*ratio # robot 1 joint angles
                         q2=curve_js_cam[lam_idx-1]*(1-ratio)+curve_js_cam[lam_idx]*ratio # robot 2 joint angles
                         q_pos=curve_js_positioner[lam_idx-1]*(1-ratio)+curve_js_positioner[lam_idx]*ratio # positioner joint angles
+                        # for tool offset
+                        ik_start_time = time.perf_counter()
+                        T_weld=robot_weld.fwd(q1)
+                        robot_weld.robot.p_tool = deepcopy(torch_tool_H_calib[:3,3])
+                        robot_weld.robot.R_tool = deepcopy(torch_tool_H_calib[:3,:3])
+                        q1=robot_weld.inv(T_weld.p, T_weld.R, last_joints=q1)[0]
+                        robot_weld.robot.p_tool = deepcopy(torch_tool_H_origin[:3,3])
+                        robot_weld.robot.R_tool = deepcopy(torch_tool_H_origin[:3,:3])
+                        ik_time_count.append(time.perf_counter()-ik_start_time)
+                        #
                         q_cmd=np.hstack((q1,q2,q_pos)) # command joint angles (combined robot 1, robot 2 and positioner)
+                        q_command_all.append(q_cmd)
 
                         ### if welding start
                         if arc_off:
@@ -598,6 +620,7 @@ def main():
                     ##################################################
                     print(f'Mean time per command: {np.mean(time_count):.4f} s, Max time per command: {np.max(time_count):.4f} s')
                     print(f'Mean model inference time: {np.mean(model_inference_time_count):.4f} s, Max model inference time: {np.max(model_inference_time_count):.4f} s')
+                    print(f'Mean IK time: {np.mean(ik_time_count):.4f} s, Max IK time: {np.max(ik_time_count):.4f} s')
 
                     ### welding end
                     if weld_arcon:
@@ -750,7 +773,17 @@ def main():
                             ratio=(lam_cur-lam_scan_relative[lam_idx-1])/(lam_scan_relative[lam_idx]-lam_scan_relative[lam_idx-1]) # find the ratio for interpolation
                             q1=curve_js_scan[lam_idx-1]*(1-ratio)+curve_js_scan[lam_idx]*ratio # robot 1 joint angles
                             q_pos=curve_js_pos_scan[lam_idx-1]*(1-ratio)+curve_js_pos_scan[lam_idx]*ratio # positioner joint angles
+                            # for tool offset
+                            T_weld=robot_weld.fwd(q1)
+                            robot_weld.robot.p_tool = deepcopy(torch_tool_H_calib[:3,3])
+                            robot_weld.robot.R_tool = deepcopy(torch_tool_H_calib[:3,:3])
+                            q1=robot_weld.inv(T_weld.p, T_weld.R, last_joints=q1)[0]
+                            robot_weld.robot.p_tool = deepcopy(torch_tool_H_origin[:3,3])
+                            robot_weld.robot.R_tool = deepcopy(torch_tool_H_origin[:3,:3])
+                            q1=robot_weld.inv(T_weld.p, T_weld.R, last_joints=q1)[0]
+                            #
                             q_cmd=np.hstack((q1,r2_rest_q,q_pos)) # command joint angles (combined robot 1, robot 2 and positioner)
+                            q_command_all.append(q_cmd)
 
                             ### log data, line scanner (fujicam), robot welding joints
                             if fuji_scanon:
