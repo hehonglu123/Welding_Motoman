@@ -39,6 +39,8 @@ def main():
     robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',d=10,tool_file_path=config_dir+'torch_robot.csv',\
         pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',\
         base_marker_config_file=config_dir+'MA2010_marker_config/MA2010_marker_config.yaml',tool_marker_config_file=config_dir+'weldgun_marker_config/weldgun_marker_config.yaml')
+    robot_weld.robot.p_tool = np.array([-49.29784692 ,  2.8512889,  476.90722611])
+    robot_weld.p_tool = deepcopy(robot_weld.robot.p_tool)
     robot_scan=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path=config_dir+'fujicam.csv',\
         pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv')
     # get fujicam standoff distance

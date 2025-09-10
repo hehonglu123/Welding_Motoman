@@ -32,12 +32,12 @@ print("positioner",H)
 
 # np.savetxt('D500B_pose.csv',H,delimiter=',')
 
-x=-82.090
-y=-11.650
-z=570.509
-rx=-158.0699
-ry=-22.1900
-rz=-94.3059
+x=-80.951
+y=-9.151
+z=570.672
+rx=-158.1330
+ry=-22.2280
+rz=-94.2680
 
 R=Rz(np.radians(-rz))@Ry(np.radians(-ry))@Rx(np.radians(-rx))
 H=H_from_RT(R,[x,y,z])

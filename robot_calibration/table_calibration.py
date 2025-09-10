@@ -239,8 +239,8 @@ test_dataset_date='0801'
 robot_marker_dir=config_dir+'MA2010_marker_config/'
 tool_marker_dir=config_dir+'weldgun_marker_config/'
 robot_1=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',\
-                    tool_file_path=config_dir+'torch.csv',d=15,\
-                    #  tool_file_path='',d=0,\
+                    # tool_file_path=config_dir+'torch.csv',d=15,\
+                    d=10,tool_file_path=config_dir+'torch_robot.csv',\
                     pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',\
                     base_marker_config_file=robot_marker_dir+'MA2010_'+ph_dataset_date+'_marker_config.yaml',\
                     tool_marker_config_file=tool_marker_dir+'weldgun_'+ph_dataset_date+'_marker_config.yaml')
@@ -255,7 +255,19 @@ origin_R_tool = deepcopy(robot_1.R_tool)
 origin_P_R1 = deepcopy(robot_1.robot.P)
 origin_H_R1 = deepcopy(robot_1.robot.H)
 
-tool_calib_joints = np.radians(np.loadtxt('tool_joint_angles.csv',delimiter=','))
+tool_calib_joints = np.radians(np.loadtxt('joint_angles.csv',delimiter=','))
+
+###
+num_js = len(tool_calib_joints)
+robot_Ts=[]
+robot_ps = []
+for i in range(num_js):
+    q=tool_calib_joints[i][:6]
+    robot_T=robot_1.fwd(q)
+    robot_Ts.append(H_from_RT(robot_T.R,robot_T.p))
+    robot_ps.append(robot_T.p)
+print("Residual tool position before calibration:", get_residual_error(robot_ps))
+print("==============")
 
 robot_1.p_tool = np.zeros(3)
 robot_1.R_tool = np.eye(3)
@@ -270,8 +282,6 @@ for i in range(num_js):
     robot_T=robot_1.fwd(q)
     robot_Ts.append(H_from_RT(robot_T.R,robot_T.p))
     robot_ps.append(robot_T.p)
-# print("Residual tool position:", get_residual_error(robot_ps))
-# print("==============")
 
 A=[]
 b=[]
@@ -300,6 +310,11 @@ for i in range(num_js):
     robot_ps.append(robot_T.p)
     robot_Ts.append(H_from_RT(robot_T.R,robot_T.p))
 print("Residual tool position after calibration:", get_residual_error(robot_ps))
+
+print("Calibrated tool p:", p_tool)
+print("Original tool p:", origin_p_tool)
+
+exit()
 
 # load table joints
 table_calib_joints = np.radians(np.loadtxt('table_angles.csv',delimiter=','))
