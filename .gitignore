@@ -446,3 +446,8 @@ mocap/kinematic_raw_data/test0804_R2/error*
 robot_calibration/turntable_calibration*
 mocap/kinematic_raw_data/get_error.py
 mocap/kinematic_raw_data/test.m
+weld/streaming_fuji/weld_Seq_models/thermal_dh_test_err_table.csv
+weld/streaming_fuji/weld_Seq_models/thermal_dh_train_err_table.csv
+weld/streaming_fuji/weld_Seq_models/thermal_loss_table.csv
+weld/streaming_fuji/weld_Seq_models/thermal_width_test_err_table.csv
+weld/streaming_fuji/weld_Seq_models/thermal_width_train_err_table.csv

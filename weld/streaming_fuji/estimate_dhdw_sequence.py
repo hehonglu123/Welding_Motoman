@@ -490,8 +490,6 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Compare RNN weights from PyTorch models")
     parser.add_argument("--train", action='store_true', help="Train the model or not, default is False")
-    parser.add_argument("--load_pretrained", action='store_true', help="Load pre-trained model or not, default is False")
-    parser.add_argument("--load_model_dir", type=str, default='', help="Directory to load the model from")
     parser.add_argument("--all_data_testing", action='store_true', help="Use all data for testing or not, default is False")
     parser.add_argument("--model_type", type=str, default='WAAM_GRU', help="Model type: WAAM_GRU, WAAM_NN")
     parser.add_argument("--thermal_emb", type=int, default=64, help="Embedding size for thermal data, default is 64")
@@ -507,6 +505,9 @@ if __name__ == "__main__":
     parser.add_argument("--no_feat_thermal_x", action='store_true', help="Not use thermal x as input feature, default is False")
     parser.add_argument("--no_feat_thermal_y", action='store_true', help="Not use thermal y as input feature, default is False")
     parser.add_argument("--no_feat_neighbor_thermal", action='store_true', help="Not use neighbor thermal as input feature, default is False")
+    parser.add_argument("--load_pretrained", action='store_true', help="Load pre-trained model or not, default is False")
+    parser.add_argument("--load_model_dir", type=str, default='', help="Directory to load the model from")
+    parser.add_argument("--use_best_train", action='store_true', help="Use the best training model or best testing model, default is False (best testing model)")
     parse_arg = parser.parse_args()
 
     # load data
@@ -625,8 +626,6 @@ if __name__ == "__main__":
             with open(model_dir+'training_params.yaml', 'w') as f:
                 yaml.dump(training_params, f, default_flow_style=False)
 
-    save_loglog = False # set to True to save the log-log model parameters
-
     print("Training parameters:")
     print("Train flag:", train_flag)
     print("Model directory:", model_dir)
@@ -737,37 +736,6 @@ if __name__ == "__main__":
         model = WAAMNNModel(scalar_dim=len(data_index), use_thermal=feat_neighbor_thermal, thermal_emb=thermal_emb, scalar_emb=scalar_emb, nn_hidden=nn_hidden_size, nn_layers=nn_layers).to(device)
     print("Model trainable parameters:",count_parameters(model))
 
-    if 'GRU' in model_type:
-        scalars_seq, thermals_seq, lengths, *_ = example_batch
-
-        # choose a small but valid batch size for viz
-        n = min(2, scalars_seq.size(0))
-
-        # ensure CPU + correct dtypes/shapes
-        scalars_seq = scalars_seq[:n].cpu()
-        thermals_seq = thermals_seq[:n].cpu()
-        lengths     = lengths[:n].reshape(-1).to(torch.long).cpu()  # 1-D Long
-
-        model.eval().cpu()
-        with torch.inference_mode():
-            model_graph = draw_graph(
-                model,
-                input_data=(scalars_seq, thermals_seq, lengths),
-                device='cpu'
-            )
-    else:
-        scalars, thermals, *_ = example_batch
-        n = min(8, scalars.size(0))
-        scalars = scalars[:n].cpu()
-        thermals = thermals[:n].cpu()
-        model.eval().cpu()
-        with torch.inference_mode():
-            model_graph = draw_graph(model, input_data=(scalars, thermals), device='cpu')
-
-    model_graph.visual_graph
-
-    exit()
-
     if train_flag:
         if load_pretrained:
             pass
@@ -787,141 +755,15 @@ if __name__ == "__main__":
         np.savetxt(model_dir+'training_time.csv', np.array([end_time - start_time]), delimiter=',')
     else:
         # load the pre-trained model
-        model.load_state_dict(torch.load(model_dir+'best_model.pth',weights_only=True))
-
-        # test_u = np.zeros((1,1000,2))
-        # test_u = torch.tensor(test_u, dtype=torch.float32).to(device)
-        # test_x = np.ones((1,1000,2))*2 # 1 sample, 1000 time steps, model_input_size features
-        # test_x = torch.tensor(test_x, dtype=torch.float32).to(device)
-        # model.eval()
-        # with torch.no_grad():
-        #     test_y = model(test_x, test_u)
-        # test_y = test_y.cpu().numpy().astype(np.float64)
-        # plt.plot(test_y[0,:,0], label='dh prediction')
-        # plt.plot(test_y[0,:,1], label='dw prediction')
-        # plt.xlabel('Time Step', fontsize=xy_label_size)
-        # plt.ylabel('Prediction', fontsize=xy_label_size)
-        # plt.title('Model Prediction', fontsize=title_size)
-        # plt.legend(fontsize=legend_size)
-        # plt.show()
-
-        print("Loaded pre-trained model from: ", model_dir+'best_model.pth')
+        if not parse_arg.use_best_train:
+            model.load_state_dict(torch.load(model_dir+'best_model.pth',weights_only=True))
+            print("Loaded pre-trained model from: ", model_dir+'best_model.pth')
+        else:
+            model.load_state_dict(torch.load(model_dir+'best_train_model.pth',weights_only=True))
+            print("Loaded pre-trained model from: ", model_dir+'best_train_model.pth')
+        
         training_loss = np.loadtxt(model_dir+'training_loss.csv', delimiter=',')
         testing_loss = np.loadtxt(model_dir+'testing_loss.csv', delimiter=',')
-
-        # visualize the parameters
-        if viz_weightings and model_type == 'RNN':
-            open_loop_string = 'Open Loop' if open_loop else 'Closed Loop'
-            if open_loop:
-                Whh = model.rnn.weight_hh_l0.detach().cpu().numpy().astype(np.float64)
-                Wih = model.rnn.weight_ih_l0.detach().cpu().numpy().astype(np.float64)
-                bh = model.rnn.bias_hh_l0.detach().cpu().numpy().astype(np.float64)
-                bi = model.rnn.bias_ih_l0.detach().cpu().numpy().astype(np.float64)
-            else:
-                Whh = model.rnn_cell.weight_hh.detach().cpu().numpy().astype(np.float64)
-                Wih = model.rnn_cell.weight_ih.detach().cpu().numpy().astype(np.float64)
-                bh = model.rnn_cell.bias_hh.detach().cpu().numpy().astype(np.float64)
-                bi = model.rnn_cell.bias_ih.detach().cpu().numpy().astype(np.float64)
-            Woh = model.fc.weight.detach().cpu().numpy().astype(np.float64)
-            bo = model.fc.bias.detach().cpu().numpy().astype(np.float64)
-
-            print("Whh shape:", Whh.shape, "Wih shape:", Wih.shape, "bh shape:", bh.shape, "bi shape:", bi.shape)
-            print("Woh shape:", Woh.shape, "bo shape:", bo.shape)
-
-            # find the equilibrium point of the RNN
-
-            # find the matrix elimited the parameter redundancy
-            W_hh_min = Whh + Wih[:,-2:]@Woh
-
-            if not open_loop:
-                prediction,zt = model.forward_linear_mat(test_data_labels, test_data_input)
-                prediction_true = model(test_data_labels, test_data_input)
-
-                # make sure prediction and prediction_true are the same
-                assert np.allclose(prediction.detach().cpu().numpy(), prediction_true.detach().cpu().numpy()), "Prediction and prediction_true are not the same!"
-
-                zt_flatten = zt.view(-1).detach().cpu().numpy()
-                zt_tanh_derivative = 1 - np.tanh(zt_flatten)**2
-                # plot zt_tanh_derivative distribution
-                plt.figure(figsize=(10, 5))
-                plt.hist(zt_tanh_derivative, bins=100, density=True, alpha=0.7, color='blue')
-                plt.title('Distribution of $z_t$ Tanh Derivative', fontsize=title_size)
-                plt.xlabel('$z_t$ Tanh Derivative', fontsize=xy_label_size)
-                plt.ylabel('Density', fontsize=xy_label_size)
-                plt.xticks(fontsize=xy_tick_size)
-                plt.yticks(fontsize=xy_tick_size)
-                plt.grid()
-                plt.tight_layout()
-                plt.show()
-
-            # plot Whh and Wih
-            plt.figure(figsize=(12, 6))
-            plt.subplot(1, 4, 1)
-            plt.imshow(Whh, cmap='viridis', aspect='equal')
-            plt.colorbar()
-            plt.title(f'RNN $W_{{hh}}$ Matrix', fontsize=title_size)
-            plt.xlabel('Hidden Units', fontsize=xy_label_size)
-            plt.ylabel('Hidden Units', fontsize=xy_label_size)
-            plt.xticks(fontsize=xy_tick_size)
-            plt.yticks(fontsize=xy_tick_size)
-            plt.subplot(1, 4, 2)
-            plt.imshow(Wih, cmap='viridis', aspect='equal')
-            plt.colorbar()
-            plt.title(f'RNN $W_{{ih}}$ Matrix', fontsize=title_size)
-            plt.xlabel('Input Features', fontsize=xy_label_size)
-            plt.ylabel('Hidden Units', fontsize=xy_label_size)
-            plt.xticks(fontsize=xy_tick_size)
-            plt.yticks(fontsize=xy_tick_size)
-            plt.suptitle(f'RNN Weight Matrices {open_loop_string}', fontsize=sup_title_size)
-            plt.subplot(1, 4, 3)
-            plt.imshow(W_hh_min, cmap='viridis', aspect='equal')
-            plt.colorbar()
-            plt.title(f'RNN $W_{{hh,min}}$ Matrix', fontsize=title_size)
-            plt.xlabel('Hidden Units', fontsize=xy_label_size)
-            plt.ylabel('Hidden Units', fontsize=xy_label_size)
-            plt.xticks(fontsize=xy_tick_size)
-            plt.yticks(fontsize=xy_tick_size)
-            # plt.subplot(1, 4, 3)
-            # plt.imshow(bh.reshape(-1, 1), cmap='viridis', aspect='equal')
-            # plt.colorbar()
-            # plt.title(f'RNN $b_{{h}}$ Vector', fontsize=title_size)
-            # plt.xlabel('Hidden Units', fontsize=xy_label_size)
-            # plt.ylabel('Bias', fontsize=xy_label_size)
-            # plt.xticks(fontsize=xy_tick_size)
-            # plt.yticks(fontsize=xy_tick_size)
-            # plt.subplot(1, 4, 4)
-            # plt.imshow(bi.reshape(-1, 1), cmap='viridis', aspect='equal')
-            # plt.colorbar()
-            # plt.title(f'RNN $b_{{i}}$ Vector', fontsize=title_size)
-            # plt.xlabel('Input Features', fontsize=xy_label_size)
-            # plt.ylabel('Bias', fontsize=xy_label_size)
-            # plt.xticks(fontsize=xy_tick_size)
-            # plt.yticks(fontsize=xy_tick_size)
-            plt.tight_layout()
-            plt.show()
-
-            # eigenvalue decomposition
-            eigenvalues, eigenvectors = np.linalg.eig(Whh)
-            plt.plot(np.sort(np.abs(eigenvalues))[::-1], 'o')
-            plt.title(f'Eigenvalues of RNN $W_{{hh}}$ Matrix ({open_loop_string})', fontsize=title_size)
-            plt.xlabel('Index', fontsize=xy_label_size)
-            plt.ylabel('Eigenvalue Magnitude', fontsize=xy_label_size)
-            plt.xticks(fontsize=xy_tick_size)
-            plt.yticks(fontsize=xy_tick_size)
-            plt.grid()
-            plt.tight_layout()
-            plt.show()
-
-            eigenvalues, eigenvectors = np.linalg.eig(W_hh_min)
-            plt.plot(np.sort(np.abs(eigenvalues))[::-1], 'o')
-            plt.title(f'Eigenvalues of RNN $W_{{hh}}$ Matrix ({open_loop_string})', fontsize=title_size)
-            plt.xlabel('Index', fontsize=xy_label_size)
-            plt.ylabel('Eigenvalue Magnitude', fontsize=xy_label_size)
-            plt.xticks(fontsize=xy_tick_size)
-            plt.yticks(fontsize=xy_tick_size)
-            plt.grid()
-            plt.tight_layout()
-            plt.show()
 
     # plot training and testing loss
     plt.figure(figsize=(10, 5))
