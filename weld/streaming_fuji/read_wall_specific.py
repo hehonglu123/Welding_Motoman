@@ -88,7 +88,7 @@ tip_wire_model = YOLO(os.path.dirname(inspect.getfile(flir_toolbox))+"/tip_wire.
 def main():
 
     test_current = False
-    test_thermal = True
+    test_thermal = False
     test_thermal_collected = False
     test_pcd = False
     test_geometry = False
@@ -97,6 +97,7 @@ def main():
     test_loglog = False
     test_read_thermal = False
     reverse_thermal_pixel_trace = False
+    viz_line_scan = True
 
     ############## Robot definition ##############
     config_dir='../../config/'
@@ -126,6 +127,15 @@ def main():
     rob_js_exe = np.loadtxt(this_layer_dir+'weld_js_exe.csv',delimiter=',')
     rob2_js_exe = rob_js_exe[:,7:13] # robot 2 js exe
     robot_stamps = rob_js_exe[:,0] # robot stamps
+    try:
+        fujicam_tool_H = np.loadtxt(logdata_dir+'fujicam.csv',delimiter=',')
+    except FileNotFoundError:
+        fujicam_tool_H = np.loadtxt(config_dir+'fujicam_0905.csv',delimiter=',')
+        np.savetxt(logdata_dir+'fujicam.csv', fujicam_tool_H, delimiter=',')
+    robot_scan.robot.p_tool = fujicam_tool_H[:3,3]
+    robot_scan.robot.R_tool = fujicam_tool_H[:3,:3]
+    robot_scan.p_tool = deepcopy(robot_scan.robot.p_tool)
+    robot_scan.R_tool = deepcopy(robot_scan.robot.R_tool)
 
     ###### viz current #####
     if test_current:
@@ -1240,6 +1250,74 @@ def main():
                         thermal_pixel_trace_stamp_key[stamp]['value'] = this_thermal_value[x_sort_id]
                     with open(this_layer_dir+'thermal_pixel_trace_stamp_key.pickle', 'wb') as f:
                         pickle.dump(thermal_pixel_trace_stamp_key, f)
+
+    ###### visualize line scan #####
+    if viz_line_scan:
+        with open(this_layer_dir+'scan_exe_noise_remove.pickle', 'rb') as f:
+            scan_exe_noise_remove = pickle.load(f)
+        rob_js_exe = np.loadtxt(this_layer_dir+'weld_js_exe.csv',delimiter=',')
+
+        windows_x = 0.1 # mm
+
+        pcd = o3d.io.read_point_cloud(this_layer_dir+'pcd.pcd')
+        profile_welding = np.loadtxt(this_layer_dir+'profile_welding.csv',delimiter=',',skiprows=1)
+        min_height = np.min(profile_welding[:,4])
+        max_height = np.max(profile_welding[:,4])
+        med_height = np.mean([min_height, max_height])
+        mean_width = np.mean(profile_welding[:,7])
+        curve_y = np.mean(curve[:,1])
+        ## get shift x
+        baselayer1_profile_height = np.loadtxt(logdata_dir+'baselayer1/profile_height.csv',delimiter=',')
+        shift_x = get_weld_shift_x(baselayer1_profile_height)
+        ## get base transform
+        scan_process = ScanProcess(robot_scan,positioner)
+        pcd_base = o3d.io.read_point_cloud(logdata_dir+'baselayer0/pcd.pcd')
+        crop_h_min = (-55,-1e5,-5)
+        crop_h_max = (55,1e5,20)
+        _,Transz0_H = scan_process.pcd2height(deepcopy(pcd_base),-5,bbox_min=crop_h_min,bbox_max=crop_h_max,Transz0_H=None,return_width=False)
+        # transform
+        pcd.transform(Transz0_H)
+
+        # for weld_id, x_wp in enumerate(profile_welding[:,1]):
+        scan_total_len = len(scan_exe_noise_remove)
+        for weld_js, scan in zip(rob_js_exe[scan_total_len//2:], scan_exe_noise_remove[scan_total_len//2:]):
+            robt_T = robot_scan.fwd(weld_js[1:7],world=True) # T_world^r2tool
+            T_origin = positioner.fwd(weld_js[-2:],world=True).inv() # T_tabletool^world
+            T_rob_positioner_top = T_origin*robt_T
+            scan_points=deepcopy(scan.T)
+            scan_points = np.insert(scan_points,0,np.zeros(len(scan_points[0])),axis=0)
+            scan_points = scan_points.T
+            ## get the points closed to origin
+            scan_points = np.transpose(np.matmul(T_rob_positioner_top.R,np.transpose(scan_points)))+T_rob_positioner_top.p
+            pcd_scan = o3d.geometry.PointCloud()
+            pcd_scan.points=o3d.utility.Vector3dVector(scan_points)
+            pcd_scan.transform(Transz0_H)
+
+            # min_bound = (x_wp-windows_x/2-shift_x,-1e5,-1e5)
+            # max_bound = (x_wp+windows_x/2-shift_x,1e5,1e5)
+            # bbox = o3d.geometry.AxisAlignedBoundingBox(min_bound=min_bound,max_bound=max_bound)
+            # welds_points_x = pcd.crop(bbox)
+            # welds_points_x = np.asarray(welds_points_x.points)
+
+            # sort in y direction
+            pcd_scan_points = np.asarray(pcd_scan.points)
+            pcd_height_id_sort = np.argsort(pcd_scan_points[:,2])
+            pcd_scan_points_high_points = pcd_scan_points[pcd_height_id_sort[-10:]]
+            x_wp = np.mean(pcd_scan_points_high_points[:,0])+shift_x
+
+            if x_wp < -55 or x_wp > 55:
+                continue
+            
+            plt.clf()
+            plt.plot(pcd_scan_points[:,1], pcd_scan_points[:,2], 'o')
+            plt.xlabel('Y Position (mm)')
+            plt.ylabel('Z Position (mm)')
+            plt.xlim(47.5, 55.5)
+            plt.ylim(med_height-4, med_height+4)
+            weld_id = np.argmin(np.abs(profile_welding[:,1]-x_wp))
+            plt.title('Cross Section at X: {:.2f} mm, cmd V: {:.2f} mm, cmd FR: {:.2f} mm'.format(x_wp, profile_welding[weld_id, 2], profile_welding[weld_id, 3]))
+            plt.grid()
+            plt.pause(0.001)
 
 if __name__ == "__main__":
     
