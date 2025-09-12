@@ -1278,6 +1278,15 @@ def main():
         # transform
         pcd.transform(Transz0_H)
 
+        plt.xlabel('Y Position (mm)')
+        plt.ylabel('Z Position (mm)')
+        plt.xlim(47.5, 55.5)
+        plt.ylim(med_height-4, med_height+4)
+        plt.title('Cross Section at X: {:.2f} mm, cmd V: {:.2f} mm, cmd FR: {:.2f} mm'.format(0.0, 0.0, 0.0))
+        plt.grid()
+        plt.pause(0.001)
+        input("Press Enter to start visualization...")
+
         # for weld_id, x_wp in enumerate(profile_welding[:,1]):
         scan_total_len = len(scan_exe_noise_remove)
         for weld_js, scan in zip(rob_js_exe[scan_total_len//2:], scan_exe_noise_remove[scan_total_len//2:]):
@@ -1310,9 +1319,10 @@ def main():
             
             plt.clf()
             plt.plot(pcd_scan_points[:,1], pcd_scan_points[:,2], 'o')
+            mean_x = np.mean(pcd_scan_points[:,1])
             plt.xlabel('Y Position (mm)')
             plt.ylabel('Z Position (mm)')
-            plt.xlim(47.5, 55.5)
+            plt.xlim(mean_x-4, mean_x+4)
             plt.ylim(med_height-4, med_height+4)
             weld_id = np.argmin(np.abs(profile_welding[:,1]-x_wp))
             plt.title('Cross Section at X: {:.2f} mm, cmd V: {:.2f} mm, cmd FR: {:.2f} mm'.format(x_wp, profile_welding[weld_id, 2], profile_welding[weld_id, 3]))
