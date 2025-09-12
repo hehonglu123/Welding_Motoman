@@ -89,6 +89,7 @@ class TimeStepDataset(Dataset):
     def __init__(self, layers_dir: List[str], sample_rate: int = 10, data_index: list = [1,2,3,6,8,9], label_index: list = [4,5]):
         super().__init__()
         self.layers_dir = layers_dir
+        print()
         self.sample_rate = sample_rate
         self.data_index = data_index
         self.label_index = label_index
@@ -486,6 +487,84 @@ def train_RNN(train_dataloader: DataLoader, test_dataloader: DataLoader, model: 
 
     return model, training_losses, testing_losses
 
+def test_static(train_dataloader: DataLoader, test_dataloader: DataLoader, model: nn.Module):
+
+    model.to(device)
+    model.eval()
+
+    # loss function
+    loss_fn = nn.MSELoss()
+
+    for dataloader, dataset in [(train_dataloader, "train"), (test_dataloader, "test")]:
+        # testing
+        total_loss = 0.0
+        n_batches = 0
+        error_dhdw_test = []
+        max_dh_error_layer = []
+        max_dw_error_layer = []
+        for scalars, thermal, target in dataloader:
+            scalars = scalars.to(device)
+            thermal = thermal.to(device)
+            target  = target.to(device)
+            pred = model(scalars, thermal)
+            loss = loss_fn(pred, target)
+            total_loss += loss.item()
+            n_batches += 1
+            pred_error = (pred.detach().cpu().numpy() - target.detach().cpu().numpy())
+            error_dhdw_test.extend(pred_error.tolist())
+        test_loss = total_loss / n_batches
+
+        # Compute error statistics
+        error_dhdw_test_abs = np.abs(error_dhdw_test)
+        dh_error_mean = np.mean(error_dhdw_test_abs[:,0])
+        dh_error_std = np.std(error_dhdw_test_abs[:,0])
+        dh_error_95 = stats.expon(scale=np.std(np.abs(error_dhdw_test_abs[:,0]))).interval(0.95)[1]
+        dh_error_max = np.max(error_dhdw_test_abs[:,0])
+        dw_error_mean = np.mean(error_dhdw_test_abs[:,1])
+        dw_error_std = np.std(error_dhdw_test_abs[:,1])
+        dw_error_95 = stats.expon(scale=np.std(np.abs(error_dhdw_test_abs[:,1]))).interval(0.95)[1]
+        dw_error_max = np.max(error_dhdw_test_abs[:,1])
+
+        print(dataset+" dh error: mean {:.4f}, std {:.4f}, 95% {:.4f}, max {:.4f}".format(dh_error_mean, dh_error_std, dh_error_95, dh_error_max))
+        print(dataset+" dw error: mean {:.4f}, std {:.4f}, 95% {:.4f}, max {:.4f}".format(dw_error_mean, dw_error_std, dw_error_95, dw_error_max))
+
+def test_RNN(train_dataloader: DataLoader, test_dataloader: DataLoader, model: nn.Module):
+
+    model.to(device)
+    model.eval()
+
+    for dataloader, dataset in [(train_dataloader, "train"), (test_dataloader, "test")]:
+        # testing
+        total_loss = 0.0
+        n_batches = 0
+        error_dhdw_test = []
+        for scalars, thermal, target, lengths in dataloader:
+            scalars = scalars.to(device)
+            thermal = thermal.to(device)
+            target  = target.to(device)
+            lengths = lengths.to(device)
+            pred = model(scalars, thermal, lengths)
+            loss = masked_mse_loss(pred, target, lengths)
+            total_loss += loss.item()
+            n_batches += 1
+            error_dhdw_test.extend(masked_error(pred, target, lengths))
+        test_loss = total_loss / n_batches
+        print(dataset+f" Loss: {test_loss:.4f}")
+
+        # Compute error statistics
+        error_dhdw_test_abs = np.abs(error_dhdw_test)
+        dh_error_mean = np.mean(error_dhdw_test_abs[:,0])
+        dh_error_std = np.std(error_dhdw_test_abs[:,0])
+        dh_error_95 = stats.expon(scale=np.std(np.abs(error_dhdw_test_abs[:,0]))).interval(0.95)[1]
+        dh_error_max = np.max(error_dhdw_test_abs[:,0])
+        dw_error_mean = np.mean(error_dhdw_test_abs[:,1])
+        dw_error_std = np.std(error_dhdw_test_abs[:,1])
+        dw_error_95 = stats.expon(scale=np.std(np.abs(error_dhdw_test_abs[:,1]))).interval(0.95)[1]
+        dw_error_max = np.max(error_dhdw_test_abs[:,1])
+
+        print(dataset+" dh error: mean {:.4f}, std {:.4f}, 95% {:.4f}, max {:.4f}".format(dh_error_mean, dh_error_std, dh_error_95, dh_error_max))
+        print(dataset+" dw error: mean {:.4f}, std {:.4f}, 95% {:.4f}, max {:.4f}".format(dw_error_mean, dw_error_std, dw_error_95, dw_error_max))
+
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Compare RNN weights from PyTorch models")
@@ -606,8 +685,12 @@ if __name__ == "__main__":
         feat_thermal_y = training_params['feat_thermal_y']
         feat_neighbor_thermal = training_params['feat_neighbor_thermal']
         innovation = training_params['innovation']
-        rnn_hidden_size = training_params['rnn_hidden_size']
-        rnn_layers = training_params['rnn_layers']
+        if 'GRU' in model_type:
+            rnn_hidden_size = training_params['rnn_hidden_size']
+            rnn_layers = training_params['rnn_layers']
+        else:
+            nn_hidden_size = training_params['nn_hidden_size']
+            nn_layers = training_params['nn_layers']
         thermal_emb = training_params['thermal_emb']
         scalar_emb = training_params['scalar_emb']
         model_output_size = training_params['model_output_size']
@@ -718,17 +801,24 @@ if __name__ == "__main__":
     if 'GRU' in model_type:
         train_ds = LayerSequenceDataset(train_data_dir_tote, sample_rate=sample_rate, data_index=data_index, label_index=[4,5])
         test_ds = LayerSequenceDataset(test_data_dir_tote, sample_rate=sample_rate, data_index=data_index, label_index=[4,5])
-        train_dataloader = DataLoader(train_ds, batch_size=4, shuffle=True, collate_fn=pad_sequences_and_make_mask)
-        test_dataloader = DataLoader(test_ds, batch_size=len(test_ds), shuffle=False, collate_fn=pad_sequences_and_make_mask)
-        batch_size = 4
+        if train_flag:
+            train_dataloader = DataLoader(train_ds, batch_size=4, shuffle=True, collate_fn=pad_sequences_and_make_mask)
+            test_dataloader = DataLoader(test_ds, batch_size=len(test_ds), shuffle=False, collate_fn=pad_sequences_and_make_mask)
+        else:
+            train_dataloader = DataLoader(train_ds, batch_size=1, shuffle=False, collate_fn=pad_sequences_and_make_mask)
+            test_dataloader = DataLoader(test_ds, batch_size=1, shuffle=False, collate_fn=pad_sequences_and_make_mask)
     else:
         train_ds = TimeStepDataset(train_data_dir_tote, sample_rate=sample_rate, data_index=data_index, label_index=[4,5])
         test_ds = TimeStepDataset(test_data_dir_tote, sample_rate=sample_rate, data_index=data_index, label_index=[4,5])
-        train_dataloader = DataLoader(train_ds, batch_size=len(train_ds), shuffle=True, collate_fn=collate_timesteps)
-        test_dataloader = DataLoader(test_ds, batch_size=len(test_ds), shuffle=False, collate_fn=collate_timesteps)
-        batch_size = len(train_ds)
-    example_batch = next(iter(train_dataloader))
-    data_input_size = example_batch[0].shape
+        if train_flag:
+            train_dataloader = DataLoader(train_ds, batch_size=len(train_ds), shuffle=True, collate_fn=collate_timesteps)
+            test_dataloader = DataLoader(test_ds, batch_size=len(test_ds), shuffle=False, collate_fn=collate_timesteps)
+        else:
+            train_dataloader = DataLoader(train_ds, batch_size=1, shuffle=False, collate_fn=collate_timesteps)
+            test_dataloader = DataLoader(test_ds, batch_size=len(test_ds), shuffle=False, collate_fn=collate_timesteps)
+    
+    print("Train dataset length:", len(train_ds))
+    print("Test dataset length:", len(test_ds))
 
     if 'GRU' in model_type:
         model = WAAMGRUModel(scalar_dim=len(data_index), use_thermal=feat_neighbor_thermal, thermal_emb=thermal_emb, scalar_emb=scalar_emb, rnn_hidden=rnn_hidden_size, rnn_layers=rnn_layers).to(device)
@@ -759,8 +849,12 @@ if __name__ == "__main__":
             model.load_state_dict(torch.load(model_dir+'best_model.pth',weights_only=True))
             print("Loaded pre-trained model from: ", model_dir+'best_model.pth')
         else:
-            model.load_state_dict(torch.load(model_dir+'best_train_model.pth',weights_only=True))
-            print("Loaded pre-trained model from: ", model_dir+'best_train_model.pth')
+            model.load_state_dict(torch.load(model_dir+'best_training_model.pth',weights_only=True))
+            print("Loaded pre-trained model from: ", model_dir+'best_training_model.pth')
+        if 'GRU' in model_type:
+            test_RNN(train_dataloader, test_dataloader, model)
+        else:
+            test_static(train_dataloader, test_dataloader, model)
         
         training_loss = np.loadtxt(model_dir+'training_loss.csv', delimiter=',')
         testing_loss = np.loadtxt(model_dir+'testing_loss.csv', delimiter=',')

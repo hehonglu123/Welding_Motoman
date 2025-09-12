@@ -54,6 +54,7 @@ for model_dir in model_dirs:
 
     min_training_loss_epoch = np.argmin(training_loss)
     min_testing_loss_epoch = np.argmin(testing_loss)
+    results[model_type][feat_set]['model_dir'] = model_dir
     results[model_type][feat_set]['training'] = {}
     results[model_type][feat_set]['testing'] = {}
     for dim_i, dim in enumerate(['dh','width']):
@@ -84,18 +85,21 @@ dh_train_err_table_str = "|      | Control Only | Control + spatial | Control + 
 dh_test_err_table_str = "|      | Control Only | Control + spatial | Control + spatial + thermal |\n"
 width_train_err_table_str = "|      | Control Only | Control + spatial | Control + spatial + thermal |\n"
 width_test_err_table_str = "|      | Control Only | Control + spatial | Control + spatial + thermal |\n"
+model_dir_table_str = "|      | Control Only | Control + spatial | Control + spatial + thermal |\n"
 for model_type, feat_sets in results.items():
     loss_table_str += f"| {model_type} |"
     dh_train_err_table_str += f"| {model_type} |"
     dh_test_err_table_str += f"| {model_type} |"
     width_train_err_table_str += f"| {model_type} |"
     width_test_err_table_str += f"| {model_type} |"
+    model_dir_table_str += f"| {model_type} |"
     for feat_set, metrics in feat_sets.items():
         print(model_type, feat_set, metrics)
         try:
             training_loss = metrics['training']['Loss']
             testing_loss = metrics['testing']['Loss']
             loss_table_str += f" {training_loss:.4f} / {testing_loss:.4f} |"
+            model_dir_table_str += f" {metrics['model_dir']} |"
             for dim in ['dh', 'width']:
                 mean_train = metrics['training'][dim]['mean'] if 'mean' in metrics['training'][dim] else 0
                 p95_train = metrics['training'][dim]['95%'] if '95%' in metrics['training'][dim] else 0
@@ -111,12 +115,14 @@ for model_type, feat_sets in results.items():
                     width_test_err_table_str += f" ({mean_test:.4f}/ {p95_test:.4f}/ {max_test:.4f}) |" if mean_test!=0 else " (N/A/ N/A/ N/A) |"
         except KeyError:
             loss_table_str += " N/A |"
+            model_dir_table_str += " N/A |"
             dh_train_err_table_str += " (N/A/ N/A/ N/A) |"
             dh_test_err_table_str += " (N/A/ N/A/ N/A) |"
             width_train_err_table_str += " (N/A/ N/A/ N/A) |"
             width_test_err_table_str += " (N/A/ N/A/ N/A) |"
 
     loss_table_str += "\n"
+    model_dir_table_str += "\n"
     dh_train_err_table_str += "\n"
     dh_test_err_table_str += "\n"
     width_train_err_table_str += "\n"
@@ -131,6 +137,8 @@ print("Width Training Error (mean, 95%, Max):")
 print(width_train_err_table_str)
 print("Width Testing Error (mean, 95%, Max):")
 print(width_test_err_table_str)
+print("Model Directory:")
+print(model_dir_table_str)
 
 # save each table to a csv file can be opened in excel
 with open("thermal_loss_table.csv", 'w') as f:

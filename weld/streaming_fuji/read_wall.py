@@ -135,6 +135,16 @@ def main():
             scanner_lagging= True
         
         logdata_dir = data_dir+logdata_dir_name
+
+        try:
+            fujicam_tool_H = np.loadtxt(logdata_dir+'fujicam.csv',delimiter=',')
+        except FileNotFoundError:
+            fujicam_tool_H = np.loadtxt(logdata_dir+'fujicam_0905.csv',delimiter=',')
+            np.savetxt(logdata_dir+'fujicam.csv', fujicam_tool_H, delimiter=',')
+        robot_scan.robot.p_tool = fujicam_tool_H[:3,3]
+        robot_scan.robot.R_tool = fujicam_tool_H[:3,:3]
+        robot_scan.p_tool = deepcopy(robot_scan.robot.p_tool)
+        robot_scan.R_tool = deepcopy(robot_scan.robot.R_tool)
         
         with open(logdata_dir+'weld_meta_data.yml', 'r') as f:
             meta_data = yaml.safe_load(f)
@@ -484,9 +494,9 @@ def main():
                         # plt.show()
 
                         # save thermal readings
-                        # thermal_reading = np.vstack((thermal_stamp,thermal_reading)).T
-                        # thermal_reading = np.hstack((thermal_reading,thermal_centroid))
-                        # np.savetxt(this_layer_dir+'thermal.csv',thermal_reading,delimiter=',')
+                        thermal_reading = np.vstack((thermal_stamp,thermal_reading)).T
+                        thermal_reading = np.hstack((thermal_reading,thermal_centroid))
+                        np.savetxt(this_layer_dir+'thermal.csv',thermal_reading,delimiter=',')
 
                         # save thermal pixel trace
                         trace_dict = {}

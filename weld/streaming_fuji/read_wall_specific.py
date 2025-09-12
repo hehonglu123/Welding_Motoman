@@ -113,12 +113,12 @@ def main():
     
     ############## choose data directory ##############
     data_dir = '../../data/wall_weld_test/'
-    logdata_dir_name = 'weld_fujiscan_2025_06_12_15_33_03/'
+    logdata_dir_name = 'weld_fujicontrol_2025_08_13_14_17_58/'
     logdata_dir = data_dir+logdata_dir_name
 
     ##### layer, basic infos ####
-    last_layer_n = 293
-    layer_n = 311
+    last_layer_n = 30
+    layer_n = 49
     layer_name = 'layer'+str(layer_n)
     last_layer_name = 'layer'+str(last_layer_n)
     this_layer_dir = logdata_dir+layer_name+'/'
@@ -1280,7 +1280,7 @@ def main():
 
         plt.xlabel('Y Position (mm)')
         plt.ylabel('Z Position (mm)')
-        plt.xlim(47.5, 55.5)
+        # plt.xlim(47.5, 55.5)
         plt.ylim(med_height-4, med_height+4)
         plt.title('Cross Section at X: {:.2f} mm, cmd V: {:.2f} mm, cmd FR: {:.2f} mm'.format(0.0, 0.0, 0.0))
         plt.grid()
@@ -1319,10 +1319,11 @@ def main():
             
             plt.clf()
             plt.plot(pcd_scan_points[:,1], pcd_scan_points[:,2], 'o')
-            mean_x = np.mean(pcd_scan_points[:,1])
+            # pcd_scan_points = pcd_scan_points[(pcd_scan_points[:,2] >= med_height-4) & (pcd_scan_points[:,2] <= med_height+4)]
+            # mean_x = np.mean(pcd_scan_points[:,1])
             plt.xlabel('Y Position (mm)')
             plt.ylabel('Z Position (mm)')
-            plt.xlim(mean_x-4, mean_x+4)
+            plt.xlim(33.5, 41.5)
             plt.ylim(med_height-4, med_height+4)
             weld_id = np.argmin(np.abs(profile_welding[:,1]-x_wp))
             plt.title('Cross Section at X: {:.2f} mm, cmd V: {:.2f} mm, cmd FR: {:.2f} mm'.format(x_wp, profile_welding[weld_id, 2], profile_welding[weld_id, 3]))
