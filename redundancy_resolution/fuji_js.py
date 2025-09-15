@@ -6,6 +6,10 @@ from matplotlib import pyplot as plt
 from motoman_def import *
 from redundancy_resolution_dual import *
 from redundancy_resolution import *
+import open3d as o3d
+sys.path.append('../scan/scan_process/')
+sys.path.append('../scan/scan_tools/')
+from scan_utils import *
 
 def get_scanner_ori(Rz_vec, Rx_vec):
     Rz_vec = Rz_vec/np.linalg.norm(Rz_vec)
@@ -81,16 +85,51 @@ def main():
 
     ## always plan for lagging
     ## then plan for both forward and backward
-
     data_dir = '../data/wall_weld_test/'
+    # data_dir = '../data/casing_scaled/'
+
     ## read curve data meta data
     with open(data_dir+'sliced_meta.yml', 'r') as f:
         meta_data = yaml.safe_load(f)
+
+    #### visualize the path in 3D with equal aspect ratio ####
+    # pcd = o3d.geometry.PointCloud()
+    # curve_points = []
+    # points_per_layer = []
+    # for layer_n in range(meta_data['layer_num']):
+    #     if layer_n%10!=0:
+    #         continue
+    #     print("Reading layer:", layer_n,flush=True)
+    #     curve = np.loadtxt(data_dir+f'curve_sliced_relative/slice{layer_n}_0.csv',delimiter=',')
+    #     curve_points.extend(curve[:,:3])
+    #     points_per_layer.append(len(curve))
+
+    #     # if layer_n>=1169:
+    #     #     print("layer:", layer_n)
+    #     #     plt.plot(curve[:,0],curve[:,1], '-o')
+    #     #     plt.axis('equal')
+    #     #     plt.show()
+    # points_per_layer = np.cumsum(points_per_layer)
+    # pcd.points = o3d.utility.Vector3dVector(np.array(curve_points))
+    # path_dl_all = np.linalg.norm(np.diff(np.array(curve_points),axis=0),axis=1)
+    # print("Path dl:", np.mean(path_dl_all), "std:", np.std(path_dl_all), "min:", np.min(path_dl_all), "max:", np.max(path_dl_all))
+    # # find the max path dl points
+    # max_dl_index = np.argmax(path_dl_all)
+    # layer_max_dl = np.where(points_per_layer > max_dl_index)[0][0]
+    # print("max dl index:", max_dl_index, "max dl:", path_dl_all[max_dl_index], "at layer:", layer_max_dl, "index:", max_dl_index-points_per_layer[layer_max_dl-1])
+    # visualize_pcd([pcd])
+    # # find the point with max z
+    # curve_points = np.array(curve_points)
+    # max_z_index = np.argmax(curve_points[:,2])
+    # print("max z index:", max_z_index, "max z p:", curve_points[max_z_index])
+    # exit()
+    
+    ## get the index (distance) where the scanner is on the layer
     path_dl = meta_data['path_dl']
     dist_weld_scan_index = np.round(dist_weld_scan/path_dl).astype(int)
     print(f'dist_weld_scan_index: {dist_weld_scan_index}, dist_weld_scan: {dist_weld_scan}')
 
-    exit()
+    # exit()
 
     layers_name = ['baselayer','layer']
     # layers_name = ['layer']
@@ -149,9 +188,9 @@ def main():
                 orientation_start = get_torch_scanner_ori(curve[dist_weld_scan_index,3:], layer_weld_scan_vec, rotate_y_direction)
                 if cases == 'forward':
                     # positioner_j2_start = np.degrees(-1*(np.radians(180)-np.arctan2(curve[dist_weld_scan_index,1],curve[dist_weld_scan_index,0])))
-                    positioner_j2_start = 90
-                else:
                     positioner_j2_start = -90
+                else:
+                    positioner_j2_start = 90
                 ## solve ik when the scanner is NOT on the layer yet
                 curve_part = deepcopy(curve[:dist_weld_scan_index+1])
                 curve_part = curve_part[::-1]
@@ -189,7 +228,8 @@ def main():
                 T_positioner = positioner.fwd(positioner_js[-1],world=True)
                 T_robot_positioner = T_positioner.inv()*T_robot
                 curve_R_start = T_robot_positioner.R # starting scanner orientation in the positioner tip frame
-                if cases == 'forward':
+                # if cases == 'forward':
+                if cases == 'backward':
                     curve_R_final = np.array([[-1,0,0],\
                                             [0,-1,0],\
                                             [0,0,1]]) # target ending scanner orientation in the positioner tip frame

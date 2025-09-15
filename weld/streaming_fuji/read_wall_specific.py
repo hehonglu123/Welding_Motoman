@@ -113,12 +113,12 @@ def main():
     
     ############## choose data directory ##############
     data_dir = '../../data/wall_weld_test/'
-    logdata_dir_name = 'weld_fujicontrol_2025_08_13_14_17_58/'
+    logdata_dir_name = 'weld_fujicontrol_2025_08_14_12_04_14/'
     logdata_dir = data_dir+logdata_dir_name
 
     ##### layer, basic infos ####
-    last_layer_n = 30
-    layer_n = 49
+    last_layer_n = 46
+    layer_n = 65
     layer_name = 'layer'+str(layer_n)
     last_layer_name = 'layer'+str(last_layer_n)
     this_layer_dir = logdata_dir+layer_name+'/'
@@ -1289,7 +1289,8 @@ def main():
 
         # for weld_id, x_wp in enumerate(profile_welding[:,1]):
         scan_total_len = len(scan_exe_noise_remove)
-        for weld_js, scan in zip(rob_js_exe[scan_total_len//2:], scan_exe_noise_remove[scan_total_len//2:]):
+        mean_x = None
+        for scan_i, (weld_js, scan) in enumerate(zip(rob_js_exe[0:], scan_exe_noise_remove[0:])):
             robt_T = robot_scan.fwd(weld_js[1:7],world=True) # T_world^r2tool
             T_origin = positioner.fwd(weld_js[-2:],world=True).inv() # T_tabletool^world
             T_rob_positioner_top = T_origin*robt_T
@@ -1319,11 +1320,12 @@ def main():
             
             plt.clf()
             plt.plot(pcd_scan_points[:,1], pcd_scan_points[:,2], 'o')
-            # pcd_scan_points = pcd_scan_points[(pcd_scan_points[:,2] >= med_height-4) & (pcd_scan_points[:,2] <= med_height+4)]
-            # mean_x = np.mean(pcd_scan_points[:,1])
             plt.xlabel('Y Position (mm)')
             plt.ylabel('Z Position (mm)')
-            plt.xlim(33.5, 41.5)
+            if mean_x is None:
+                pcd_scan_points = pcd_scan_points[(pcd_scan_points[:,2] >= med_height-4) & (pcd_scan_points[:,2] <= med_height+4)]
+                mean_x = np.mean(pcd_scan_points[:,1])
+            plt.xlim(mean_x-4, mean_x+4)
             plt.ylim(med_height-4, med_height+4)
             weld_id = np.argmin(np.abs(profile_welding[:,1]-x_wp))
             plt.title('Cross Section at X: {:.2f} mm, cmd V: {:.2f} mm, cmd FR: {:.2f} mm'.format(x_wp, profile_welding[weld_id, 2], profile_welding[weld_id, 3]))
