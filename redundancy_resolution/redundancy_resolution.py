@@ -419,11 +419,12 @@ class redundancy_resolution(object):
 		n_next=self.positioner.base_H[:3,:3]@self.positioner.fwd_rotation(q_next)@n_d ###get current pointing direction
 		return get_angle(n_next,[0,0,1])
 
-	def rob2_flir_resolution(self,rob1_curve_js,robot2,measure_distance=500,rotate_angle=np.radians(15),y_direction=np.array([-1,0,0])):
+	def rob2_flir_resolution(self,rob1_curve_js,robot2,positioner_js=None,curve=None,measure_distance=500,rotate_angle=np.radians(15),y_direction=np.array([-1,0,0])):
 		###determine second robot trajectory with FLIR
 		#rob1_curve_js: 2010 trajectory
 		#robot2: 1440 with FLIR TOOL defs
 		H2010_1440=H_inv(robot2.base_H)		###2010's base frame in 1440's base frame
+		H1440_D500=H2010_1440@self.positioner.base_H	###D500's base frame in 1440's base frame
 		rob2_curve_js=[]
 		q_prev=np.zeros(6)
 		for i in range(len(rob1_curve_js)):
@@ -431,12 +432,18 @@ class redundancy_resolution(object):
 			for x in range(len(rob1_curve_js[i])):
 				rob2_js_ith_layer_xth_section=[]
 				for j in range(len(rob1_curve_js[i][x])):
-					p=self.robot.fwd(rob1_curve_js[i][x][j]).p
-					p_in_base_frame=np.dot(H2010_1440[:3,:3],p)+H2010_1440[:3,3]
-					v_z=H2010_1440[:3,:3]@rot(np.array([1,0,0]),rotate_angle)@np.array([0,-1,0]) ###pointing toward positioner's X with 15deg tiltd angle looking down
-					# v_z=H2010_1440[:3,:3]@self.positioner.base_H[:3,0]	###pointing toward positioner's X on horizontal plane in 1440's base frame
-					# v_z=VectorPlaneProjection(v_z,np.array([0,0,1]))	###project on gravity plane
-					v_y=VectorPlaneProjection(y_direction,v_z)	###FLIR's Y pointing toward 1440's "y_direction" in 1440's base frame, projected on v_z's plane
+					if positioner_js is None:
+						p=self.robot.fwd(rob1_curve_js[i][x][j]).p
+						p_in_base_frame=np.dot(H2010_1440[:3,:3],p)+H2010_1440[:3,3]
+						v_z=H2010_1440[:3,:3]@rot(np.array([1,0,0]),rotate_angle)@np.array([0,-1,0]) ###pointing toward positioner's X with 15deg tiltd angle looking down
+						# v_z=H2010_1440[:3,:3]@self.positioner.base_H[:3,0]	###pointing toward positioner's X on horizontal plane in 1440's base frame
+						# v_z=VectorPlaneProjection(v_z,np.array([0,0,1]))	###project on gravity plane
+						v_y=VectorPlaneProjection(y_direction,v_z)	###FLIR's Y pointing toward 1440's "y_direction" in 1440's base frame, projected on v_z's plane
+					else:
+						T_torch = self.robot.fwd(rob1_curve_js[i][x][j])
+						T_positioner = self.positioner.fwd(positioner_js[i][x][j],world=True)
+						T_torch_positioner = T_positioner.inv()*T_torch
+					
 					v_x=np.cross(v_y,v_z)
 					p_in_base_frame=p_in_base_frame-measure_distance*v_z			###back project measure_distance-mm away from torch
 					R=np.vstack((v_x,v_y,v_z)).T
