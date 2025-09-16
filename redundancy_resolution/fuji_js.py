@@ -129,7 +129,7 @@ def main():
     dist_weld_scan_index = np.round(dist_weld_scan/path_dl).astype(int)
     print(f'dist_weld_scan_index: {dist_weld_scan_index}, dist_weld_scan: {dist_weld_scan}')
 
-    # exit()
+    exit()
 
     layers_name = ['baselayer','layer']
     # layers_name = ['layer']
