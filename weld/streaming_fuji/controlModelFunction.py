@@ -22,8 +22,16 @@ class controlLogLogModel():
     def __init__(self,model_dir,lambda_fac=0.99,cov_dh_init=10,cov_dw_init=10):
         self.model_dir = 'weld_Seq_models/'+model_dir
 
-        self.theta_dh = np.loadtxt(self.model_dir + '/theta_param_dh.csv', delimiter=',')
-        self.theta_dw = np.loadtxt(self.model_dir + '/theta_param_dw.csv', delimiter=',')
+        if os.path.exists(self.model_dir + '/theta_param_dh.csv'):
+            self.theta_dh = np.loadtxt(self.model_dir + '/theta_param_dh.csv', delimiter=',')
+        else:
+            print("No pre-trained log-log model found for dh. Use default parameters.")
+            self.theta_dh = np.array([-0.51165164, 0.31240801, 0.29077162])
+        if os.path.exists(self.model_dir + '/theta_param_dw.csv'):
+            self.theta_dw = np.loadtxt(self.model_dir + '/theta_param_dw.csv', delimiter=',')
+        else:
+            print("No pre-trained log-log model found for width. Use default parameters.")
+            self.theta_dw = np.array([-0.44045542, 0.5737361, -0.04727175])
         self.theta_dh_origin = deepcopy(self.theta_dh)
         self.theta_dw_origin = deepcopy(self.theta_dw)
 

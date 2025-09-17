@@ -116,7 +116,7 @@ def main():
     scan_online_process = False
     thermal_on = False
     input_from_user = False
-    SIMULATION = True
+    SIMULATION = False
     # simulation_speed_sim = False
     simulation_save_control_state_fig = False
 
@@ -275,7 +275,7 @@ def main():
     # collision avoidance z offset
     safety_z_offset = 50
     # direction 
-    torch_ori_fix = True # torch orientation fixed
+    torch_ori_fix = False # torch orientation fixed
     # lookahead distance
     lookahead_distance = 1 # mm
     # which layer to start correction

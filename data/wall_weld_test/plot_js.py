@@ -4,13 +4,13 @@ import glob
 
 data_dir = 'curve_sliced_js/'
 
-direction = 'forward' # 'forward' or 'backward'
+direction = 'backward' # 'forward' or 'backward'
 
 # curve_js_files = glob.glob(data_dir + f'MA2010_base_js*_0_{direction}.csv')
 # for i in range(len(curve_js_files)):
 
 weld_parts = 'layer' # base or layer
-layer_num = 420
+layer_num = 459
 
 if weld_parts == 'base':
     curve_js = np.loadtxt(data_dir+f'MA2010_base_js{layer_num}_0_{direction}.csv', delimiter=',')
