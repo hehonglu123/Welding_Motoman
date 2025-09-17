@@ -26,7 +26,7 @@ rx=0.0028
 ry=14.6701
 rz=90.2315
 
-R=Rz(np.radians(-rz))@Ry(np.radians(-ry))@Rx(np.radians(-rx))
+R=Rz(np.radians(rz))@Ry(np.radians(ry))@Rx(np.radians(rx))
 H=H_from_RT(R,[x,y-center2bottom*np.sin(np.radians(ry)),z-6-center2bottom*np.cos(np.radians(ry))])
 print("positioner",H)
 
@@ -39,7 +39,7 @@ rx=156.6579
 ry=-16.6649
 rz=119.7000
 
-R=Rz(np.radians(-rz))@Ry(np.radians(-ry))@Rx(np.radians(-rx))
+R=Rz(np.radians(rz))@Ry(np.radians(ry))@Rx(np.radians(rx))
 H=H_from_RT(R,[x,y,z])
 print("tool",H)
 np.savetxt('fujicam.csv',H,delimiter=',')

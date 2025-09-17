@@ -129,8 +129,6 @@ def main():
     dist_weld_scan_index = np.round(dist_weld_scan/path_dl).astype(int)
     print(f'dist_weld_scan_index: {dist_weld_scan_index}, dist_weld_scan: {dist_weld_scan}')
 
-    exit()
-
     layers_name = ['baselayer','layer']
     # layers_name = ['layer']
     for layer_name in layers_name:
@@ -188,9 +186,9 @@ def main():
                 orientation_start = get_torch_scanner_ori(curve[dist_weld_scan_index,3:], layer_weld_scan_vec, rotate_y_direction)
                 if cases == 'forward':
                     # positioner_j2_start = np.degrees(-1*(np.radians(180)-np.arctan2(curve[dist_weld_scan_index,1],curve[dist_weld_scan_index,0])))
-                    positioner_j2_start = -180
+                    positioner_j2_start = -90
                 else:
-                    positioner_j2_start = 0
+                    positioner_j2_start = 90
                 ## solve ik when the scanner is NOT on the layer yet
                 curve_part = deepcopy(curve[:dist_weld_scan_index+1])
                 curve_part = curve_part[::-1]
@@ -216,15 +214,15 @@ def main():
                 rr_thermal = redundancy_resolution(robot_weld,positioner,curve)
                 rThermal_js = rr_thermal.rob2_flir_resolution([[rWeld_js]],robot_thermal,measure_distance=thermal_distance,rotate_angle=np.radians(15),y_direction=np.array([0,0,-1]))[0][0]
                 ## visualize the js
-                plt.plot(np.degrees(rWeld_js), '-o')
-                plt.legend(['j1','j2','j3','j4','j5','j6'])
-                plt.title('weld robot js')
-                plt.show()
+                # plt.plot(np.degrees(rWeld_js), '-o')
+                # plt.legend(['j1','j2','j3','j4','j5','j6'])
+                # plt.title('weld robot js')
+                # plt.show()
 
-                plt.plot(np.degrees(rThermal_js), '-o')
-                plt.legend(['j1','j2','j3','j4','j5','j6'])
-                plt.title('thermal robot js')
-                plt.show()
+                # plt.plot(np.degrees(rThermal_js), '-o')
+                # plt.legend(['j1','j2','j3','j4','j5','j6'])
+                # plt.title('thermal robot js')
+                # plt.show()
                 ## solve ik when the torch is NOT on the layer (leaving the layer)
                 curve_part = deepcopy(curve[-dist_weld_scan_index-1:])
                 curve_part = curve_part[:,:3]
@@ -238,8 +236,8 @@ def main():
                 T_positioner = positioner.fwd(positioner_js[-1],world=True)
                 T_robot_positioner = T_positioner.inv()*T_robot
                 curve_R_start = T_robot_positioner.R # starting scanner orientation in the positioner tip frame
-                # if cases == 'forward':
-                if cases == 'backward':
+                if cases == 'forward':
+                # if cases == 'backward':
                     curve_R_final = np.array([[-1,0,0],\
                                             [0,-1,0],\
                                             [0,0,1]]) # target ending scanner orientation in the positioner tip frame
