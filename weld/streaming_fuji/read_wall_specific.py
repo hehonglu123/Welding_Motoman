@@ -88,7 +88,7 @@ tip_wire_model = YOLO(os.path.dirname(inspect.getfile(flir_toolbox))+"/tip_wire.
 def main():
 
     test_current = False
-    test_thermal = False
+    test_thermal = True
     test_thermal_collected = False
     test_pcd = False
     test_geometry = False
@@ -97,7 +97,7 @@ def main():
     test_loglog = False
     test_read_thermal = False
     reverse_thermal_pixel_trace = False
-    viz_line_scan = True
+    viz_line_scan = False
 
     ############## Robot definition ##############
     config_dir='../../config/'
