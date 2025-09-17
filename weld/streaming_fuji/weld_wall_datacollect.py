@@ -291,7 +291,8 @@ def main():
             try:
                 if torch_ori_fix:
                     print("Torch Orientation Fixed")
-                    curve_direction = 'backward'
+                    # curve_direction = 'backward'
+                    curve_direction = 'forward'
                 elif forward:
                     curve_direction = 'forward'
                 else:
@@ -319,7 +320,7 @@ def main():
                 lam_relative = calc_lam_cs(curve[:,:3])
                 lam_scan_relative = calc_lam_cs(curve_scan[:,:3])
 
-                if forward and curve_direction == 'backward':
+                if (forward and curve_direction == 'backward') or (not forward and curve_direction == 'forward'):
                     curve_js = curve_js[::-1]
                     curve_js_cam = curve_js_cam[::-1]
                     curve_js_positioner = curve_js_positioner[::-1]
@@ -515,7 +516,7 @@ def main():
                     ######
 
                     # if torch orientation is fixed, and the traveling/curve direction is opposite
-                    if forward and curve_direction == 'backward':
+                    if (forward and curve_direction == 'backward') or (not forward and curve_direction == 'forward'):
                         # deal with special case, forward but curve direction is backward
                         # happens if fixed torch orientation
                         scan_layer = int(np.min([i+6/layer_resolution,weld_end-1]))
