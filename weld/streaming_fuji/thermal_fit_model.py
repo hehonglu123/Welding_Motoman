@@ -5,6 +5,7 @@ import numpy as np
 from scipy.signal import find_peaks
 from scipy.interpolate import CubicSpline, LinearNDInterpolator
 from matplotlib import pyplot as plt
+from matplotlib.colors import TwoSlopeNorm, SymLogNorm
 import open3d as o3d
 import cv2 as cv
 from motoman_def import *
@@ -18,6 +19,43 @@ title_size = 20
 sup_title_size = 20
 
 cam_pixel_moving_ratio = 1.77 # 1.77 pixel per mm
+
+# ---------- helpers ----------
+def robust_limits(z, q=0.995):
+    """Robust symmetric limits around zero using quantiles to ignore outliers."""
+    z = np.asarray(z)
+    z = z[np.isfinite(z)]
+    if z.size == 0:
+        return (-1, 1)
+    zmax = np.quantile(np.abs(z), q)
+    if zmax == 0:
+        zmax = np.max(np.abs(z)) if np.max(np.abs(z)) > 0 else 1.0
+    return (-zmax, zmax)
+
+def signed_norm(z, center=0.0, q=0.995, symlog=False, linthresh=1e-2):
+    """
+    Centered norm for signed data. If symlog=True, uses symmetric log to show
+    both tiny and huge magnitudes while keeping sign.
+    """
+    vmin, vmax = robust_limits(z, q=q)
+    if symlog:
+        return SymLogNorm(linthresh=linthresh, vmin=vmin, vmax=vmax), (vmin, vmax)
+    else:
+        return TwoSlopeNorm(vmin=vmin, vcenter=center, vmax=vmax), (vmin, vmax)
+
+def plot_signed_scatter(ax, XY, Z, title, xlabel, ylabel, cmap="coolwarm",
+                        q=0.995, symlog=False, linthresh=1e-2, s=4, alpha=0.9):
+    """Scatter for irregular samples with proper signed normalization."""
+    if symlog:
+        norm, (vmin, vmax) = signed_norm(Z, q=q, symlog=symlog, linthresh=linthresh)
+        sc = ax.scatter(XY[:,0], XY[:,1], c=Z, s=s, cmap=cmap, norm=norm, alpha=alpha)
+    else:
+        sc = ax.scatter(XY[:,0], XY[:,1], c=Z, s=s, cmap=cmap)
+    ax.set_title(title, fontsize=title_size)
+    ax.set_xlabel(xlabel, fontsize=xy_label_size)
+    ax.set_ylabel(ylabel, fontsize=xy_label_size)
+    ax.tick_params(axis='both', which='major', labelsize=xy_tick_size)
+    return sc
 
 def main():
     ############## Robot definition ##############
@@ -44,14 +82,119 @@ def main():
     this_layer_dir = logdata_dir+layer_name+'/'
     last_layer_dir = logdata_dir+last_layer_name+'/'
 
+    ##### read robot weld exe pose and stamp ####
+    weld_relative_exe = np.loadtxt(this_layer_dir+'weld_relative_exe.csv', delimiter=',') # in mm
+    weld_relative_v_exe = np.loadtxt(this_layer_dir+'weld_relative_v_exe.csv', delimiter=',') # in mm/s
+    rob_js_exe = np.loadtxt(this_layer_dir+'weld_js_exe.csv',delimiter=',')
+    weld_cmd = np.loadtxt(this_layer_dir+'weld_cmd.csv',delimiter=',')
+    # get js at index 1~6 and 13 14
+    rob_js_exe = rob_js_exe[:,[0,1,2,3,4,5,6,13,14]]
+    robot_stamps = rob_js_exe[:,0]
+    stamps_diff_sorted = np.argsort(np.diff(robot_stamps))[::-1]
+    for stamp_diff_id in stamps_diff_sorted:
+        # make sure to find the time jump after the welding command
+        if robot_stamps[stamp_diff_id] > weld_cmd[-1,0] and robot_stamps[stamp_diff_id] < weld_cmd[-1,0]+3:
+            weld_split_id = stamp_diff_id
+            break
+    # weld_split_id = np.argmax(np.diff(robot_stamps))
+    scan_js_exe = deepcopy(rob_js_exe)
+    weld_js_exe = rob_js_exe[:weld_split_id+1,:]
+    weld_stamps = robot_stamps[:weld_split_id+1]
+    assert len(weld_stamps) == len(weld_relative_exe), len(weld_stamps) == len(weld_relative_v_exe)
+
     ##### read thermal data ####
-    with open(this_layer_dir+'ir_recording.pickle', 'rb') as f:
-        ir_exe = pickle.load(f)
-    ir_stamp = np.loadtxt(this_layer_dir+'ir_stamps.csv',delimiter=',')
+    with open(this_layer_dir+'thermal_pixel_trace_stamp_key.pickle', 'rb') as f:
+        thermal_pixel_trace = pickle.load(f)
+    thermal_map = [] # a array with Nx3, each row is x,time,temperature
+    thermal_map_contain_zero = []
+    thermal_dx = [] # a array with Nx3, each row is x,time,dT/dx
+    thermal_dx2 = [] # a array with Nx3, each row is x,time,d2T/dx2
+    thermal_x_sample = np.arange(-81, 98, 0.5) # in mm , relative to weld
+    thermal_stamp_all = np.sort(np.array(list(thermal_pixel_trace.keys())))
+    min_stamp = np.min(thermal_stamp_all)
+    for stamp in thermal_stamp_all:
+        # find current weld x position
+        weld_id = np.argmin(np.abs(weld_stamps - stamp))
+        weld_x = weld_relative_exe[weld_id,0]
+        this_stamp_thermal_sample_zero = np.interp(thermal_x_sample, thermal_pixel_trace[stamp]['x']-weld_x, thermal_pixel_trace[stamp]['value'], left=0, right=0)
+        this_stamp_thermal_sample = np.interp(thermal_x_sample, thermal_pixel_trace[stamp]['x']-weld_x, thermal_pixel_trace[stamp]['value'])
+        thermal_map.extend( np.vstack( (np.ones_like(thermal_x_sample)*(stamp-min_stamp), thermal_x_sample, this_stamp_thermal_sample) ).T.tolist() )
+        thermal_map_contain_zero.extend( np.vstack( (np.ones_like(thermal_x_sample)*(stamp-min_stamp), thermal_x_sample, this_stamp_thermal_sample_zero) ).T.tolist() )
+        this_stamp_thermal_sample_dx = np.gradient(this_stamp_thermal_sample, thermal_x_sample)
+        thermal_dx.extend( np.vstack( (np.ones_like(thermal_x_sample)*(stamp-min_stamp), thermal_x_sample, this_stamp_thermal_sample_dx) ).T.tolist() )
+        this_stamp_thermal_sample_dx2 = np.gradient(this_stamp_thermal_sample_dx, thermal_x_sample)
+        thermal_dx2.extend( np.vstack( (np.ones_like(thermal_x_sample)*(stamp-min_stamp), thermal_x_sample, this_stamp_thermal_sample_dx2) ).T.tolist() )
+    thermal_map = np.array(thermal_map)
+    thermal_map_contain_zero = np.array(thermal_map_contain_zero)
+    thermal_dx = np.array(thermal_dx)
+    thermal_dx2 = np.array(thermal_dx2)
 
-    thermal_centroid_record = []
+    thermal_dt = np.zeros_like(thermal_map)
+    for x in thermal_x_sample:
+        this_x_id = np.where(thermal_map[:,1]==x)[0]
+        this_x_stamp = thermal_map[this_x_id,0]
+        this_dthermal_dt = np.gradient(thermal_map[this_x_id,2], this_x_stamp)
+        thermal_dt[this_x_id,2] = this_dthermal_dt
+        thermal_dt[this_x_id,0] = this_x_stamp
+        thermal_dt[this_x_id,1] = x
 
-    for (ir_id,ir_image_raw, stamp) in zip(range(len(ir_exe)), ir_exe, ir_stamp):
-        ir_image = deepcopy(ir_image_raw)
-        img_height, img_width = ir_image.shape
-    
+    non_zero_index = np.where(thermal_map_contain_zero[:,2]!=0)[0] # get rid of zero value
+    thermal_map = thermal_map[non_zero_index]
+    thermal_dx = thermal_dx[non_zero_index]
+    thermal_dx2 = thermal_dx2[non_zero_index]
+    thermal_dt = thermal_dt[non_zero_index]
+
+    # visualization for verification
+    # ---------- data wrappers ----------
+    # Expecting arrays shaped (N, 3): [:,0]=time; [:,1]=x; [:,2]=value
+    TM  = thermal_map
+    DX  = thermal_dx
+    DX2 = thermal_dx2
+    DT  = thermal_dt
+    # Choose normalization style:
+    # - For broad dynamic range in derivatives, symlog=True helps a lot.
+    use_symlog = True         # try True first; set to False if you prefer linear
+    symlog_linthresh = 1e-2   # linear region around zero for SymLogNorm
+    # Make figure with nicer layout
+    fig = plt.figure(figsize=(12, 8))
+    axs = [fig.add_subplot(221), fig.add_subplot(222),
+        fig.add_subplot(223), fig.add_subplot(224)]
+    # Plot panels (use diverging cmap to highlight +/-)
+    sc0 = plot_signed_scatter(
+        axs[0], TM[:, :2], TM[:, 2]-8000, "thermal map",
+        "time (s)", "y relative to torch (mm)",
+        cmap="coolwarm", symlog=False  # temperature often non-negative; keep linear if so
+    )
+    sc1 = plot_signed_scatter(
+        axs[1], DX[:, :2], DX[:, 2], "dU/dy",
+        "time (s)", "y relative to torch (mm)",
+        cmap="coolwarm", symlog=use_symlog, linthresh=symlog_linthresh
+    )
+    sc2 = plot_signed_scatter(
+        axs[2], DX2[:, :2], DX2[:, 2], "d²U/dy²",
+        "time (s)", "y relative to torch (mm)",
+        cmap="coolwarm", symlog=use_symlog, linthresh=symlog_linthresh
+    )
+    sc3 = plot_signed_scatter(
+        axs[3], DT[:, :2], DT[:, 2], "dU/dt",
+        "time (s)", "y relative to torch (mm)",
+        cmap="coolwarm", symlog=use_symlog, linthresh=symlog_linthresh
+    )
+    # Dedicated colorbars per panel (clearer than sharing when ranges differ)
+    for ax, sc in zip(axs, [sc0, sc1, sc2, sc3]):
+        cb = plt.colorbar(sc, ax=ax)
+        # cb.ax.tick_params(labelsize=xy_tick_size)
+    plt.suptitle(f'Layer {layer_n}', fontsize=sup_title_size)
+    plt.tight_layout()
+    plt.show()
+
+    # with open(this_layer_dir+'ir_recording.pickle', 'rb') as f:
+    #     ir_exe = pickle.load(f)
+    # ir_stamp = np.loadtxt(this_layer_dir+'ir_stamps.csv',delimiter=',')
+    # thermal_centroid_record = []
+    # for (ir_id,ir_image_raw, stamp) in zip(range(len(ir_exe)), ir_exe, ir_stamp):
+    #     ir_image = deepcopy(ir_image_raw)
+    #     img_height, img_width = ir_image.shape
+
+if __name__ == '__main__':
+    main()
