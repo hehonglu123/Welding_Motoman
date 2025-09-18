@@ -193,7 +193,7 @@ def main():
         # layer welding parameters
         layer_feedrate = 100
         layer_nom_height = 3 # mm
-        layer_nom_vel = 10*1/np.sqrt(2) # mm/s => 1, 1/np.sqrt(2), 1/2, 1/(2*np.sqrt(2)), 1/4, affecting VPD
+        layer_nom_vel = 10*1/np.power(2, 0.75) # mm/s => 1, 1/np.sqrt(2), 1/2, 1/(2*np.sqrt(2)), 1/4, affecting VPD
         layer_nom_incre = int(layer_nom_height/layer_resolution)
         # wire cross section
         cross_section = 1.14 # mm^2
@@ -675,6 +675,7 @@ def main():
                     np.savetxt(logdata_dir+layer_name+f'/weld_js_exe.csv', weld_js_exe, delimiter=',') # save welding/scanning logged joint space data
                     np.savetxt(logdata_dir+layer_name+f'/js_cmd.csv', q_cmd_all, delimiter=',') # save welding/scanning commanded joint space data
                     np.savetxt(logdata_dir+layer_name+f'/weld_cmd.csv', welding_cmd_all, delimiter=',') # save welding commands
+                    np.savetxt(logdata_dir+f'fujicam.csv', fuji_tool_H, delimiter=',') # save fujicam to flange tool0 transformation
                     if fuji_scanon:
                         with open(logdata_dir+layer_name+f'/scan_exe.pickle', 'wb') as file: # save scanning logged data
                             pickle.dump(scan_exe, file)

@@ -140,8 +140,8 @@ def main():
         st = time.time()
         start_layer = 0
         for layer_n in range(start_layer,layer_num):
-            if layer_n<layer_num-2:
-                continue # test the last two layers first
+            # if layer_n<layer_num-2:
+            #     continue # test the last two layers first
             ##### read curve data #####
             if layer_name == 'baselayer':
                 curve = np.loadtxt(data_dir+f'curve_sliced_relative/baselayer{layer_n}_0.csv',delimiter=',')

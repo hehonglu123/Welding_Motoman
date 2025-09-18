@@ -11,6 +11,7 @@ import torch
 import torch.nn as nn
 
 from RobotRaconteur.Client import *
+from RobotRaconteur import RobotRaconteurPythonError
 from weldRRSensor import *
 from StreamingSend import *
 from robotics_utils import *
@@ -110,14 +111,13 @@ def get_weld_shift_x(profile_height):
 
 def main():
     
-    weld_arcon = False
-    welder_log = False
-    fuji_scanon = False
-    scan_online_process = False
-    thermal_on = False
+    weld_arcon = True
+    welder_log = True
+    fuji_scanon = True
+    scan_online_process = True
+    thermal_on = True
     input_from_user = False
     SIMULATION = False
-    # simulation_speed_sim = False
     simulation_save_control_state_fig = False
 
     if SIMULATION:
@@ -141,7 +141,7 @@ def main():
     #                                [-6.95508436e-04 , 2.91540649e-04 , 9.99999707e-01 , 1.18566260e+03],\
     #                                [ 0.00000000e+00 , 0.00000000e+00 , 0.00000000e+00 , 1.00000000e+00]]) # a place holder, to be replaced by actual calibration
     torch_tool_H_calib = deepcopy(torch_tool_H_origin)
-    torch_tool_H_calib[3,2] -= 5
+    # torch_tool_H_calib[3,2] -= 5
 
     # get fujicam standoff distance
     # Move the fujicam frame along the z-axis with the distance of the standoff distance
@@ -275,7 +275,7 @@ def main():
     # collision avoidance z offset
     safety_z_offset = 50
     # direction 
-    torch_ori_fix = False # torch orientation fixed
+    torch_ori_fix = True # torch orientation fixed
     # lookahead distance
     lookahead_distance = 1 # mm
     # which layer to start correction
@@ -287,21 +287,22 @@ def main():
         scan_nom_vel = 20 # for speed up
 
     ##### controller parameters and model #####
+    # choose between log-log control or learning model one step Jacobian
+    control_method = 'loglog-static' # 'loglog-static', 'loglog-rls' or 'learning-Jacobian'
+    assert control_method in ['loglog-static', 'loglog-rls', 'learning-Jacobian'], "Invalid control method"
     ### Learning model
-    control_model_dir = 'model_20250715_151650'
-    ctrlModel = controlModel(control_model_dir,device=device)
-    alpha_control = 0.25
-    lambda_smooth = 1e-2  # regularization parameter for smoothness
-    lambda_disc = 1e-1*5  # regularization parameter for discrete input
+    if control_method == 'learning-Jacobian':
+        control_model_dir = 'model_20250715_151650'
+        ctrlModel = controlModel(control_model_dir,device=device)
+        alpha_control = 0.25
+        lambda_smooth = 1e-2  # regularization parameter for smoothness
+        lambda_disc = 1e-1*5  # regularization parameter for discrete input
     ### log-log model
     loglog_model_dir = 'loglog_models'
     loglogModel = controlLogLogModel(loglog_model_dir)
     # max min torch velocity
     v_Maximum = 20
     v_minimum = 0.75
-    # choose between log-log control or learning model one step Jacobian
-    control_method = 'loglog-static' # 'loglog-static', 'loglog-rls' or 'learning-Jacobian'
-    assert control_method in ['loglog-static', 'loglog-rls', 'learning-Jacobian'], "Invalid control method"
     #######################################
 
     ##### welding target parameters #####
@@ -335,7 +336,6 @@ def main():
     current_time = datetime.datetime.now()
     formatted_time = current_time.strftime('%Y_%m_%d_%H_%M_%S.%f')[:-7]
     logdata_dir='../../data/wall_weld_test/weld_fujicontrol_'+formatted_time+'/'
-    # logdata_dir='../../data/wall_weld_test/weld_fujicontrol_2025_08_13_14_17_58/'
 
     ##### Parameters to chose where to start welding #####
     # start-end layers
@@ -348,18 +348,18 @@ def main():
     Transz0_H=None
     last_profile_height = None
     if read_from_file_layer:
-        logdata_dir = '../../data/wall_weld_test/weld_fujicontrol_2025_08_13_14_17_58/'
-        Transz0_H = np.array([[ 9.99850748e-01 , 1.22093145e-04 , 1.72761855e-02 ,-1.41469281e-01],
-                    [ 1.22093145e-04 , 9.99900124e-01 ,-1.41325105e-02,  1.15726710e-01],
-                    [-1.72761855e-02,  1.41325105e-02,  9.99750872e-01, -8.18664727e+00],
-                    [ 0.00000000e+00 , 0.00000000e+00 , 0.00000000e+00 , 1.00000000e+00]])
+        logdata_dir = '../../data/wall_weld_test/weld_fujicontrol_2025_09_18_12_27_30/'
+        Transz0_H = np.array([[ 9.99992234e-01 , 2.78865002e-05 , 3.94089885e-03, -1.97753537e-02],\
+                            [ 2.78865002e-05,  9.99899861e-01, -1.41515917e-02 , 7.10124116e-02],\
+                            [-3.94089885e-03 , 1.41515917e-02 , 9.99892095e-01, -5.01743907e+00],\
+                            [ 0.00000000e+00 , 0.00000000e+00 , 0.00000000e+00 , 1.00000000e+00]])
         last_profile_height = None
-    # logdata_dir='../../data/wall_weld_test/weld_fujicontrol_2025_08_13_14_17_58/'
-    # Transz0_H = np.array([[ 9.99850748e-01 , 1.22093145e-04 , 1.72761855e-02 ,-1.41469281e-01],
-    #                 [ 1.22093145e-04 , 9.99900124e-01 ,-1.41325105e-02,  1.15726710e-01],
-    #                 [-1.72761855e-02,  1.41325105e-02,  9.99750872e-01, -8.18664727e+00],
-    #                 [ 0.00000000e+00 , 0.00000000e+00 , 0.00000000e+00 , 1.00000000e+00]])
-    # last_profile_height = np.loadtxt(logdata_dir+'baselayer1/profile_height.csv', delimiter=',') # load the last profile height
+    # logdata_dir = '../../data/wall_weld_test/weld_fujicontrol_2025_09_18_13_21_41/'
+    # Transz0_H = np.array([[ 9.99992234e-01 , 2.78865002e-05 , 3.94089885e-03, -1.97753537e-02],\
+    #                     [ 2.78865002e-05,  9.99899861e-01, -1.41515917e-02 , 7.10124116e-02],\
+    #                     [-3.94089885e-03 , 1.41515917e-02 , 9.99892095e-01, -5.01743907e+00],\
+    #                     [ 0.00000000e+00 , 0.00000000e+00 , 0.00000000e+00 , 1.00000000e+00]])
+    # last_profile_height = np.loadtxt(logdata_dir+'layer85/profile_height.csv', delimiter=',') # load the last profile height
     #################################################3
 
     ##### weld meta data #####
@@ -369,9 +369,13 @@ def main():
                     ,'base_feedrate':base_feedrate, 'base_nom_incre':base_nom_incre, 'base_nom_vel':base_nom_vel\
                     ,'layer_feedrate':layer_feedrate, 'layer_nom_incre':layer_nom_incre, 'layer_nom_vel':float(round(layer_nom_vel,3))\
                     ,'cross_section':cross_section, 'dh_target':float(dh_target), 'dw_target':float(np.mean(dw_target[:,1])), 'lookahead_distance':lookahead_distance,\
-                    'alpha_control':alpha_control, 'lambda_smooth':lambda_smooth, 'lambda_disc':lambda_disc,\
-                    'model_dir':control_model_dir, 'v_Maximum':v_Maximum, 'v_minimum':v_minimum, 'weld_type':weld_type,\
+                    'v_Maximum':v_Maximum, 'v_minimum':v_minimum, 'weld_type':weld_type,\
                     'loglog_model_dir':loglog_model_dir, 'control_method':control_method, 'correction_layer_start':correction_layer_start}
+    if control_method == 'learning-Jacobian':
+        weld_meta_data['model_dir'] = control_model_dir
+        weld_meta_data['alpha_control'] = alpha_control
+        weld_meta_data['lambda_smooth'] = lambda_smooth
+        weld_meta_data['lambda_disc'] = lambda_disc
     ##############################
 
     ####### simulation setup #####
@@ -408,12 +412,14 @@ def main():
             nom_incre = base_nom_incre
         else:
             weld_start = layer_start
+            # weld_start = 99
             weld_end = layer_end
             # weld_end = 36
             nom_incre = layer_nom_incre
             if weld_start == 0:
-                shift_weld_profile_x = get_weld_shift_x(last_profile_height)
-                # shift_weld_profile_x = 5.75
+            # if weld_start == 99:
+                base_layer_height = np.loadtxt(logdata_dir+'baselayer1/profile_height.csv', delimiter=',')
+                shift_weld_profile_x = 0 if base_layer_height is None else get_weld_shift_x(base_layer_height)
                 print("Shift Weld Profile X:", shift_weld_profile_x)
 
         layer_count = 0
@@ -424,10 +430,13 @@ def main():
         while i < weld_end:
             if weld_parts == 'layer':
                 # compensate the shift of the weld profile
+                mean_layer_height = 0 if last_profile_height is None else np.mean(last_profile_height[:,1])
                 last_profile_height[:,0] = last_profile_height[:,0] + shift_weld_profile_x
                 target_layer_height = dh_target + mean_layer_height
             print("=====================================")
             print(f'Welding {weld_parts} layer {i} counting {layer_count} direction {forward}')
+            if weld_parts == 'layer':
+                print(f'Mean layer height {mean_layer_height:.2f} mm, target layer height {target_layer_height:.2f} mm')
             try:
                 if torch_ori_fix:
                     print("Torch Orientation Fixed")
@@ -552,9 +561,25 @@ def main():
                         if arc_off:
                             if weld_arcon:
                                 print("Welding Start")
-                                fronius_client.job_number = int(round(feedrate_cmd/10)+job_offset) # get fronius job number
-                                fronius_client.start_weld() # command to start welding
-                                time.sleep(weld_start_sleep) # welder needs about 0.2s to start welding
+                                try:
+                                    fronius_client.job_number = int(round(feedrate_cmd/10)+job_offset) # get fronius job number
+                                    fronius_client.start_weld() # command to start welding
+                                    time.sleep(weld_start_sleep) # welder needs about 0.2s to start welding
+                                except RobotRaconteurPythonError.InvalidOperationException:
+                                    print("Fronius failed. Restart RR service and try again.")
+                                    fronius_sub=RRN.SubscribeService('rr+tcp://192.168.55.21:60823?service=welder')
+                                    try:
+                                        fronius_client = fronius_sub.GetDefaultClientWait(1)      #connect, timeout=30s
+                                    except:
+                                        print("Fronius connection failed")
+                                        traceback.print_exc()
+                                        SS.deinitialize_robot()
+                                        exit()
+                                    hflags_const = RRN.GetConstants("experimental.fronius", fronius_client)["WelderStateHighFlags"]
+                                    fronius_client.prepare_welder()
+                                    fronius_client.job_number = int(round(feedrate_cmd/10)+job_offset) # get fronius job number
+                                    fronius_client.start_weld() # command to start welding
+                                    time.sleep(weld_start_sleep) # welder needs about 0.2s to start welding
                             welding_cmd_all.append(np.hstack((time.perf_counter(),i,this_curve_p[0],v_cmd,int(round(feedrate_cmd/10)*10))))
                             last_update_time=time.perf_counter()
                             last_viz_time=time.perf_counter()
@@ -834,9 +859,13 @@ def main():
 
                         # final scan processing
                         if fuji_scanon and scan_online_process:
+                            final_scan_processing_start = time.perf_counter()
                             while len(scan_process.raw_scan_pipe)!=0:
                                 print("Final scan processing...",len(scan_process.raw_scan_pipe))
                                 time.sleep(0.01)
+                                if time.perf_counter()-final_scan_processing_start>5:
+                                    print("Final scan processing timeout!")
+                                    break
                             while len(scan_process.denoise_pipe)!=0:
                                 scan_denoise = scan_process.denoise_pipe.pop(0)
                                 scan_exe_noise_remove.append(scan_denoise)
@@ -868,7 +897,7 @@ def main():
                         np.savetxt(logdata_dir+layer_name+f'/weld_js_exe.csv', weld_js_exe, delimiter=',') # save welding/scanning logged joint space data
                         np.savetxt(logdata_dir+layer_name+f'/js_cmd.csv', q_cmd_all, delimiter=',') # save welding/scanning commanded joint space data
                         np.savetxt(logdata_dir+layer_name+f'/weld_cmd.csv', welding_cmd_all, delimiter=',') # save welding commands
-                        np.savetxt(logdata_dir+layer_name+f'/fujicam.csv', fuji_tool_H, delimiter=',') # save fujicam to flange tool0 transformation
+                        np.savetxt(logdata_dir+f'fujicam.csv', fuji_tool_H, delimiter=',') # save fujicam to flange tool0 transformation
                         np.savetxt(logdata_dir+layer_name+f'/flir.csv', flir_tool_H, delimiter=',') # save thermal cam to flange tool0 transformation
                         if layer_count >= correction_layer_start:
                             np.savetxt(logdata_dir+layer_name+f'/control_status_log.csv', control_status_log, delimiter=',') # save control status log if controlling

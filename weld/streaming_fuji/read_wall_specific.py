@@ -88,9 +88,9 @@ tip_wire_model = YOLO(os.path.dirname(inspect.getfile(flir_toolbox))+"/tip_wire.
 def main():
 
     test_current = False
-    test_thermal = True
+    test_thermal = False
     test_thermal_collected = False
-    test_pcd = False
+    test_pcd = True
     test_geometry = False
     test_weld_shift = False
     get_statistics = False
@@ -113,12 +113,12 @@ def main():
     
     ############## choose data directory ##############
     data_dir = '../../data/wall_weld_test/'
-    logdata_dir_name = 'weld_fujicontrol_2025_08_14_12_04_14/'
+    logdata_dir_name = 'weld_fujiscan_2025_09_18_12_11_55/'
     logdata_dir = data_dir+logdata_dir_name
 
     ##### layer, basic infos ####
-    last_layer_n = 46
-    layer_n = 65
+    last_layer_n = 19
+    layer_n = 0
     layer_name = 'layer'+str(layer_n)
     last_layer_name = 'layer'+str(last_layer_n)
     this_layer_dir = logdata_dir+layer_name+'/'
@@ -568,6 +568,7 @@ def main():
     if test_pcd:
         scan_process = ScanProcess(robot_scan,positioner)
         pcd = o3d.io.read_point_cloud(this_layer_dir+'pcd.pcd')
+        visualize_pcd([pcd])
         pcd_denoise = o3d.io.read_point_cloud(this_layer_dir+'pcd_denoise.pcd')
         pcd_base_denoise = o3d.io.read_point_cloud(logdata_dir+'baselayer0/'+'pcd_denoise.pcd')
         last_profile_height = np.loadtxt(last_layer_dir+'profile_height.csv',delimiter=',')
