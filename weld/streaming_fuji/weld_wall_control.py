@@ -142,6 +142,7 @@ def main():
     #                                [ 0.00000000e+00 , 0.00000000e+00 , 0.00000000e+00 , 1.00000000e+00]]) # a place holder, to be replaced by actual calibration
     torch_tool_H_calib = deepcopy(torch_tool_H_origin)
     # torch_tool_H_calib[3,2] -= 5
+    tool_different = True if np.any(torch_tool_H_origin != torch_tool_H_calib) else False
 
     # get fujicam standoff distance
     # Move the fujicam frame along the z-axis with the distance of the standoff distance
@@ -545,14 +546,15 @@ def main():
                         q2=curve_js_cam[lam_idx-1]*(1-ratio)+curve_js_cam[lam_idx]*ratio # robot 2 joint angles
                         q_pos=curve_js_positioner[lam_idx-1]*(1-ratio)+curve_js_positioner[lam_idx]*ratio # positioner joint angles
                         # for tool offset
-                        ik_start_time = time.perf_counter()
-                        T_weld=robot_weld.fwd(q1)
-                        robot_weld.robot.p_tool = deepcopy(torch_tool_H_calib[:3,3])
-                        robot_weld.robot.R_tool = deepcopy(torch_tool_H_calib[:3,:3])
-                        q1=robot_weld.inv(T_weld.p, T_weld.R, last_joints=q1)[0]
-                        robot_weld.robot.p_tool = deepcopy(torch_tool_H_origin[:3,3])
-                        robot_weld.robot.R_tool = deepcopy(torch_tool_H_origin[:3,:3])
-                        ik_time_count.append(time.perf_counter()-ik_start_time)
+                        if tool_different:
+                            ik_start_time = time.perf_counter()
+                            T_weld=robot_weld.fwd(q1)
+                            robot_weld.robot.p_tool = deepcopy(torch_tool_H_calib[:3,3])
+                            robot_weld.robot.R_tool = deepcopy(torch_tool_H_calib[:3,:3])
+                            q1=robot_weld.inv(T_weld.p, T_weld.R, last_joints=q1)[0]
+                            robot_weld.robot.p_tool = deepcopy(torch_tool_H_origin[:3,3])
+                            robot_weld.robot.R_tool = deepcopy(torch_tool_H_origin[:3,:3])
+                            ik_time_count.append(time.perf_counter()-ik_start_time)
                         #
                         q_cmd=np.hstack((q1,q2,q_pos)) # command joint angles (combined robot 1, robot 2 and positioner)
                         q_command_all.append(q_cmd)
@@ -647,7 +649,8 @@ def main():
                     ##################################################
                     print(f'Mean time per command: {np.mean(time_count):.4f} s, Max time per command: {np.max(time_count):.4f} s')
                     print(f'Mean model inference time: {np.mean(model_inference_time_count):.4f} s, Max model inference time: {np.max(model_inference_time_count):.4f} s')
-                    print(f'Mean IK time: {np.mean(ik_time_count):.4f} s, Max IK time: {np.max(ik_time_count):.4f} s')
+                    if tool_different:
+                        print(f'Mean IK time: {np.mean(ik_time_count):.4f} s, Max IK time: {np.max(ik_time_count):.4f} s')
 
                     ### welding end
                     if weld_arcon:
@@ -801,13 +804,14 @@ def main():
                             q1=curve_js_scan[lam_idx-1]*(1-ratio)+curve_js_scan[lam_idx]*ratio # robot 1 joint angles
                             q_pos=curve_js_pos_scan[lam_idx-1]*(1-ratio)+curve_js_pos_scan[lam_idx]*ratio # positioner joint angles
                             # for tool offset
-                            T_weld=robot_weld.fwd(q1)
-                            robot_weld.robot.p_tool = deepcopy(torch_tool_H_calib[:3,3])
-                            robot_weld.robot.R_tool = deepcopy(torch_tool_H_calib[:3,:3])
-                            q1=robot_weld.inv(T_weld.p, T_weld.R, last_joints=q1)[0]
-                            robot_weld.robot.p_tool = deepcopy(torch_tool_H_origin[:3,3])
-                            robot_weld.robot.R_tool = deepcopy(torch_tool_H_origin[:3,:3])
-                            q1=robot_weld.inv(T_weld.p, T_weld.R, last_joints=q1)[0]
+                            if tool_different:
+                                T_weld=robot_weld.fwd(q1)
+                                robot_weld.robot.p_tool = deepcopy(torch_tool_H_calib[:3,3])
+                                robot_weld.robot.R_tool = deepcopy(torch_tool_H_calib[:3,:3])
+                                q1=robot_weld.inv(T_weld.p, T_weld.R, last_joints=q1)[0]
+                                robot_weld.robot.p_tool = deepcopy(torch_tool_H_origin[:3,3])
+                                robot_weld.robot.R_tool = deepcopy(torch_tool_H_origin[:3,:3])
+                                q1=robot_weld.inv(T_weld.p, T_weld.R, last_joints=q1)[0]
                             #
                             q_cmd=np.hstack((q1,r2_rest_q,q_pos)) # command joint angles (combined robot 1, robot 2 and positioner)
                             q_command_all.append(q_cmd)

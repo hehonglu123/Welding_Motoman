@@ -118,7 +118,7 @@ def main():
 
     ##### layer, basic infos ####
     last_layer_n = 19
-    layer_n = 0
+    layer_n = 31
     layer_name = 'layer'+str(layer_n)
     last_layer_name = 'layer'+str(last_layer_n)
     this_layer_dir = logdata_dir+layer_name+'/'
