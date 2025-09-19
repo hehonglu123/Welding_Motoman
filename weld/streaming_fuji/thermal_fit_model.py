@@ -2,7 +2,7 @@ import time, os, copy, sys, yaml, inspect
 import glob
 from copy import deepcopy
 import numpy as np
-from scipy.signal import find_peaks
+from scipy.signal import find_peaks, savgol_filter
 from scipy.interpolate import CubicSpline, LinearNDInterpolator
 from matplotlib import pyplot as plt
 from matplotlib.colors import TwoSlopeNorm, SymLogNorm
@@ -82,9 +82,12 @@ def main():
     this_layer_dir = logdata_dir+layer_name+'/'
     last_layer_dir = logdata_dir+last_layer_name+'/'
 
+    visualize_thermal_map = False
+
     ##### read robot weld exe pose and stamp ####
     weld_relative_exe = np.loadtxt(this_layer_dir+'weld_relative_exe.csv', delimiter=',') # in mm
     weld_relative_v_exe = np.loadtxt(this_layer_dir+'weld_relative_v_exe.csv', delimiter=',') # in mm/s
+    weld_relative_speed_exe = np.linalg.norm(weld_relative_v_exe, axis=1) # in mm/s
     rob_js_exe = np.loadtxt(this_layer_dir+'weld_js_exe.csv',delimiter=',')
     weld_cmd = np.loadtxt(this_layer_dir+'weld_cmd.csv',delimiter=',')
     # get js at index 1~6 and 13 14
@@ -105,7 +108,7 @@ def main():
     ##### read thermal data ####
     with open(this_layer_dir+'thermal_pixel_trace_stamp_key.pickle', 'rb') as f:
         thermal_pixel_trace = pickle.load(f)
-    thermal_map = [] # a array with Nx3, each row is x,time,temperature
+    thermal_map = [] # a array with Nx4, each row is x,time,temperature,velocity,wire feed rate (related to power)
     thermal_map_contain_zero = []
     thermal_dx = [] # a array with Nx3, each row is x,time,dT/dx
     thermal_dx2 = [] # a array with Nx3, each row is x,time,d2T/dx2
@@ -115,14 +118,19 @@ def main():
     for stamp in thermal_stamp_all:
         # find current weld x position
         weld_id = np.argmin(np.abs(weld_stamps - stamp))
+        weld_cmd_id = np.argmin(np.abs(weld_cmd[:,0] - stamp))
         weld_x = weld_relative_exe[weld_id,0]
         this_stamp_thermal_sample_zero = np.interp(thermal_x_sample, thermal_pixel_trace[stamp]['x']-weld_x, thermal_pixel_trace[stamp]['value'], left=0, right=0)
         this_stamp_thermal_sample = np.interp(thermal_x_sample, thermal_pixel_trace[stamp]['x']-weld_x, thermal_pixel_trace[stamp]['value'])
-        thermal_map.extend( np.vstack( (np.ones_like(thermal_x_sample)*(stamp-min_stamp), thermal_x_sample, this_stamp_thermal_sample) ).T.tolist() )
-        thermal_map_contain_zero.extend( np.vstack( (np.ones_like(thermal_x_sample)*(stamp-min_stamp), thermal_x_sample, this_stamp_thermal_sample_zero) ).T.tolist() )
-        this_stamp_thermal_sample_dx = np.gradient(this_stamp_thermal_sample, thermal_x_sample)
+        thermal_map.extend( np.vstack( (np.ones_like(thermal_x_sample)*(stamp-min_stamp), thermal_x_sample, this_stamp_thermal_sample,\
+                                        np.ones_like(thermal_x_sample)*weld_relative_speed_exe[weld_id], np.ones_like(thermal_x_sample)*weld_cmd[weld_cmd_id, 1]),  ).T.tolist() )
+        thermal_map_contain_zero.extend( np.vstack( (np.ones_like(thermal_x_sample)*(stamp-min_stamp), thermal_x_sample, this_stamp_thermal_sample_zero, \
+                                        np.ones_like(thermal_x_sample)*weld_relative_speed_exe[weld_id], np.ones_like(thermal_x_sample)*weld_cmd[weld_cmd_id, 1]),  ).T.tolist() )
+        # this_stamp_thermal_sample_dx = np.gradient(this_stamp_thermal_sample, thermal_x_sample)
+        this_stamp_thermal_sample_dx = savgol_filter(this_stamp_thermal_sample, 11, 3, deriv=1, delta=0.5) # window size 11, polynomial order 3
         thermal_dx.extend( np.vstack( (np.ones_like(thermal_x_sample)*(stamp-min_stamp), thermal_x_sample, this_stamp_thermal_sample_dx) ).T.tolist() )
-        this_stamp_thermal_sample_dx2 = np.gradient(this_stamp_thermal_sample_dx, thermal_x_sample)
+        # this_stamp_thermal_sample_dx2 = np.gradient(this_stamp_thermal_sample_dx, thermal_x_sample) # second derivative
+        this_stamp_thermal_sample_dx2 = savgol_filter(this_stamp_thermal_sample, 11, 3, deriv=2, delta=0.5) # window size 11, polynomial order 3
         thermal_dx2.extend( np.vstack( (np.ones_like(thermal_x_sample)*(stamp-min_stamp), thermal_x_sample, this_stamp_thermal_sample_dx2) ).T.tolist() )
     thermal_map = np.array(thermal_map)
     thermal_map_contain_zero = np.array(thermal_map_contain_zero)
@@ -133,7 +141,8 @@ def main():
     for x in thermal_x_sample:
         this_x_id = np.where(thermal_map[:,1]==x)[0]
         this_x_stamp = thermal_map[this_x_id,0]
-        this_dthermal_dt = np.gradient(thermal_map[this_x_id,2], this_x_stamp)
+        # this_dthermal_dt = np.gradient(thermal_map[this_x_id,2], this_x_stamp)
+        this_dthermal_dt = savgol_filter(thermal_map[this_x_id,2], 11, 3, deriv=1, delta=np.mean(np.diff(this_x_stamp))) # window size 11, polynomial order 3
         thermal_dt[this_x_id,2] = this_dthermal_dt
         thermal_dt[this_x_id,0] = this_x_stamp
         thermal_dt[this_x_id,1] = x
@@ -144,49 +153,50 @@ def main():
     thermal_dx2 = thermal_dx2[non_zero_index]
     thermal_dt = thermal_dt[non_zero_index]
 
-    # visualization for verification
-    # ---------- data wrappers ----------
-    # Expecting arrays shaped (N, 3): [:,0]=time; [:,1]=x; [:,2]=value
-    TM  = thermal_map
-    DX  = thermal_dx
-    DX2 = thermal_dx2
-    DT  = thermal_dt
-    # Choose normalization style:
-    # - For broad dynamic range in derivatives, symlog=True helps a lot.
-    use_symlog = True         # try True first; set to False if you prefer linear
-    symlog_linthresh = 1e-2   # linear region around zero for SymLogNorm
-    # Make figure with nicer layout
-    fig = plt.figure(figsize=(12, 8))
-    axs = [fig.add_subplot(221), fig.add_subplot(222),
-        fig.add_subplot(223), fig.add_subplot(224)]
-    # Plot panels (use diverging cmap to highlight +/-)
-    sc0 = plot_signed_scatter(
-        axs[0], TM[:, :2], TM[:, 2]-8000, "thermal map",
-        "time (s)", "y relative to torch (mm)",
-        cmap="coolwarm", symlog=False  # temperature often non-negative; keep linear if so
-    )
-    sc1 = plot_signed_scatter(
-        axs[1], DX[:, :2], DX[:, 2], "dU/dy",
-        "time (s)", "y relative to torch (mm)",
-        cmap="coolwarm", symlog=use_symlog, linthresh=symlog_linthresh
-    )
-    sc2 = plot_signed_scatter(
-        axs[2], DX2[:, :2], DX2[:, 2], "d²U/dy²",
-        "time (s)", "y relative to torch (mm)",
-        cmap="coolwarm", symlog=use_symlog, linthresh=symlog_linthresh
-    )
-    sc3 = plot_signed_scatter(
-        axs[3], DT[:, :2], DT[:, 2], "dU/dt",
-        "time (s)", "y relative to torch (mm)",
-        cmap="coolwarm", symlog=use_symlog, linthresh=symlog_linthresh
-    )
-    # Dedicated colorbars per panel (clearer than sharing when ranges differ)
-    for ax, sc in zip(axs, [sc0, sc1, sc2, sc3]):
-        cb = plt.colorbar(sc, ax=ax)
-        # cb.ax.tick_params(labelsize=xy_tick_size)
-    plt.suptitle(f'Layer {layer_n}', fontsize=sup_title_size)
-    plt.tight_layout()
-    plt.show()
+    if visualize_thermal_map:
+        # visualization for verification
+        # ---------- data wrappers ----------
+        # Expecting arrays shaped (N, 3): [:,0]=time; [:,1]=x; [:,2]=value
+        TM  = thermal_map
+        DX  = thermal_dx
+        DX2 = thermal_dx2
+        DT  = thermal_dt
+        # Choose normalization style:
+        # - For broad dynamic range in derivatives, symlog=True helps a lot.
+        use_symlog = True         # try True first; set to False if you prefer linear
+        symlog_linthresh = 1e-2   # linear region around zero for SymLogNorm
+        # Make figure with nicer layout
+        fig = plt.figure(figsize=(12, 8))
+        axs = [fig.add_subplot(221), fig.add_subplot(222),
+            fig.add_subplot(223), fig.add_subplot(224)]
+        # Plot panels (use diverging cmap to highlight +/-)
+        sc0 = plot_signed_scatter(
+            axs[0], TM[:, :2], TM[:, 2]-8000, "thermal map",
+            "time (s)", "y relative to torch (mm)",
+            cmap="coolwarm", symlog=False  # temperature often non-negative; keep linear if so
+        )
+        sc1 = plot_signed_scatter(
+            axs[1], DX[:, :2], DX[:, 2], "dU/dy",
+            "time (s)", "y relative to torch (mm)",
+            cmap="coolwarm", symlog=use_symlog, linthresh=symlog_linthresh
+        )
+        sc2 = plot_signed_scatter(
+            axs[2], DX2[:, :2], DX2[:, 2], "d²U/dy²",
+            "time (s)", "y relative to torch (mm)",
+            cmap="coolwarm", symlog=use_symlog, linthresh=symlog_linthresh
+        )
+        sc3 = plot_signed_scatter(
+            axs[3], DT[:, :2], DT[:, 2], "dU/dt",
+            "time (s)", "y relative to torch (mm)",
+            cmap="coolwarm", symlog=use_symlog, linthresh=symlog_linthresh
+        )
+        # Dedicated colorbars per panel (clearer than sharing when ranges differ)
+        for ax, sc in zip(axs, [sc0, sc1, sc2, sc3]):
+            cb = plt.colorbar(sc, ax=ax)
+            # cb.ax.tick_params(labelsize=xy_tick_size)
+        plt.suptitle(f'Layer {layer_n}', fontsize=sup_title_size)
+        plt.tight_layout()
+        plt.show()
 
     # with open(this_layer_dir+'ir_recording.pickle', 'rb') as f:
     #     ir_exe = pickle.load(f)
