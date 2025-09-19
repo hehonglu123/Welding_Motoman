@@ -111,11 +111,11 @@ def get_weld_shift_x(profile_height):
 
 def main():
     
-    weld_arcon = True
-    welder_log = True
-    fuji_scanon = True
-    scan_online_process = True
-    thermal_on = True
+    weld_arcon = False
+    welder_log = False
+    fuji_scanon = False
+    scan_online_process = False
+    thermal_on = False
     input_from_user = False
     SIMULATION = False
     simulation_save_control_state_fig = False
@@ -276,7 +276,7 @@ def main():
     # collision avoidance z offset
     safety_z_offset = 50
     # direction 
-    torch_ori_fix = True # torch orientation fixed
+    torch_ori_fix = False # torch orientation fixed
     # lookahead distance
     lookahead_distance = 1 # mm
     # which layer to start correction

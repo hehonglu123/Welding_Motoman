@@ -43,7 +43,7 @@ def main():
     robot_weld=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',d=10,tool_file_path=config_dir+'torch_robot.csv',\
         pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',\
         base_marker_config_file=config_dir+'MA2010_marker_config/MA2010_marker_config.yaml',tool_marker_config_file=config_dir+'weldgun_marker_config/weldgun_marker_config.yaml')
-    robot_weld.robot.p_tool = np.array([-49.29784692 ,  2.8512889,  476.90722611])
+    robot_weld.robot.p_tool = np.array([-49.29784692 ,  2.8512889,  476.90722611]) + robot_weld.robot.R_tool[:,2]*6
     robot_weld.p_tool = deepcopy(robot_weld.robot.p_tool)
     robot_scan=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path=config_dir+'fujicam.csv',\
         pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv')
@@ -188,9 +188,9 @@ def main():
                 orientation_start = get_torch_scanner_ori(curve[dist_weld_scan_index,3:], layer_weld_scan_vec, rotate_y_direction)
                 if cases == 'forward':
                     # positioner_j2_start = np.degrees(-1*(np.radians(180)-np.arctan2(curve[dist_weld_scan_index,1],curve[dist_weld_scan_index,0])))
-                    positioner_j2_start = -90
-                else:
                     positioner_j2_start = 90
+                else:
+                    positioner_j2_start = -90
                 ## solve ik when the scanner is NOT on the layer yet
                 curve_part = deepcopy(curve[:dist_weld_scan_index+1])
                 curve_part = curve_part[::-1]
