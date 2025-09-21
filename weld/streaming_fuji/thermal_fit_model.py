@@ -10,6 +10,7 @@ import open3d as o3d
 import cv2 as cv
 from motoman_def import *
 from robotics_utils import *
+from qpsolvers import solve_qp
 
 # for plotting
 xy_label_size = 18
@@ -84,10 +85,15 @@ def main():
 
     visualize_thermal_map = False
 
+    # parameters
+    heat_input_mask_window = 1.2 # in mm, the window size of the heat input around the weld
+
     ##### read robot weld exe pose and stamp ####
     weld_relative_exe = np.loadtxt(this_layer_dir+'weld_relative_exe.csv', delimiter=',') # in mm
     weld_relative_v_exe = np.loadtxt(this_layer_dir+'weld_relative_v_exe.csv', delimiter=',') # in mm/s
-    weld_relative_speed_exe = np.linalg.norm(weld_relative_v_exe, axis=1) # in mm/s
+    # weld_relative_speed_exe = np.linalg.norm(weld_relative_v_exe, axis=1) # in mm/s
+    weld_relative_speed_exe = deepcopy(weld_relative_v_exe)*np.sign(weld_relative_exe[-1,0]-weld_relative_exe[0,0]) # in mm/s, consider the direction
+    print("weld relative speed sign: ", np.sign(weld_relative_exe[-1,0]-weld_relative_exe[0,0]))
     rob_js_exe = np.loadtxt(this_layer_dir+'weld_js_exe.csv',delimiter=',')
     weld_cmd = np.loadtxt(this_layer_dir+'weld_cmd.csv',delimiter=',')
     # get js at index 1~6 and 13 14
@@ -108,11 +114,12 @@ def main():
     ##### read thermal data ####
     with open(this_layer_dir+'thermal_pixel_trace_stamp_key.pickle', 'rb') as f:
         thermal_pixel_trace = pickle.load(f)
-    thermal_map = [] # a array with Nx4, each row is x,time,temperature,velocity,wire feed rate (related to power)
+    thermal_map = [] # a array with Nx4, each row is time,x,temperature,velocity,wire feed rate (related to power inputs)
     thermal_map_contain_zero = []
-    thermal_dx = [] # a array with Nx3, each row is x,time,dT/dx
-    thermal_dx2 = [] # a array with Nx3, each row is x,time,d2T/dx2
+    thermal_dx = [] # a array with Nx3, each row is time,x,dT/dx
+    thermal_dx2 = [] # a array with Nx3, each row is time,x,d2T/dx2
     thermal_x_sample = np.arange(-81, 98, 0.5) # in mm , relative to weld
+    heat_input_mask = ((thermal_x_sample>=-heat_input_mask_window) & (thermal_x_sample<=heat_input_mask_window)).astype(float)
     thermal_stamp_all = np.sort(np.array(list(thermal_pixel_trace.keys())))
     min_stamp = np.min(thermal_stamp_all)
     for stamp in thermal_stamp_all:
@@ -123,9 +130,11 @@ def main():
         this_stamp_thermal_sample_zero = np.interp(thermal_x_sample, thermal_pixel_trace[stamp]['x']-weld_x, thermal_pixel_trace[stamp]['value'], left=0, right=0)
         this_stamp_thermal_sample = np.interp(thermal_x_sample, thermal_pixel_trace[stamp]['x']-weld_x, thermal_pixel_trace[stamp]['value'])
         thermal_map.extend( np.vstack( (np.ones_like(thermal_x_sample)*(stamp-min_stamp), thermal_x_sample, this_stamp_thermal_sample,\
-                                        np.ones_like(thermal_x_sample)*weld_relative_speed_exe[weld_id], np.ones_like(thermal_x_sample)*weld_cmd[weld_cmd_id, 1]),  ).T.tolist() )
-        thermal_map_contain_zero.extend( np.vstack( (np.ones_like(thermal_x_sample)*(stamp-min_stamp), thermal_x_sample, this_stamp_thermal_sample_zero, \
-                                        np.ones_like(thermal_x_sample)*weld_relative_speed_exe[weld_id], np.ones_like(thermal_x_sample)*weld_cmd[weld_cmd_id, 1]),  ).T.tolist() )
+                                        np.ones_like(thermal_x_sample)*weld_relative_speed_exe[weld_id],\
+                                        heat_input_mask*weld_cmd[weld_cmd_id, -1])  ).T.tolist() )
+        thermal_map_contain_zero.extend(np.vstack( (np.ones_like(thermal_x_sample)*(stamp-min_stamp), thermal_x_sample, this_stamp_thermal_sample_zero,\
+                                        np.ones_like(thermal_x_sample)*weld_relative_speed_exe[weld_id],\
+                                        heat_input_mask*weld_cmd[weld_cmd_id, -1])  ).T.tolist() )
         # this_stamp_thermal_sample_dx = np.gradient(this_stamp_thermal_sample, thermal_x_sample)
         this_stamp_thermal_sample_dx = savgol_filter(this_stamp_thermal_sample, 11, 3, deriv=1, delta=0.5) # window size 11, polynomial order 3
         thermal_dx.extend( np.vstack( (np.ones_like(thermal_x_sample)*(stamp-min_stamp), thermal_x_sample, this_stamp_thermal_sample_dx) ).T.tolist() )
@@ -197,6 +206,67 @@ def main():
         plt.suptitle(f'Layer {layer_n}', fontsize=sup_title_size)
         plt.tight_layout()
         plt.show()
+
+    # solve pointwise linear regression
+    assert len(thermal_map)==len(thermal_dx) and len(thermal_map)==len(thermal_dt) and len(thermal_map)==len(thermal_dx2)
+    print("total thermal data points: ", len(thermal_map))
+
+    # check if each index x and stamps are the same
+    for data_i in range(len(thermal_map)):
+        assert thermal_map[data_i,0]==thermal_dx[data_i,0] and thermal_map[data_i,0]==thermal_dt[data_i,0] and thermal_map[data_i,0]==thermal_dx2[data_i,0]
+        assert thermal_map[data_i,1]==thermal_dx[data_i,1] and thermal_map[data_i,1]==thermal_dt[data_i,1] and thermal_map[data_i,1]==thermal_dx2[data_i,1]
+    print("data check pass!")
+
+    # phi_mat = [U_yy, -U, p(t)Pi(y)]
+    phi_mat = np.vstack((thermal_dx2[:,2], -thermal_map[:,2], thermal_map[:,4])).T
+    # b = [U_t - v(t)U_y]
+    b_vector = thermal_dt[:,2] - thermal_map[:,3] * thermal_dx[:,2]
+
+    print("start solving QP...")
+    # solve qp problem
+    # min ||phi_mat theta - b||^2
+    # where theta = [k, alpha, beta] >=0
+    P = (phi_mat.T @ phi_mat)
+    q = - (b_vector.T @ phi_mat).T
+    G = -np.eye(3)
+    h = np.zeros(3)
+    theta = solve_qp(P, q, G, h, solver='quadprog')
+    print("QP solved!")
+    print(theta)
+    # print("k: %.4f, alpha: %.4f, beta: %.4f"%(theta[0], theta[1], theta[2]))
+
+    # direction psuedo inverse
+    theta_pinv = np.linalg.pinv(phi_mat) @ b_vector
+    print("psuedo inverse solved!")
+    print(theta_pinv)
+    print("k: %.4f, alpha: %.4f, beta: %.4f"%(theta_pinv[0], theta_pinv[1], theta_pinv[2]))
+
+    # fitting error validation #
+    # r(y,t) = U_t - (k U_yy + v(t)U_y - alpha U + beta p(t)Pi(y))
+    res_error = thermal_dt[:,2] - (theta[0]*thermal_dx2[:,2] + thermal_map[:,3]*thermal_dx[:,2] - theta[1]*thermal_map[:,2] + theta[2]*thermal_map[:,4])
+    print("fitting error mean: %.4f, std: %.4f"%(np.mean(np.abs(res_error)), np.std(np.abs(res_error))))
+    # visualize the fitting error distribution
+    plt.figure(figsize=(8,6))
+    plt.hist(np.abs(res_error), bins=500)
+    plt.title('Fitting error distribution histogram', fontsize=title_size)
+    plt.xlabel('Fitting error (dU/dt)', fontsize=xy_label_size)
+    plt.ylabel('Counts', fontsize=xy_label_size)
+    plt.grid()
+    plt.tick_params(axis='both', which='major', labelsize=xy_tick_size)
+    plt.tight_layout()
+    plt.show()
+
+    ##### strong-form regression #####
+    # sort thermal map according to stamp and x
+    thermal_map_sort_stamp_idx = np.argsort(thermal_map[:,0])
+    thermal_map = thermal_map[thermal_map_sort_stamp_idx]
+    for stamp in thermal_stamp_all:
+        stamp_mask = thermal_map[:,0] == stamp
+        # sort this stamp data according to x
+        stamp_sort_x_idx = np.argsort(thermal_map[stamp_mask,1])
+        thermal_map[stamp_mask] = thermal_map[stamp_mask][stamp_sort_x_idx]
+    
+
 
     # with open(this_layer_dir+'ir_recording.pickle', 'rb') as f:
     #     ir_exe = pickle.load(f)
