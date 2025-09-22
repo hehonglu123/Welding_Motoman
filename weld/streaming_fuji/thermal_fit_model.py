@@ -73,11 +73,13 @@ def main():
     
     data_dir = '../../data/wall_weld_test/'
     
-    visualize_thermal_map = False
+    visualize_thermal_map = True
     # parameters
-    heat_input_mask_window = 1.2 # in mm, the window size of the heat input around the weld
-    thermal_x_sample = np.arange(-81, 98, 0.5) # in mm , relative to weld torch center
+    heat_input_mask_window = 1.14 # in mm, the window size of the heat input around the weld
+    # thermal_x_sample = np.arange(-81, 98, 0.5) # in mm , relative to weld torch center
+    thermal_x_sample = np.arange(-30, 30, 0.5) # in mm , relative to weld torch center
     ambient_temp = 8000 # in "temperature unit" (not degree C)
+    skip_stamps = 10
     
     ### example data ##
     ## logdata_dir_name = 'weld_fujiscan_2025_06_12_15_33_03/'
@@ -89,8 +91,8 @@ def main():
     thermal_dt = [] # a array with Nx3, each row is time,x,dT/dt
     
     # log data directory
-    logdata_dir_name_all = ['weld_fujiscan_2025_06_12_15_33_03/','weld_fujiscan_2025_06_12_17_33_24/']
-    # logdata_dir_name_all = ['weld_fujiscan_2025_06_12_17_33_24/']
+    # logdata_dir_name_all = ['weld_fujiscan_2025_06_12_15_33_03/','weld_fujiscan_2025_06_12_17_33_24/']
+    logdata_dir_name_all = ['weld_fujiscan_2025_06_12_15_33_03/']
 
     for logdata_dir_name in logdata_dir_name_all:
         print("===============================")
@@ -109,12 +111,12 @@ def main():
         # for layer_n in [layer_nums[-1],layer_nums[-2]]:
         for layer_n_id, layer_n in enumerate(layer_nums):
             #### debug only one layer ####
-            # if layer_n != 311:
-            #     continue
-            # if layer_n not in [311,330]:
-            #     continue
-            if layer_n_id < len(layer_nums)-6:
+            if layer_n != 311:
                 continue
+            # if layer_n not in [330]:
+            #     continue
+            # if layer_n_id < len(layer_nums)-6:
+            #     continue
             ##############################
 
             print("==========")
@@ -131,6 +133,8 @@ def main():
             print("weld relative speed sign: ", np.sign(weld_relative_exe[-1,0]-weld_relative_exe[0,0]))
             rob_js_exe = np.loadtxt(this_layer_dir+'weld_js_exe.csv',delimiter=',')
             weld_cmd = np.loadtxt(this_layer_dir+'weld_cmd.csv',delimiter=',')
+            print("Average ipm:", np.mean(weld_cmd[:,-1]))
+            print(f"Input speed low:{np.min(weld_cmd[:,-2])}, high:{np.max(weld_cmd[:,-2])}")
             # get js at index 1~6 and 13 14
             rob_js_exe = rob_js_exe[:,[0,1,2,3,4,5,6,13,14]]
             robot_stamps = rob_js_exe[:,0]
@@ -155,25 +159,50 @@ def main():
             layer_thermal_dx2 = [] # a array with Nx3, each row is time,x,d2T/dx2
             heat_input_mask = ((thermal_x_sample>=-heat_input_mask_window) & (thermal_x_sample<=heat_input_mask_window)).astype(float)
             thermal_stamp_all = np.sort(np.array(list(thermal_pixel_trace.keys())))
+            min_stamp = min(thermal_stamp_all)
+            max_stamp = max(thermal_stamp_all)
+
             for stamp in thermal_stamp_all:
+                if stamp-min_stamp<skip_stamps or max_stamp-stamp<skip_stamps:
+                    continue
                 # find current weld x position
                 weld_id = np.argmin(np.abs(weld_stamps - stamp))
                 weld_cmd_id = np.argmin(np.abs(weld_cmd[:,0] - stamp))
                 weld_x = weld_relative_exe[weld_id,0]
                 this_stamp_thermal_sample_zero = np.interp(thermal_x_sample, thermal_pixel_trace[stamp]['x']-weld_x, thermal_pixel_trace[stamp]['value']-ambient_temp, left=0, right=0)
-                this_stamp_thermal_sample = np.interp(thermal_x_sample, thermal_pixel_trace[stamp]['x']-weld_x, thermal_pixel_trace[stamp]['value']-ambient_temp)
+                this_stamp_thermal_sample_raw = np.interp(thermal_x_sample, thermal_pixel_trace[stamp]['x']-weld_x, thermal_pixel_trace[stamp]['value']-ambient_temp)
+                # polyfit data
+                this_stamp_thermal_sample = np.poly1d(np.polyfit(thermal_x_sample, this_stamp_thermal_sample_raw, 50))(thermal_x_sample)
+                # without polyfit data
+                # this_stamp_thermal_sample = this_stamp_thermal_sample_raw
+                ###################
+
                 layer_thermal_map.extend( np.vstack( (np.ones_like(thermal_x_sample)*(stamp), thermal_x_sample, this_stamp_thermal_sample,\
                                                 np.ones_like(thermal_x_sample)*weld_relative_speed_exe[weld_id],\
                                                 heat_input_mask*weld_cmd[weld_cmd_id, -1])  ).T.tolist() )
                 layer_thermal_map_contain_zero.extend(np.vstack( (np.ones_like(thermal_x_sample)*(stamp), thermal_x_sample, this_stamp_thermal_sample_zero,\
                                                 np.ones_like(thermal_x_sample)*weld_relative_speed_exe[weld_id],\
                                                 heat_input_mask*weld_cmd[weld_cmd_id, -1])  ).T.tolist() )
-                # this_stamp_thermal_sample_dx = np.gradient(this_stamp_thermal_sample, thermal_x_sample)
-                this_stamp_thermal_sample_dx = savgol_filter(this_stamp_thermal_sample, 11, 3, deriv=1, delta=0.5) # window size 11, polynomial order 3
+                this_stamp_thermal_sample_dx = np.gradient(this_stamp_thermal_sample, thermal_x_sample)
+                # this_stamp_thermal_sample_dx = savgol_filter(this_stamp_thermal_sample, 11, 3, deriv=1, delta=0.5) # window size 11, polynomial order 3
                 layer_thermal_dx.extend( np.vstack( (np.ones_like(thermal_x_sample)*(stamp), thermal_x_sample, this_stamp_thermal_sample_dx) ).T.tolist() )
-                # this_stamp_thermal_sample_dx2 = np.gradient(this_stamp_thermal_sample_dx, thermal_x_sample) # second derivative
-                this_stamp_thermal_sample_dx2 = savgol_filter(this_stamp_thermal_sample, 11, 3, deriv=2, delta=0.5) # window size 11, polynomial order 3
+                this_stamp_thermal_sample_dx2 = np.gradient(this_stamp_thermal_sample_dx, thermal_x_sample) # second derivative
+                # this_stamp_thermal_sample_dx2 = savgol_filter(this_stamp_thermal_sample, 11, 3, deriv=2, delta=0.5) # window size 11, polynomial order 3
                 layer_thermal_dx2.extend( np.vstack( (np.ones_like(thermal_x_sample)*(stamp), thermal_x_sample, this_stamp_thermal_sample_dx2) ).T.tolist() )
+
+                # visualie the thermal map for verification, and try poly fit
+                plt.clf()
+                plt.plot(thermal_x_sample, this_stamp_thermal_sample_raw, '-o')
+                # plt.plot(thermal_pixel_trace[stamp]['x']-weld_x,np.poly1d(np.polyfit(thermal_pixel_trace[stamp]['x']-weld_x, thermal_pixel_trace[stamp]['value']-ambient_temp, 30))(thermal_x_sample), '--')
+                # plt.plot(thermal_x_sample,np.poly1d(np.polyfit(thermal_x_sample, this_stamp_thermal_sample, 30))(thermal_x_sample), '--')
+                plt.plot(thermal_x_sample,this_stamp_thermal_sample, '--')
+                plt.title('Layer %d, stamp %.2f s'%(layer_n, stamp), fontsize=title_size)
+                plt.xlabel('x relative to weld (mm)', fontsize=xy_label_size)
+                plt.ylabel('thermal (temperature unit)', fontsize=xy_label_size)
+                plt.tick_params(axis='both', which='major', labelsize=xy_tick_size)
+                plt.grid()
+                plt.pause(0.03)
+
             layer_thermal_map = np.array(layer_thermal_map)
             layer_thermal_map_contain_zero = np.array(layer_thermal_map_contain_zero)
             layer_thermal_dx = np.array(layer_thermal_dx)
@@ -183,8 +212,8 @@ def main():
             for x in thermal_x_sample:
                 this_x_id = np.where(layer_thermal_map[:,1]==x)[0]
                 this_x_stamp = layer_thermal_map[this_x_id,0]
-                # this_dthermal_dt = np.gradient(thermal_map[this_x_id,2], this_x_stamp)
-                this_dthermal_dt = savgol_filter(layer_thermal_map[this_x_id,2], 11, 3, deriv=1, delta=np.mean(np.diff(this_x_stamp))) # window size 11, polynomial order 3
+                this_dthermal_dt = np.gradient(layer_thermal_map[this_x_id,2], this_x_stamp)
+                # this_dthermal_dt = savgol_filter(layer_thermal_map[this_x_id,2], 11, 3, deriv=1, delta=np.mean(np.diff(this_x_stamp))) # window size 11, polynomial order 3
                 layer_thermal_dt[this_x_id,2] = this_dthermal_dt
                 layer_thermal_dt[this_x_id,0] = this_x_stamp
                 layer_thermal_dt[this_x_id,1] = x
@@ -206,10 +235,10 @@ def main():
                 # visualization for verification
                 # ---------- data wrappers ----------
                 # Expecting arrays shaped (N, 3): [:,0]=time; [:,1]=x; [:,2]=value
-                TM  = thermal_map
-                DX  = thermal_dx
-                DX2 = thermal_dx2
-                DT  = thermal_dt
+                TM  = layer_thermal_map
+                DX  = layer_thermal_dx
+                DX2 = layer_thermal_dx2
+                DT  = layer_thermal_dt
                 # Choose normalization style:
                 # - For broad dynamic range in derivatives, symlog=True helps a lot.
                 use_symlog = True         # try True first; set to False if you prefer linear
