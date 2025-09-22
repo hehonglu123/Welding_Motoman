@@ -111,11 +111,11 @@ def get_weld_shift_x(profile_height):
 
 def main():
     
-    weld_arcon = False
-    welder_log = False
-    fuji_scanon = False
-    scan_online_process = False
-    thermal_on = False
+    weld_arcon = True
+    welder_log = True
+    fuji_scanon = True
+    scan_online_process = True
+    thermal_on = True
     input_from_user = False
     SIMULATION = False
     simulation_save_control_state_fig = False
@@ -276,7 +276,7 @@ def main():
     # collision avoidance z offset
     safety_z_offset = 50
     # direction 
-    torch_ori_fix = False # torch orientation fixed
+    torch_ori_fix = True # torch orientation fixed
     # lookahead distance
     lookahead_distance = 1 # mm
     # which layer to start correction
@@ -355,12 +355,12 @@ def main():
                             [-3.94089885e-03 , 1.41515917e-02 , 9.99892095e-01, -5.01743907e+00],\
                             [ 0.00000000e+00 , 0.00000000e+00 , 0.00000000e+00 , 1.00000000e+00]])
         last_profile_height = None
-    # logdata_dir = '../../data/wall_weld_test/weld_fujicontrol_2025_09_18_13_21_41/'
-    # Transz0_H = np.array([[ 9.99992234e-01 , 2.78865002e-05 , 3.94089885e-03, -1.97753537e-02],\
-    #                     [ 2.78865002e-05,  9.99899861e-01, -1.41515917e-02 , 7.10124116e-02],\
-    #                     [-3.94089885e-03 , 1.41515917e-02 , 9.99892095e-01, -5.01743907e+00],\
-    #                     [ 0.00000000e+00 , 0.00000000e+00 , 0.00000000e+00 , 1.00000000e+00]])
-    # last_profile_height = np.loadtxt(logdata_dir+'layer85/profile_height.csv', delimiter=',') # load the last profile height
+    logdata_dir = '../../data/wall_weld_test/weld_fujicontrol_2025_09_22_17_10_07/'
+    Transz0_H = np.array([[ 9.99994281e-01 , 2.85367605e-06 , 3.38210714e-03, -2.01219324e-02],\
+                            [ 2.85367605e-06 , 9.99998576e-01, -1.68750766e-03 , 1.00398697e-02],\
+                            [-3.38210714e-03 , 1.68750766e-03,  9.99992857e-01, -5.94948291e+00],\
+                            [ 0.00000000e+00 , 0.00000000e+00,  0.00000000e+00,  1.00000000e+00]])
+    last_profile_height = np.loadtxt(logdata_dir+'layer45/profile_height.csv', delimiter=',') # load the last profile height
     #################################################3
 
     ##### weld meta data #####
@@ -401,11 +401,11 @@ def main():
     input("Ready to start? Press Enter to continue...")
     ################## print layers ##################
     arc_off=True
-    forward = True
+    forward = False
 
     mean_layer_height = 0
-    for weld_parts in ['base','layer']:
-    # for weld_parts in ['layer']:
+    # for weld_parts in ['base','layer']:
+    for weld_parts in ['layer']:
         if weld_parts == 'base':
             weld_start = baselayer_start
             # weld_start = 1
@@ -413,17 +413,17 @@ def main():
             nom_incre = base_nom_incre
         else:
             weld_start = layer_start
-            # weld_start = 99
+            weld_start = 59
             weld_end = layer_end
             # weld_end = 36
             nom_incre = layer_nom_incre
-            if weld_start == 0:
-            # if weld_start == 99:
+            # if weld_start == 0:
+            if weld_start == 59:
                 base_layer_height = np.loadtxt(logdata_dir+'baselayer1/profile_height.csv', delimiter=',')
                 shift_weld_profile_x = 0 if base_layer_height is None else get_weld_shift_x(base_layer_height)
                 print("Shift Weld Profile X:", shift_weld_profile_x)
 
-        layer_count = 0
+        layer_count = 3
         i=weld_start
         print("Welding parts:",weld_parts)
         print("Start layer:",weld_start,"End layer:",weld_end,"Nominal Increment:",nom_incre)
@@ -441,8 +441,8 @@ def main():
             try:
                 if torch_ori_fix:
                     print("Torch Orientation Fixed")
-                    # curve_direction = 'backward'
-                    curve_direction = 'forward'
+                    curve_direction = 'backward'
+                    # curve_direction = 'forward'
                 elif forward:
                     curve_direction = 'forward'
                 else:

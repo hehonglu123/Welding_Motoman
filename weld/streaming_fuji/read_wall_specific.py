@@ -113,7 +113,7 @@ def main():
     
     ############## choose data directory ##############
     data_dir = '../../data/wall_weld_test/'
-    logdata_dir_name = 'weld_fujiscan_2025_09_18_12_11_55/'
+    logdata_dir_name = 'weld_fujicontrol_2025_09_22_16_58_55/'
     logdata_dir = data_dir+logdata_dir_name
 
     ##### layer, basic infos ####
