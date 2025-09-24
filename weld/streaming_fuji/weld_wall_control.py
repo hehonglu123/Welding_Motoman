@@ -348,19 +348,22 @@ def main():
     read_from_file_layer = False
     Transz0_H=None
     last_profile_height = None
+    forward = True
+    mean_layer_height = 0
+    weld_parts_all = ['base','layer']
     if read_from_file_layer:
-        logdata_dir = '../../data/wall_weld_test/weld_fujicontrol_2025_09_18_12_27_30/'
-        Transz0_H = np.array([[ 9.99992234e-01 , 2.78865002e-05 , 3.94089885e-03, -1.97753537e-02],\
-                            [ 2.78865002e-05,  9.99899861e-01, -1.41515917e-02 , 7.10124116e-02],\
-                            [-3.94089885e-03 , 1.41515917e-02 , 9.99892095e-01, -5.01743907e+00],\
-                            [ 0.00000000e+00 , 0.00000000e+00 , 0.00000000e+00 , 1.00000000e+00]])
-        last_profile_height = None
-    logdata_dir = '../../data/wall_weld_test/weld_fujicontrol_2025_09_22_17_10_07/'
-    Transz0_H = np.array([[ 9.99994281e-01 , 2.85367605e-06 , 3.38210714e-03, -2.01219324e-02],\
-                            [ 2.85367605e-06 , 9.99998576e-01, -1.68750766e-03 , 1.00398697e-02],\
-                            [-3.38210714e-03 , 1.68750766e-03,  9.99992857e-01, -5.94948291e+00],\
-                            [ 0.00000000e+00 , 0.00000000e+00,  0.00000000e+00,  1.00000000e+00]])
-    last_profile_height = np.loadtxt(logdata_dir+'layer45/profile_height.csv', delimiter=',') # load the last profile height
+        logdata_dir = '../../data/wall_weld_test/weld_fujicontrol_2025_09_22_17_10_07/'
+        Transz0_H = np.loadtxt(logdata_dir+'Transz0_H.csv', delimiter=',') # load the last Transz0_H
+        last_layer_n=26
+        layer_start = 45
+        last_profile_height = np.loadtxt(logdata_dir+'layer'+str(last_layer_n)+'/profile_height.csv', delimiter=',') # load the last profile height
+        weld_parts_all = ['layer']
+        weld_cmd = np.loadtxt(logdata_dir+'layer'+str(layer_start)+'/weld_cmd.csv', delimiter=',')
+        if weld_cmd[0,2] < weld_cmd[-1,2]: # compare the x value of the start and end point
+            forward = True
+        else:
+            forward = False
+
     #################################################3
 
     ##### weld meta data #####
@@ -400,12 +403,10 @@ def main():
     print("Control start layer:",correction_layer_start)
     input("Ready to start? Press Enter to continue...")
     ################## print layers ##################
+    
     arc_off=True
-    forward = False
-
-    mean_layer_height = 0
-    # for weld_parts in ['base','layer']:
-    for weld_parts in ['layer']:
+    for weld_parts in weld_parts_all:
+    # for weld_parts in ['layer']:
         if weld_parts == 'base':
             weld_start = baselayer_start
             # weld_start = 1
@@ -413,20 +414,29 @@ def main():
             nom_incre = base_nom_incre
         else:
             weld_start = layer_start
-            weld_start = 59
             weld_end = layer_end
-            # weld_end = 36
             nom_incre = layer_nom_incre
-            # if weld_start == 0:
-            if weld_start == 59:
-                base_layer_height = np.loadtxt(logdata_dir+'baselayer1/profile_height.csv', delimiter=',')
-                shift_weld_profile_x = 0 if base_layer_height is None else get_weld_shift_x(base_layer_height)
-                print("Shift Weld Profile X:", shift_weld_profile_x)
+            base_layer_height = np.loadtxt(logdata_dir+'baselayer1/profile_height.csv', delimiter=',')
+            shift_weld_profile_x = 0 if base_layer_height is None else get_weld_shift_x(base_layer_height)
+            print("Shift Weld Profile X:", shift_weld_profile_x)
 
-        layer_count = 3
+        if not read_from_file_layer:
+            layer_count = 0
+        else:
+            total_layers_name = glob.glob(sim_folder+'layer*')
+            # get printed layer number
+            layer_nums = []
+            for layer_name in total_layers_name:
+                this_layer = layer_name.split('\\')[-1]
+                this_layer = this_layer.split('r')[-1]
+                layer_nums.append(int(this_layer))
+            layer_nums = np.sort(layer_nums)
+            layer_count = np.where(layer_nums==weld_start)[0][0]
+
         i=weld_start
         print("Welding parts:",weld_parts)
         print("Start layer:",weld_start,"End layer:",weld_end,"Nominal Increment:",nom_incre)
+        print("Forward:",forward,"Current layer count:", layer_count)
         input("Press Enter to continue...")
         while i < weld_end:
             if weld_parts == 'layer':
@@ -921,7 +931,9 @@ def main():
                     weld_js_exe = np.loadtxt(logdata_dir+layer_name+f'/weld_js_exe.csv',delimiter=',')
                     with open(logdata_dir+layer_name+f'/scan_exe.pickle', 'rb') as f:
                         scan_exe = pickle.load(f)
-                
+                    with open(logdata_dir+layer_name+f'/scan_exe_noise_remove.pickle', 'rb') as f:
+                        scan_exe_noise_remove = pickle.load(f)
+
                 # assert len(stamps_exe) == len(scan_exe), f'Length of stamps_exe {len(stamps_exe)} and scan_exe {len(scan_exe)} do not match!'
                 ################### get layer increments ############################
                 if weld_arcon:
@@ -959,6 +971,8 @@ def main():
                     profile_width[:,1] = np.convolve(profile_width[:,1], np.ones(5)/5, mode='same')
                     print("Transz0_H:",Transz0_H)
                     np.savetxt(logdata_dir+layer_name+f'/profile_height.csv', profile_height, delimiter=',')
+                    np.savetxt(logdata_dir+layer_name+f'/profile_width.csv', profile_width, delimiter=',')
+                    np.savetxt(logdata_dir+f'/Transz0_H.csv', Transz0_H, delimiter=',')
                     o3d.io.write_point_cloud(logdata_dir+layer_name+f'/pcd.pcd',pcd)
 
                     # update loglog-rls recursive least square
