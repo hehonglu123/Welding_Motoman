@@ -113,12 +113,12 @@ def main():
     
     ############## choose data directory ##############
     data_dir = '../../data/wall_weld_test/'
-    logdata_dir_name = 'weld_fujicontrol_2025_09_22_17_10_07/'
+    logdata_dir_name = 'weld_fujicontrol_2025_09_24_12_06_39/'
     logdata_dir = data_dir+logdata_dir_name
 
     ##### layer, basic infos ####
     last_layer_n = 19
-    layer_n = 26
+    layer_n = 135
     layer_name = 'layer'+str(layer_n)
     # layer_name = 'baselayer1'
     last_layer_name = 'layer'+str(last_layer_n)
