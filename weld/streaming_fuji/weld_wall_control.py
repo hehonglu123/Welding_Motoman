@@ -912,7 +912,8 @@ def main():
                         np.savetxt(logdata_dir+layer_name+f'/js_cmd.csv', q_cmd_all, delimiter=',') # save welding/scanning commanded joint space data
                         np.savetxt(logdata_dir+layer_name+f'/weld_cmd.csv', welding_cmd_all, delimiter=',') # save welding commands
                         np.savetxt(logdata_dir+f'fujicam.csv', fuji_tool_H, delimiter=',') # save fujicam to flange tool0 transformation
-                        np.savetxt(logdata_dir+layer_name+f'/flir.csv', flir_tool_H, delimiter=',') # save thermal cam to flange tool0 transformation
+                        np.savetxt(logdata_dir+f'/flir.csv', flir_tool_H, delimiter=',') # save thermal cam to flange tool0 transformation
+                        np.savetxt(logdata_dir+f'/torch.csv', torch_tool_H_calib, delimiter=',') # save torch to flange tool0 transformation
                         if layer_count >= correction_layer_start:
                             np.savetxt(logdata_dir+layer_name+f'/control_status_log.csv', control_status_log, delimiter=',') # save control status log if controlling
                         if fuji_scanon:

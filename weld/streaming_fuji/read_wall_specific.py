@@ -4,6 +4,7 @@ from copy import deepcopy
 import numpy as np
 from scipy.signal import find_peaks
 from scipy.interpolate import CubicSpline, LinearNDInterpolator
+from scipy.io import savemat
 from matplotlib import pyplot as plt
 import open3d as o3d
 import cv2 as cv
@@ -98,6 +99,7 @@ def main():
     test_read_thermal = False
     reverse_thermal_pixel_trace = False
     viz_line_scan = False
+    save_2D_thermal_map = False
 
     ############## Robot definition ##############
     config_dir='../../config/'
@@ -118,7 +120,7 @@ def main():
 
     ##### layer, basic infos ####
     last_layer_n = 19
-    layer_n = 135
+    layer_n = 99
     layer_name = 'layer'+str(layer_n)
     # layer_name = 'baselayer1'
     last_layer_name = 'layer'+str(last_layer_n)
@@ -1333,6 +1335,50 @@ def main():
             plt.title('Cross Section at X: {:.2f} mm, cmd V: {:.2f} mm, cmd FR: {:.2f} mm'.format(x_wp, profile_welding[weld_id, 2], profile_welding[weld_id, 3]))
             plt.grid()
             plt.pause(0.001)
+
+    ###### turn thermal pickel file to 3D array .mat file #####
+    if reverse_thermal_pixel_trace:
+        logdata_dir_all = ['weld_fujiscan_2025_06_11_16_27_41/','weld_fujiscan_2025_06_11_16_52_36/','weld_fujiscan_2025_06_11_17_16_48/',\
+                       'weld_fujiscan_2025_06_11_17_49_27/','weld_fujiscan_2025_06_11_18_14_56/','weld_fujiscan_2025_06_12_17_33_24/',\
+                       'weld_fujiscan_2025_06_12_16_59_09/','weld_fujiscan_2025_06_12_15_33_03/','weld_fujiscan_2025_06_12_15_03_27/',\
+                       'weld_fujiscan_2025_07_09_14_52_42/','weld_fujiscan_2025_07_09_15_21_35/','weld_fujiscan_2025_07_09_16_16_40/']
+        cam_pixel_moving_ratio = 1.77 # 1.77 pixel per mm
+
+        for logdata_dir_name in logdata_dir_all:
+            print('Processing:',logdata_dir_name)
+            logdata_dir = data_dir+logdata_dir_name
+            for weld_parts in ['base','layer']:
+                if weld_parts == 'base':
+                    total_layers_name = glob.glob(logdata_dir+'baselayer*')
+                else:
+                    total_layers_name = glob.glob(logdata_dir+'layer*')
+                # get printed layer number
+                layer_nums = []
+                for layer_name in total_layers_name:
+                    this_layer = layer_name.split('\\')[-1]
+                    this_layer = this_layer.split('r')[-1]
+                    layer_nums.append(int(this_layer))
+                layer_nums = np.sort(layer_nums)
+
+                for layer_n_id, layer_n in enumerate(layer_nums):
+                    # read logged data
+                    if weld_parts == 'base':
+                        layer_name = 'baselayer'+str(layer_n)
+                    else:
+                        layer_name = 'layer'+str(layer_n)
+                    print('Processing layer:',layer_name)
+                    this_layer_dir = logdata_dir+layer_name+'/'
+
+                    with open(this_layer_dir+'ir_recording.pickle', 'rb') as f:
+                        ir_exe = pickle.load(f)
+                    ir_stamp = np.loadtxt(this_layer_dir+'ir_stamps.csv',delimiter=',')
+                    thermal_reading = np.loadtxt(this_layer_dir+'thermal_reading.csv',delimiter=',',skiprows=1) # collected flame pixel location
+                    weld_relative_exe = np.loadtxt(this_layer_dir+'weld_relative_exe.csv',delimiter=',',skiprows=1) # relative to the first point
+                    robot_stamps_exe = np.loadtxt(this_layer_dir+'weld_js_exe.csv',delimiter=',',skiprows=1)
+                    robot_stamps_exe = robot_stamps_exe[:,0]
+
+                    
+
 
 if __name__ == "__main__":
     
