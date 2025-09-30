@@ -4,6 +4,7 @@ from copy import deepcopy
 import numpy as np
 from scipy.signal import find_peaks
 from scipy.interpolate import CubicSpline
+from scipy.io import savemat
 from matplotlib import pyplot as plt
 import open3d as o3d
 import cv2 as cv
@@ -86,6 +87,7 @@ def main():
     data_dir = '../../data/wall_weld_test/'
 
     run_thermal = True
+    run_thermal2mat = True
     run_geometry = True
     run_compile = True
 
@@ -237,6 +239,7 @@ def main():
                     weld_js_exe = rob_js_exe[:weld_split_id+1,:]
                 else:
                     weld_js_exe = rob_js_exe[weld_split_id+1:,:]
+                weld_stamps = weld_js_exe[:,0]
 
                 ############### get welding status ##############
                 print("Getting welding status...")
@@ -742,6 +745,43 @@ def main():
                     np.savetxt(this_layer_dir+'profile_welding.csv',profile_welding,delimiter=',',header=header)
                     last_profile_height = profile_height
 
+                ############### convert thermal to .mat file ##############
+                if run_thermal2mat:
+                    with open(this_layer_dir+'ir_recording.pickle', 'rb') as f:
+                        ir_exe = pickle.load(f)
+                    ir_stamps = np.loadtxt(this_layer_dir+'ir_stamps.csv',delimiter=',')
+                    profile_cmd = np.loadtxt(this_layer_dir+'profile_welding.csv',delimiter=',',skiprows=1)[:,[0,2,3]] # time, cmd_v, cmd_feedrate
+                    # find pixel location vs workpiece frame
+                    flame_centroid_pix_location = thermal_reading[len(thermal_reading)//2-5:len(thermal_reading)//2+5,2:] # use the middle point as the representative
+                    flame_centroid_pix_location_mean = np.mean(flame_centroid_pix_location, axis=0).astype(int)
+                    weld_relative_center_exe = weld_relative_exe[np.argmin(np.abs(weld_stamps-thermal_reading[len(thermal_reading)//2,0]))]
+
+                    #### two lists
+                    #### list 1: a list of 2D array storing the thermal image at each timestamp (ir_exe)
+                    #### list 2: a list of timestamps, x, y, z in workpiece frame, and flame pixel location (thermal_reading)
+                    thermal_matrix_list = []
+                    thermal_info_list = []
+                    for ir_id, (ir_stamp, ir_image) in enumerate(zip(ir_stamps, ir_exe)):
+                        if ir_stamp not in thermal_reading[:,0]:
+                            print("Skipping IR frame due to no detecting flame")
+                            continue
+                        # find the closest timestamp in thermal_reading
+                        closest_thermal_id = np.argmin(np.abs(thermal_reading[:,0]-ir_stamp))
+                        closest_weld_pos = weld_relative_exe[np.argmin(np.abs(weld_stamps-ir_stamp))]
+                        closest_cmd = profile_cmd[np.argmin(np.abs(profile_cmd[:,0]-ir_stamp))]
+                        # adjust weld z position due to uneven weld base
+                        weld_z = weld_relative_center_exe[2]+cam_pixel_moving_ratio*(flame_centroid_pix_location_mean[1]-thermal_reading[closest_thermal_id,3])
+                        weld_x = closest_weld_pos[0]
+                        weld_y = closest_weld_pos[1]
+                        # append to list
+                        thermal_matrix_list.append(ir_image)
+                        thermal_info_list.append(np.array([ir_stamp, weld_x, weld_y, weld_z, np.ones(thermal_reading[closest_thermal_id,2].shape)*flame_centroid_pix_location_mean[0], thermal_reading[closest_thermal_id,3], closest_cmd[1], closest_cmd[2]]))
+                    thermal_info_list = np.array(thermal_info_list)
+                    thermal_matrix_list = np.array(thermal_matrix_list)
+
+                    # save to .mat files
+                    savemat(this_layer_dir+'thermal_map.mat', {'thermal_matrix_list': thermal_matrix_list, 'thermal_info_list': thermal_info_list, 'ImageColumn2dxmm': cam_pixel_moving_ratio, 'ImageRow2dzmm': cam_pixel_moving_ratio})
+                
                 print("Finished processing layer:",layer_name)
                 print("=====================================")
 

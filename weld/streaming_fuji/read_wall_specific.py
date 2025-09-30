@@ -91,7 +91,7 @@ def main():
     test_current = False
     test_thermal = False
     test_thermal_collected = False
-    test_pcd = True
+    test_pcd = False
     test_geometry = False
     test_weld_shift = False
     get_statistics = False
@@ -99,7 +99,7 @@ def main():
     test_read_thermal = False
     reverse_thermal_pixel_trace = False
     viz_line_scan = False
-    save_2D_thermal_map = False
+    save_2D_thermal_map = True
 
     ############## Robot definition ##############
     config_dir='../../config/'
@@ -1337,11 +1337,12 @@ def main():
             plt.pause(0.001)
 
     ###### turn thermal pickel file to 3D array .mat file #####
-    if reverse_thermal_pixel_trace:
+    if save_2D_thermal_map:
         logdata_dir_all = ['weld_fujiscan_2025_06_11_16_27_41/','weld_fujiscan_2025_06_11_16_52_36/','weld_fujiscan_2025_06_11_17_16_48/',\
                        'weld_fujiscan_2025_06_11_17_49_27/','weld_fujiscan_2025_06_11_18_14_56/','weld_fujiscan_2025_06_12_17_33_24/',\
                        'weld_fujiscan_2025_06_12_16_59_09/','weld_fujiscan_2025_06_12_15_33_03/','weld_fujiscan_2025_06_12_15_03_27/',\
                        'weld_fujiscan_2025_07_09_14_52_42/','weld_fujiscan_2025_07_09_15_21_35/','weld_fujiscan_2025_07_09_16_16_40/']
+        # logdata_dir_all = ['weld_fujiscan_2025_07_09_14_52_42/','weld_fujiscan_2025_07_09_15_21_35/','weld_fujiscan_2025_07_09_16_16_40/']
         cam_pixel_moving_ratio = 1.77 # 1.77 pixel per mm
 
         for logdata_dir_name in logdata_dir_all:
@@ -1371,14 +1372,61 @@ def main():
 
                     with open(this_layer_dir+'ir_recording.pickle', 'rb') as f:
                         ir_exe = pickle.load(f)
-                    ir_stamp = np.loadtxt(this_layer_dir+'ir_stamps.csv',delimiter=',')
-                    thermal_reading = np.loadtxt(this_layer_dir+'thermal_reading.csv',delimiter=',',skiprows=1) # collected flame pixel location
-                    weld_relative_exe = np.loadtxt(this_layer_dir+'weld_relative_exe.csv',delimiter=',',skiprows=1) # relative to the first point
-                    robot_stamps_exe = np.loadtxt(this_layer_dir+'weld_js_exe.csv',delimiter=',',skiprows=1)
-                    robot_stamps_exe = robot_stamps_exe[:,0]
+                    ir_stamps = np.loadtxt(this_layer_dir+'ir_stamps.csv',delimiter=',')
+                    thermal_reading = np.loadtxt(this_layer_dir+'thermal.csv',delimiter=',') # collected flame pixel location
+                    weld_relative_exe = np.loadtxt(this_layer_dir+'weld_relative_exe.csv',delimiter=',') # relative to the first point
+                    profile_cmd = np.loadtxt(this_layer_dir+'profile_welding.csv',delimiter=',',skiprows=1) # time, cmd_v, cmd_feedrate
+                    profile_cmd = profile_cmd[:,[0,2,3]]
 
-                    
+                    robot_stamps_exe = np.loadtxt(this_layer_dir+'weld_js_exe.csv',delimiter=',')[:,0]
+                    weld_cmd = np.loadtxt(this_layer_dir+'weld_cmd.csv',delimiter=',')
+                    stamps_diff_sorted = np.argsort(np.diff(robot_stamps_exe))[::-1]
+                    for stamp_diff_id in stamps_diff_sorted:
+                        # make sure to find the time jump after the welding command
+                        if robot_stamps_exe[stamp_diff_id] > weld_cmd[-1,0] and robot_stamps_exe[stamp_diff_id] < weld_cmd[-1,0]+3:
+                            weld_split_id = stamp_diff_id
+                            break
+                    # weld_split_id = np.argmax(np.diff(robot_stamps))
+                    robot_stamps_exe = robot_stamps_exe[:weld_split_id+1]
 
+                    assert len(weld_relative_exe) == len(robot_stamps_exe), "Length of weld_relative_exe and robot_stamps_exe do not match!"
+
+                    # find pixel location vs workpiece frame
+                    flame_centroid_pix_location = thermal_reading[len(thermal_reading)//2-5:len(thermal_reading)//2+5,2:] # use the middle point as the representative
+                    flame_centroid_pix_location_mean = np.mean(flame_centroid_pix_location, axis=0).astype(int)
+                    weld_relative_center_exe = weld_relative_exe[np.argmin(np.abs(robot_stamps_exe-thermal_reading[len(thermal_reading)//2,0]))]
+
+                    # # find welding direction
+                    # weld_direction = 1 if weld_relative_exe[-1,0]-weld_relative_exe[0,0]>0 else -1
+
+                    #### two lists
+                    #### list 1: a list of 2D array storing the thermal image at each timestamp (ir_exe)
+                    #### list 2: a list of timestamps, x, y, z in workpiece frame, and flame pixel location (thermal_reading)
+                    thermal_matrix_list = []
+                    thermal_info_list = []
+                    for ir_id, (ir_stamp, ir_image) in enumerate(zip(ir_stamps, ir_exe)):
+                        if ir_stamp not in thermal_reading[:,0]:
+                            print("Skipping IR frame due to no detecting flame")
+                            continue
+                        # find the closest timestamp in thermal_reading
+                        closest_thermal_id = np.argmin(np.abs(thermal_reading[:,0]-ir_stamp))
+                        closest_weld_pos = weld_relative_exe[np.argmin(np.abs(robot_stamps_exe-ir_stamp))]
+                        closest_cmd = profile_cmd[np.argmin(np.abs(profile_cmd[:,0]-ir_stamp))]
+                        # adjust weld z position due to uneven weld base
+                        weld_z = weld_relative_center_exe[2]+cam_pixel_moving_ratio*(flame_centroid_pix_location_mean[1]-thermal_reading[closest_thermal_id,3])
+                        weld_x = closest_weld_pos[0]
+                        weld_y = closest_weld_pos[1]
+                        # append to list
+                        thermal_matrix_list.append(ir_image)
+                        thermal_info_list.append(np.array([ir_stamp, weld_x, weld_y, weld_z, np.ones(thermal_reading[closest_thermal_id,2].shape)*flame_centroid_pix_location_mean[0], thermal_reading[closest_thermal_id,3], closest_cmd[1], closest_cmd[2]]))
+                    thermal_info_list = np.array(thermal_info_list)
+                    thermal_matrix_list = np.array(thermal_matrix_list)
+
+                    # save to .mat files
+                    savemat(this_layer_dir+'thermal_map.mat', {'thermal_matrix_list': thermal_matrix_list, 'thermal_info_list': thermal_info_list, 'ImageColumn2dxmm': cam_pixel_moving_ratio, 'ImageRow2dzmm': cam_pixel_moving_ratio})
+
+
+    ######
 
 if __name__ == "__main__":
     
