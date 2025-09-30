@@ -77,6 +77,16 @@ def main():
         base_marker_config_file=config_dir+'MA2010_marker_config/MA2010_marker_config.yaml',tool_marker_config_file=config_dir+'weldgun_marker_config/weldgun_marker_config.yaml')
     robot_scan=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path=config_dir+'fujicam.csv',\
         pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv')
+    fuji_tool_H = deepcopy(H_from_RT(robot_scan.R_tool, robot_scan.p_tool))
+    torch_tool_H_origin = deepcopy(H_from_RT(robot_weld.R_tool, robot_weld.p_tool))
+    # torch_tool_H_calib = np.array([[ 9.99997852e-01 , 1.56713800e-03 , 6.95508436e-04 , 2.79923245e+02],\
+    #                                [-1.56713800e-03 , 9.99998763e-01 ,-2.91540649e-04 , 1.45784766e+02],\
+    #                                [-6.95508436e-04 , 2.91540649e-04 , 9.99999707e-01 , 1.18566260e+03],\
+    #                                [ 0.00000000e+00 , 0.00000000e+00 , 0.00000000e+00 , 1.00000000e+00]]) # a place holder, to be replaced by actual calibration
+    torch_tool_H_calib = deepcopy(torch_tool_H_origin)
+    # torch_tool_H_calib[3,2] -= 5
+    tool_different = True if np.any(torch_tool_H_origin != torch_tool_H_calib) else False
+
     # get fujicam standoff distance
     # Move the fujicam frame along the z-axis with the distance of the standoff distance
     # will locate the frame onto 
@@ -88,6 +98,7 @@ def main():
         pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv')
     robot_thermal=robot_obj('MA1440_A0',def_path=config_dir+'MA1440_A0_robot_default_config.yml',tool_file_path=config_dir+'flir.csv',\
 	                        pulse2deg_file_path=config_dir+'MA1440_A0_pulse2deg_real.csv',base_transformation_file=config_dir+'MA1440_pose.csv')
+    flir_tool_H = deepcopy(H_from_RT(robot_thermal.R_tool, robot_thermal.p_tool))
     positioner=positioner_obj('D500B',def_path=config_dir+'D500B_robot_default_config.yml',tool_file_path=config_dir+'positioner_tcp.csv',\
         base_transformation_file=config_dir+'D500B_pose.csv',pulse2deg_file_path=config_dir+'D500B_pulse2deg_real.csv',\
         base_marker_config_file=config_dir+'D500B_marker_config/D500B_marker_config.yaml',tool_marker_config_file=config_dir+'positioner_tcp_marker_config/positioner_tcp_marker_config.yaml')
@@ -676,6 +687,8 @@ def main():
                     np.savetxt(logdata_dir+layer_name+f'/js_cmd.csv', q_cmd_all, delimiter=',') # save welding/scanning commanded joint space data
                     np.savetxt(logdata_dir+layer_name+f'/weld_cmd.csv', welding_cmd_all, delimiter=',') # save welding commands
                     np.savetxt(logdata_dir+f'fujicam.csv', fuji_tool_H, delimiter=',') # save fujicam to flange tool0 transformation
+                    np.savetxt(logdata_dir+f'/flir.csv', flir_tool_H, delimiter=',') # save thermal cam to flange tool0 transformation
+                    np.savetxt(logdata_dir+f'/torch.csv', torch_tool_H_calib, delimiter=',') # save torch to flange tool0 transformation
                     if fuji_scanon:
                         with open(logdata_dir+layer_name+f'/scan_exe.pickle', 'wb') as file: # save scanning logged data
                             pickle.dump(scan_exe, file)
