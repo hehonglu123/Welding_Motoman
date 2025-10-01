@@ -109,6 +109,19 @@ def get_weld_shift_x(profile_height):
     
     return shift_x
 
+def welding_profile_generate_smooth(feedrate_nom, VPD, cross_section, lam_max):
+    
+    feedrate_nom = int(round(feedrate_nom/10)*10) # round to 10, make sure it is a multiple of 10
+    feedrate_min = feedrate_nom-5
+    feedrate_max = feedrate_nom+5
+    vel_nom = cross_section*inch2mm*feedrate_nom/VPD # get nominal velocity
+    vel_min = cross_section*inch2mm*feedrate_min/VPD
+    vel_max = cross_section*inch2mm*feedrate_max/VPD
+
+    vel_profile = np.linspace(vel_min, vel_max, np.round(lam_max/vel_nom).astype(int)) # velocity profile around nominal velocity
+    feedrate_profile = [feedrate_nom]*len(vel_profile) # feedrate profile is constant
+    return vel_profile, feedrate_profile
+
 def main():
     
     weld_arcon = True
@@ -286,6 +299,9 @@ def main():
     rescan_layer = True # rescan the layer after welding no matter what
     # Fujicam remaining scan time, scan time after welding is done to make sure the robot reach the end point
     fujicam_remaining_scan_time = 0.5
+    # max min torch velocity
+    v_Maximum = 20
+    v_minimum = 0.75
 
     if SIMULATION:
         base_nom_vel = 50 # for speed up
@@ -306,13 +322,19 @@ def main():
         correction_layer_start = 999999999999999 # never correct
     elif control_method == 'data-collection':
         correction_layer_start = 0 # pre-plan all layers
+        layer_feedrate = 100 # inch/min
+        layer_nom_vel = 10*1/np.power(2, 0.75) # mm/s => 1, 1/np.sqrt(2), 1/2, 1/(2*np.sqrt(2)), 1/4, affecting VPD
+        VPD = cross_section*inch2mm*layer_feedrate/layer_nom_vel # volume per distance (mm^3/mm)
+        v_Maximum = 30
+        # feedrate at all layers
+        feedrate_layers = np.arange(feedrate_min,feedrate_max+1,10).astype(int) # inch/min
+        feedrate_layers = feedrate_layers[::-1] # always start from the highest feedrate (highest velocity)
 
-    ### log-log model
-    loglog_model_dir = 'loglog_models'
-    loglogModel = controlLogLogModel(loglog_model_dir)
-    # max min torch velocity
-    v_Maximum = 20
-    v_minimum = 0.75
+    if control_method != 'data-collection':
+        ### log-log model for static or rls
+        ### or for the initial guess for Jacobian learning or openloop
+        loglog_model_dir = 'loglog_models'
+        loglogModel = controlLogLogModel(loglog_model_dir)
     #######################################
 
     ##### welding target parameters #####
@@ -383,17 +405,21 @@ def main():
                     ,'layer_feedrate':layer_feedrate, 'layer_nom_incre':layer_nom_incre, 'layer_nom_vel':float(round(layer_nom_vel,3))\
                     ,'cross_section':cross_section, 'dh_target':float(dh_target), 'dw_target':float(np.mean(dw_target[:,1])), 'lookahead_distance':lookahead_distance,\
                     'v_Maximum':v_Maximum, 'v_minimum':v_minimum, 'weld_type':weld_type,\
-                    'loglog_model_dir':loglog_model_dir, 'control_method':control_method, 'correction_layer_start':correction_layer_start,\
+                    'control_method':control_method, 'correction_layer_start':correction_layer_start,\
                     'rescan_layer':rescan_layer, 'fujicam_remaining_scan_time':fujicam_remaining_scan_time, 'torch_ori_fix':torch_ori_fix, 'torch_ori_fix_direction':torch_ori_fix_direction}
     if control_method == 'learning-Jacobian':
         weld_meta_data['model_dir'] = control_model_dir
         weld_meta_data['alpha_control'] = alpha_control
         weld_meta_data['lambda_smooth'] = lambda_smooth
         weld_meta_data['lambda_disc'] = lambda_disc
+    if control_method == 'data-collection':
+        weld_meta_data['VPD'] = float(round(VPD,3))
+    if control_method != 'data-collection':
+        weld_meta_data['loglog_model_dir'] = loglog_model_dir
     ##############################
 
     ####### simulation setup #####
-    if SIMULATION or not weld_arcon:
+    if SIMULATION:
         sim_folder = '../../data/wall_weld_test/weld_fujicontrol_2025_08_14_11_19_59/'
         total_layers_name = glob.glob(sim_folder+'layer*')
         # get printed layer number
@@ -529,20 +555,25 @@ def main():
                         scan_denoise_thread = Thread(target=scan_process.scan_denoise_thread, args=([-40, 30],[40, 200])) # arges: (crop_min, crop_max)
                         scan_denoise_thread.start()
                     
-                    ### initial velocity
+                    ### initial velocity, feedrate and data-collection velocity feedrate setting
                     if weld_parts == 'base':
                         v_cmd = base_nom_vel
                         feedrate_cmd = base_feedrate
                     else:
-                        current_x = curve[0][0]
-                        next_dw = get_target_dw(current_x, dw_target, lookahead_distance, forward)
-                        if layer_count < correction_layer_start: #
-                            next_dh = dh_target
-                        else:
-                            next_dh = get_target_dh(current_x, last_profile_height, target_layer_height, lookahead_distance, forward)
-                        v_cmd ,feedrate_cmd = loglogModel.get_control_loglog(next_dh,next_dw) # get the velocity and feedrate from the control loglog as the initial
-                        dh_pred, dw_pred = loglogModel.get_pred_loglog(v_cmd, feedrate_cmd) # get the predicted dh and dw from the control loglog
-                        print(f'Initial Torch V: {v_cmd:.2f} mm/s, Feedrate: {feedrate_cmd:.2f} inch/min, dh_pred: {dh_pred:.2f} mm, dw_pred: {dw_pred:.2f} mm')
+                        if control_method not in ['data-collection']:
+                            current_x = curve[0][0]
+                            next_dw = get_target_dw(current_x, dw_target, lookahead_distance, forward)
+                            if layer_count < correction_layer_start: #
+                                next_dh = dh_target
+                            else:
+                                next_dh = get_target_dh(current_x, last_profile_height, target_layer_height, lookahead_distance, forward)
+                            v_cmd ,feedrate_cmd = loglogModel.get_control_loglog(next_dh,next_dw) # get the velocity and feedrate from the control loglog as the initial
+                            dh_pred, dw_pred = loglogModel.get_pred_loglog(v_cmd, feedrate_cmd) # get the predicted dh and dw from the control loglog
+                            print(f'Initial Torch V: {v_cmd:.2f} mm/s, Feedrate: {feedrate_cmd:.2f} inch/min, dh_pred: {dh_pred:.2f} mm, dw_pred: {dw_pred:.2f} mm')
+                        elif control_method == 'data-collection':
+                            vel_profile, feedrate_profile = welding_profile_generate_smooth(feedrate_layers[layer_count], VPD, cross_section, lam_relative[-1])
+                            v_cmd, feedrate_cmd = vel_profile[0], feedrate_profile[0]
+                            print(f'Initial Torch V: {v_cmd:.2f} mm/s, Feedrate: {feedrate_cmd:.2f} inch/min')
                     
                     ### start welding and data logging
                     q_command_all = []
@@ -572,8 +603,8 @@ def main():
                             robot_weld.robot.p_tool = deepcopy(torch_tool_H_origin[:3,3])
                             robot_weld.robot.R_tool = deepcopy(torch_tool_H_origin[:3,:3])
                             ik_time_count.append(time.perf_counter()-ik_start_time)
-                        #
-                        q_cmd=np.hstack((q1,q2,q_pos)) # command joint angles (combined robot 1, robot 2 and positioner)
+                        # command joint angles (combined robot 1, robot 2 and positioner)
+                        q_cmd=np.hstack((q1,q2,q_pos)) 
                         q_command_all.append(q_cmd)
 
                         ### if welding start
@@ -599,7 +630,7 @@ def main():
                                     fronius_client.job_number = int(round(feedrate_cmd/10)+job_offset) # get fronius job number
                                     fronius_client.start_weld() # command to start welding
                                     time.sleep(weld_start_sleep) # welder needs about 0.2s to start welding
-                            welding_cmd_all.append(np.hstack((time.perf_counter(),i,this_curve_p[0],v_cmd,int(round(feedrate_cmd/10)*10))))
+                            welding_cmd_all.append(np.hstack((time.perf_counter(),i,this_curve_p[0],v_cmd,int(round(feedrate_cmd/10)*10), weld_cmd_updated, cmd_update_cnt)))
                             last_update_time=time.perf_counter()
                             last_viz_time=time.perf_counter()
                             cmd_update_cnt += 1
@@ -620,6 +651,11 @@ def main():
                                 elif 'loglog' in control_method:
                                     v_cmd ,feedrate_cmd = loglogModel.get_control_loglog(next_dh,next_dw)
                                     dh_pred, dw_pred = loglogModel.get_pred_loglog(v_cmd, feedrate_cmd)
+                                elif control_method == 'data-collection':
+                                    if cmd_update_cnt % feedrate_update_rate == 0 and cmd_update_cnt//feedrate_update_rate < len(vel_profile):
+                                        # only update once per second for data-collection
+                                        v_cmd = vel_profile[np.min([cmd_update_cnt//feedrate_update_rate, len(vel_profile)-1])]
+                                        feedrate_cmd = feedrate_profile[np.min([cmd_update_cnt//feedrate_update_rate, len(feedrate_profile)-1])]
                                 v_cmd = np.clip(v_cmd, v_minimum, v_Maximum) # clip the velocity
                             if weld_arcon: # update the feedrate command to the welder
                                 fronius_client.async_set_job_number(int(round(feedrate_cmd/10)+job_offset), welder_handler)
