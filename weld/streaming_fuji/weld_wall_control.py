@@ -325,10 +325,21 @@ def main():
         layer_feedrate = 100 # inch/min
         layer_nom_vel = 10*1/np.power(2, 0.75) # mm/s => 1, 1/np.sqrt(2), 1/2, 1/(2*np.sqrt(2)), 1/4, affecting VPD
         VPD = cross_section*inch2mm*layer_feedrate/layer_nom_vel # volume per distance (mm^3/mm)
+        varying_speed_in_layer = True # vary the speed within a layer
         v_Maximum = 30
         # feedrate at all layers
-        feedrate_layers = np.arange(feedrate_min,feedrate_max+1,10).astype(int) # inch/min
-        feedrate_layers = feedrate_layers[::-1] # always start from the highest feedrate (highest velocity)
+        # feedrate_layers = np.arange(feedrate_min,feedrate_max+1,10).astype(int) # inch/min
+        # feedrate_layers = feedrate_layers[::-1] # always start from the highest feedrate (highest velocity)
+        feedrate_layers = np.ones(14)*150
+        # torch orientation of all layers
+        # torch orientation = R(k2,theta2)*R(k1,theta1)*tool_origin_R
+        # where k1 is the travel direction, k2 is perpendicular to k1 and k1 k2 is perpendicular to the tool_origin_R[:,2]
+        torch_ori_theta1 = np.radians([0,0,10,10,20,20,30,30,-10,-10,-20,-20,-30,-30])
+        torch_ori_theta2 = np.zeros_like(torch_ori_theta1)
+        # torch_ori_theta1 = np.zeros_like(torch_ori_theta1)
+        # torch_ori_theta2 = np.radians([0,0,10,10,20,20,30,30,-10,-10,-20,-20,-30,-30])
+        assert len(torch_ori_theta1) == len(feedrate_layers), "Length of torch_ori_theta1 must be equal to length of feedrate_layers"
+        assert len(torch_ori_theta2) == len(feedrate_layers), "Length of torch_ori_theta2 must be equal to length of feedrate_layers"
 
     if control_method != 'data-collection':
         ### log-log model for static or rls
@@ -414,6 +425,9 @@ def main():
         weld_meta_data['lambda_disc'] = lambda_disc
     if control_method == 'data-collection':
         weld_meta_data['VPD'] = float(round(VPD,3))
+        weld_meta_data['feedrate_layers'] = feedrate_layers.tolist()
+        weld_meta_data['torch_ori_theta1'] = torch_ori_theta1.tolist()
+        weld_meta_data['torch_ori_theta2'] = torch_ori_theta2.tolist()
     if control_method != 'data-collection':
         weld_meta_data['loglog_model_dir'] = loglog_model_dir
     ##############################
@@ -571,7 +585,11 @@ def main():
                             dh_pred, dw_pred = loglogModel.get_pred_loglog(v_cmd, feedrate_cmd) # get the predicted dh and dw from the control loglog
                             print(f'Initial Torch V: {v_cmd:.2f} mm/s, Feedrate: {feedrate_cmd:.2f} inch/min, dh_pred: {dh_pred:.2f} mm, dw_pred: {dw_pred:.2f} mm')
                         elif control_method == 'data-collection':
-                            vel_profile, feedrate_profile = welding_profile_generate_smooth(feedrate_layers[layer_count], VPD, cross_section, lam_relative[-1])
+                            if varying_speed_in_layer:
+                                vel_profile, feedrate_profile = welding_profile_generate_smooth(feedrate_layers[layer_count], VPD, cross_section, lam_relative[-1])
+                            else:
+                                feedrate_profile = [feedrate_layers[layer_count]]
+                                vel_profile = [cross_section*inch2mm*feedrate_layers[layer_count]/VPD]
                             v_cmd, feedrate_cmd = vel_profile[0], feedrate_profile[0]
                             print(f'Initial Torch V: {v_cmd:.2f} mm/s, Feedrate: {feedrate_cmd:.2f} inch/min')
                     
@@ -599,6 +617,10 @@ def main():
                             T_weld=robot_weld.fwd(q1)
                             robot_weld.robot.p_tool = deepcopy(torch_tool_H_calib[:3,3])
                             robot_weld.robot.R_tool = deepcopy(torch_tool_H_calib[:3,:3])
+                            ##### reorientation the tool #####
+                            
+                            ##################################
+
                             q1=robot_weld.inv(T_weld.p, T_weld.R, last_joints=q1)[0]
                             robot_weld.robot.p_tool = deepcopy(torch_tool_H_origin[:3,3])
                             robot_weld.robot.R_tool = deepcopy(torch_tool_H_origin[:3,:3])
