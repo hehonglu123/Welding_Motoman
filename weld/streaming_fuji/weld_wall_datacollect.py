@@ -361,11 +361,7 @@ def main():
                     print(f'Velocity Profile: {vel_profile}')
                     print(f'Feedrate Profile: {feedrate_profile}')
 
-                    if input_from_user:
-                        input("Press Enter to continue...")
-                    else:
-                        # time.sleep(1)
-                        pass
+                    input("Press Enter to continue...")
 
                     # move to start point with safety_z_offset
                     for z in np.arange(safety_z_offset,0,-5): # a linear movement
@@ -647,30 +643,6 @@ def main():
                         q_end_offset = np.hstack((curve_js_end_offset, r2_rest_q, q_pos))
                         SS.jog2q(q_end_offset)
 
-                    ################### for debugging ######################
-                    # weld_js_exe = np.array(weld_js_exe)
-                    # #### plot robot torch executed velocity vs v cmd
-                    # weld_relative_exe = []
-                    # for exe_i in range(len(weld_js_exe)):
-                    #     T_tool = robot_weld.fwd(weld_js_exe[exe_i][1:7])
-                    #     T_positioner = positioner.fwd(weld_js_exe[exe_i][-2:])
-                    #     T_tool_positioner = T_positioner.inv() * T_tool
-                    #     weld_relative_exe.append(T_tool_positioner.p)
-                    # weld_relative_exe = np.array(weld_relative_exe)
-                    # weld_relative_v_exe=np.linalg.norm(np.diff(weld_relative_exe,axis=0),2,1)/np.diff(weld_js_exe[:,0])
-                    # weld_relative_v_exe=np.append(weld_relative_v_exe[0],weld_relative_v_exe)
-                    # weld_relative_v_exe=moving_average(weld_relative_v_exe,padding=True)
-                    # weld_relative_v_exe=moving_average(weld_relative_v_exe,padding=True) # velocity in mm/s
-                    # welding_cmd_all = np.array(welding_cmd_all)
-                    # plt.plot(weld_js_exe[:,0],weld_relative_v_exe,label='weld relative exe velocity')
-                    # plt.plot(welding_cmd_all[:,0],welding_cmd_all[:,2],label='weld cmd velocity')
-                    # plt.xlabel('Time (s)')
-                    # plt.ylabel('Velocity (mm/s)')
-                    # plt.title(f'Welding {weld_parts} layer {i} velocity')
-                    # plt.legend()
-                    # plt.grid()
-                    # plt.show()
-
                     ############## save data ######################
                     if not os.path.exists(logdata_dir):
                         os.makedirs(logdata_dir)
@@ -686,7 +658,7 @@ def main():
                     np.savetxt(logdata_dir+layer_name+f'/weld_js_exe.csv', weld_js_exe, delimiter=',') # save welding/scanning logged joint space data
                     np.savetxt(logdata_dir+layer_name+f'/js_cmd.csv', q_cmd_all, delimiter=',') # save welding/scanning commanded joint space data
                     np.savetxt(logdata_dir+layer_name+f'/weld_cmd.csv', welding_cmd_all, delimiter=',') # save welding commands
-                    np.savetxt(logdata_dir+f'fujicam.csv', fuji_tool_H, delimiter=',') # save fujicam to flange tool0 transformation
+                    np.savetxt(logdata_dir+f'/fujicam.csv', fuji_tool_H, delimiter=',') # save fujicam to flange tool0 transformation
                     np.savetxt(logdata_dir+f'/flir.csv', flir_tool_H, delimiter=',') # save thermal cam to flange tool0 transformation
                     np.savetxt(logdata_dir+f'/torch.csv', torch_tool_H_calib, delimiter=',') # save torch to flange tool0 transformation
                     if fuji_scanon:

@@ -1303,6 +1303,7 @@ def main():
             Transz0_H = np.loadtxt(logdata_dir+'Transz0_H.csv',delimiter=',')
         except FileNotFoundError:
             _,Transz0_H = scan_process.pcd2height(deepcopy(pcd_base),-5,bbox_min=crop_h_min,bbox_max=crop_h_max,Transz0_H=None,return_width=False)
+            np.savetxt(logdata_dir+'Transz0_H.csv',Transz0_H,delimiter=',')
         pcd.transform(Transz0_H)
 
         plt.xlabel('Y Position (mm)')

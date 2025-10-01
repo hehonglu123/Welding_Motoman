@@ -277,11 +277,15 @@ def main():
     safety_z_offset = 50
     # direction 
     torch_ori_fix = True # torch orientation fixed
+    torch_ori_fix_direction = 'backward' # 'forward' or 'backward', only used when torch_ori_fix is True
     # lookahead distance
     lookahead_distance = 1 # mm
     # which layer to start correction
     correction_layer_start = 2 # start correction from layer 2, set to a large number if no correction layer
-    # correction_layer_start = 99999999999999 # no correction layer, set to a large number
+    # rescan layer
+    rescan_layer = True # rescan the layer after welding no matter what
+    # Fujicam remaining scan time, scan time after welding is done to make sure the robot reach the end point
+    fujicam_remaining_scan_time = 0.5
 
     if SIMULATION:
         base_nom_vel = 50 # for speed up
@@ -289,8 +293,8 @@ def main():
 
     ##### controller parameters and model #####
     # choose between log-log control or learning model one step Jacobian
-    control_method = 'loglog-static' # 'loglog-static', 'loglog-rls' or 'learning-Jacobian'
-    assert control_method in ['loglog-static', 'loglog-rls', 'learning-Jacobian'], "Invalid control method"
+    control_method = 'loglog-static' # 'loglog-static', 'loglog-rls', 'learning-Jacobian', 'openloop', 'data-collection'
+    assert control_method in ['loglog-static', 'loglog-rls', 'learning-Jacobian', 'openloop', 'data-collection'], "Invalid control method"
     ### Learning model
     if control_method == 'learning-Jacobian':
         control_model_dir = 'model_20250715_151650'
@@ -298,6 +302,11 @@ def main():
         alpha_control = 0.25
         lambda_smooth = 1e-2  # regularization parameter for smoothness
         lambda_disc = 1e-1*5  # regularization parameter for discrete input
+    elif control_method == 'openloop':
+        correction_layer_start = 999999999999999 # never correct
+    elif control_method == 'data-collection':
+        correction_layer_start = 0 # pre-plan all layers
+
     ### log-log model
     loglog_model_dir = 'loglog_models'
     loglogModel = controlLogLogModel(loglog_model_dir)
@@ -336,7 +345,7 @@ def main():
     ##### Log data dir #####
     current_time = datetime.datetime.now()
     formatted_time = current_time.strftime('%Y_%m_%d_%H_%M_%S.%f')[:-7]
-    logdata_dir='../../data/wall_weld_test/weld_fujicontrol_'+formatted_time+'/'
+    logdata_dir='../../data/wall_weld_test/weld_'+formatted_time+'/'
 
     ##### Parameters to chose where to start welding #####
     # start-end layers
@@ -374,7 +383,8 @@ def main():
                     ,'layer_feedrate':layer_feedrate, 'layer_nom_incre':layer_nom_incre, 'layer_nom_vel':float(round(layer_nom_vel,3))\
                     ,'cross_section':cross_section, 'dh_target':float(dh_target), 'dw_target':float(np.mean(dw_target[:,1])), 'lookahead_distance':lookahead_distance,\
                     'v_Maximum':v_Maximum, 'v_minimum':v_minimum, 'weld_type':weld_type,\
-                    'loglog_model_dir':loglog_model_dir, 'control_method':control_method, 'correction_layer_start':correction_layer_start}
+                    'loglog_model_dir':loglog_model_dir, 'control_method':control_method, 'correction_layer_start':correction_layer_start,\
+                    'rescan_layer':rescan_layer, 'fujicam_remaining_scan_time':fujicam_remaining_scan_time, 'torch_ori_fix':torch_ori_fix, 'torch_ori_fix_direction':torch_ori_fix_direction}
     if control_method == 'learning-Jacobian':
         weld_meta_data['model_dir'] = control_model_dir
         weld_meta_data['alpha_control'] = alpha_control
@@ -409,7 +419,6 @@ def main():
     # for weld_parts in ['layer']:
         if weld_parts == 'base':
             weld_start = baselayer_start
-            # weld_start = 1
             weld_end = baselayer_end
             nom_incre = base_nom_incre
         else:
@@ -451,8 +460,7 @@ def main():
             try:
                 if torch_ori_fix:
                     print("Torch Orientation Fixed")
-                    curve_direction = 'backward'
-                    # curve_direction = 'forward'
+                    curve_direction = deepcopy(torch_ori_fix_direction)
                 elif forward:
                     curve_direction = 'forward'
                 else:
@@ -484,7 +492,6 @@ def main():
                     curve_js = curve_js[::-1]
                     curve_js_cam = curve_js_cam[::-1]
                     curve_js_positioner = curve_js_positioner[::-1]
-                
                 
                 if not read_from_file_layer: # actually weld a layer
 
@@ -602,32 +609,34 @@ def main():
                         weld_cmd_updated = False
                         if time.perf_counter()-last_update_time>1./feedrate_update_rate:
                             model_inference_start_time = time.perf_counter()
-                            if weld_parts == 'layer':
+                            # update the welding command, welding velocity and wire feedrate
+                            if weld_parts == 'layer' and layer_count >= correction_layer_start: # only update welding command for layer (not for baselayer)
                                 # update feedrate to welder
-                                current_x = this_curve_p[0]
-                                next_dw = get_target_dw(current_x, dw_target, lookahead_distance, forward)
-                                if layer_count < correction_layer_start:
-                                    next_dh = dh_target
-                                else:
-                                    next_dh = get_target_dh(current_x, last_profile_height, target_layer_height, lookahead_distance, forward)
+                                current_x = this_curve_p[0] # find the current x position
+                                next_dw = get_target_dw(current_x, dw_target, lookahead_distance, forward) # get the next dw target
+                                next_dh = get_target_dh(current_x, last_profile_height, target_layer_height, lookahead_distance, forward)
                                 if control_method == 'learning-Jacobian':
                                     v_cmd, feedrate_cmd, dh_pred, dw_pred = ctrlModel.forward_one_step_get_opt_u(v_cmd, feedrate_cmd, next_dh, next_dw, alpha_control,  lambda_smooth=lambda_smooth, lambda_disc=lambda_disc)
                                 elif 'loglog' in control_method:
                                     v_cmd ,feedrate_cmd = loglogModel.get_control_loglog(next_dh,next_dw)
                                     dh_pred, dw_pred = loglogModel.get_pred_loglog(v_cmd, feedrate_cmd)
                                 v_cmd = np.clip(v_cmd, v_minimum, v_Maximum) # clip the velocity
-                                weld_cmd_updated = True
-                            if weld_arcon:
+                            if weld_arcon: # update the feedrate command to the welder
                                 fronius_client.async_set_job_number(int(round(feedrate_cmd/10)+job_offset), welder_handler)
-                            model_inference_time_count.append(time.perf_counter()-model_inference_start_time)
+                            weld_cmd_updated = True # mark that the welding command is updated
+                            cmd_update_cnt += 1 # weld command update count
+                            model_inference_time_count.append(time.perf_counter()-model_inference_start_time) # log model inference time
                             # log command data
-                            welding_cmd_all.append(np.hstack((time.perf_counter(),i,this_curve_p[0],v_cmd,int(round(feedrate_cmd/10)*10))))
+                            welding_cmd_all.append(np.hstack((time.perf_counter(),i,this_curve_p[0],v_cmd,int(round(feedrate_cmd/10)*10), weld_cmd_updated, cmd_update_cnt)))
                             last_update_time=time.perf_counter()
                             if (time.perf_counter()-last_viz_time)>viz_interval:
                                 print("Current X:", this_curve_p[0], "Update Feedrate, Velocity:",int(round(feedrate_cmd/10)*10),round(v_cmd,1))
                                 last_viz_time=time.perf_counter()
                         if weld_parts == 'layer':
-                            control_status_log.append(np.hstack((time.perf_counter(),this_curve_p[0],v_cmd,int(round(feedrate_cmd/10)*10),next_dh, next_dw, dh_pred, dw_pred, weld_cmd_updated)))
+                            if layer_count >= correction_layer_start:
+                                control_status_log.append(np.hstack((time.perf_counter(),this_curve_p[0],v_cmd,int(round(feedrate_cmd/10)*10),next_dh, next_dw, dh_pred, dw_pred, weld_cmd_updated, cmd_update_cnt)))
+                            else:
+                                control_status_log.append(np.hstack((time.perf_counter(),this_curve_p[0],v_cmd,int(round(feedrate_cmd/10)*10),weld_cmd_updated, cmd_update_cnt, weld_cmd_updated, cmd_update_cnt)))
                         
                         ### log data, line scanner (fujicam), robot welding joints
                         if fuji_scanon:
@@ -668,9 +677,9 @@ def main():
                     arc_off=True # turn the arc off
                     ### log the remaining fujicam data
                     if not SIMULATION:
-                        fuji_scan_time = 0.5 # stay for a while for scanning, and robot to move to the final position
+                        # stay for a while for scanning, and robot to move to the final position
                         fuji_scan_start = time.perf_counter()
-                        while time.perf_counter()-fuji_scan_start<fuji_scan_time:
+                        while time.perf_counter()-fuji_scan_start<fujicam_remaining_scan_time:
                             ### log data
                             if fuji_scanon:
                                 wire_packet=fuji_scan_wire.TryGetInValue() # log fuji cam scanner data
@@ -758,7 +767,7 @@ def main():
                             np.savetxt(sim_folder+'layer'+str(i)+'/control_status_log.csv', control_status_log, delimiter=',')
 
                     # if torch orientation is fixed, and the traveling/curve direction is opposite
-                    if (forward and curve_direction == 'backward') or (not forward and curve_direction == 'forward'):
+                    if (forward and curve_direction == 'backward') or (not forward and curve_direction == 'forward') or rescan_layer:
                         # deal with special case, forward but curve direction is backward
                         # happens if fixed torch orientation
                         scan_layer = int(np.min([i+6/layer_resolution,weld_end-1]))
@@ -850,9 +859,8 @@ def main():
                                 time.sleep(1/stream_rate) # wait for the robot to reach the start point, clean the buffer
                                 
                         ########################################
-                        fuji_scan_time = 0.5 # stay for a while for scanning, and robot to move to the final position
                         fuji_scan_start = time.perf_counter()
-                        while time.perf_counter()-fuji_scan_start<fuji_scan_time:
+                        while time.perf_counter()-fuji_scan_start<fujicam_remaining_scan_time:
                             ### log data
                             if fuji_scanon:
                                 wire_packet=fuji_scan_wire.TryGetInValue() # log fuji cam scanner data
@@ -911,7 +919,7 @@ def main():
                         np.savetxt(logdata_dir+layer_name+f'/weld_js_exe.csv', weld_js_exe, delimiter=',') # save welding/scanning logged joint space data
                         np.savetxt(logdata_dir+layer_name+f'/js_cmd.csv', q_cmd_all, delimiter=',') # save welding/scanning commanded joint space data
                         np.savetxt(logdata_dir+layer_name+f'/weld_cmd.csv', welding_cmd_all, delimiter=',') # save welding commands
-                        np.savetxt(logdata_dir+f'fujicam.csv', fuji_tool_H, delimiter=',') # save fujicam to flange tool0 transformation
+                        np.savetxt(logdata_dir+f'/fujicam.csv', fuji_tool_H, delimiter=',') # save fujicam to flange tool0 transformation
                         np.savetxt(logdata_dir+f'/flir.csv', flir_tool_H, delimiter=',') # save thermal cam to flange tool0 transformation
                         np.savetxt(logdata_dir+f'/torch.csv', torch_tool_H_calib, delimiter=',') # save torch to flange tool0 transformation
                         if layer_count >= correction_layer_start:

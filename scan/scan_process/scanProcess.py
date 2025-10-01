@@ -766,7 +766,6 @@ class ScanProcess():
         mti_pcd=np.delete(mti_pcd,mti_pcd[1]>crop_max[1],axis=1)
         mti_pcd=np.delete(mti_pcd,mti_pcd[0]<crop_min[0],axis=1)
         mti_pcd=np.delete(mti_pcd,mti_pcd[0]>crop_max[0],axis=1)
-        # mti_pcd[0]=-1*mti_pcd[0]
         mti_pcd = mti_pcd.T
 
         # print("mti_pcd shape:",mti_pcd.shape)
