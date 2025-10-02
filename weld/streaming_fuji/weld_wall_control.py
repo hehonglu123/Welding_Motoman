@@ -612,15 +612,27 @@ def main():
                         q2=curve_js_cam[lam_idx-1]*(1-ratio)+curve_js_cam[lam_idx]*ratio # robot 2 joint angles
                         q_pos=curve_js_positioner[lam_idx-1]*(1-ratio)+curve_js_positioner[lam_idx]*ratio # positioner joint angles
                         # for tool offset
-                        if tool_different:
+                        if tool_different or (control_method == 'data-collection' and (torch_ori_theta1[layer_count] != 0 or torch_ori_theta2[layer_count] != 0)):
                             ik_start_time = time.perf_counter()
                             T_weld=robot_weld.fwd(q1)
+                            ##### reorientation the tool #####
+                            if weld_parts == 'layer' and control_method == 'data-collection':
+                                if torch_ori_theta1[layer_count] != 0 or torch_ori_theta2[layer_count] != 0:
+                                    T_pos = positioner.fwd(q_pos, world=True)
+                                    T_weld_pos = T_pos.inv()*T_weld
+                                    kz = T_weld_pos.R[:3,2]
+                                    k1 = curve[lam_idx]-curve[lam_idx-1]
+                                    k1 = k1/np.linalg.norm(k1)
+                                    k2 = np.cross(kz,k1)
+                                    k2 = k2/np.linalg.norm(k2)
+                                    R1 = rot(k1, torch_ori_theta1[layer_count])
+                                    R2 = rot(k2, torch_ori_theta2[layer_count])
+                                    torch_R_new = R2@R1@T_weld_pos.R
+                                    T_weld_pos.R = torch_R_new
+                                    T_weld = T_pos@T_weld_pos
+                            ##################################
                             robot_weld.robot.p_tool = deepcopy(torch_tool_H_calib[:3,3])
                             robot_weld.robot.R_tool = deepcopy(torch_tool_H_calib[:3,:3])
-                            ##### reorientation the tool #####
-                            
-                            ##################################
-
                             q1=robot_weld.inv(T_weld.p, T_weld.R, last_joints=q1)[0]
                             robot_weld.robot.p_tool = deepcopy(torch_tool_H_origin[:3,3])
                             robot_weld.robot.R_tool = deepcopy(torch_tool_H_origin[:3,:3])
@@ -865,7 +877,12 @@ def main():
                             # move to start point
                             q_start = np.hstack((curve_js_scan[0], q2, curve_js_pos_scan[0]))
                             SS.jog2q(q_start)
-                        
+
+                    if weld_parts == 'layer' and control_method == 'data-collection' and not rescan_layer:
+                        if torch_ori_theta1[layer_count] != 0 or torch_ori_theta2[layer_count] != 0:
+                            # reorientation the tool to original if changed
+                            SS.jog2q(np.hstack((curve_js_scan[0], q2, curve_js_pos_scan[0])))
+
                     ####### remain scanning motion ##########################
                     r2_rest_q = q2
                     v_cmd = scan_nom_vel
