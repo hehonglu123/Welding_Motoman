@@ -124,14 +124,18 @@ def welding_profile_generate_smooth(feedrate_nom, VPD, cross_section, lam_max):
 
 def main():
     
-    weld_arcon = False
-    welder_log = False
-    fuji_scanon = False
-    scan_online_process = False
-    thermal_on = False
+    weld_arcon = True
+    welder_log = True
+    fuji_scanon = True
+    scan_online_process = True
+    thermal_on = True
     input_from_user = False
     SIMULATION = False
     simulation_save_control_state_fig = False
+
+    print("Welder:", weld_arcon)
+    print("Fuji scan:", fuji_scanon)
+    print("Thermal cam:", thermal_on)
 
     if SIMULATION:
         weld_arcon = False
@@ -155,7 +159,6 @@ def main():
     #                                [-6.95508436e-04 , 2.91540649e-04 , 9.99999707e-01 , 1.18566260e+03],\
     #                                [ 0.00000000e+00 , 0.00000000e+00 , 0.00000000e+00 , 1.00000000e+00]]) # a place holder, to be replaced by actual calibration
     torch_tool_H_calib = deepcopy(torch_tool_H_origin)
-    # torch_tool_H_calib[3,2] -= 5
     tool_different = True if np.any(torch_tool_H_origin != torch_tool_H_calib) else False
 
     # get fujicam standoff distance
@@ -324,24 +327,32 @@ def main():
     elif control_method == 'data-collection':
         correction_layer_start = 0 # pre-plan all layers
         layer_feedrate = 100 # inch/min
-        layer_nom_vel = 10*1/np.power(2, 0.75) # mm/s => 1, 1/np.sqrt(2), 1/2, 1/(2*np.sqrt(2)), 1/4, affecting VPD
+        layer_nom_vel = 10*1/np.power(2, 1) # mm/s => 1, 1/np.sqrt(2), 1/2, 1/(2*np.sqrt(2)), 1/4, affecting VPD
         VPD = cross_section*inch2mm*layer_feedrate/layer_nom_vel # volume per distance (mm^3/mm)
-        varying_speed_in_layer = True # vary the speed within a layer
+        
+        varying_speed_in_layer = False # vary the speed within a layer
         v_Maximum = 30
         # feedrate at all layers
         # feedrate_layers = np.arange(feedrate_min,feedrate_max+1,10).astype(int) # inch/min
         # feedrate_layers = feedrate_layers[::-1] # always start from the highest feedrate (highest velocity)
-        feedrate_layers = np.ones(12)*150
+        feedrate_layers = np.ones(10)*150
         # torch orientation of all layers
         # torch orientation = R(k2,theta2)*R(k1,theta1)*tool_origin_R
         # where k1 is the travel direction, k2 is perpendicular to k1 and k1 k2 is perpendicular to the tool_origin_R[:,2]
-        torch_ori_theta1 = np.radians([10,10,20,20,30,30,-10,-10,-20,-20,-30,-30])
-        torch_ori_theta2 = np.zeros_like(torch_ori_theta1)
-        # torch_ori_theta2 = np.radians([10,10,20,20,30,30,-10,-10,-20,-20,-30,-30])
-        # torch_ori_theta1 = np.zeros_like(torch_ori_theta2)
+        # torch_ori_theta1 = np.radians([0,0,10,10,-10,-10,20,20,-20,-20,30,30,-30,-30])
+        # torch_ori_theta2 = np.zeros_like(torch_ori_theta1)
+        torch_ori_theta2 = np.radians([0,0,10,10,-10,-10,20,20,-20,-20])
+        torch_ori_theta1 = np.zeros_like(torch_ori_theta2)
         
         assert len(torch_ori_theta1) == len(feedrate_layers), "Length of torch_ori_theta1 must be equal to length of feedrate_layers"
         assert len(torch_ori_theta2) == len(feedrate_layers), "Length of torch_ori_theta2 must be equal to length of feedrate_layers"
+
+        print("Data collection parameters of each layer:")
+        print("layer_nom_vel of the first layer (mm/s):", cross_section*inch2mm*feedrate_layers[0]/VPD)
+        print("feedrate (inch/min):", feedrate_layers)
+        print("torch_ori_theta1 (deg):", np.degrees(torch_ori_theta1))
+        print("torch_ori_theta2 (deg):", np.degrees(torch_ori_theta2))
+
 
     if control_method != 'data-collection':
         ### log-log model for static or rls
@@ -394,8 +405,8 @@ def main():
     last_profile_height = None
     forward = True
     mean_layer_height = 0
-    # weld_parts_all = ['base','layer']
-    weld_parts_all = ['layer']
+    weld_parts_all = ['base','layer']
+    # weld_parts_all = ['layer']
     if read_from_file_layer:
         logdata_dir = '../../data/wall_weld_test/weld_fujicontrol_2025_09_22_17_10_07/'
         Transz0_H = np.loadtxt(logdata_dir+'Transz0_H.csv', delimiter=',') # load the last Transz0_H
@@ -1041,7 +1052,8 @@ def main():
                         np.savetxt(logdata_dir+layer_name+f'/weld_cmd.csv', welding_cmd_all, delimiter=',') # save welding commands
                         np.savetxt(logdata_dir+f'/fujicam.csv', fuji_tool_H, delimiter=',') # save fujicam to flange tool0 transformation
                         np.savetxt(logdata_dir+f'/flir.csv', flir_tool_H, delimiter=',') # save thermal cam to flange tool0 transformation
-                        np.savetxt(logdata_dir+f'/torch.csv', torch_tool_H_calib, delimiter=',') # save torch to flange tool0 transformation
+                        np.savetxt(logdata_dir+f'/torch_calib.csv', torch_tool_H_calib, delimiter=',') # save torch to flange tool0 transformation
+                        np.savetxt(logdata_dir+f'/torch.csv', torch_tool_H_origin, delimiter=',') # save torch to flange tool0 transformation
                         if layer_count >= correction_layer_start:
                             np.savetxt(logdata_dir+layer_name+f'/control_status_log.csv', control_status_log, delimiter=',') # save control status log if controlling
                         if fuji_scanon:
