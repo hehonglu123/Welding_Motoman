@@ -4,10 +4,10 @@ from copy import deepcopy
 import numpy as np
 from scipy.signal import find_peaks
 from scipy.interpolate import CubicSpline, LinearNDInterpolator
-from scipy.io import savemat
+from scipy.io import savemat, loadmat
 from matplotlib import pyplot as plt
 import open3d as o3d
-import cv2 as cv
+import cv2
 from motoman_def import *
 from robotics_utils import *
 from flir_toolbox import *
@@ -89,7 +89,7 @@ tip_wire_model = YOLO(os.path.dirname(inspect.getfile(flir_toolbox))+"/tip_wire.
 def main():
 
     test_current = False
-    test_thermal = True
+    test_thermal = False
     test_thermal_collected = False
     test_pcd = False
     test_geometry = False
@@ -100,6 +100,7 @@ def main():
     reverse_thermal_pixel_trace = False
     viz_line_scan = False
     save_2D_thermal_map = False
+    get_melt_pool = True
 
     ############## Robot definition ##############
     config_dir='../../config/'
@@ -115,12 +116,17 @@ def main():
     
     ############## choose data directory ##############
     data_dir = '../../data/wall_weld_test/'
+    
+    # logdata_dir_name = 'weld_fujiscan_2025_06_11_17_16_48/'
+    # last_layer_n = 320
+    # layer_n = 345
     logdata_dir_name = 'weld_fujiscan_2025_06_11_18_14_56/'
-    logdata_dir = data_dir+logdata_dir_name
+    last_layer_n = 345
+    layer_n = 0
+    
 
     ##### layer, basic infos ####
-    last_layer_n = 19
-    layer_n = 0
+    logdata_dir = data_dir+logdata_dir_name
     layer_name = 'layer'+str(layer_n)
     # layer_name = 'baselayer1'
     last_layer_name = 'layer'+str(last_layer_n)
@@ -340,15 +346,16 @@ def main():
             window_z_pixel = int(last_mean_height/cam_pixel_moving_ratio)
             flame_centroid_estimate = np.mean(thermal_centroid_record[-10:], axis=0).astype(int)
             ir_image_roi = ir_image[max(0,flame_centroid_estimate[1]-5):min(img_height,flame_centroid_estimate[1]+window_z_pixel+3), \
-                                    max(0,flame_centroid_estimate[0]-window_x_pixel):min(img_width,flame_centroid_estimate[0]+window_x_pixel)]
+                                    max(0,flame_centroid_estimate[0]-window_x_pixel):min(img_width,flame_centroid_estimate[0]+window_x_pixel+1)]
             # show it in x z coordinate
             plt.clf()
             # plt.imshow(np.log10(ir_image), cmap='hot', aspect='equal', extent=[-40, 40, -min(img_height,flame_centroid_estimate[1]+ir_pixel_window_size//2)+flame_centroid_estimate[1], min(window_z_pixel, flame_centroid_estimate[1])])
-            plt.imshow(np.log10(ir_image), cmap='hot', aspect='equal')
+            # plt.imshow(np.log10(ir_image_roi), cmap='hot', aspect='equal')
+            plt.imshow(ir_image_roi, cmap='hot', aspect='equal')
             plt.xlabel('X (mm)')
             plt.ylabel('Z (mm)')
-            # plt.xticks(plt.xticks()[0], (plt.xticks()[0]*cam_pixel_moving_ratio).astype(int))
-            # plt.yticks(plt.yticks()[0], (plt.yticks()[0]*cam_pixel_moving_ratio).astype(int))
+            plt.xticks(plt.xticks()[0], (plt.xticks()[0]*cam_pixel_moving_ratio).astype(int))
+            plt.yticks(plt.yticks()[0], (plt.yticks()[0]*cam_pixel_moving_ratio).astype(int))
             plt.colorbar(label='Log10 Pixel Value (Counts)', format='%.2f')
             plt.pause(0.000001)
         
@@ -1493,6 +1500,82 @@ def main():
                     # save to .mat files
                     savemat(this_layer_dir+'thermal_map.mat', {'thermal_matrix_list': thermal_matrix_list, 'thermal_info_list': thermal_info_list, 'ImageColumn2dxmm': cam_pixel_moving_ratio, 'ImageRow2dzmm': cam_pixel_moving_ratio})
 
+    ###### get meltpool size #####
+    if get_melt_pool:
+        thermal_map = loadmat(this_layer_dir+'thermal_map.mat')
+        thermal_matrix_list = thermal_map['thermal_matrix_list']
+        thermal_info_list = thermal_map['thermal_info_list']
+
+        mid_id = len(thermal_matrix_list)//2
+
+        for ir_id in range(len(thermal_matrix_list)):
+            ir_image = thermal_matrix_list[ir_id]
+            flame_pix_x = int(thermal_info_list[ir_id,4])
+            flame_pix_y = int(thermal_info_list[ir_id,5])
+
+            # get image of interest
+            flame_upper = 10
+            flame_lower = 4
+            flame_left = 1
+            flame_right = 20
+            ir_image_roi = ir_image[flame_pix_y-flame_upper:flame_pix_y+flame_lower+1, flame_pix_x-flame_left:flame_pix_x+flame_right+1]
+
+            # # plot the ir image and mark the flame pixel location
+            # plt.clf()
+            # plt.imshow(ir_image_roi, cmap='hot')
+            # plt.colorbar()
+            # plt.scatter(flame_left, flame_upper, c='blue', s=5)
+            # plt.title('IR Image with Flame Pixel Location')
+            # plt.xlabel('Pixel X')
+            # plt.ylabel('Pixel Y')
+            # plt.show()
+
+            # Smooth a bit to suppress sensor noise
+            # blur = cv2.GaussianBlur(ir_image_roi.astype(np.float32), (3,3), 0)
+            blur = ir_image_roi.astype(np.float32)
+
+            # ---- Gradient magnitude (Sobel) ----
+            grad_x = cv2.Sobel(blur, cv2.CV_32F, 1, 0, ksize=3)
+            grad_y = cv2.Sobel(blur, cv2.CV_32F, 0, 1, ksize=3)
+            grad_mag = cv2.magnitude(grad_x, grad_y)
+
+            # ---- Normalize gradient just for thresholding ----
+            gmin, gmax = np.min(grad_mag), np.max(grad_mag)
+            grad_norm = (grad_mag - gmin) / (gmax - gmin + 1e-6)
+            _, grad_norm_masked = cv2.threshold(grad_norm, 0.6, 1.0, cv2.THRESH_TOZERO)
+
+            # ---- for grad_norm_masked, any index smaller than x=5 and y=10 is set to 0 ----
+            grad_norm_masked[:10,:5] = 0
+
+            # ---- Threshold on relative gradient strength ----
+            # (you can tune 0.3 ~ 0.5 depending on sharpness)
+            # edges = (grad_norm > 0.6).astype(np.uint8)
+            edges = (grad_norm_masked > 0.0).astype(np.uint8)
+
+            # ---- Contour detection ----
+            contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            if not contours:
+                print("No contours found!")
+                continue
+            contour = max(contours, key=cv2.contourArea)
+
+            # Scale to 0–255 only for visualization
+            vis = (ir_image_roi - np.min(ir_image_roi))/(np.max(ir_image_roi) - np.min(ir_image_roi)) * 255
+            vis = vis.astype(np.uint8)
+            vis = cv2.cvtColor(vis, cv2.COLOR_GRAY2BGR)
+            cv2.drawContours(vis, [contour], -1, (0,255,0), 1)
+
+            plt.clf()
+            plt.subplot(1,4,1)
+            plt.imshow(blur, cmap='hot')
+            plt.subplot(1,4,2)
+            plt.imshow(grad_mag, cmap='gray')
+            plt.subplot(1,4,3)
+            plt.imshow(grad_norm_masked, cmap='gray')
+            plt.subplot(1,4,4)  
+            plt.imshow(vis[:,:,::-1])
+            plt.title("Weld Pool Edge (High-Res Gradient)")
+            plt.pause(0.001)
 
 if __name__ == "__main__":
     
