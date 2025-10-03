@@ -122,7 +122,7 @@ def main():
     # layer_n = 345
     logdata_dir_name = 'weld_fujiscan_2025_06_11_18_14_56/'
     last_layer_n = 345
-    layer_n = 0
+    layer_n = 33 # 0 33
     
 
     ##### layer, basic infos ####
