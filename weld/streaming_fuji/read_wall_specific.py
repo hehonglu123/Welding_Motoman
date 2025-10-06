@@ -117,12 +117,18 @@ def main():
     ############## choose data directory ##############
     data_dir = '../../data/wall_weld_test/'
     
-    # logdata_dir_name = 'weld_fujiscan_2025_06_11_17_16_48/'
-    # last_layer_n = 320
-    # layer_n = 345
-    logdata_dir_name = 'weld_fujiscan_2025_06_11_18_14_56/'
-    last_layer_n = 345
-    layer_n = 33 # 0 33
+    #### for weld pool extraction test ####
+    logdata_dir_name = 'weld_fujiscan_2025_06_11_17_16_48/'
+    last_layer_n = 320
+    layer_n = 345
+    # logdata_dir_name = 'weld_fujiscan_2025_06_11_18_14_56/'
+    # last_layer_n = 345
+    # layer_n = 0 # 0 33
+    #####################
+
+    # logdata_dir_name = 'weld_2025_10_03_18_49_52/'
+    # last_layer_n = 345
+    # layer_n = 171 # 0 33
     
 
     ##### layer, basic infos ####
@@ -1508,6 +1514,8 @@ def main():
 
         mid_id = len(thermal_matrix_list)//2
 
+        press_enter_start = True
+
         for ir_id in range(len(thermal_matrix_list)):
             ir_image = thermal_matrix_list[ir_id]
             flame_pix_x = int(thermal_info_list[ir_id,4])
@@ -1515,8 +1523,8 @@ def main():
 
             # get image of interest
             flame_upper = 10
-            flame_lower = 4
-            flame_left = 1
+            flame_lower = 9
+            flame_left = 10
             flame_right = 20
             ir_image_roi = ir_image[flame_pix_y-flame_upper:flame_pix_y+flame_lower+1, flame_pix_x-flame_left:flame_pix_x+flame_right+1]
 
@@ -1565,17 +1573,38 @@ def main():
             vis = cv2.cvtColor(vis, cv2.COLOR_GRAY2BGR)
             cv2.drawContours(vis, [contour], -1, (0,255,0), 1)
 
+            # threshold the original image to get the area above T
+            _, thermal_thresh = cv2.threshold(blur, 10000, 255, cv2.THRESH_BINARY)
+
+            # or operation between thermal_thresh grad_norm_masked
+            # thermal_thresh = (thermal_thresh > 0).astype(np.uint8)
+            # thermal_grad = cv2.bitwise_or(thermal_thresh, grad_norm_masked.astype(np.uint8))
+            _, grad_masked_thresh = cv2.threshold(grad_norm_masked, 0.1, 255, cv2.THRESH_BINARY)
+            combined_thermal_grad = thermal_thresh.astype(np.uint32) + grad_masked_thresh.astype(np.uint32)
+
+            flame_marker_size = 12
             plt.clf()
-            plt.subplot(1,4,1)
+            plt.subplot(2,2,1)
             plt.imshow(blur, cmap='hot')
-            plt.subplot(1,4,2)
-            plt.imshow(grad_mag, cmap='gray')
-            plt.subplot(1,4,3)
+            plt.scatter(flame_left, flame_upper, c='blue', s=flame_marker_size)
+            plt.subplot(2,2,2)
+            # plt.imshow(grad_mag, cmap='gray')
             plt.imshow(grad_norm_masked, cmap='gray')
-            plt.subplot(1,4,4)  
-            plt.imshow(vis[:,:,::-1])
-            plt.title("Weld Pool Edge (High-Res Gradient)")
+            plt.scatter(flame_left, flame_upper, c='blue', s=flame_marker_size)
+            plt.subplot(2,2,3)
+            # plt.imshow(grad_norm_masked, cmap='gray')
+            plt.imshow(thermal_thresh, cmap='gray')
+            plt.scatter(flame_left, flame_upper, c='blue', s=flame_marker_size)
+            plt.subplot(2,2,4)  
+            # plt.imshow(vis[:,:,::-1])
+            plt.imshow(combined_thermal_grad, cmap='gray')
+            plt.scatter(flame_left, flame_upper, c='blue', s=flame_marker_size)
+
+            plt.suptitle("Weld Pool Edge (High-Res Gradient)")
             plt.pause(0.001)
+            if press_enter_start:
+                input("Press Enter to continue...")
+                press_enter_start = False
 
 if __name__ == "__main__":
     

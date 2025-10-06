@@ -86,10 +86,10 @@ def main():
     ################## Read geometry data ##################
     data_dir = '../../data/wall_weld_test/'
 
-    run_thermal = True
-    run_thermal2mat = True
+    run_thermal = False
+    run_thermal2mat = False
     run_geometry = True
-    run_compile = True
+    run_compile = False
 
     # logdata_dir_all = ['weld_fujiscan_2025_02_26_18_08_18/', 'weld_fujiscan_2025_02_26_16_24_21/', 'weld_fujiscan_2025_02_26_17_39_17/']
     # logdata_dir_all = ['weld_fujiscan_2025_02_26_16_24_21/', 'weld_fujiscan_2025_02_26_18_08_18/', 'weld_fujiscan_2025_02_26_17_39_17/']
@@ -106,7 +106,7 @@ def main():
     #                    'weld_fujiscan_2025_06_12_16_59_09/','weld_fujiscan_2025_06_12_15_33_03/','weld_fujiscan_2025_06_12_15_03_27/',\
     #                    'weld_fujiscan_2025_07_09_14_52_42/','weld_fujiscan_2025_07_09_15_21_35/','weld_fujiscan_2025_07_09_16_16_40/']
     # logdata_dir_all = ['weld_fujiscan_2025_07_09_14_52_42/','weld_fujiscan_2025_07_09_15_21_35/','weld_fujiscan_2025_07_09_16_16_40/']
-    logdata_dir_all = ['weld_fujicontrol_2025_08_14_12_04_14/']
+    logdata_dir_all = ['weld_2025_10_03_18_49_52/']
     # logdata_dir_all= ['weld_fujicontrol_2025_08_13_14_17_58/', 'weld_fujicontrol_2025_08_13_14_57_52/']
     # logdata_dir_all= ['weld_fujicontrol_2025_08_13_14_17_58/', 'weld_fujicontrol_2025_08_13_14_57_52/','weld_fujicontrol_2025_08_14_11_19_59/']
     
@@ -596,8 +596,8 @@ def main():
                         # z_height_start = 0
                         # print(z_height_start)
                         # print(curve_y)
-                        crop_extend_x=20
-                        crop_extend_z=20
+                        crop_extend_x=10
+                        crop_extend_z=10
                         crop_min=(curve_x_end-crop_extend_x,curve_y-30,-30)
                         crop_max=(curve_x_start+crop_extend_x,curve_y+30,z_height_start+crop_extend_z)
                         crop_h_min=(curve_x_end-crop_extend_x,curve_y-20,-30)
