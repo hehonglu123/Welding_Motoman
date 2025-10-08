@@ -91,7 +91,7 @@ def main():
     test_current = False
     test_thermal = False
     test_thermal_collected = False
-    test_pcd = False
+    test_pcd = True
     test_geometry = False
     test_weld_shift = False
     get_statistics = False
@@ -100,7 +100,7 @@ def main():
     reverse_thermal_pixel_trace = False
     viz_line_scan = False
     save_2D_thermal_map = False
-    get_melt_pool = True
+    get_melt_pool = False
 
     ############## Robot definition ##############
     config_dir='../../config/'
@@ -118,17 +118,17 @@ def main():
     data_dir = '../../data/wall_weld_test/'
     
     #### for weld pool extraction test ####
-    logdata_dir_name = 'weld_fujiscan_2025_06_11_17_16_48/'
-    last_layer_n = 320
-    layer_n = 345
-    # logdata_dir_name = 'weld_fujiscan_2025_06_11_18_14_56/'
-    # last_layer_n = 345
-    # layer_n = 0 # 0 33
+    # logdata_dir_name = 'weld_2025_10_08_15_27_02/'
+    # last_layer_n = 320
+    # layer_n = 1
+    # # logdata_dir_name = 'weld_fujiscan_2025_06_11_18_14_56/'
+    # # last_layer_n = 345
+    # # layer_n = 0 # 0 33
     #####################
 
-    # logdata_dir_name = 'weld_2025_10_03_18_49_52/'
-    # last_layer_n = 345
-    # layer_n = 171 # 0 33
+    logdata_dir_name = 'weld_2025_10_08_18_00_23/'
+    last_layer_n = 345
+    layer_n = 16 # 0 33
     
 
     ##### layer, basic infos ####
@@ -140,6 +140,7 @@ def main():
     last_layer_dir = logdata_dir+last_layer_name+'/'
     curve = np.loadtxt(data_dir+f'curve_sliced_relative/slice{layer_n}_0.csv',delimiter=',')
     rob_js_exe = np.loadtxt(this_layer_dir+'weld_js_exe.csv',delimiter=',')
+    scan_js_exe = deepcopy(rob_js_exe)[:,[0,1,2,3,4,5,6,13,14]] # scan js exe
     rob2_js_exe = rob_js_exe[:,7:13] # robot 2 js exe
     robot_stamps = rob_js_exe[:,0] # robot stamps
     try:
@@ -600,8 +601,31 @@ def main():
     ###### test pcd and profile height width ####
     if test_pcd:
         scan_process = ScanProcess(robot_scan,positioner)
-        pcd = o3d.io.read_point_cloud(this_layer_dir+'pcd.pcd')
+        # pcd = o3d.io.read_point_cloud(this_layer_dir+'pcd.pcd')
+        
+        with open(this_layer_dir+'scan_exe.pickle', 'rb') as f:
+            scan_exe = pickle.load(f)
+        try:
+            with open(this_layer_dir+'scan_exe_noise_remove.pickle', 'rb') as f:
+                scan_exe_noise_remove = pickle.load(f)
+        except:
+            print("No denoised scan found, Run the denoising process first.")
+            scan_exe_noise_remove = []
+            for scan in scan_exe:
+                scan_noise_remove = scan_process.scan2dDenoise(deepcopy(scan).T,crop_min=[-40,30],crop_max=[40,200])
+                scan_exe_noise_remove.append(scan_noise_remove)
+            print("Denoising completed.")
+            # with open(this_layer_dir+'scan_exe_noise_remove.pickle', 'wb') as f:
+            #     pickle.dump(scan_exe_noise_remove, f)
+        pcd_denoise = scan_process.pcd_register_mti(scan_exe_noise_remove,scan_js_exe[:,1:],robot_stamps,flip=True,scanner='fuji')
+        visualize_pcd([pcd_denoise])
+        pcd = scan_process.pcd_register_mti(scan_exe,scan_js_exe[:,1:],robot_stamps,flip=True,scanner='fuji')
         visualize_pcd([pcd])
+        pcd_3d_denoise = scan_process.pcd_noise_remove(pcd,outlier_remove=False,nb_neighbors=40,std_ratio=1.5,\
+                                                        crop_flag=False,cluster_based_outlier_remove=True,cluster_neighbor=1,min_points=100)
+        visualize_pcd([pcd_3d_denoise])
+
+
         pcd_denoise = o3d.io.read_point_cloud(this_layer_dir+'pcd_denoise.pcd')
         pcd_base_denoise = o3d.io.read_point_cloud(logdata_dir+'baselayer0/'+'pcd_denoise.pcd')
         last_profile_height = np.loadtxt(last_layer_dir+'profile_height.csv',delimiter=',')

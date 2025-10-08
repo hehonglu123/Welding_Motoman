@@ -124,11 +124,11 @@ def welding_profile_generate_smooth(feedrate_nom, VPD, cross_section, lam_max):
 
 def main():
     
-    weld_arcon = True
-    welder_log = True
-    fuji_scanon = True
-    scan_online_process = True
-    thermal_on = True
+    weld_arcon = False
+    welder_log = False
+    fuji_scanon = False
+    scan_online_process = False
+    thermal_on = False
     input_from_user = False
     SIMULATION = False
     simulation_save_control_state_fig = False
@@ -278,7 +278,7 @@ def main():
         tune_ratio = 1.5
         layer_feedrate = tune_ratio*100
         layer_nom_vel = tune_ratio*10*1/2 # mm/s => 1, 1/np.sqrt(2), 1/2, 1/(2*np.sqrt(2)), 1/4, affecting VPD
-        layer_nom_height = 3 # mm
+        layer_nom_height = 1.75 # mm
         layer_nom_incre = int(layer_nom_height/layer_resolution)
         # wire cross section
         cross_section = 1.14 # mm^2
@@ -298,14 +298,16 @@ def main():
     # lookahead distance
     lookahead_distance = 1 # mm
     # which layer to start correction
-    correction_layer_start = 2 # start correction from layer 2, set to a large number if no correction layer
+    correction_layer_start = 2 # start correction from layer n, set to a large number if no correction layer
     # rescan layer
-    rescan_layer = True # rescan the layer after welding no matter what
+    rescan_layer = False # rescan the layer after welding no matter what
     # Fujicam remaining scan time, scan time after welding is done to make sure the robot reach the end point
     fujicam_remaining_scan_time = 0.5
     # max min torch velocity
     v_Maximum = 20
     v_minimum = 0.75
+    # update height using nominal increments
+    use_nominal_incre = True
 
     if SIMULATION:
         base_nom_vel = 50 # for speed up
@@ -335,13 +337,15 @@ def main():
         # feedrate at all layers
         # feedrate_layers = np.arange(feedrate_min,feedrate_max+1,10).astype(int) # inch/min
         # feedrate_layers = feedrate_layers[::-1] # always start from the highest feedrate (highest velocity)
-        feedrate_layers = np.ones(10)*150
+        # feedrate_layers = np.ones(10)*150
+        feedrate_layers = np.array([250,250,200,200,150,150,100,100,50,50])
         # torch orientation of all layers
         # torch orientation = R(k2,theta2)*R(k1,theta1)*tool_origin_R
         # where k1 is the travel direction, k2 is perpendicular to k1 and k1 k2 is perpendicular to the tool_origin_R[:,2]
         # torch_ori_theta1 = np.radians([0,0,10,10,-10,-10,20,20,-20,-20,30,30,-30,-30])
         # torch_ori_theta2 = np.zeros_like(torch_ori_theta1)
-        torch_ori_theta2 = np.radians([0,0,10,10,-10,-10,20,20,-20,-20])
+        # torch_ori_theta2 = np.radians([0,0,10,10,-10,-10,20,20,-20,-20])
+        torch_ori_theta2 = np.zeros_like(feedrate_layers)
         torch_ori_theta1 = np.zeros_like(torch_ori_theta2)
         
         assert len(torch_ori_theta1) == len(feedrate_layers), "Length of torch_ori_theta1 must be equal to length of feedrate_layers"
@@ -354,13 +358,16 @@ def main():
         print("torch_ori_theta2 (deg):", np.degrees(torch_ori_theta2))
 
 
-    if control_method != 'data-collection':
+    try:
         ### log-log model for static or rls
         ### or for the initial guess for Jacobian learning or openloop
         loglog_model_dir = 'loglog_models'
         loglogModel = controlLogLogModel(loglog_model_dir)
         #######################################
+    except:
+        print("No log-log model found, please train the log-log model first if needed.")
 
+    if control_method != 'data-collection':
         ##### welding target parameters #####
         curve = np.loadtxt(data_dir+f'curve_sliced_relative/slice0_0.csv',delimiter=',')
         curve_x_start = np.min(curve[:,0])
@@ -483,8 +490,14 @@ def main():
             weld_end = layer_end
             nom_incre = layer_nom_incre
             if weld_arcon:
-                base_layer_height = np.loadtxt(logdata_dir+'baselayer1/profile_height.csv', delimiter=',')
-                shift_weld_profile_x = 0 if base_layer_height is None else get_weld_shift_x(base_layer_height)
+                try:
+                    base_layer_height = np.loadtxt(logdata_dir+'baselayer1/profile_height.csv', delimiter=',')
+                    shift_weld_profile_x = 0 if base_layer_height is None else get_weld_shift_x(base_layer_height)
+                except Exception as e:
+                    print("Error occurred while calculating the weld profile shift:", e)
+                    print("Failed to calculate the weld profile shift, set to 0")
+                    input("Press Enter to continue...")
+                    shift_weld_profile_x = 0
             else:
                 shift_weld_profile_x = 0
             print("Shift Weld Profile X:", shift_weld_profile_x)
@@ -637,6 +650,8 @@ def main():
                             v_cmd ,feedrate_cmd = loglogModel.get_control_loglog(next_dh,next_dw) # get the velocity and feedrate from the control loglog as the initial
                             dh_pred, dw_pred = loglogModel.get_pred_loglog(v_cmd, feedrate_cmd) # get the predicted dh and dw from the control loglog
                             print(f'Initial Torch V: {v_cmd:.2f} mm/s, Feedrate: {feedrate_cmd:.2f} inch/min, dh_pred: {dh_pred:.2f} mm, dw_pred: {dw_pred:.2f} mm')
+                            nom_incre = max(int(np.ceil(dh_pred/layer_resolution)), 1) if weld_parts == 'layer' else base_nom_incre
+                            print("Nominal Increment for this layer:", nom_incre)
                         else: # data-collection
                             if varying_speed_in_layer:
                                 vel_profile, feedrate_profile = welding_profile_generate_smooth(feedrate_layers[layer_count], VPD, cross_section, lam_relative[-1])
@@ -646,6 +661,10 @@ def main():
                             v_cmd, feedrate_cmd = vel_profile[0], feedrate_profile[0]
                             next_dh, next_dw, dh_pred, dw_pred = 0, 0, 0, 0
                             print(f'Initial Torch V: {v_cmd:.2f} mm/s, Feedrate: {feedrate_cmd:.2f} inch/min')
+
+                            dh_pred_test, dw_pred_test = loglogModel.get_pred_loglog(v_cmd, feedrate_cmd) # get the predicted dh and dw from the control loglog
+                            nom_incre = max(int(np.ceil(dh_pred_test/layer_resolution)), 1) if weld_parts == 'layer' else base_nom_incre
+                            print("Nominal Increment for this layer:", nom_incre)
                     
                     ### start welding and data logging
                     q_command_all = []
@@ -768,7 +787,7 @@ def main():
                         if fuji_scanon:
                             wire_packet=fuji_scan_wire.TryGetInValue() # log fuji cam scanner data
                             valid_indices=np.where(wire_packet[1].I_data>1)[0]
-                            valid_indices=np.intersect1d(valid_indices,np.where(np.abs(wire_packet[1].Z_data)>50)[0])
+                            valid_indices=np.intersect1d(valid_indices,np.where(np.abs(wire_packet[1].Z_data)>10)[0])
                             line_profile=np.hstack((wire_packet[1].Y_data[valid_indices].reshape(-1,1),wire_packet[1].Z_data[valid_indices].reshape(-1,1)))
                             scan_exe.append(line_profile)
                         weld_js_exe.append(np.append(time.perf_counter(),deepcopy(SS.q_cur))) if not SIMULATION else None # log timestamp and robot joints
@@ -810,7 +829,7 @@ def main():
                             if fuji_scanon:
                                 wire_packet=fuji_scan_wire.TryGetInValue() # log fuji cam scanner data
                                 valid_indices=np.where(wire_packet[1].I_data>1)[0]
-                                valid_indices=np.intersect1d(valid_indices,np.where(np.abs(wire_packet[1].Z_data)>30)[0])
+                                valid_indices=np.intersect1d(valid_indices,np.where(np.abs(wire_packet[1].Z_data)>10)[0])
                                 line_profile=np.hstack((wire_packet[1].Y_data[valid_indices].reshape(-1,1),wire_packet[1].Z_data[valid_indices].reshape(-1,1)))
                                 scan_exe.append(line_profile)
                             weld_js_exe.append(np.append(time.perf_counter(),deepcopy(SS.q_cur))) if not SIMULATION else None # log robot joints
@@ -970,7 +989,7 @@ def main():
                             if fuji_scanon:
                                 wire_packet=fuji_scan_wire.TryGetInValue() # log fuji cam scanner data
                                 valid_indices=np.where(wire_packet[1].I_data>1)[0]
-                                valid_indices=np.intersect1d(valid_indices,np.where(np.abs(wire_packet[1].Z_data)>50)[0])
+                                valid_indices=np.intersect1d(valid_indices,np.where(np.abs(wire_packet[1].Z_data)>10)[0])
                                 line_profile=np.hstack((wire_packet[1].Y_data[valid_indices].reshape(-1,1),wire_packet[1].Z_data[valid_indices].reshape(-1,1)))
                                 scan_exe.append(line_profile)
                             weld_js_exe.append(np.append(time.perf_counter(),deepcopy(SS.q_cur))) if not SIMULATION else None # log robot joints
@@ -996,7 +1015,7 @@ def main():
                             if fuji_scanon:
                                 wire_packet=fuji_scan_wire.TryGetInValue() # log fuji cam scanner data
                                 valid_indices=np.where(wire_packet[1].I_data>1)[0]
-                                valid_indices=np.intersect1d(valid_indices,np.where(np.abs(wire_packet[1].Z_data)>30)[0])
+                                valid_indices=np.intersect1d(valid_indices,np.where(np.abs(wire_packet[1].Z_data)>10)[0])
                                 line_profile=np.hstack((wire_packet[1].Y_data[valid_indices].reshape(-1,1),wire_packet[1].Z_data[valid_indices].reshape(-1,1)))
                                 scan_exe.append(line_profile)
                             weld_js_exe.append(np.append(time.perf_counter(),deepcopy(SS.q_cur))) if not SIMULATION else None # log robot joints
@@ -1077,7 +1096,12 @@ def main():
 
                 # assert len(stamps_exe) == len(scan_exe), f'Length of stamps_exe {len(stamps_exe)} and scan_exe {len(scan_exe)} do not match!'
                 ################### get layer increments ############################
-                if weld_arcon:
+                if use_nominal_incre:
+                    i = i + nom_incre
+                    if fuji_scanon:
+                        with open(logdata_dir+layer_name+f'/scan_exe_noise_remove.pickle', 'wb') as f:
+                            pickle.dump(scan_exe_noise_remove, f)
+                elif weld_arcon:
                     weld_js_exe = np.array(weld_js_exe)
                     stamps_exe = deepcopy(weld_js_exe[:,0])
                 # if True:
