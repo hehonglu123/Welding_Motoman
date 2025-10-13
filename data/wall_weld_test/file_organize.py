@@ -52,7 +52,7 @@ def rename_run_dir(old: Path, new_str: str) -> Path:
     if not m:
         print(f"No timestamp found in '{old.name}', keeping name.")
         return old
-    new_name = f"{m.group(1)}_SSWL0_{new_str}"
+    new_name = f"{m.group(1)}_WL0SS_{new_str}"
     new_path = old.with_name(new_name)
     if new_path.exists():
         print(f"Target '{new_path}' exists, keeping original name.")
