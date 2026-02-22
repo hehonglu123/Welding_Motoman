@@ -399,7 +399,7 @@ if __name__ == "__main__":
                 train_data_batch_len.append(len(interp_data))
     
     print(f'Min length of the data: {np.min(train_data_batch_len)}, max length of the data: {np.max(train_data_batch_len)}')
-    exit()
+    # exit()
     # total amount of data
     print("Total amount of data: ", len(data_dirs))
     print("Total amount of data batch: ", np.sum(train_data_batch_len))

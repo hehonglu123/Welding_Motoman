@@ -456,3 +456,6 @@ weld/streaming_fuji/weld_Seq_models/thermal_width_test_err_table.csv
 weld/streaming_fuji/weld_Seq_models/thermal_width_train_err_table.csv
 
 data/casing_scaled/*
+data/sine_wave/static/slicing.yml
+data/sine_wave/static
+data/blade0.8/NX_slice2
