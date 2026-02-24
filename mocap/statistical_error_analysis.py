@@ -176,20 +176,27 @@ def plot_error_distributions(errors):
 
 def main():
 
-    robot_type = 'R1'
+    robot_type = 'R2'
 
     test_data_dir = 'kinematic_raw_data/test0801_R1/' if robot_type == 'R1' else 'kinematic_raw_data/test0804_R2/'
+    PH_data_dir = 'PH_grad_data/test0801_R1/train_data_' if robot_type == 'R1' else 'PH_grad_data/test0804_R2/train_data_'
 
     # Set the path to your pickle file
     pickle_file = test_data_dir+"test_error_pos.pickle"  # Update this path
+
+    train_pickle_file = PH_data_dir+"train_error_pos.pickle"  # Update this path
     
     # Load errors
     errors = load_errors(pickle_file)
     if errors is None:
         return
+    
+    train_errors = load_errors(train_pickle_file)
+    if train_errors is None:
+        return
 
-    T_error_fbf = np.loadtxt(test_data_dir + "error_T_FBF.csv")
-    T_error_cpa = np.loadtxt(test_data_dir + "error_T_CPA.csv")
+    T_error_fbf = np.loadtxt(test_data_dir + "error_T_FBF.csv",delimiter=',')
+    T_error_cpa = np.loadtxt(test_data_dir + "error_T_CPA.csv",delimiter=',')
 
     plt.plot(np.linalg.norm(T_error_cpa[1736:,:3],axis=1), '-o', label='CPA')
     plt.plot(np.linalg.norm(T_error_fbf[1736:,:3],axis=1), '-o', label='FBF')
@@ -208,12 +215,130 @@ def main():
     # remove old keys
     del errors['Zero PH']
     del errors['One PH']
-    del errors['Fourier Basis PH']
+    # del errors['Fourier Basis PH']
 
     plt.plot(errors['CPA'], '-o', label='CPA')
     plt.plot(errors['FBF'], '-o', label='FBF')
     plt.legend()
     plt.show()
+
+    mocap_T = np.loadtxt(test_data_dir + "mocap_T_align.csv", delimiter=',')
+    mocap_T_train = np.loadtxt(PH_data_dir + "mocap_T_align.csv", delimiter=',')
+
+    ##### train error plot
+    # plot error distribution in x y plane
+    all_errors = []
+    for method in ['Nominal','CPA','Fourier Basis PH']:
+        print(f"Processing method: {method}")
+        print(len(train_errors[method]),len(mocap_T_train))
+        assert len(train_errors[method]) == len(mocap_T_train), f"Error: Length mismatch for {method} and mocap_T"
+        print(train_errors[method][0])
+        if method != 'One PH':
+            all_errors.extend(train_errors[method])
+    all_errors = np.array(all_errors)
+    max_error = np.max(np.abs(all_errors))
+    min_error = np.min(np.abs(all_errors))
+
+    diff_error = max_error - min_error
+    start_idx = 0
+    end_idx = len(mocap_T_train)
+
+    skip_idx = 2
+    total_length = len(mocap_T_train[start_idx:end_idx, 0][::skip_idx])
+    marker_size = 150
+
+    fig, ax = plt.subplots(figsize=(10, 5))
+    # Color bar Normalization
+    norm = colors.Normalize(vmin=min_error, vmax=min_error + diff_error)
+    cmap = plt.get_cmap('inferno')
+    sm = cm.ScalarMappable(norm=norm, cmap=cmap)
+    sm.set_array(np.array([]))
+
+    ax.grid()
+    nominal_errors_sortid = np.argsort(np.abs(train_errors['Nominal'][start_idx:end_idx][::skip_idx]))[::-1]
+    nominal_errors = np.abs(train_errors['Nominal'][start_idx:end_idx][::skip_idx])
+    cpa_errors_sortid = np.argsort(np.abs(train_errors['CPA'][start_idx:end_idx][::skip_idx])[::-1])[::-1]
+    cpa_errors = np.abs(train_errors['CPA'][start_idx:end_idx][::skip_idx])
+    fbf_errors_sortid = np.argsort(np.abs(train_errors['Fourier Basis PH'][start_idx:end_idx][::skip_idx]))[::-1]
+    fbf_errors = np.abs(train_errors['Fourier Basis PH'][start_idx:end_idx][::skip_idx])
+    ax.scatter(mocap_T_train[start_idx:end_idx, 0][::skip_idx][nominal_errors_sortid], np.ones(total_length)*2.1,c=nominal_errors[nominal_errors_sortid], cmap=cmap, norm=norm, label='Nominal', s=marker_size)
+    ax.scatter(mocap_T_train[start_idx:end_idx, 0][::skip_idx][cpa_errors_sortid], np.ones(total_length)*1.1,c=cpa_errors[cpa_errors_sortid], cmap=cmap, norm=norm, label='CPA', s=marker_size)
+    ax.scatter(mocap_T_train[start_idx:end_idx, 0][::skip_idx][fbf_errors_sortid], np.ones(total_length)*0.1,c=fbf_errors[fbf_errors_sortid], cmap=cmap, norm=norm, label='FBF', s=marker_size)
+    # Proper colorbar using ScalarMappable
+    cbar = plt.colorbar(sm, ax=ax,pad=0.02)
+    cbar.set_label('Error (mm)', fontsize=xy_label_size)         # Title font size
+    cbar.ax.tick_params(labelsize=xy_tick_size)
+    # Plot aesthetics
+    if robot_type == 'R1':
+        ax.set_title('MA2010 (R1) Train Error at Different Configurations (X Position)', fontsize=title_size)
+    else:
+        ax.set_title('MA1440 (R2) Train Error at Different Configurations (X Position)', fontsize=title_size)
+    ax.set_xlabel('X Position (mm)', fontsize=xy_label_size)
+    # ax.set_ylabel('Methods', fontsize=xy_label_size)
+    ax.set_ylim(-2, 2.5)
+    ax.set_yticks([0, 1, 2], ['CDC', 'CPA', 'Nominal'], fontsize=xy_label_size)
+    ax.tick_params(axis='both', which='major', labelsize=xy_tick_size)
+    ax.tick_params(axis='y', labelrotation=35)
+    plt.tight_layout()
+    plt.show()
+
+    ##### test error plot
+    # plot error distribution in x y plane
+    all_errors = []
+    for method in ['Nominal','CPA','Fourier Basis PH']:
+        print(f"Processing method: {method}")
+        assert len(errors[method]) == len(mocap_T), f"Error: Length mismatch for {method} and mocap_T"
+        print(errors[method][0])
+        if method != 'One PH':
+            all_errors.extend(errors[method])
+    all_errors = np.array(all_errors)
+    max_error = np.max(np.abs(all_errors))
+    min_error = np.min(np.abs(all_errors))
+    diff_error = max_error - min_error
+
+    start_idx = 610
+    end_idx = 1000
+
+    skip_idx = 2
+    total_length = len(mocap_T[start_idx:end_idx, 0][::skip_idx])
+    marker_size = 150
+
+    fig, ax = plt.subplots(figsize=(10, 5))
+    # Color bar Normalization
+    norm = colors.Normalize(vmin=min_error, vmax=min_error + diff_error)
+    cmap = plt.get_cmap('inferno')
+    sm = cm.ScalarMappable(norm=norm, cmap=cmap)
+    sm.set_array(np.array([]))
+
+    ax.grid()
+    nominal_errors = np.abs(errors['Nominal'][start_idx:end_idx][::skip_idx])
+    cpa_errors = np.abs(errors['CPA'][start_idx:end_idx][::skip_idx])
+    fbf_errors = np.abs(errors['Fourier Basis PH'][start_idx:end_idx][::skip_idx])
+    # plt.scatter(mocap_T[start_idx:end_idx, 0][::skip_idx],mocap_T[start_idx:end_idx, 1][::skip_idx]+20, c=nominal_errors, cmap=cmap, norm=norm, label='Nominal')
+    # plt.scatter(mocap_T[start_idx:end_idx, 0][::skip_idx], mocap_T[start_idx:end_idx, 1][::skip_idx]+10, c=cpa_errors, cmap=cmap, norm=norm, label='CPA')
+    # plt.scatter(mocap_T[start_idx:end_idx, 0][::skip_idx], mocap_T[start_idx:end_idx, 1][::skip_idx], c=fbf_errors, cmap=cmap, norm=norm, label='FBF')
+    ax.scatter(mocap_T[start_idx:end_idx, 0][::skip_idx], np.ones(total_length)*2.1,c=nominal_errors, cmap=cmap, norm=norm, label='Nominal', s=marker_size)
+    ax.scatter(mocap_T[start_idx:end_idx, 0][::skip_idx], np.ones(total_length)*1.1,c=cpa_errors, cmap=cmap, norm=norm, label='CPA', s=marker_size)
+    ax.scatter(mocap_T[start_idx:end_idx, 0][::skip_idx], np.ones(total_length)*0.1,c=fbf_errors, cmap=cmap, norm=norm, label='FBF', s=marker_size)
+    # Proper colorbar using ScalarMappable
+    cbar = plt.colorbar(sm, ax=ax,pad=0.02)
+    cbar.set_label('Error (mm)', fontsize=xy_label_size)         # Title font size
+    cbar.ax.tick_params(labelsize=xy_tick_size)
+    # Plot aesthetics
+    if robot_type == 'R1':
+        ax.set_title('MA2010 (R1) Error at Different Configurations (X Position)', fontsize=title_size)
+    else:
+        ax.set_title('MA1440 (R2) Error at Different Configurations (X Position)', fontsize=title_size)
+    ax.set_xlabel('X Position (mm)', fontsize=xy_label_size)
+    # ax.set_ylabel('Methods', fontsize=xy_label_size)
+    ax.set_ylim(-2, 2.5)
+    ax.set_yticks([0, 1, 2], ['FBF', 'CPA', 'Nominal'], fontsize=xy_label_size)
+    ax.tick_params(axis='both', which='major', labelsize=xy_tick_size)
+    ax.tick_params(axis='y', labelrotation=35)
+    plt.tight_layout()
+    plt.show()
+
+    exit()
 
     methods_one_set = ['Nominal', 'CPA', 'NLS-0', 'NLS-1']
     methods_config_set = ['FBF', 'NN', 'AE']
@@ -270,19 +395,7 @@ def main():
     # Plot error distributions
     # plot_error_distributions(errors)
 
-    # plot error distribution in x y plane
-    mocap_T = np.loadtxt(test_data_dir + "mocap_T_align.csv", delimiter=',')
-    all_errors = []
-    for method in errors.keys():
-        print(f"Processing method: {method}")
-        assert len(errors[method]) == len(mocap_T), f"Error: Length mismatch for {method} and mocap_T"
-        print(errors[method][0])
-        if method != 'One PH':
-            all_errors.extend(errors[method])
-    all_errors = np.array(all_errors)
-    max_error = np.max(np.abs(all_errors))
-    min_error = np.min(np.abs(all_errors))
-    diff_error = max_error - min_error
+    
 
     ## draw mocap T position in 3D plots
     fig = plt.figure(figsize=(10, 5))
@@ -294,47 +407,7 @@ def main():
     ax.set_title('Mocap T Position in 3D Space')
     plt.show()
 
-    start_idx = 610
-    end_idx = 1000
-
-    skip_idx = 2
-    total_length = len(mocap_T[start_idx:end_idx, 0][::skip_idx])
-    marker_size = 150
-
-    fig, ax = plt.subplots(figsize=(10, 5))
-    # Color bar Normalization
-    norm = colors.Normalize(vmin=min_error, vmax=min_error + diff_error)
-    cmap = plt.get_cmap('inferno')
-    sm = cm.ScalarMappable(norm=norm, cmap=cmap)
-    sm.set_array(np.array([]))
-
-    ax.grid()
-    nominal_errors = np.abs(errors['Nominal'][start_idx:end_idx][::skip_idx])
-    cpa_errors = np.abs(errors['CPA'][start_idx:end_idx][::skip_idx])
-    fbf_errors = np.abs(errors['Fourier Basis PH'][start_idx:end_idx][::skip_idx])
-    # plt.scatter(mocap_T[start_idx:end_idx, 0][::skip_idx],mocap_T[start_idx:end_idx, 1][::skip_idx]+20, c=nominal_errors, cmap=cmap, norm=norm, label='Nominal')
-    # plt.scatter(mocap_T[start_idx:end_idx, 0][::skip_idx], mocap_T[start_idx:end_idx, 1][::skip_idx]+10, c=cpa_errors, cmap=cmap, norm=norm, label='CPA')
-    # plt.scatter(mocap_T[start_idx:end_idx, 0][::skip_idx], mocap_T[start_idx:end_idx, 1][::skip_idx], c=fbf_errors, cmap=cmap, norm=norm, label='FBF')
-    ax.scatter(mocap_T[start_idx:end_idx, 0][::skip_idx], np.ones(total_length)*2.1,c=nominal_errors, cmap=cmap, norm=norm, label='Nominal', s=marker_size)
-    ax.scatter(mocap_T[start_idx:end_idx, 0][::skip_idx], np.ones(total_length)*1.1,c=cpa_errors, cmap=cmap, norm=norm, label='CPA', s=marker_size)
-    ax.scatter(mocap_T[start_idx:end_idx, 0][::skip_idx], np.ones(total_length)*0.1,c=fbf_errors, cmap=cmap, norm=norm, label='FBF', s=marker_size)
-    # Proper colorbar using ScalarMappable
-    cbar = plt.colorbar(sm, ax=ax,pad=0.02)
-    cbar.set_label('Error (mm)', fontsize=xy_label_size)         # Title font size
-    cbar.ax.tick_params(labelsize=xy_tick_size)
-    # Plot aesthetics
-    if robot_type == 'R1':
-        ax.set_title('MA2010 (R1) Error at Different Configurations (X Position)', fontsize=title_size)
-    else:
-        ax.set_title('MA1440 (R2) Error at Different Configurations (X Position)', fontsize=title_size)
-    ax.set_xlabel('X Position (mm)', fontsize=xy_label_size)
-    # ax.set_ylabel('Methods', fontsize=xy_label_size)
-    ax.set_ylim(-2, 2.5)
-    ax.set_yticks([0, 1, 2], ['FBF', 'CPA', 'Nominal'], fontsize=xy_label_size)
-    ax.tick_params(axis='both', which='major', labelsize=xy_tick_size)
-    ax.tick_params(axis='y', labelrotation=35)
-    plt.tight_layout()
-    plt.show()
+    
 
     
 if __name__ == "__main__":

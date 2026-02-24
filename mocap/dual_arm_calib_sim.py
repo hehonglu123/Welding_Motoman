@@ -18,6 +18,13 @@ Rx=np.array([1,0,0])
 Ry=np.array([0,1,0])
 Rz=np.array([0,0,1])
 
+# for plotting
+xy_label_size = 14
+xy_tick_size = 12
+legend_size = 12
+title_size = 16
+sup_title_size = 18
+
 def PH_to_frame(P: np.ndarray, H: np.ndarray, tool: Transform, frame: Transform):
 
     # convert joint axis direction to the inertial frame
@@ -159,15 +166,15 @@ def main():
         param_ph1_gt[jN1*2:] = np.radians(np.random.normal(0.03,0.05,jN1*2)) # th_i, phi_i of robot1, radians
         # param_ph2_gt[:jN1*2] = np.random.uniform(-0.5,0.5,jN2*2) # vi, wi of robot2, mm
         param_ph2_gt[:jN2*2] = np.random.normal(0.4,0.1,jN2*2) # vi, wi of robot2, mm
-        #param_ph2_gt[jN1*2:] = np.radians(np.random.uniform(-0.025,0.025,jN2*2)) # th_i, phi_i of robot2, radians
+        # param_ph2_gt[jN1*2:] = np.radians(np.random.uniform(-0.025,0.025,jN2*2)) # th_i, phi_i of robot2, radians
         param_ph2_gt[jN2*2:] = np.radians(np.random.normal(0.03,0.05,jN2*2)) # th_i, phi_i of robot2, radians
 
         # param_t1_gt[:3] = np.random.uniform(-1,1,3) # tool dp of robot1, mm
         param_t1_gt[:3] = np.random.normal(0.5,0.1,3) # tool dp of robot1, mm
-        # param_t1_gt[3:] = np.radians(np.random.uniform(-0.05,0.05,3)) # tool dR of robot1, radians
-        param_t1_gt[3:] = np.radians(np.random.normal(0.5,0.3,3))
+        param_t1_gt[3:] = np.radians(np.random.uniform(-0.05,0.05,3)) # tool dR of robot1, radians
+        # param_t1_gt[3:] = np.radians(np.random.normal(0.5,0.3,3))
         #param_t2_gt[:3] = np.random.uniform(-1,1,3) # tool dp of robot2, mm
-        #param_t2_gt[3:] = np.radians(np.random.uniform(-0.05,0.05,3)) # tool dR of robot2, radians
+        # param_t2_gt[3:] = np.radians(np.random.uniform(-0.05,0.05,3)) # tool dR of robot2, radians
         param_t2_gt[:3] = np.random.normal(0.5,0.1,3) # tool dp of robot2, mm
         param_t2_gt[3:] = np.radians(np.random.normal(0.5,0.3,3)) # tool dR of robot2, radians
 
@@ -203,8 +210,8 @@ def main():
             t1_gt = robot1_gt.fwd(q1)
             t2_gt = robot2_gt.fwd(q2)
             t1_t2_gt = t2_gt.inv() * t1_gt
-            # if np.any(t1_t2_gt.p < t1_t2_lower_limit_p) or np.any(t1_t2_gt.p > t1_t2_upper_limit_p):
-            #     continue
+            if np.any(t1_t2_gt.p < t1_t2_lower_limit_p) or np.any(t1_t2_gt.p > t1_t2_upper_limit_p):
+                continue
             print("data #:", len(data_joints))
             # get ground truth T and joints
             data_joints.append(np.concatenate((q1, q2)))
@@ -360,10 +367,12 @@ def main():
     total_H2 = 2*jN2 # total number of H parameters to be estimated. robot 2
     total_tool_p = 3 # total number of tool p parameters to be estimated, for 1 robot
     total_tool_R = 3 # total number of tool R parameters to be estimated, for 1 robot
-    max_iteration = 100
+    max_iteration = 80
     
     pos_error_norm_progress = []
     ori_error_norm_progress = []
+    pos_error_norm_std_progress = []
+    ori_error_norm_std_progress = []
     param_p1_error_progress = []
     param_h1_error_progress = []
     param_p2_error_progress = []
@@ -417,6 +426,8 @@ def main():
         J_ana = np.array(J_ana)
         pos_error_norm_progress.append(np.mean(error_pos))
         ori_error_norm_progress.append(np.mean(error_ori))
+        pos_error_norm_std_progress.append(np.std(error_pos))
+        ori_error_norm_std_progress.append(np.std(error_ori))
         param_p1_error_progress.append(param_ph1[:jN1*2]-param_ph1_gt[:jN1*2])
         param_h1_error_progress.append(param_ph1[jN1*2:]-param_ph1_gt[jN1*2:])
         param_p2_error_progress.append(param_ph2[:jN2*2]-param_ph2_gt[:jN2*2])
@@ -426,7 +437,7 @@ def main():
         param_t2p_error_progress.append(robot2.robot.p_tool-robot2_gt.robot.p_tool)
         param_t2R_error_progress.append(R2rpy(robot2.robot.R_tool@robot2_gt.robot.R_tool.T))
 
-        print("position error, orientation error:", np.mean(error_pos), np.degrees(np.mean(error_ori)))
+        print("position error, orientation error:", np.mean(error_pos), np.mean(np.degrees(error_ori)))
         # update PH using QP
         # parameters: param_ph1, param_t1, param_ph2, param_t2
         G = J_ana
@@ -456,6 +467,26 @@ def main():
         param_t2 = param_t2 - alpha*dparam[:total_tool_p+total_tool_R]
         dparam = dparam[total_tool_p+total_tool_R:]
         print("dparam:", dparam)
+
+    # position error
+    plt.errorbar(np.arange(0,len(pos_error_norm_progress)),pos_error_norm_progress,pos_error_norm_std_progress)
+    plt.xlabel('Iteration', fontsize=xy_label_size)
+    plt.ylabel('Position Error Norm (mm)', fontsize=xy_label_size)
+    plt.xticks(fontsize=xy_tick_size)
+    plt.yticks(fontsize=xy_tick_size)
+    plt.title('Mean/SD of Relative Position Error Norm', fontsize=title_size)
+    # plt.tight_layout()
+    plt.show()
+
+    # position error
+    plt.errorbar(np.arange(0,len(ori_error_norm_progress)),np.degrees(ori_error_norm_progress),np.degrees(ori_error_norm_std_progress))
+    plt.xlabel('Iteration', fontsize=xy_label_size)
+    plt.ylabel('Orientation Error Norm (deg)', fontsize=xy_label_size)
+    plt.xticks(fontsize=xy_tick_size)
+    plt.yticks(fontsize=xy_tick_size)
+    plt.title('Mean/SD of Relative Orientation Error Norm', fontsize=title_size)
+    # plt.tight_layout()
+    plt.show()
 
     # plot error progress in a 2x3 grid
     fig, axs = plt.subplots(2, 3, figsize=(15, 10))

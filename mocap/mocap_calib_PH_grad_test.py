@@ -30,7 +30,7 @@ Rz=np.array([0,0,1])
 
 config_dir='../config/'
 
-robot_type = 'R1'
+robot_type = 'R2'
 
 if robot_type == 'R1':
     ph_dataset_date='0801'
@@ -100,8 +100,8 @@ test_mocap_T = np.loadtxt(test_data_dir+'mocap_T_align.csv',delimiter=',')
 
 train_robot_q = np.loadtxt(PH_data_dir+'robot_q_align.csv',delimiter=',')
 train_mocap_T = np.loadtxt(PH_data_dir+'mocap_T_align.csv',delimiter=',')
-train_robot_q = train_robot_q[:2]
-train_mocap_T = train_mocap_T[:2]
+train_robot_q = train_robot_q
+train_mocap_T = train_mocap_T
 
 ##### calibrate base xyz only
 all_train_errors = []
